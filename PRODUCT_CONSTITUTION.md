@@ -282,6 +282,26 @@ Novelty should never take precedence over long-term operational quality.
 
 ⸻
 
+Principle 21 — StageFlow Owns Workflow, Not Data
+
+StageFlow is responsible for orchestrating production workflows rather than replacing systems that already own conference information.
+
+Examples of systems that remain authoritative include:
+
+* scheduling platforms
+* speaker management systems
+* livestream platforms
+* publication platforms
+* conference APIs
+
+StageFlow synchronizes with these systems through well-defined integration adapters.
+
+The platform should avoid becoming the source of truth for information that is more appropriately owned elsewhere.
+
+This separation allows StageFlow to remain event-agnostic, adaptable, and reusable across conferences of all sizes.
+
+⸻
+
 Constitutional Test
 
 Every proposed feature should satisfy the following questions:
