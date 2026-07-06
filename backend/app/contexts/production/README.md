@@ -36,6 +36,16 @@ ED-0009 adds foundational production finding contracts only.
 
 Findings are the first human-reviewable reasoning artifacts. A finding says what StageFlow found that may deserve attention, but it does not decide whether the finding is correct. Verification follows in ED-0010.
 
+## Verification Protocol
+
+ED-0010 adds foundational production verification protocol contracts only.
+
+Verification decisions record append-only judgment about findings. Verification does not mutate findings, does not create finding status, and does not produce operational products.
+
+## Operational Products
+
+Operational products come after verification. Verification decisions may later inform session windows, clips, alerts, incidents, metadata records, or package tasks, but ED-0010 creates none of those.
+
 ## Continuous Recording Blocks
 
 Real event production often records long stage blocks rather than one file per scheduled session. A `RecordingBlock` represents one continuous stage recording period, such as a morning block or afternoon block.

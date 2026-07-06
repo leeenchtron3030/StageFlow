@@ -30,6 +30,7 @@ This manifest documents the StageFlow repository structure, repository-level fil
 | `backend/app/contexts/production/hypothesis/` | Production hypothesis contract package. | ED-0008 | Backend-only hypothesis primitives; no proposals, verification, or action behavior. |
 | `backend/app/contexts/production/observation/` | Production observation contract package. | ED-0006 | Backend-only observation primitives; no reasoning or detection logic. |
 | `backend/app/contexts/production/timeline/` | Production timeline contract package. | ED-0005 | Backend-only continuous recording and session window primitives. |
+| `backend/app/contexts/production/verification/` | Production verification protocol package. | ED-0010 | Backend-only append-only judgment records; no workflow or operational product behavior. |
 | `backend/app/contexts/publishing/` | Publishing & Analytics context package boundary. | ED-0002 | Empty package boundary. |
 | `backend/app/contexts/rendering/` | Media Rendering context package boundary. | ED-0002 | Empty package boundary. |
 | `backend/app/contexts/simulation/` | Simulation context package boundary. | ED-0002 | Empty package boundary. |
@@ -147,6 +148,14 @@ This manifest documents the StageFlow repository structure, repository-level fil
 | `backend/app/contexts/production/timeline/session_window.py` | Session window contract. | ED-0005 | Connects schedule reference to verified or proposed media range. |
 | `backend/app/contexts/production/timeline/timeline_position.py` | Timeline position contract. | ED-0005 | Offset within a recording block. |
 | `backend/app/contexts/production/timeline/timeline_range.py` | Timeline range contract. | ED-0005 | Span within one recording block. |
+| `backend/app/contexts/production/verification/__init__.py` | Production verification package exports. | ED-0010 | Exports verification protocol contracts. |
+| `backend/app/contexts/production/verification/verification_action.py` | Verification action categories. | ED-0010 | Judgment action values; not workflow states. |
+| `backend/app/contexts/production/verification/verification_actor.py` | Verification actor contract. | ED-0010 | References decision actor IDs without user/auth behavior. |
+| `backend/app/contexts/production/verification/verification_adjustment.py` | Verification adjustment contract. | ED-0010 | Describes adjustments without applying them. |
+| `backend/app/contexts/production/verification/verification_decision.py` | Verification decision contract. | ED-0010 | Immutable judgment record referencing a finding ID. |
+| `backend/app/contexts/production/verification/verification_note.py` | Verification note contract. | ED-0010 | Explanatory note attached to a decision. |
+| `backend/app/contexts/production/verification/verification_reason.py` | Verification reason categories. | ED-0010 | Provider-agnostic reason values. |
+| `backend/app/contexts/production/verification/verification_summary.py` | Verification summary contract. | ED-0010 | Summarizes decision history without final policy. |
 | `backend/app/shared/domain_events/domain_event.py` | Base domain event contract. | ED-0004 | Generic event ID, type, timestamp, correlation, actor, and metadata. |
 | `backend/app/shared/errors/errors.py` | Structured error contracts. | ED-0004 | Generic error categories only. |
 | `backend/app/shared/ids/correlation_id.py` | Correlation ID contract. | ED-0004 | Generic UUID-compatible workflow tracing ID. |
@@ -161,6 +170,7 @@ This manifest documents the StageFlow repository structure, repository-level fil
 | `backend/tests/test_production_hypothesis_contracts.py` | Production hypothesis contract tests. | ED-0008 | Covers hypothesis primitives and boundary rules. |
 | `backend/tests/test_production_observation_contracts.py` | Production observation contract tests. | ED-0006 | Covers observation primitives and boundary rules. |
 | `backend/tests/test_production_timeline_contracts.py` | Production timeline contract tests. | ED-0005 | Tests are placed under `backend/tests/` per existing convention. |
+| `backend/tests/test_production_verification_contracts.py` | Production verification contract tests. | ED-0010 | Covers append-only verification primitives and boundary rules. |
 | `backend/tests/test_shared_contracts.py` | Shared contract tests. | ED-0004 | Covers backend contract primitives. |
 
 ## Frontend Files
