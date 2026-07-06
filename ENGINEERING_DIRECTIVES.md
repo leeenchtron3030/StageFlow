@@ -18,6 +18,7 @@ Engineering Directives are the implementation authority for StageFlow. Each dire
 | ED-0008 | Production Hypothesis Foundation | Approved / Implemented | Establishes backend-only Production Context hypothesis contracts for possible interpretations of evidence without proposals, verification, session-window generation, persistence, APIs, or provider-specific behavior. |
 | ED-0009 | Production Finding Foundation | Approved / Implemented | Establishes backend-only Production Context finding contracts as the first human-reviewable reasoning artifacts without verification workflows, operational products, persistence, APIs, or frontend behavior. |
 | ED-0010 | Verification Protocol Foundation | Approved / Implemented | Establishes backend-only Production Context append-only verification decision contracts for judgments about findings without workflows, operational products, persistence, APIs, or frontend behavior. |
+| ED-0011 | Operational Product Foundation | Approved / Implemented | Establishes backend-only Production Context operational product contracts as the generic execution-layer boundary without specialized product implementations, persistence, APIs, queues, workers, or frontend behavior. |
 
 ## Process
 
