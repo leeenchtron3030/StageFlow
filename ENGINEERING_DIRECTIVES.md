@@ -13,6 +13,7 @@ Engineering Directives are the implementation authority for StageFlow. Each dire
 | ED-0003 | Frontend Foundation | Approved / Implemented | Establishes the Next.js frontend foundation, workflow-oriented package boundaries, design tokens, theme foundation, and minimal application shell without backend communication or business logic. |
 | ED-0004 | Shared Contracts Foundation | Approved / Implemented | Establishes generic backend and frontend shared contracts for identifiers, correlation, results, errors, time, clocks, time ranges, and base domain events without business behavior. |
 | ED-0005 | Production Timeline Foundation | Approved / Implemented | Establishes backend-only Production Context timeline contracts for recording blocks, timeline positions and ranges, schedule references, and session windows without ingestion, persistence, APIs, or media file logic. |
+| ED-0006 | Production Observation Foundation | Approved / Implemented | Establishes backend-only Production Context observation contracts for generic timestamped observations on recording timelines without reasoning, detection, persistence, APIs, or provider-specific behavior. |
 
 ## Process
 
