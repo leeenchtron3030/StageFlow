@@ -1,1 +1,1 @@
-"""Production context package."""
+"""Production bounded context package."""
