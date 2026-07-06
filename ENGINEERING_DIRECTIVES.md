@@ -10,7 +10,7 @@ Engineering Directives are the implementation authority for StageFlow. Each dire
 | --- | --- | --- | --- |
 | ED-0001 | Repository Governance & Skeleton | Approved / Implemented | Establishes repository-level governance files and skeleton directories without application code. |
 | ED-0002 | Backend Foundation | Approved / Implemented | Establishes the Python FastAPI backend foundation, package boundaries, health endpoint, and baseline quality tooling without domain behavior. |
-| ED-0003 | Frontend Foundation | Reserved | Reserved for future frontend foundation work. |
+| ED-0003 | Frontend Foundation | Approved / Implemented | Establishes the Next.js frontend foundation, workflow-oriented package boundaries, design tokens, theme foundation, and minimal application shell without backend communication or business logic. |
 | ED-0004 | Development Tooling | Reserved | Reserved for future development tooling work. |
 | ED-0005 | Production Context Foundation | Reserved | Reserved for future Production Context foundation work. |
 
