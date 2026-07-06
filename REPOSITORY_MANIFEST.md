@@ -33,13 +33,13 @@ This manifest documents the StageFlow repository structure, repository-level fil
 | `backend/app/core/health/` | Minimal health response support. | ED-0002 | No dependency checks. |
 | `backend/app/core/lifecycle/` | FastAPI lifecycle hook. | ED-0002 | No external resource initialization. |
 | `backend/app/core/logging/` | Minimal logging setup. | ED-0002 | Standard logging only. |
-| `backend/app/shared/` | Domain-neutral shared primitives package root. | ED-0002 | Package boundaries only. |
-| `backend/app/shared/domain_events/` | Reserved domain event primitives package. | ED-0002 | No event behavior. |
-| `backend/app/shared/errors/` | Reserved shared errors package. | ED-0002 | No error primitives yet. |
-| `backend/app/shared/ids/` | Reserved shared identifiers package. | ED-0002 | No ID primitives yet. |
-| `backend/app/shared/result/` | Reserved shared result package. | ED-0002 | No result primitives yet. |
-| `backend/app/shared/time/` | Reserved shared time package. | ED-0002 | No time helpers yet. |
-| `backend/tests/` | Backend test suite. | ED-0002 | Contains minimal health endpoint coverage. |
+| `backend/app/shared/` | Domain-neutral shared primitives package root. | ED-0002 / ED-0004 | ED-0004 populates generic shared contracts. |
+| `backend/app/shared/domain_events/` | Base domain event contract package. | ED-0004 | Contains only generic event primitives. |
+| `backend/app/shared/errors/` | Structured shared error package. | ED-0004 | Contains generic error categories only. |
+| `backend/app/shared/ids/` | Shared identifier package. | ED-0004 | Contains generic entity and correlation IDs only. |
+| `backend/app/shared/result/` | Shared result package. | ED-0004 | Contains explicit success/failure result contract. |
+| `backend/app/shared/time/` | Shared time package. | ED-0004 | Contains clocks, timestamp alias, and time range. |
+| `backend/tests/` | Backend test suite. | ED-0002 / ED-0004 | Contains health endpoint and shared contract coverage. |
 | `docs/` | Canonical and supporting architecture documentation. | Existing architecture work | Preserved by ED-0001. |
 | `examples/` | Future examples that demonstrate approved implementation patterns. | ED-0001 | No application examples are created by ED-0001. |
 | `frontend/` | Next.js frontend workspace. | ED-0003 | Contains no backend communication or business logic in ED-0003. |
@@ -49,7 +49,12 @@ This manifest documents the StageFlow repository structure, repository-level fil
 | `frontend/src/core/` | Frontend application-wide foundations. | ED-0003 | Reserved for future providers and configuration. |
 | `frontend/src/layouts/` | Reusable layout package. | ED-0003 | Reserved for future workflow layouts. |
 | `frontend/src/routes/` | Route metadata and route support package. | ED-0003 | No additional routes in ED-0003. |
-| `frontend/src/shared/` | Shared frontend utilities package. | ED-0003 | Reserved for future shared primitives. |
+| `frontend/src/shared/` | Shared frontend utilities and contract package. | ED-0003 / ED-0004 | ED-0004 populates generic shared contracts. |
+| `frontend/src/shared/domain-events/` | Frontend base domain event contract package. | ED-0004 | Contains only generic event types. |
+| `frontend/src/shared/errors/` | Frontend structured error package. | ED-0004 | Contains generic error categories only. |
+| `frontend/src/shared/ids/` | Frontend shared identifier package. | ED-0004 | Contains generic entity and correlation IDs only. |
+| `frontend/src/shared/result/` | Frontend shared result package. | ED-0004 | Contains explicit success/failure result type. |
+| `frontend/src/shared/time/` | Frontend shared time package. | ED-0004 | Contains clock and time range contracts. |
 | `frontend/src/styles/` | Frontend styling foundation package. | ED-0003 | Contains initial design token module. |
 | `frontend/src/themes/` | Theme architecture package. | ED-0003 | Reserved for future white-label theme work. |
 | `frontend/src/workflows/` | Workflow-oriented frontend package root. | ED-0003 | Package boundaries only; no workflow implementation. |
@@ -105,8 +110,16 @@ This manifest documents the StageFlow repository structure, repository-level fil
 | `backend/app/core/health/service.py` | Minimal health response model and function. | ED-0002 | No dependency checks. |
 | `backend/app/core/lifecycle/lifespan.py` | FastAPI lifespan hook. | ED-0002 | Sets process readiness only. |
 | `backend/app/core/logging/configure.py` | Minimal logging configuration. | ED-0002 | Standard logging only. |
+| `backend/app/shared/domain_events/domain_event.py` | Base domain event contract. | ED-0004 | Generic event ID, type, timestamp, correlation, actor, and metadata. |
+| `backend/app/shared/errors/errors.py` | Structured error contracts. | ED-0004 | Generic error categories only. |
+| `backend/app/shared/ids/correlation_id.py` | Correlation ID contract. | ED-0004 | Generic UUID-compatible workflow tracing ID. |
+| `backend/app/shared/ids/entity_id.py` | Entity ID contract. | ED-0004 | Generic UUID-compatible entity ID. |
+| `backend/app/shared/result/result.py` | Result contract. | ED-0004 | Explicit success/failure result. |
+| `backend/app/shared/time/clock.py` | Clock contracts. | ED-0004 | System and fixed clocks with UTC timestamps. |
+| `backend/app/shared/time/time_range.py` | Time range contract. | ED-0004 | Immutable start/end/duration range. |
 | `backend/tests/README.md` | Backend test suite guide. | ED-0002 | Documents health-only coverage. |
 | `backend/tests/test_health.py` | Health endpoint test. | ED-0002 | Verifies startup through FastAPI TestClient. |
+| `backend/tests/test_shared_contracts.py` | Shared contract tests. | ED-0004 | Covers backend contract primitives. |
 
 ## Frontend Files
 
@@ -124,6 +137,13 @@ This manifest documents the StageFlow repository structure, repository-level fil
 | `frontend/app/layout.tsx` | Root application layout. | ED-0003 | Minimal metadata and global style import. |
 | `frontend/app/page.tsx` | Root page. | ED-0003 | Displays required ED-0003 placeholder information only. |
 | `frontend/app/globals.css` | Global Tailwind and CSS variable foundation. | ED-0003 | Tailwind v4 CSS-first setup with semantic roles. |
+| `frontend/src/shared/domain-events/domain-event.ts` | Frontend base domain event type. | ED-0004 | Generic event shape only. |
+| `frontend/src/shared/errors/errors.ts` | Frontend structured error types and helpers. | ED-0004 | Generic error categories only. |
+| `frontend/src/shared/ids/correlation-id.ts` | Frontend correlation ID type and helpers. | ED-0004 | Branded UUID-compatible string. |
+| `frontend/src/shared/ids/entity-id.ts` | Frontend entity ID type and helpers. | ED-0004 | Branded UUID-compatible string. |
+| `frontend/src/shared/result/result.ts` | Frontend result type and helpers. | ED-0004 | Explicit success/failure union. |
+| `frontend/src/shared/time/clock.ts` | Frontend clock and timestamp contracts. | ED-0004 | System and fixed clock helpers. |
+| `frontend/src/shared/time/time-range.ts` | Frontend time range type and helper. | ED-0004 | Immutable parseable timestamp range. |
 | `frontend/src/styles/design_tokens.ts` | Initial design token module. | ED-0003 | Placeholder tokens for future theming and design system work. |
 
 ## Documentation Files

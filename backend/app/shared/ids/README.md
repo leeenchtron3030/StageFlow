@@ -2,8 +2,11 @@
 
 ## Purpose
 
-Reserved for domain-neutral identifier primitives.
+Contains domain-neutral identifier primitives.
 
 ## Current Scope
 
-No shared identifier implementation exists in ED-0002.
+- `EntityId` for generic entity identity.
+- `CorrelationId` for workflow tracing.
+
+Domain-specific identifiers do not belong here until future bounded-context directives approve them.

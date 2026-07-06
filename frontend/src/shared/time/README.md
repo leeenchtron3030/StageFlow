@@ -2,14 +2,14 @@
 
 ## Purpose
 
-Contains domain-neutral time contracts.
+Contains frontend time contracts.
 
 ## Current Scope
 
-- `Clock`
-- `SystemClock`
-- `FixedClock`
 - `Timestamp`
+- `Clock`
+- `systemClock`
+- fixed clock helper
 - `TimeRange`
 
 Media-specific timeline logic does not belong here.
