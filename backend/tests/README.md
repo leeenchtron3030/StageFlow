@@ -18,6 +18,8 @@ ED-0007 adds Production Context evidence contract tests under `backend/tests/`, 
 
 ED-0008 adds Production Context hypothesis contract tests under `backend/tests/`, preserving the same backend test convention.
 
+ED-0009 adds Production Context finding contract tests under `backend/tests/`, keeping finding tests out of application packages.
+
 ## What Does Not Belong Here
 
 - Tests for unimplemented domain behavior.
