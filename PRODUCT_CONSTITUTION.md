@@ -302,6 +302,30 @@ This separation allows StageFlow to remain event-agnostic, adaptable, and reusab
 
 ⸻
 
+Principle 22 — Findings Before Actions
+
+StageFlow should produce explainable findings before recommending or performing operational actions.
+
+Every workflow should preserve the distinction between:
+
+- what was observed
+
+- what supports a conclusion
+
+- what StageFlow believes may be true
+
+- what has been found
+
+- what has been verified
+
+- what action should occur
+
+Findings must remain reviewable, explainable, and traceable to their supporting observations, evidence, and hypotheses.
+
+StageFlow should never hide meaningful operational reasoning behind opaque automation.
+
+⸻
+
 Constitutional Test
 
 Every proposed feature should satisfy the following questions:
