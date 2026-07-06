@@ -2,8 +2,15 @@
 
 ## Purpose
 
-Reserved for domain-neutral error primitives.
+Contains structured, safe-to-log error primitives.
 
 ## Current Scope
 
-No shared error implementation exists in ED-0002.
+- `StageFlowError`
+- `ValidationError`
+- `DomainError`
+- `InfrastructureError`
+- `IntegrationError`
+- `ConfigurationError`
+
+Business-specific errors do not belong here.

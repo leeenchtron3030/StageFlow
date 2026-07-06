@@ -8,6 +8,8 @@ This directory contains backend tests.
 
 ED-0002 includes minimal coverage for application creation and the health endpoint.
 
+ED-0004 adds shared contract tests for identifiers, results, errors, clocks, time ranges, and base domain events.
+
 ## What Does Not Belong Here
 
 - Tests for unimplemented domain behavior.

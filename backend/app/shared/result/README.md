@@ -2,8 +2,10 @@
 
 ## Purpose
 
-Reserved for result primitives that can be used across bounded contexts.
+Contains a small explicit success/failure result type that can be used across bounded contexts.
 
 ## Current Scope
 
-No result implementation exists in ED-0002.
+`Result` represents either success with a value or failure with a structured `StageFlowError`.
+
+It is not intended to replace exceptions for programmer errors.

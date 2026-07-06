@@ -1,1 +1,1 @@
-"""Shared backend primitives package."""
+"""Shared backend contract primitives."""

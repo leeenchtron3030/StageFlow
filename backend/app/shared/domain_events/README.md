@@ -2,8 +2,10 @@
 
 ## Purpose
 
-Reserved for domain event primitives after event-driven behavior is approved.
+Contains the base domain event contract.
 
 ## Current Scope
 
-No domain event implementation exists in ED-0002.
+ED-0004 defines only `DomainEvent`, a generic base event shape.
+
+StageFlow-specific events such as session, clip, package, or publishing events do not belong here until future bounded-context directives approve them.
