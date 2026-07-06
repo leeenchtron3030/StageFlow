@@ -25,6 +25,8 @@ This manifest documents the StageFlow repository structure, repository-level fil
 | `backend/app/contexts/integration/` | Integration context package boundary. | ED-0002 | Empty package boundary. |
 | `backend/app/contexts/packaging/` | Packaging & Delivery context package boundary. | ED-0002 | Empty package boundary. |
 | `backend/app/contexts/production/` | Production context package. | ED-0002 / ED-0005 | ED-0005 adds production timeline contracts only. |
+| `backend/app/contexts/production/evidence/` | Production evidence contract package. | ED-0007 | Backend-only evidence primitives; no reasoning, proposals, or scoring policy. |
+| `backend/app/contexts/production/hypothesis/` | Production hypothesis contract package. | ED-0008 | Backend-only hypothesis primitives; no proposals, verification, or action behavior. |
 | `backend/app/contexts/production/observation/` | Production observation contract package. | ED-0006 | Backend-only observation primitives; no reasoning or detection logic. |
 | `backend/app/contexts/production/timeline/` | Production timeline contract package. | ED-0005 | Backend-only continuous recording and session window primitives. |
 | `backend/app/contexts/publishing/` | Publishing & Analytics context package boundary. | ED-0002 | Empty package boundary. |
@@ -112,6 +114,18 @@ This manifest documents the StageFlow repository structure, repository-level fil
 | `backend/app/core/health/service.py` | Minimal health response model and function. | ED-0002 | No dependency checks. |
 | `backend/app/core/lifecycle/lifespan.py` | FastAPI lifespan hook. | ED-0002 | Sets process readiness only. |
 | `backend/app/core/logging/configure.py` | Minimal logging configuration. | ED-0002 | Standard logging only. |
+| `backend/app/contexts/production/evidence/__init__.py` | Production evidence package exports. | ED-0007 | Exports evidence contracts. |
+| `backend/app/contexts/production/evidence/evidence_item.py` | Evidence item contract. | ED-0007 | References an observation ID without embedding Observation objects. |
+| `backend/app/contexts/production/evidence/evidence_purpose.py` | Evidence purpose categories. | ED-0007 | Potential future support purposes only. |
+| `backend/app/contexts/production/evidence/evidence_set.py` | Evidence set contract. | ED-0007 | Groups one or more evidence items. |
+| `backend/app/contexts/production/evidence/evidence_strength.py` | Evidence strength categories. | ED-0007 | Includes contradictory support as first-class evidence. |
+| `backend/app/contexts/production/evidence/evidence_summary.py` | Evidence summary contract. | ED-0007 | Summarizes counts without final confidence. |
+| `backend/app/contexts/production/hypothesis/__init__.py` | Production hypothesis package exports. | ED-0008 | Exports hypothesis contracts. |
+| `backend/app/contexts/production/hypothesis/hypothesis.py` | Hypothesis contract. | ED-0008 | Represents a possible interpretation of evidence. |
+| `backend/app/contexts/production/hypothesis/hypothesis_confidence.py` | Hypothesis confidence contract. | ED-0008 | Numeric confidence from `0.0` to `1.0`. |
+| `backend/app/contexts/production/hypothesis/hypothesis_status.py` | Hypothesis status categories. | ED-0008 | Tentative lifecycle states only; not verification. |
+| `backend/app/contexts/production/hypothesis/hypothesis_support.py` | Hypothesis support contract. | ED-0008 | References supporting, contradicting, and neutral evidence-set IDs. |
+| `backend/app/contexts/production/hypothesis/hypothesis_type.py` | Hypothesis type categories. | ED-0008 | Tentative possible-meaning categories only. |
 | `backend/app/contexts/production/timeline/__init__.py` | Production timeline package exports. | ED-0005 | Exports timeline contracts and statuses. |
 | `backend/app/contexts/production/observation/__init__.py` | Production observation package exports. | ED-0006 | Exports observation contracts. |
 | `backend/app/contexts/production/observation/observation.py` | Observation contract. | ED-0006 | Timestamped statement about something noticed on a recording timeline. |
@@ -133,6 +147,8 @@ This manifest documents the StageFlow repository structure, repository-level fil
 | `backend/app/shared/time/time_range.py` | Time range contract. | ED-0004 | Immutable start/end/duration range. |
 | `backend/tests/README.md` | Backend test suite guide. | ED-0002 | Documents health-only coverage. |
 | `backend/tests/test_health.py` | Health endpoint test. | ED-0002 | Verifies startup through FastAPI TestClient. |
+| `backend/tests/test_production_evidence_contracts.py` | Production evidence contract tests. | ED-0007 | Covers evidence primitives and boundary rules. |
+| `backend/tests/test_production_hypothesis_contracts.py` | Production hypothesis contract tests. | ED-0008 | Covers hypothesis primitives and boundary rules. |
 | `backend/tests/test_production_observation_contracts.py` | Production observation contract tests. | ED-0006 | Covers observation primitives and boundary rules. |
 | `backend/tests/test_production_timeline_contracts.py` | Production timeline contract tests. | ED-0005 | Tests are placed under `backend/tests/` per existing convention. |
 | `backend/tests/test_shared_contracts.py` | Shared contract tests. | ED-0004 | Covers backend contract primitives. |

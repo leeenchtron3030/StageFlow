@@ -16,7 +16,19 @@ ED-0006 adds foundational production observation contracts only.
 
 Observation primitives describe what was noticed at a timeline point or range. Observations may come from humans, transcripts, audio, graphics, schedules, livestream systems, or other generic sources.
 
-Reasoning will later decide what observations mean. Observations do not create `SessionWindow` records by themselves.
+Reasoning will later decide what observations mean. Observations do not create timeline conclusions by themselves.
+
+## Evidence Primitives
+
+ED-0007 adds foundational production evidence contracts only.
+
+Evidence organizes observation references into support for a possible future conclusion. Evidence is still not a conclusion, and it must remain separate from reasoning and proposal generation.
+
+## Hypothesis Primitives
+
+ED-0008 adds foundational production hypothesis contracts only.
+
+Hypothesis primitives express possible meaning based on evidence. A hypothesis is a belief, not an action. Proposal generation and verification come later.
 
 ## Continuous Recording Blocks
 
