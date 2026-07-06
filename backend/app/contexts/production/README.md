@@ -44,7 +44,11 @@ Verification decisions record append-only judgment about findings. Verification 
 
 ## Operational Products
 
-Operational products come after verification. Verification decisions may later inform session windows, clips, alerts, incidents, metadata records, or package tasks, but ED-0010 creates none of those.
+ED-0011 adds foundational production operational product contracts only.
+
+Timeline, Observation, Evidence, Hypothesis, Finding, and Verification form the reasoning layer. Operational Products begin the execution layer.
+
+Operational products are downstream of verified reasoning and stay traceable to findings and verification decisions. Specific product types will be implemented by later directives.
 
 ## Continuous Recording Blocks
 
