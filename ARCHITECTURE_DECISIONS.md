@@ -23,3 +23,43 @@ StageFlow owns production workflow. It must not become the source of truth for c
 ## ADR-0005 External Integrations Use Adapters Within the Integration Context
 
 External integrations use adapters within the Integration Context. Integration-specific concerns should remain behind adapter boundaries rather than leaking into core domain workflows.
+
+## Reserved
+
+ADR-0006 through ADR-0008 are intentionally reserved for future architectural decisions.
+
+Architecture Decision Records are never renumbered after publication.
+
+## ADR-0009 — Verification Preserves Reasoning History
+
+Verification does not modify Findings.
+
+Instead, Verification records immutable Verification Decisions.
+
+Multiple Verification Decisions may exist for the same Finding.
+
+Verification history is append-only.
+
+Operational Products are created from verified reasoning rather than replacing reasoning artifacts.
+
+This preserves:
+
+- explainability
+- auditability
+- reviewer history
+- disagreement
+- future reinterpretation
+
+The reasoning chain therefore becomes:
+
+Observation
+↓
+Evidence
+↓
+Hypothesis
+↓
+Finding
+↓
+Verification Decision
+↓
+Operational Product

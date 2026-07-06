@@ -4,6 +4,25 @@
 
 This manifest documents the StageFlow repository structure, repository-level files, and ownership by Engineering Directive.
 
+## Architecture Releases
+
+### AR-1.4 — Complete Reasoning Architecture
+
+This Architecture Release completes the StageFlow reasoning architecture.
+
+It formally establishes:
+
+- Timeline
+- Observation
+- Evidence
+- Hypothesis
+- Finding
+- Verification Decision
+
+Operational Products are defined as downstream outputs of verified reasoning.
+
+Subsequent Engineering Directives build on this completed reasoning model rather than extending it.
+
 ## Directories
 
 | Path | Purpose | Owning Engineering Directive | Notes |
