@@ -14,6 +14,8 @@ Engineering Directives are the implementation authority for StageFlow. Each dire
 | ED-0004 | Shared Contracts Foundation | Approved / Implemented | Establishes generic backend and frontend shared contracts for identifiers, correlation, results, errors, time, clocks, time ranges, and base domain events without business behavior. |
 | ED-0005 | Production Timeline Foundation | Approved / Implemented | Establishes backend-only Production Context timeline contracts for recording blocks, timeline positions and ranges, schedule references, and session windows without ingestion, persistence, APIs, or media file logic. |
 | ED-0006 | Production Observation Foundation | Approved / Implemented | Establishes backend-only Production Context observation contracts for generic timestamped observations on recording timelines without reasoning, detection, persistence, APIs, or provider-specific behavior. |
+| ED-0007 | Production Evidence Foundation | Approved / Implemented | Establishes backend-only Production Context evidence contracts for grouping observation references as support without reasoning, proposals, scoring policy, persistence, APIs, or provider-specific behavior. |
+| ED-0008 | Production Hypothesis Foundation | Approved / Implemented | Establishes backend-only Production Context hypothesis contracts for possible interpretations of evidence without proposals, verification, session-window generation, persistence, APIs, or provider-specific behavior. |
 
 ## Process
 
