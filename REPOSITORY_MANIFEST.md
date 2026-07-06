@@ -24,7 +24,8 @@ This manifest documents the StageFlow repository structure, repository-level fil
 | `backend/app/contexts/identity/` | Identity & Access context package boundary. | ED-0002 | Empty package boundary. |
 | `backend/app/contexts/integration/` | Integration context package boundary. | ED-0002 | Empty package boundary. |
 | `backend/app/contexts/packaging/` | Packaging & Delivery context package boundary. | ED-0002 | Empty package boundary. |
-| `backend/app/contexts/production/` | Production context package boundary. | ED-0002 | Empty package boundary. |
+| `backend/app/contexts/production/` | Production context package. | ED-0002 / ED-0005 | ED-0005 adds production timeline contracts only. |
+| `backend/app/contexts/production/timeline/` | Production timeline contract package. | ED-0005 | Backend-only continuous recording and session window primitives. |
 | `backend/app/contexts/publishing/` | Publishing & Analytics context package boundary. | ED-0002 | Empty package boundary. |
 | `backend/app/contexts/rendering/` | Media Rendering context package boundary. | ED-0002 | Empty package boundary. |
 | `backend/app/contexts/simulation/` | Simulation context package boundary. | ED-0002 | Empty package boundary. |
@@ -110,6 +111,12 @@ This manifest documents the StageFlow repository structure, repository-level fil
 | `backend/app/core/health/service.py` | Minimal health response model and function. | ED-0002 | No dependency checks. |
 | `backend/app/core/lifecycle/lifespan.py` | FastAPI lifespan hook. | ED-0002 | Sets process readiness only. |
 | `backend/app/core/logging/configure.py` | Minimal logging configuration. | ED-0002 | Standard logging only. |
+| `backend/app/contexts/production/timeline/__init__.py` | Production timeline package exports. | ED-0005 | Exports timeline contracts and statuses. |
+| `backend/app/contexts/production/timeline/recording_block.py` | Continuous recording block contract. | ED-0005 | Represents recording periods, not sessions. |
+| `backend/app/contexts/production/timeline/schedule_reference.py` | External schedule reference contract. | ED-0005 | Uses generic external schedule language. |
+| `backend/app/contexts/production/timeline/session_window.py` | Session window contract. | ED-0005 | Connects schedule reference to verified or proposed media range. |
+| `backend/app/contexts/production/timeline/timeline_position.py` | Timeline position contract. | ED-0005 | Offset within a recording block. |
+| `backend/app/contexts/production/timeline/timeline_range.py` | Timeline range contract. | ED-0005 | Span within one recording block. |
 | `backend/app/shared/domain_events/domain_event.py` | Base domain event contract. | ED-0004 | Generic event ID, type, timestamp, correlation, actor, and metadata. |
 | `backend/app/shared/errors/errors.py` | Structured error contracts. | ED-0004 | Generic error categories only. |
 | `backend/app/shared/ids/correlation_id.py` | Correlation ID contract. | ED-0004 | Generic UUID-compatible workflow tracing ID. |
@@ -119,6 +126,7 @@ This manifest documents the StageFlow repository structure, repository-level fil
 | `backend/app/shared/time/time_range.py` | Time range contract. | ED-0004 | Immutable start/end/duration range. |
 | `backend/tests/README.md` | Backend test suite guide. | ED-0002 | Documents health-only coverage. |
 | `backend/tests/test_health.py` | Health endpoint test. | ED-0002 | Verifies startup through FastAPI TestClient. |
+| `backend/tests/test_production_timeline_contracts.py` | Production timeline contract tests. | ED-0005 | Tests are placed under `backend/tests/` per existing convention. |
 | `backend/tests/test_shared_contracts.py` | Shared contract tests. | ED-0004 | Covers backend contract primitives. |
 
 ## Frontend Files
