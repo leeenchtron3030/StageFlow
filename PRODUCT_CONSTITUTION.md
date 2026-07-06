@@ -326,6 +326,27 @@ StageFlow should never hide meaningful operational reasoning behind opaque autom
 
 ⸻
 
+## Principle 23 — Preserve Reasoning History
+
+StageFlow preserves the complete reasoning history behind every operational decision.
+
+The platform distinguishes between:
+
+- observations
+- evidence
+- hypotheses
+- findings
+- verification decisions
+- operational products
+
+Each layer contributes new knowledge without replacing or mutating previous reasoning.
+
+This preserves explainability, auditability, and trust.
+
+Operational products should always be traceable back through the complete reasoning chain that produced them.
+
+⸻
+
 Constitutional Test
 
 Every proposed feature should satisfy the following questions:
