@@ -42,6 +42,23 @@ This manifest documents the StageFlow repository structure, repository-level fil
 | `backend/tests/` | Backend test suite. | ED-0002 | Contains minimal health endpoint coverage. |
 | `docs/` | Canonical and supporting architecture documentation. | Existing architecture work | Preserved by ED-0001. |
 | `examples/` | Future examples that demonstrate approved implementation patterns. | ED-0001 | No application examples are created by ED-0001. |
+| `frontend/` | Next.js frontend workspace. | ED-0003 | Contains no backend communication or business logic in ED-0003. |
+| `frontend/app/` | Next.js App Router root. | ED-0003 | Contains only the root layout, root page, and global styles. |
+| `frontend/src/` | Frontend source package root. | ED-0003 | Organized around frontend foundations and future workflows. |
+| `frontend/src/components/` | Shared frontend component package. | ED-0003 | No components generated in ED-0003. |
+| `frontend/src/core/` | Frontend application-wide foundations. | ED-0003 | Reserved for future providers and configuration. |
+| `frontend/src/layouts/` | Reusable layout package. | ED-0003 | Reserved for future workflow layouts. |
+| `frontend/src/routes/` | Route metadata and route support package. | ED-0003 | No additional routes in ED-0003. |
+| `frontend/src/shared/` | Shared frontend utilities package. | ED-0003 | Reserved for future shared primitives. |
+| `frontend/src/styles/` | Frontend styling foundation package. | ED-0003 | Contains initial design token module. |
+| `frontend/src/themes/` | Theme architecture package. | ED-0003 | Reserved for future white-label theme work. |
+| `frontend/src/workflows/` | Workflow-oriented frontend package root. | ED-0003 | Package boundaries only; no workflow implementation. |
+| `frontend/src/workflows/content_lead/` | Content Lead workflow package boundary. | ED-0003 | Empty boundary with README only. |
+| `frontend/src/workflows/package_delivery/` | Package Delivery workflow package boundary. | ED-0003 | Empty boundary with README only. |
+| `frontend/src/workflows/reviewer/` | Reviewer workflow package boundary. | ED-0003 | Empty boundary with README only. |
+| `frontend/src/workflows/simulation/` | Simulation workflow package boundary. | ED-0003 | Empty boundary with README only. |
+| `frontend/src/workflows/technical_director/` | Technical Director workflow package boundary. | ED-0003 | Empty boundary with README only. |
+| `frontend/tests/` | Frontend test package. | ED-0003 | No test runner added in ED-0003. |
 | `mock_data/` | Future safe synthetic fixtures and mock data. | ED-0001 | Real production or event data does not belong here. |
 | `reference/` | Future non-authoritative reference material. | ED-0001 | Canonical specifications remain in root files and `docs/`. |
 | `scripts/` | Future repository maintenance and developer utility scripts. | ED-0001 | No scripts are created by ED-0001. |
@@ -54,7 +71,7 @@ This manifest documents the StageFlow repository structure, repository-level fil
 | `.editorconfig` | Shared editor formatting defaults. | ED-0001 | Covers common Python, TypeScript, Markdown, YAML, and JSON conventions. |
 | `.env.example` | Example environment file. | Existing repository work | Preserved by ED-0001. |
 | `.gitattributes` | Git text and binary file handling rules. | Existing repository work | Preserved by ED-0001. |
-| `.gitignore` | Ignored local, generated, runtime, and dependency files. | Existing repository work | Preserved by ED-0001. |
+| `.gitignore` | Ignored local, generated, runtime, and dependency files. | Existing repository work / ED-0003 | ED-0003 adds TypeScript build cache ignore coverage. |
 | `ARCHITECTURE_DECISIONS.md` | Architecture Decision Record index. | ED-0001 | Initialized with ADR-0001 through ADR-0005. |
 | `CHANGELOG.md` | Future release and change history. | Existing repository work | Preserved by ED-0001. |
 | `CONTRIBUTING.md` | Initial contributor guide and engineering process expectations. | ED-0001 | Establishes specification-first contribution rules. |
@@ -90,6 +107,24 @@ This manifest documents the StageFlow repository structure, repository-level fil
 | `backend/app/core/logging/configure.py` | Minimal logging configuration. | ED-0002 | Standard logging only. |
 | `backend/tests/README.md` | Backend test suite guide. | ED-0002 | Documents health-only coverage. |
 | `backend/tests/test_health.py` | Health endpoint test. | ED-0002 | Verifies startup through FastAPI TestClient. |
+
+## Frontend Files
+
+| Path | Purpose | Owning Engineering Directive | Notes |
+| --- | --- | --- | --- |
+| `frontend/README.md` | Frontend workspace guide. | ED-0003 | Documents setup, commands, and frontend boundaries. |
+| `frontend/package.json` | Frontend package scripts and dependencies. | ED-0003 | Defines Next.js, TypeScript, Tailwind, shadcn, TanStack Query, React Hook Form, and Zod dependencies. |
+| `frontend/package-lock.json` | Locked frontend dependency graph. | ED-0003 | Generated by `npm install`. |
+| `frontend/next.config.ts` | Next.js configuration. | ED-0003 | Minimal configuration. |
+| `frontend/tsconfig.json` | TypeScript configuration. | ED-0003 | Strict TypeScript with Next.js plugin. |
+| `frontend/postcss.config.mjs` | PostCSS configuration. | ED-0003 | Enables Tailwind CSS v4 PostCSS plugin. |
+| `frontend/eslint.config.mjs` | ESLint flat configuration. | ED-0003 | Uses Next.js core web vitals and TypeScript configs. |
+| `frontend/components.json` | shadcn/ui configuration. | ED-0003 | Initializes shadcn aliases and CSS variable mode without generating UI components. |
+| `frontend/next-env.d.ts` | Next.js TypeScript environment declarations. | ED-0003 | Generated by Next.js. |
+| `frontend/app/layout.tsx` | Root application layout. | ED-0003 | Minimal metadata and global style import. |
+| `frontend/app/page.tsx` | Root page. | ED-0003 | Displays required ED-0003 placeholder information only. |
+| `frontend/app/globals.css` | Global Tailwind and CSS variable foundation. | ED-0003 | Tailwind v4 CSS-first setup with semantic roles. |
+| `frontend/src/styles/design_tokens.ts` | Initial design token module. | ED-0003 | Placeholder tokens for future theming and design system work. |
 
 ## Documentation Files
 
