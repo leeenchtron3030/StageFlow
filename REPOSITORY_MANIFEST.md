@@ -26,6 +26,7 @@ This manifest documents the StageFlow repository structure, repository-level fil
 | `backend/app/contexts/packaging/` | Packaging & Delivery context package boundary. | ED-0002 | Empty package boundary. |
 | `backend/app/contexts/production/` | Production context package. | ED-0002 / ED-0005 | ED-0005 adds production timeline contracts only. |
 | `backend/app/contexts/production/evidence/` | Production evidence contract package. | ED-0007 | Backend-only evidence primitives; no reasoning, proposals, or scoring policy. |
+| `backend/app/contexts/production/finding/` | Production finding contract package. | ED-0009 | Backend-only human-reviewable reasoning artifacts; no verification or workflow behavior. |
 | `backend/app/contexts/production/hypothesis/` | Production hypothesis contract package. | ED-0008 | Backend-only hypothesis primitives; no proposals, verification, or action behavior. |
 | `backend/app/contexts/production/observation/` | Production observation contract package. | ED-0006 | Backend-only observation primitives; no reasoning or detection logic. |
 | `backend/app/contexts/production/timeline/` | Production timeline contract package. | ED-0005 | Backend-only continuous recording and session window primitives. |
@@ -120,6 +121,14 @@ This manifest documents the StageFlow repository structure, repository-level fil
 | `backend/app/contexts/production/evidence/evidence_set.py` | Evidence set contract. | ED-0007 | Groups one or more evidence items. |
 | `backend/app/contexts/production/evidence/evidence_strength.py` | Evidence strength categories. | ED-0007 | Includes contradictory support as first-class evidence. |
 | `backend/app/contexts/production/evidence/evidence_summary.py` | Evidence summary contract. | ED-0007 | Summarizes counts without final confidence. |
+| `backend/app/contexts/production/finding/__init__.py` | Production finding package exports. | ED-0009 | Exports finding contracts. |
+| `backend/app/contexts/production/finding/finding.py` | Finding contract. | ED-0009 | Human-reviewable reasoning artifact referencing hypothesis IDs only. |
+| `backend/app/contexts/production/finding/finding_confidence.py` | Finding confidence contract. | ED-0009 | Numeric confidence from `0.0` to `1.0`. |
+| `backend/app/contexts/production/finding/finding_location.py` | Finding location contract. | ED-0009 | Point or range on the production timeline. |
+| `backend/app/contexts/production/finding/finding_origin.py` | Finding origin categories. | ED-0009 | Generic reasoning pathways only. |
+| `backend/app/contexts/production/finding/finding_summary.py` | Finding summary contract. | ED-0009 | Lightweight review-surface representation without workflow state. |
+| `backend/app/contexts/production/finding/finding_support.py` | Finding support contract. | ED-0009 | References supporting, contradicting, and neutral hypothesis IDs. |
+| `backend/app/contexts/production/finding/finding_type.py` | Finding type categories. | ED-0009 | Generic finding categories only. |
 | `backend/app/contexts/production/hypothesis/__init__.py` | Production hypothesis package exports. | ED-0008 | Exports hypothesis contracts. |
 | `backend/app/contexts/production/hypothesis/hypothesis.py` | Hypothesis contract. | ED-0008 | Represents a possible interpretation of evidence. |
 | `backend/app/contexts/production/hypothesis/hypothesis_confidence.py` | Hypothesis confidence contract. | ED-0008 | Numeric confidence from `0.0` to `1.0`. |
@@ -148,6 +157,7 @@ This manifest documents the StageFlow repository structure, repository-level fil
 | `backend/tests/README.md` | Backend test suite guide. | ED-0002 | Documents health-only coverage. |
 | `backend/tests/test_health.py` | Health endpoint test. | ED-0002 | Verifies startup through FastAPI TestClient. |
 | `backend/tests/test_production_evidence_contracts.py` | Production evidence contract tests. | ED-0007 | Covers evidence primitives and boundary rules. |
+| `backend/tests/test_production_finding_contracts.py` | Production finding contract tests. | ED-0009 | Covers finding primitives and boundary rules. |
 | `backend/tests/test_production_hypothesis_contracts.py` | Production hypothesis contract tests. | ED-0008 | Covers hypothesis primitives and boundary rules. |
 | `backend/tests/test_production_observation_contracts.py` | Production observation contract tests. | ED-0006 | Covers observation primitives and boundary rules. |
 | `backend/tests/test_production_timeline_contracts.py` | Production timeline contract tests. | ED-0005 | Tests are placed under `backend/tests/` per existing convention. |

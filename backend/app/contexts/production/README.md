@@ -30,6 +30,12 @@ ED-0008 adds foundational production hypothesis contracts only.
 
 Hypothesis primitives express possible meaning based on evidence. A hypothesis is a belief, not an action. Proposal generation and verification come later.
 
+## Finding Primitives
+
+ED-0009 adds foundational production finding contracts only.
+
+Findings are the first human-reviewable reasoning artifacts. A finding says what StageFlow found that may deserve attention, but it does not decide whether the finding is correct. Verification follows in ED-0010.
+
 ## Continuous Recording Blocks
 
 Real event production often records long stage blocks rather than one file per scheduled session. A `RecordingBlock` represents one continuous stage recording period, such as a morning block or afternoon block.
