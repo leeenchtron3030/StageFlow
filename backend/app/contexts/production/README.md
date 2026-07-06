@@ -4,9 +4,19 @@
 
 The Production Context owns live-event production state and the temporal model for continuous stage recordings.
 
-## ED-0005 Scope
+## Timeline Primitives
 
 ED-0005 adds foundational production timeline contracts only. It does not implement ingestion, transcription, workers, persistence, APIs, rendering, packages, or frontend behavior.
+
+Timeline primitives describe where things happen on a continuous recording timeline.
+
+## Observation Primitives
+
+ED-0006 adds foundational production observation contracts only.
+
+Observation primitives describe what was noticed at a timeline point or range. Observations may come from humans, transcripts, audio, graphics, schedules, livestream systems, or other generic sources.
+
+Reasoning will later decide what observations mean. Observations do not create `SessionWindow` records by themselves.
 
 ## Continuous Recording Blocks
 

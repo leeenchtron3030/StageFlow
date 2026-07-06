@@ -12,6 +12,8 @@ ED-0004 adds shared contract tests for identifiers, results, errors, clocks, tim
 
 ED-0005 adds Production Context timeline contract tests under `backend/tests/`, following the existing backend test convention instead of nesting tests inside application packages.
 
+ED-0006 adds Production Context observation contract tests under `backend/tests/`, following the same convention.
+
 ## What Does Not Belong Here
 
 - Tests for unimplemented domain behavior.
