@@ -42,16 +42,20 @@ No layer should assume the responsibility of another.
 
 ⸻
 
-Timeline
+# Timeline
 
 Timeline objects describe where something exists within recorded production media.
 
-Timeline objects answer:
+Timeline produces candidate ranges without assigning operational meaning.
 
-* Where did this occur?
-* When did this occur?
+These candidate ranges may later contribute to Findings and, after verification, become Operational Products.
 
-Timeline objects do not interpret events.
+Timeline answers:
+
+- Where did this occur?
+- When did this occur?
+
+Timeline does not determine what the range ultimately represents.
 
 ⸻
 
