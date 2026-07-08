@@ -34,6 +34,16 @@ The dispatcher does not interpret, does not create Observations directly, does n
 
 ED-0015 does not implement queues, workers, retries, scheduling, plugin discovery, registries, event buses, persistence, APIs, adapters, or frontend behavior.
 
+## Recording System Adapters
+
+ED-0016 adds foundational recording system adapter contracts only.
+
+Recording System Adapters report continuous recording activity from external or internal recording systems. They emit generic `ProductionEvent` objects that can later flow through the dispatcher and interpreter layers.
+
+Recording System Adapters do not ingest media files, detect chunks, inspect codecs, construct timelines, dispatch events, interpret events, create Observations, or create reasoning artifacts.
+
+Media artifact adapters and provider-specific recording integrations come later.
+
 ## Production Event Interpreters
 
 ED-0014 adds foundational production event interpreter contracts only.

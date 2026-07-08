@@ -23,6 +23,7 @@ Engineering Directives are the implementation authority for StageFlow. Each dire
 | ED-0013 | Production Event Foundation | Approved / Implemented | Establishes backend-only Production Context production event contracts as the provider-agnostic runtime boundary before Observations without adapters, ingestion, persistence, APIs, queues, workers, or frontend behavior. |
 | ED-0014 | Production Event Interpreter Foundation | Approved / Implemented | Establishes backend-only Production Context interpreter contracts for translating Production Events into Observations without adapters, reasoning, persistence, APIs, queues, workers, or frontend behavior. |
 | ED-0015 | Production Event Dispatcher Foundation | Approved / Implemented | Establishes backend-only Production Context dispatcher contracts for routing Production Events to matching interpreters without interpretation, reasoning, infrastructure, persistence, APIs, adapters, or frontend behavior. |
+| ED-0016 | Recording System Adapter Contract | Approved / Implemented | Establishes backend-only Production Context recording system adapter contracts that emit generic Production Events without provider-specific integrations, media ingestion, persistence, APIs, queues, workers, or frontend behavior. |
 
 ## Process
 
