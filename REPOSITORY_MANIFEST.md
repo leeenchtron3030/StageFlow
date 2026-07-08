@@ -51,6 +51,8 @@ ED-0017 adds Media Artifact Adapter contracts for reporting artifact availabilit
 
 ED-0018 adds Schedule Source Adapter contracts for planned activities, preserving separation between planned reality and observed reality.
 
+ED-0019 adds Runtime Clock contracts as a time-boundary ingress source that emits generic Production Events without scheduling work.
+
 ## Directories
 
 | Path | Purpose | Owning Engineering Directive | Notes |
@@ -71,7 +73,7 @@ ED-0018 adds Schedule Source Adapter contracts for planned activities, preservin
 | `backend/app/contexts/identity/` | Identity & Access context package boundary. | ED-0002 | Empty package boundary. |
 | `backend/app/contexts/integration/` | Integration context package boundary. | ED-0002 | Empty package boundary. |
 | `backend/app/contexts/packaging/` | Packaging & Delivery context package boundary. | ED-0002 | Empty package boundary. |
-| `backend/app/contexts/production/` | Production context package. | ED-0002 / ED-0005 / ED-0012 / ED-0013 / ED-0014 / ED-0015 / ED-0016 / ED-0017 / ED-0018 | ED-0005 adds production timeline contracts; ED-0012 adds the first specialized operational product; ED-0013 adds runtime input events; ED-0014 adds event interpreter contracts; ED-0015 adds event dispatcher contracts; ED-0016 adds recording adapter contracts; ED-0017 adds media artifact adapter contracts; ED-0018 adds schedule adapter contracts. |
+| `backend/app/contexts/production/` | Production context package. | ED-0002 / ED-0005 / ED-0012 / ED-0013 / ED-0014 / ED-0015 / ED-0016 / ED-0017 / ED-0018 / ED-0019 | ED-0005 adds production timeline contracts; ED-0012 adds the first specialized operational product; ED-0013 adds runtime input events; ED-0014 adds event interpreter contracts; ED-0015 adds event dispatcher contracts; ED-0016 adds recording adapter contracts; ED-0017 adds media artifact adapter contracts; ED-0018 adds schedule adapter contracts; ED-0019 adds runtime clock contracts. |
 | `backend/app/contexts/production/dispatcher/` | Production event dispatcher contract package. | ED-0015 | Backend-only in-memory routing boundary from Production Events to matching interpreters; no interpretation, reasoning, infrastructure, persistence, APIs, adapters, or frontend behavior. |
 | `backend/app/contexts/production/evidence/` | Production evidence contract package. | ED-0007 | Backend-only evidence primitives; no reasoning, proposals, or scoring policy. |
 | `backend/app/contexts/production/finding/` | Production finding contract package. | ED-0009 | Backend-only human-reviewable reasoning artifacts; no verification or workflow behavior. |
@@ -82,6 +84,7 @@ ED-0018 adds Schedule Source Adapter contracts for planned activities, preservin
 | `backend/app/contexts/production/operational_product/` | Production operational product contract package. | ED-0011 | Backend-only generic execution-layer primitives; no specialized products, persistence, APIs, queues, or workers. |
 | `backend/app/contexts/production/production_event/` | Production event contract package. | ED-0013 | Backend-only provider-agnostic runtime input primitives; no adapters, observation generation, persistence, APIs, queues, workers, or frontend behavior. |
 | `backend/app/contexts/production/recording_adapter/` | Production recording system adapter contract package. | ED-0016 | Backend-only adapter-facing recording activity contracts that emit generic Production Events; no provider integrations, media ingestion, persistence, APIs, queues, workers, or frontend behavior. |
+| `backend/app/contexts/production/runtime_clock/` | Production runtime clock contract package. | ED-0019 | Backend-only time-boundary ingress contracts that emit generic Production Events; no scheduling infrastructure, retry execution, reconciliation, persistence, APIs, queues, workers, or frontend behavior. |
 | `backend/app/contexts/production/schedule_adapter/` | Production schedule source adapter contract package. | ED-0018 | Backend-only planned-activity contracts that emit generic Production Events; no provider integrations, Sessions, Observations, reasoning, persistence, APIs, queues, workers, or frontend behavior. |
 | `backend/app/contexts/production/session_window_product/` | Production session window product contract package. | ED-0012 | Backend-only specialized operational product connecting schedule references to verified timeline ranges; no Session aggregate, media storage, packages, persistence, APIs, or frontend behavior. |
 | `backend/app/contexts/production/timeline/` | Production timeline contract package. | ED-0005 | Backend-only continuous recording and session window primitives. |
@@ -245,6 +248,15 @@ ED-0018 adds Schedule Source Adapter contracts for planned activities, preservin
 | `backend/app/contexts/production/recording_adapter/recording_session_event.py` | Recording session event contract. | ED-0016 | Adapter-level recording activity event with generic Production Event mapping helper. |
 | `backend/app/contexts/production/recording_adapter/recording_system_adapter.py` | Recording system adapter contract. | ED-0016 | Generic adapter contract that emits Production Events only. |
 | `backend/app/contexts/production/recording_adapter/recording_system_status.py` | Recording system status categories. | ED-0016 | Generic recording system or adapter status values. |
+| `backend/app/contexts/production/runtime_clock/__init__.py` | Runtime clock package exports. | ED-0019 | Exports runtime clock contracts. |
+| `backend/app/contexts/production/runtime_clock/README.md` | Runtime clock package guide. | ED-0019 | Documents time-boundary ingress scope and scheduling exclusions. |
+| `backend/app/contexts/production/runtime_clock/clock_capability.py` | Clock capability categories. | ED-0019 | Describes what the clock can report without implementing behavior. |
+| `backend/app/contexts/production/runtime_clock/clock_event.py` | Clock event contract. | ED-0019 | Clock-level boundary event with generic Production Event mapping helper. |
+| `backend/app/contexts/production/runtime_clock/clock_summary.py` | Clock summary contract. | ED-0019 | Lightweight diagnostics summary without time evaluation or event emission. |
+| `backend/app/contexts/production/runtime_clock/runtime_clock.py` | Runtime clock contract. | ED-0019 | Generic immutable boundary evaluator and Production Event emitter contract. |
+| `backend/app/contexts/production/runtime_clock/time_boundary.py` | Time boundary contract. | ED-0019 | Meaningful temporal boundary without workflow action or production outcome semantics. |
+| `backend/app/contexts/production/runtime_clock/time_boundary_status.py` | Time boundary status categories. | ED-0019 | Boundary lifecycle values, not production outcome values. |
+| `backend/app/contexts/production/runtime_clock/time_boundary_type.py` | Time boundary type categories. | ED-0019 | Generic temporal boundary categories without workflow actions. |
 | `backend/app/contexts/production/schedule_adapter/__init__.py` | Schedule source adapter package exports. | ED-0018 | Exports schedule adapter contracts. |
 | `backend/app/contexts/production/schedule_adapter/README.md` | Schedule source adapter package guide. | ED-0018 | Documents planned-world scope, generic Production Event mapping, and exclusions. |
 | `backend/app/contexts/production/schedule_adapter/schedule_adapter_capability.py` | Schedule adapter capability categories. | ED-0018 | Describes what schedule changes an adapter can report without implementing behavior. |
@@ -296,6 +308,7 @@ ED-0018 adds Schedule Source Adapter contracts for planned activities, preservin
 | `backend/tests/test_production_timeline_contracts.py` | Production timeline contract tests. | ED-0005 | Tests are placed under `backend/tests/` per existing convention. |
 | `backend/tests/test_production_verification_contracts.py` | Production verification contract tests. | ED-0010 | Covers append-only verification primitives and boundary rules. |
 | `backend/tests/test_recording_system_adapter_contracts.py` | Recording system adapter contract tests. | ED-0016 | Covers adapter identity, status, capabilities, session events, Production Event mapping, summaries, and excluded behaviors. |
+| `backend/tests/test_runtime_clock_contracts.py` | Runtime clock contract tests. | ED-0019 | Covers clock contracts, time boundaries, boundary evaluation, Production Event mapping, summaries, and excluded behaviors. |
 | `backend/tests/test_schedule_source_adapter_contracts.py` | Schedule source adapter contract tests. | ED-0018 | Covers planned activity contracts, schedule adapter capabilities, Production Event mapping, summaries, and excluded behaviors. |
 | `backend/tests/test_shared_contracts.py` | Shared contract tests. | ED-0004 | Covers backend contract primitives. |
 
