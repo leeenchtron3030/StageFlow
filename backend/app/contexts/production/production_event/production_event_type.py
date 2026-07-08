@@ -1,0 +1,23 @@
+from enum import StrEnum
+
+
+class ProductionEventType(StrEnum):
+    RECORDING_BLOCK_STARTED = "recording_block_started"
+    RECORDING_BLOCK_ENDED = "recording_block_ended"
+    RECORDING_BLOCK_STATUS_CHANGED = "recording_block_status_changed"
+    MEDIA_FILE_CREATED = "media_file_created"
+    MEDIA_FILE_FINALIZED = "media_file_finalized"
+    MEDIA_FILE_FAILED = "media_file_failed"
+    SCHEDULE_ARTIFACT_UPDATED = "schedule_artifact_updated"
+    SCHEDULE_BOUNDARY_REACHED = "schedule_boundary_reached"
+    TRANSCRIPT_SEGMENT_AVAILABLE = "transcript_segment_available"
+    OCR_TEXT_AVAILABLE = "ocr_text_available"
+    AUDIO_LEVEL_CHANGED = "audio_level_changed"
+    AUDIO_SPIKE_DETECTED = "audio_spike_detected"
+    MANUAL_MARKER_ADDED = "manual_marker_added"
+    OPERATOR_NOTE_ADDED = "operator_note_added"
+    LIVESTREAM_STATUS_CHANGED = "livestream_status_changed"
+    WEBHOOK_RECEIVED = "webhook_received"
+    TIMER_ELAPSED = "timer_elapsed"
+    SYSTEM_STATUS_CHANGED = "system_status_changed"
+    UNKNOWN = "unknown"
