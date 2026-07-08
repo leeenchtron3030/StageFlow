@@ -10,6 +10,18 @@ ED-0005 adds foundational production timeline contracts only. It does not implem
 
 Timeline primitives describe where things happen on a continuous recording timeline.
 
+## Production Events
+
+ED-0013 adds foundational production event contracts only.
+
+Production Events are the runtime boundary where outside-world inputs and internal adapter emissions enter StageFlow. A Production Event records that something happened according to a source, with an `occurred_at` timestamp for source time and a `received_at` timestamp for StageFlow receipt time.
+
+Production Events are not Observations. They do not decide what an input means, do not create Observations, and do not create reasoning artifacts or Operational Products.
+
+Adapters will later emit Production Events, and a future Observation Engine may interpret them into Observations. ED-0013 does not implement adapters, ingestion, webhooks, file watching, transcription, OCR, AI analysis, observation generation, persistence, APIs, queues, workers, or frontend behavior.
+
+Production Events remain provider-agnostic. Event types, sources, references, and payloads use generic runtime language instead of provider or tool names.
+
 ## Observation Primitives
 
 ED-0006 adds foundational production observation contracts only.
