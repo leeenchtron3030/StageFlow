@@ -54,6 +54,16 @@ Media Artifact Adapters do not ingest, validate, transcode, inspect, or process 
 
 Filesystem watching, media ingestion, media validation, and provider-specific artifact integrations come later.
 
+## Schedule Source Adapters
+
+ED-0018 adds foundational schedule source adapter contracts only.
+
+Schedule Source Adapters report planned activity information. They emit generic `ProductionEvent` objects for schedule changes, but they do not create Sessions, Session Window Products, Observations, Evidence, Findings, Operational Products, or RecordingBlocks.
+
+`ScheduledActivity` represents the planned world: what is supposed to happen. It is not evidence, not an Observation, and not proof that the activity occurred.
+
+Future reasoning may reconcile Scheduled Activities with observed reality. ED-0018 does not perform that comparison.
+
 ## Production Event Interpreters
 
 ED-0014 adds foundational production event interpreter contracts only.
