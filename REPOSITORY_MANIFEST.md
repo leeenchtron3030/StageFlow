@@ -21,7 +21,9 @@ It formally establishes:
 
 Operational Products are defined as downstream outputs of verified reasoning.
 
-Subsequent Engineering Directives build on this completed reasoning model rather than extending it.
+ED-0012 adds the first specialized Operational Product: the Session Window Product.
+
+Subsequent Engineering Directives build on this completed reasoning model and specialized product foundation rather than extending the reasoning layer.
 
 ## Directories
 
@@ -43,12 +45,13 @@ Subsequent Engineering Directives build on this completed reasoning model rather
 | `backend/app/contexts/identity/` | Identity & Access context package boundary. | ED-0002 | Empty package boundary. |
 | `backend/app/contexts/integration/` | Integration context package boundary. | ED-0002 | Empty package boundary. |
 | `backend/app/contexts/packaging/` | Packaging & Delivery context package boundary. | ED-0002 | Empty package boundary. |
-| `backend/app/contexts/production/` | Production context package. | ED-0002 / ED-0005 | ED-0005 adds production timeline contracts only. |
+| `backend/app/contexts/production/` | Production context package. | ED-0002 / ED-0005 / ED-0012 | ED-0005 adds production timeline contracts; ED-0012 adds the first specialized operational product. |
 | `backend/app/contexts/production/evidence/` | Production evidence contract package. | ED-0007 | Backend-only evidence primitives; no reasoning, proposals, or scoring policy. |
 | `backend/app/contexts/production/finding/` | Production finding contract package. | ED-0009 | Backend-only human-reviewable reasoning artifacts; no verification or workflow behavior. |
 | `backend/app/contexts/production/hypothesis/` | Production hypothesis contract package. | ED-0008 | Backend-only hypothesis primitives; no proposals, verification, or action behavior. |
 | `backend/app/contexts/production/observation/` | Production observation contract package. | ED-0006 | Backend-only observation primitives; no reasoning or detection logic. |
 | `backend/app/contexts/production/operational_product/` | Production operational product contract package. | ED-0011 | Backend-only generic execution-layer primitives; no specialized products, persistence, APIs, queues, or workers. |
+| `backend/app/contexts/production/session_window_product/` | Production session window product contract package. | ED-0012 | Backend-only specialized operational product connecting schedule references to verified timeline ranges; no Session aggregate, media storage, packages, persistence, APIs, or frontend behavior. |
 | `backend/app/contexts/production/timeline/` | Production timeline contract package. | ED-0005 | Backend-only continuous recording and session window primitives. |
 | `backend/app/contexts/production/verification/` | Production verification protocol package. | ED-0010 | Backend-only append-only judgment records; no workflow or operational product behavior. |
 | `backend/app/contexts/publishing/` | Publishing & Analytics context package boundary. | ED-0002 | Empty package boundary. |
@@ -170,6 +173,13 @@ Subsequent Engineering Directives build on this completed reasoning model rather
 | `backend/app/contexts/production/operational_product/operational_product_status.py` | Operational product status categories. | ED-0011 | Execution lifecycle status for products only. |
 | `backend/app/contexts/production/operational_product/operational_product_summary.py` | Operational product summary contract. | ED-0011 | Lightweight queue/dashboard summary without workflow policy. |
 | `backend/app/contexts/production/operational_product/operational_product_type.py` | Operational product type categories. | ED-0011 | Broad product family categories only. |
+| `backend/app/contexts/production/session_window_product/__init__.py` | Production session window product package exports. | ED-0012 | Exports specialized session window product contracts. |
+| `backend/app/contexts/production/session_window_product/README.md` | Session window product package guide. | ED-0012 | Documents scope, lineage, boundary confidence, and relationship to ED-0005 `SessionWindow`. |
+| `backend/app/contexts/production/session_window_product/session_window_product.py` | Session window product contract. | ED-0012 | Verified media window for scheduled session information; references Operational Product by ID only. |
+| `backend/app/contexts/production/session_window_product/session_window_product_boundary.py` | Session window product boundary contract. | ED-0012 | Start and end boundary confidence from `0.0` through `1.0`. |
+| `backend/app/contexts/production/session_window_product/session_window_product_lineage.py` | Session window product lineage contract. | ED-0012 | ID-only traceability to Findings, Verification Decisions, and originating Operational Product. |
+| `backend/app/contexts/production/session_window_product/session_window_product_status.py` | Session window product status categories. | ED-0012 | Specialized product lifecycle values, separate from verification and generic Operational Product status. |
+| `backend/app/contexts/production/session_window_product/session_window_product_summary.py` | Session window product summary contract. | ED-0012 | Lightweight dashboard/package-workflow summary without package creation or media rendering. |
 | `backend/app/contexts/production/timeline/recording_block.py` | Continuous recording block contract. | ED-0005 | Represents recording periods, not sessions. |
 | `backend/app/contexts/production/timeline/schedule_reference.py` | External schedule reference contract. | ED-0005 | Uses generic external schedule language. |
 | `backend/app/contexts/production/timeline/session_window.py` | Session window contract. | ED-0005 | Connects schedule reference to verified or proposed media range. |
@@ -197,6 +207,7 @@ Subsequent Engineering Directives build on this completed reasoning model rather
 | `backend/tests/test_production_hypothesis_contracts.py` | Production hypothesis contract tests. | ED-0008 | Covers hypothesis primitives and boundary rules. |
 | `backend/tests/test_production_observation_contracts.py` | Production observation contract tests. | ED-0006 | Covers observation primitives and boundary rules. |
 | `backend/tests/test_production_operational_product_contracts.py` | Production operational product contract tests. | ED-0011 | Covers generic product primitives and boundary rules. |
+| `backend/tests/test_production_session_window_product_contracts.py` | Production session window product contract tests. | ED-0012 | Covers specialized product primitives, lineage, boundary confidence, summaries, and excluded behaviors. |
 | `backend/tests/test_production_timeline_contracts.py` | Production timeline contract tests. | ED-0005 | Tests are placed under `backend/tests/` per existing convention. |
 | `backend/tests/test_production_verification_contracts.py` | Production verification contract tests. | ED-0010 | Covers append-only verification primitives and boundary rules. |
 | `backend/tests/test_shared_contracts.py` | Shared contract tests. | ED-0004 | Covers backend contract primitives. |

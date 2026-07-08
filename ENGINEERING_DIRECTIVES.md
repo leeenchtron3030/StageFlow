@@ -19,6 +19,7 @@ Engineering Directives are the implementation authority for StageFlow. Each dire
 | ED-0009 | Production Finding Foundation | Approved / Implemented | Establishes backend-only Production Context finding contracts as the first human-reviewable reasoning artifacts without verification workflows, operational products, persistence, APIs, or frontend behavior. |
 | ED-0010 | Verification Protocol Foundation | Approved / Implemented | Establishes backend-only Production Context append-only verification decision contracts for judgments about findings without workflows, operational products, persistence, APIs, or frontend behavior. |
 | ED-0011 | Operational Product Foundation | Approved / Implemented | Establishes backend-only Production Context operational product contracts as the generic execution-layer boundary without specialized product implementations, persistence, APIs, queues, workers, or frontend behavior. |
+| ED-0012 | Session Window Product Foundation | Approved / Implemented | Establishes backend-only Production Context session window product contracts as the first specialized operational product without Session aggregates, persistence, APIs, media storage, package generation, integrations, or frontend behavior. |
 
 ## Process
 

@@ -50,6 +50,20 @@ Timeline, Observation, Evidence, Hypothesis, Finding, and Verification form the 
 
 Operational products are downstream of verified reasoning and stay traceable to findings and verification decisions. Specific product types will be implemented by later directives.
 
+## Session Window Products
+
+ED-0012 adds the first specialized Operational Product: the Session Window Product.
+
+A `RecordingBlock` is continuous media, such as a full morning or afternoon recording for one stage.
+
+A `ScheduleReference` points to planned session data from an external schedule source. It is not owned by Production and does not create a Session aggregate.
+
+A `TimelineRange` identifies the actual media offsets inside a `RecordingBlock`.
+
+A `SessionWindowProduct` is the verified product connecting planned schedule information to actual media time. It references the generic `OperationalProduct` by ID only, keeps ID-only lineage to Findings and Verification Decisions, and carries boundary confidence for the start and end of the verified media window.
+
+Packaging comes later. Session Window Products may become inputs to packaging workflows, but ED-0012 does not create packages, clips, rendering, persistence, APIs, workers, queues, or frontend behavior.
+
 ## Continuous Recording Blocks
 
 Real event production often records long stage blocks rather than one file per scheduled session. A `RecordingBlock` represents one continuous stage recording period, such as a morning block or afternoon block.
@@ -61,6 +75,8 @@ A `RecordingBlock` is not a session.
 A `SessionWindow` represents a proposed or verified media range within one `RecordingBlock` that corresponds to scheduled session information.
 
 This lets StageFlow reconcile planned schedule data with actual observed media time.
+
+ED-0012 leaves the ED-0005 `SessionWindow` timeline contract in place. The newer `SessionWindowProduct` is the specialized product downstream of verified reasoning. Future architecture work should decide whether the ED-0005 contract should be renamed, deprecated, or folded into the product model once full Session modeling is specified.
 
 ## Scheduled Time vs Media Time
 
