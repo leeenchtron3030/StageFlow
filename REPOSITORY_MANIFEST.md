@@ -43,6 +43,8 @@ ED-0013 adds Production Events as the provider-agnostic runtime boundary before 
 
 ED-0014 adds Production Event Interpreters as the translation boundary from Production Events into Observations without extending into reasoning.
 
+ED-0015 adds Production Event Dispatchers as the in-memory routing boundary from Production Events to matching Interpreters.
+
 ## Directories
 
 | Path | Purpose | Owning Engineering Directive | Notes |
@@ -63,7 +65,8 @@ ED-0014 adds Production Event Interpreters as the translation boundary from Prod
 | `backend/app/contexts/identity/` | Identity & Access context package boundary. | ED-0002 | Empty package boundary. |
 | `backend/app/contexts/integration/` | Integration context package boundary. | ED-0002 | Empty package boundary. |
 | `backend/app/contexts/packaging/` | Packaging & Delivery context package boundary. | ED-0002 | Empty package boundary. |
-| `backend/app/contexts/production/` | Production context package. | ED-0002 / ED-0005 / ED-0012 / ED-0013 / ED-0014 | ED-0005 adds production timeline contracts; ED-0012 adds the first specialized operational product; ED-0013 adds runtime input events; ED-0014 adds event interpreter contracts. |
+| `backend/app/contexts/production/` | Production context package. | ED-0002 / ED-0005 / ED-0012 / ED-0013 / ED-0014 / ED-0015 | ED-0005 adds production timeline contracts; ED-0012 adds the first specialized operational product; ED-0013 adds runtime input events; ED-0014 adds event interpreter contracts; ED-0015 adds event dispatcher contracts. |
+| `backend/app/contexts/production/dispatcher/` | Production event dispatcher contract package. | ED-0015 | Backend-only in-memory routing boundary from Production Events to matching interpreters; no interpretation, reasoning, infrastructure, persistence, APIs, adapters, or frontend behavior. |
 | `backend/app/contexts/production/evidence/` | Production evidence contract package. | ED-0007 | Backend-only evidence primitives; no reasoning, proposals, or scoring policy. |
 | `backend/app/contexts/production/finding/` | Production finding contract package. | ED-0009 | Backend-only human-reviewable reasoning artifacts; no verification or workflow behavior. |
 | `backend/app/contexts/production/hypothesis/` | Production hypothesis contract package. | ED-0008 | Backend-only hypothesis primitives; no proposals, verification, or action behavior. |
@@ -165,6 +168,13 @@ ED-0014 adds Production Event Interpreters as the translation boundary from Prod
 | `backend/app/contexts/production/evidence/evidence_set.py` | Evidence set contract. | ED-0007 | Groups one or more evidence items. |
 | `backend/app/contexts/production/evidence/evidence_strength.py` | Evidence strength categories. | ED-0007 | Includes contradictory support as first-class evidence. |
 | `backend/app/contexts/production/evidence/evidence_summary.py` | Evidence summary contract. | ED-0007 | Summarizes counts without final confidence. |
+| `backend/app/contexts/production/dispatcher/__init__.py` | Production event dispatcher package exports. | ED-0015 | Exports dispatcher contracts. |
+| `backend/app/contexts/production/dispatcher/README.md` | Production event dispatcher package guide. | ED-0015 | Documents routing responsibility and infrastructure exclusions. |
+| `backend/app/contexts/production/dispatcher/dispatch_context.py` | Dispatch context contract. | ED-0015 | Lightweight routing context convertible to interpreter context. |
+| `backend/app/contexts/production/dispatcher/dispatch_result.py` | Dispatch result contract. | ED-0015 | Aggregates invoked interpreter IDs and InterpreterResults unchanged. |
+| `backend/app/contexts/production/dispatcher/dispatch_rule.py` | Dispatch rule contract. | ED-0015 | Declarative routing intent without execution or discovery. |
+| `backend/app/contexts/production/dispatcher/dispatch_summary.py` | Dispatch summary contract. | ED-0015 | Lightweight diagnostics summary without dispatch execution or provider details. |
+| `backend/app/contexts/production/dispatcher/production_event_dispatcher.py` | Production event dispatcher contract. | ED-0015 | Small in-memory router from Production Events to matching interpreters. |
 | `backend/app/contexts/production/finding/__init__.py` | Production finding package exports. | ED-0009 | Exports finding contracts. |
 | `backend/app/contexts/production/finding/finding.py` | Finding contract. | ED-0009 | Human-reviewable reasoning artifact referencing hypothesis IDs only. |
 | `backend/app/contexts/production/finding/finding_confidence.py` | Finding confidence contract. | ED-0009 | Numeric confidence from `0.0` to `1.0`. |
@@ -238,6 +248,7 @@ ED-0014 adds Production Event Interpreters as the translation boundary from Prod
 | `backend/app/shared/time/time_range.py` | Time range contract. | ED-0004 | Immutable start/end/duration range. |
 | `backend/tests/README.md` | Backend test suite guide. | ED-0002 | Documents health-only coverage. |
 | `backend/tests/test_health.py` | Health endpoint test. | ED-0002 | Verifies startup through FastAPI TestClient. |
+| `backend/tests/test_production_dispatcher_contracts.py` | Production event dispatcher contract tests. | ED-0015 | Covers dispatch routing, contexts, rules, summaries, unchanged interpreter results, and excluded infrastructure behaviors. |
 | `backend/tests/test_production_evidence_contracts.py` | Production evidence contract tests. | ED-0007 | Covers evidence primitives and boundary rules. |
 | `backend/tests/test_production_finding_contracts.py` | Production finding contract tests. | ED-0009 | Covers finding primitives and boundary rules. |
 | `backend/tests/test_production_hypothesis_contracts.py` | Production hypothesis contract tests. | ED-0008 | Covers hypothesis primitives and boundary rules. |
