@@ -21,6 +21,7 @@ Engineering Directives are the implementation authority for StageFlow. Each dire
 | ED-0011 | Operational Product Foundation | Approved / Implemented | Establishes backend-only Production Context operational product contracts as the generic execution-layer boundary without specialized product implementations, persistence, APIs, queues, workers, or frontend behavior. |
 | ED-0012 | Session Window Product Foundation | Approved / Implemented | Establishes backend-only Production Context session window product contracts as the first specialized operational product without Session aggregates, persistence, APIs, media storage, package generation, integrations, or frontend behavior. |
 | ED-0013 | Production Event Foundation | Approved / Implemented | Establishes backend-only Production Context production event contracts as the provider-agnostic runtime boundary before Observations without adapters, ingestion, persistence, APIs, queues, workers, or frontend behavior. |
+| ED-0014 | Production Event Interpreter Foundation | Approved / Implemented | Establishes backend-only Production Context interpreter contracts for translating Production Events into Observations without adapters, reasoning, persistence, APIs, queues, workers, or frontend behavior. |
 
 ## Process
 

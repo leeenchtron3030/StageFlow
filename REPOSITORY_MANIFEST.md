@@ -41,6 +41,8 @@ is a specialized Operational Product produced after verification.
 
 ED-0013 adds Production Events as the provider-agnostic runtime boundary before Observations.
 
+ED-0014 adds Production Event Interpreters as the translation boundary from Production Events into Observations without extending into reasoning.
+
 ## Directories
 
 | Path | Purpose | Owning Engineering Directive | Notes |
@@ -61,10 +63,11 @@ ED-0013 adds Production Events as the provider-agnostic runtime boundary before 
 | `backend/app/contexts/identity/` | Identity & Access context package boundary. | ED-0002 | Empty package boundary. |
 | `backend/app/contexts/integration/` | Integration context package boundary. | ED-0002 | Empty package boundary. |
 | `backend/app/contexts/packaging/` | Packaging & Delivery context package boundary. | ED-0002 | Empty package boundary. |
-| `backend/app/contexts/production/` | Production context package. | ED-0002 / ED-0005 / ED-0012 / ED-0013 | ED-0005 adds production timeline contracts; ED-0012 adds the first specialized operational product; ED-0013 adds runtime input events. |
+| `backend/app/contexts/production/` | Production context package. | ED-0002 / ED-0005 / ED-0012 / ED-0013 / ED-0014 | ED-0005 adds production timeline contracts; ED-0012 adds the first specialized operational product; ED-0013 adds runtime input events; ED-0014 adds event interpreter contracts. |
 | `backend/app/contexts/production/evidence/` | Production evidence contract package. | ED-0007 | Backend-only evidence primitives; no reasoning, proposals, or scoring policy. |
 | `backend/app/contexts/production/finding/` | Production finding contract package. | ED-0009 | Backend-only human-reviewable reasoning artifacts; no verification or workflow behavior. |
 | `backend/app/contexts/production/hypothesis/` | Production hypothesis contract package. | ED-0008 | Backend-only hypothesis primitives; no proposals, verification, or action behavior. |
+| `backend/app/contexts/production/interpreter/` | Production event interpreter contract package. | ED-0014 | Backend-only translation boundary from Production Events to Observations; no adapters, reasoning, persistence, APIs, queues, workers, or frontend behavior. |
 | `backend/app/contexts/production/observation/` | Production observation contract package. | ED-0006 | Backend-only observation primitives; no reasoning or detection logic. |
 | `backend/app/contexts/production/operational_product/` | Production operational product contract package. | ED-0011 | Backend-only generic execution-layer primitives; no specialized products, persistence, APIs, queues, or workers. |
 | `backend/app/contexts/production/production_event/` | Production event contract package. | ED-0013 | Backend-only provider-agnostic runtime input primitives; no adapters, observation generation, persistence, APIs, queues, workers, or frontend behavior. |
@@ -176,6 +179,14 @@ ED-0013 adds Production Events as the provider-agnostic runtime boundary before 
 | `backend/app/contexts/production/hypothesis/hypothesis_status.py` | Hypothesis status categories. | ED-0008 | Tentative lifecycle states only; not verification. |
 | `backend/app/contexts/production/hypothesis/hypothesis_support.py` | Hypothesis support contract. | ED-0008 | References supporting, contradicting, and neutral evidence-set IDs. |
 | `backend/app/contexts/production/hypothesis/hypothesis_type.py` | Hypothesis type categories. | ED-0008 | Tentative possible-meaning categories only. |
+| `backend/app/contexts/production/interpreter/__init__.py` | Production event interpreter package exports. | ED-0014 | Exports interpreter contracts. |
+| `backend/app/contexts/production/interpreter/README.md` | Production event interpreter package guide. | ED-0014 | Documents translation boundary scope and exclusions. |
+| `backend/app/contexts/production/interpreter/interpreter_context.py` | Interpreter context contract. | ED-0014 | Lightweight interpretation context without adapter or persistence objects. |
+| `backend/app/contexts/production/interpreter/interpreter_result.py` | Interpreter result contract. | ED-0014 | Traceable result containing zero or more Observations only. |
+| `backend/app/contexts/production/interpreter/interpreter_rule.py` | Interpreter rule contract. | ED-0014 | Declarative event/source to intended Observation type description without executable logic. |
+| `backend/app/contexts/production/interpreter/interpreter_status.py` | Interpreter status categories. | ED-0014 | Availability values for interpreters only. |
+| `backend/app/contexts/production/interpreter/interpreter_summary.py` | Interpreter summary contract. | ED-0014 | Lightweight diagnostics summary without execution or provider internals. |
+| `backend/app/contexts/production/interpreter/production_event_interpreter.py` | Production event interpreter contract. | ED-0014 | Generic matching and no-op interpretation contract from Production Events to InterpreterResults. |
 | `backend/app/contexts/production/timeline/__init__.py` | Production timeline package exports. | ED-0005 | Exports timeline contracts and statuses. |
 | `backend/app/contexts/production/observation/__init__.py` | Production observation package exports. | ED-0006 | Exports observation contracts. |
 | `backend/app/contexts/production/observation/observation.py` | Observation contract. | ED-0006 | Timestamped statement about something noticed on a recording timeline. |
@@ -230,6 +241,7 @@ ED-0013 adds Production Events as the provider-agnostic runtime boundary before 
 | `backend/tests/test_production_evidence_contracts.py` | Production evidence contract tests. | ED-0007 | Covers evidence primitives and boundary rules. |
 | `backend/tests/test_production_finding_contracts.py` | Production finding contract tests. | ED-0009 | Covers finding primitives and boundary rules. |
 | `backend/tests/test_production_hypothesis_contracts.py` | Production hypothesis contract tests. | ED-0008 | Covers hypothesis primitives and boundary rules. |
+| `backend/tests/test_production_interpreter_contracts.py` | Production event interpreter contract tests. | ED-0014 | Covers interpreter matching, results, context, rules, summaries, and excluded behaviors. |
 | `backend/tests/test_production_observation_contracts.py` | Production observation contract tests. | ED-0006 | Covers observation primitives and boundary rules. |
 | `backend/tests/test_production_operational_product_contracts.py` | Production operational product contract tests. | ED-0011 | Covers generic product primitives and boundary rules. |
 | `backend/tests/test_production_event_contracts.py` | Production event contract tests. | ED-0013 | Covers runtime event primitives, payload immutability, references, summaries, and excluded behaviors. |
