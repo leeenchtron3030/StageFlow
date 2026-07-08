@@ -22,6 +22,18 @@ Adapters will later emit Production Events, and a future Observation Engine may 
 
 Production Events remain provider-agnostic. Event types, sources, references, and payloads use generic runtime language instead of provider or tool names.
 
+## Production Event Dispatchers
+
+ED-0015 adds foundational production event dispatcher contracts only.
+
+The runtime path is `ProductionEvent` -> `ProductionEventDispatcher` -> `ProductionEventInterpreter` -> `Observation`.
+
+The dispatcher routes. It receives available interpreters, determines which ones can receive a Production Event, invokes matching interpreters, and returns one dispatch result.
+
+The dispatcher does not interpret, does not create Observations directly, does not reason, and does not create Evidence, Findings, Verification Decisions, or Operational Products.
+
+ED-0015 does not implement queues, workers, retries, scheduling, plugin discovery, registries, event buses, persistence, APIs, adapters, or frontend behavior.
+
 ## Production Event Interpreters
 
 ED-0014 adds foundational production event interpreter contracts only.
