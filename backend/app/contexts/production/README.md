@@ -44,6 +44,16 @@ Recording System Adapters do not ingest media files, detect chunks, inspect code
 
 Media artifact adapters and provider-specific recording integrations come later.
 
+## Media Artifact Adapters
+
+ED-0017 adds foundational media artifact adapter contracts only.
+
+Media Artifact Adapters report that media-related artifacts exist, changed, finalized, failed, or became unavailable. They emit generic `ProductionEvent` objects.
+
+Media Artifact Adapters do not ingest, validate, transcode, inspect, or process media. They do not register chunks, parse transcripts, extract thumbnails, watch filesystems, dispatch events, interpret events, create Observations, or create reasoning artifacts.
+
+Filesystem watching, media ingestion, media validation, and provider-specific artifact integrations come later.
+
 ## Production Event Interpreters
 
 ED-0014 adds foundational production event interpreter contracts only.

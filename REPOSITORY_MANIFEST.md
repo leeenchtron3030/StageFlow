@@ -47,6 +47,8 @@ ED-0015 adds Production Event Dispatchers as the in-memory routing boundary from
 
 ED-0016 adds Recording System Adapter contracts as the first adapter-facing boundary that emits generic Production Events.
 
+ED-0017 adds Media Artifact Adapter contracts for reporting artifact availability separately from recording activity and media ingestion.
+
 ## Directories
 
 | Path | Purpose | Owning Engineering Directive | Notes |
@@ -67,12 +69,13 @@ ED-0016 adds Recording System Adapter contracts as the first adapter-facing boun
 | `backend/app/contexts/identity/` | Identity & Access context package boundary. | ED-0002 | Empty package boundary. |
 | `backend/app/contexts/integration/` | Integration context package boundary. | ED-0002 | Empty package boundary. |
 | `backend/app/contexts/packaging/` | Packaging & Delivery context package boundary. | ED-0002 | Empty package boundary. |
-| `backend/app/contexts/production/` | Production context package. | ED-0002 / ED-0005 / ED-0012 / ED-0013 / ED-0014 / ED-0015 / ED-0016 | ED-0005 adds production timeline contracts; ED-0012 adds the first specialized operational product; ED-0013 adds runtime input events; ED-0014 adds event interpreter contracts; ED-0015 adds event dispatcher contracts; ED-0016 adds recording adapter contracts. |
+| `backend/app/contexts/production/` | Production context package. | ED-0002 / ED-0005 / ED-0012 / ED-0013 / ED-0014 / ED-0015 / ED-0016 / ED-0017 | ED-0005 adds production timeline contracts; ED-0012 adds the first specialized operational product; ED-0013 adds runtime input events; ED-0014 adds event interpreter contracts; ED-0015 adds event dispatcher contracts; ED-0016 adds recording adapter contracts; ED-0017 adds media artifact adapter contracts. |
 | `backend/app/contexts/production/dispatcher/` | Production event dispatcher contract package. | ED-0015 | Backend-only in-memory routing boundary from Production Events to matching interpreters; no interpretation, reasoning, infrastructure, persistence, APIs, adapters, or frontend behavior. |
 | `backend/app/contexts/production/evidence/` | Production evidence contract package. | ED-0007 | Backend-only evidence primitives; no reasoning, proposals, or scoring policy. |
 | `backend/app/contexts/production/finding/` | Production finding contract package. | ED-0009 | Backend-only human-reviewable reasoning artifacts; no verification or workflow behavior. |
 | `backend/app/contexts/production/hypothesis/` | Production hypothesis contract package. | ED-0008 | Backend-only hypothesis primitives; no proposals, verification, or action behavior. |
 | `backend/app/contexts/production/interpreter/` | Production event interpreter contract package. | ED-0014 | Backend-only translation boundary from Production Events to Observations; no adapters, reasoning, persistence, APIs, queues, workers, or frontend behavior. |
+| `backend/app/contexts/production/media_artifact_adapter/` | Production media artifact adapter contract package. | ED-0017 | Backend-only adapter-facing artifact availability contracts that emit generic Production Events; no filesystem watching, ingestion, validation, chunk registration, persistence, APIs, queues, workers, or frontend behavior. |
 | `backend/app/contexts/production/observation/` | Production observation contract package. | ED-0006 | Backend-only observation primitives; no reasoning or detection logic. |
 | `backend/app/contexts/production/operational_product/` | Production operational product contract package. | ED-0011 | Backend-only generic execution-layer primitives; no specialized products, persistence, APIs, queues, or workers. |
 | `backend/app/contexts/production/production_event/` | Production event contract package. | ED-0013 | Backend-only provider-agnostic runtime input primitives; no adapters, observation generation, persistence, APIs, queues, workers, or frontend behavior. |
@@ -200,6 +203,15 @@ ED-0016 adds Recording System Adapter contracts as the first adapter-facing boun
 | `backend/app/contexts/production/interpreter/interpreter_status.py` | Interpreter status categories. | ED-0014 | Availability values for interpreters only. |
 | `backend/app/contexts/production/interpreter/interpreter_summary.py` | Interpreter summary contract. | ED-0014 | Lightweight diagnostics summary without execution or provider internals. |
 | `backend/app/contexts/production/interpreter/production_event_interpreter.py` | Production event interpreter contract. | ED-0014 | Generic matching and no-op interpretation contract from Production Events to InterpreterResults. |
+| `backend/app/contexts/production/media_artifact_adapter/__init__.py` | Media artifact adapter package exports. | ED-0017 | Exports media artifact adapter contracts. |
+| `backend/app/contexts/production/media_artifact_adapter/README.md` | Media artifact adapter package guide. | ED-0017 | Documents artifact reporting scope, generic Production Event mapping, and exclusions. |
+| `backend/app/contexts/production/media_artifact_adapter/media_artifact_adapter.py` | Media artifact adapter contract. | ED-0017 | Generic adapter contract that emits Production Events only. |
+| `backend/app/contexts/production/media_artifact_adapter/media_artifact_capability.py` | Media artifact adapter capability categories. | ED-0017 | Describes what artifact activity an adapter can report without implementing behavior. |
+| `backend/app/contexts/production/media_artifact_adapter/media_artifact_event.py` | Media artifact event contract. | ED-0017 | Adapter-level artifact availability event with generic Production Event mapping helper. |
+| `backend/app/contexts/production/media_artifact_adapter/media_artifact_identity.py` | Media artifact adapter identity contract. | ED-0017 | Provider-agnostic adapter identity and kind values. |
+| `backend/app/contexts/production/media_artifact_adapter/media_artifact_status.py` | Media artifact status categories. | ED-0017 | Generic artifact availability values, not ingestion or validation state. |
+| `backend/app/contexts/production/media_artifact_adapter/media_artifact_summary.py` | Media artifact adapter summary contract. | ED-0017 | Lightweight diagnostics summary without event creation or media inspection. |
+| `backend/app/contexts/production/media_artifact_adapter/media_artifact_type.py` | Media artifact type categories. | ED-0017 | Broad artifact families without codec or provider-specific types. |
 | `backend/app/contexts/production/timeline/__init__.py` | Production timeline package exports. | ED-0005 | Exports timeline contracts and statuses. |
 | `backend/app/contexts/production/observation/__init__.py` | Production observation package exports. | ED-0006 | Exports observation contracts. |
 | `backend/app/contexts/production/observation/observation.py` | Observation contract. | ED-0006 | Timestamped statement about something noticed on a recording timeline. |
@@ -259,6 +271,7 @@ ED-0016 adds Recording System Adapter contracts as the first adapter-facing boun
 | `backend/app/shared/time/time_range.py` | Time range contract. | ED-0004 | Immutable start/end/duration range. |
 | `backend/tests/README.md` | Backend test suite guide. | ED-0002 | Documents health-only coverage. |
 | `backend/tests/test_health.py` | Health endpoint test. | ED-0002 | Verifies startup through FastAPI TestClient. |
+| `backend/tests/test_media_artifact_adapter_contracts.py` | Media artifact adapter contract tests. | ED-0017 | Covers adapter identity, artifact events, types, statuses, capabilities, Production Event mapping, summaries, and excluded behaviors. |
 | `backend/tests/test_production_dispatcher_contracts.py` | Production event dispatcher contract tests. | ED-0015 | Covers dispatch routing, contexts, rules, summaries, unchanged interpreter results, and excluded infrastructure behaviors. |
 | `backend/tests/test_production_evidence_contracts.py` | Production evidence contract tests. | ED-0007 | Covers evidence primitives and boundary rules. |
 | `backend/tests/test_production_finding_contracts.py` | Production finding contract tests. | ED-0009 | Covers finding primitives and boundary rules. |
