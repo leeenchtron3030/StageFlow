@@ -64,6 +64,16 @@ Schedule Source Adapters report planned activity information. They emit generic 
 
 Future reasoning may reconcile Scheduled Activities with observed reality. ED-0018 does not perform that comparison.
 
+## Runtime Clock
+
+ED-0019 adds foundational runtime clock contracts only.
+
+The Runtime Clock is an ingress source. It emits generic `ProductionEvent` objects when meaningful time boundaries are crossed.
+
+The Runtime Clock does not start StageFlow, schedule work, execute retries, execute timeouts, reconcile schedules, dispatch events, interpret events, create Observations, or decide what happened.
+
+A crossed time boundary only means that a temporal boundary is now relevant. It is not proof that production activity occurred.
+
 ## Production Event Interpreters
 
 ED-0014 adds foundational production event interpreter contracts only.
