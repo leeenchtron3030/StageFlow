@@ -45,6 +45,8 @@ ED-0014 adds Production Event Interpreters as the translation boundary from Prod
 
 ED-0015 adds Production Event Dispatchers as the in-memory routing boundary from Production Events to matching Interpreters.
 
+ED-0016 adds Recording System Adapter contracts as the first adapter-facing boundary that emits generic Production Events.
+
 ## Directories
 
 | Path | Purpose | Owning Engineering Directive | Notes |
@@ -65,7 +67,7 @@ ED-0015 adds Production Event Dispatchers as the in-memory routing boundary from
 | `backend/app/contexts/identity/` | Identity & Access context package boundary. | ED-0002 | Empty package boundary. |
 | `backend/app/contexts/integration/` | Integration context package boundary. | ED-0002 | Empty package boundary. |
 | `backend/app/contexts/packaging/` | Packaging & Delivery context package boundary. | ED-0002 | Empty package boundary. |
-| `backend/app/contexts/production/` | Production context package. | ED-0002 / ED-0005 / ED-0012 / ED-0013 / ED-0014 / ED-0015 | ED-0005 adds production timeline contracts; ED-0012 adds the first specialized operational product; ED-0013 adds runtime input events; ED-0014 adds event interpreter contracts; ED-0015 adds event dispatcher contracts. |
+| `backend/app/contexts/production/` | Production context package. | ED-0002 / ED-0005 / ED-0012 / ED-0013 / ED-0014 / ED-0015 / ED-0016 | ED-0005 adds production timeline contracts; ED-0012 adds the first specialized operational product; ED-0013 adds runtime input events; ED-0014 adds event interpreter contracts; ED-0015 adds event dispatcher contracts; ED-0016 adds recording adapter contracts. |
 | `backend/app/contexts/production/dispatcher/` | Production event dispatcher contract package. | ED-0015 | Backend-only in-memory routing boundary from Production Events to matching interpreters; no interpretation, reasoning, infrastructure, persistence, APIs, adapters, or frontend behavior. |
 | `backend/app/contexts/production/evidence/` | Production evidence contract package. | ED-0007 | Backend-only evidence primitives; no reasoning, proposals, or scoring policy. |
 | `backend/app/contexts/production/finding/` | Production finding contract package. | ED-0009 | Backend-only human-reviewable reasoning artifacts; no verification or workflow behavior. |
@@ -74,6 +76,7 @@ ED-0015 adds Production Event Dispatchers as the in-memory routing boundary from
 | `backend/app/contexts/production/observation/` | Production observation contract package. | ED-0006 | Backend-only observation primitives; no reasoning or detection logic. |
 | `backend/app/contexts/production/operational_product/` | Production operational product contract package. | ED-0011 | Backend-only generic execution-layer primitives; no specialized products, persistence, APIs, queues, or workers. |
 | `backend/app/contexts/production/production_event/` | Production event contract package. | ED-0013 | Backend-only provider-agnostic runtime input primitives; no adapters, observation generation, persistence, APIs, queues, workers, or frontend behavior. |
+| `backend/app/contexts/production/recording_adapter/` | Production recording system adapter contract package. | ED-0016 | Backend-only adapter-facing recording activity contracts that emit generic Production Events; no provider integrations, media ingestion, persistence, APIs, queues, workers, or frontend behavior. |
 | `backend/app/contexts/production/session_window_product/` | Production session window product contract package. | ED-0012 | Backend-only specialized operational product connecting schedule references to verified timeline ranges; no Session aggregate, media storage, packages, persistence, APIs, or frontend behavior. |
 | `backend/app/contexts/production/timeline/` | Production timeline contract package. | ED-0005 | Backend-only continuous recording and session window primitives. |
 | `backend/app/contexts/production/verification/` | Production verification protocol package. | ED-0010 | Backend-only append-only judgment records; no workflow or operational product behavior. |
@@ -219,6 +222,14 @@ ED-0015 adds Production Event Dispatchers as the in-memory routing boundary from
 | `backend/app/contexts/production/production_event/production_event_source.py` | Production event source categories. | ED-0013 | Provider-agnostic source categories only. |
 | `backend/app/contexts/production/production_event/production_event_summary.py` | Production event summary contract. | ED-0013 | Lightweight log and diagnostics summary without reasoning or workflow triggers. |
 | `backend/app/contexts/production/production_event/production_event_type.py` | Production event type categories. | ED-0013 | Generic happened-event types without conclusion-oriented names. |
+| `backend/app/contexts/production/recording_adapter/__init__.py` | Recording system adapter package exports. | ED-0016 | Exports recording adapter contracts. |
+| `backend/app/contexts/production/recording_adapter/README.md` | Recording system adapter package guide. | ED-0016 | Documents adapter scope, generic Production Event mapping, and exclusions. |
+| `backend/app/contexts/production/recording_adapter/recording_adapter_capability.py` | Recording adapter capability categories. | ED-0016 | Describes what a recording adapter can report without implementing behavior. |
+| `backend/app/contexts/production/recording_adapter/recording_adapter_identity.py` | Recording adapter identity contract. | ED-0016 | Provider-agnostic adapter identity and kind values. |
+| `backend/app/contexts/production/recording_adapter/recording_adapter_summary.py` | Recording adapter summary contract. | ED-0016 | Lightweight diagnostics summary without event creation or media inspection. |
+| `backend/app/contexts/production/recording_adapter/recording_session_event.py` | Recording session event contract. | ED-0016 | Adapter-level recording activity event with generic Production Event mapping helper. |
+| `backend/app/contexts/production/recording_adapter/recording_system_adapter.py` | Recording system adapter contract. | ED-0016 | Generic adapter contract that emits Production Events only. |
+| `backend/app/contexts/production/recording_adapter/recording_system_status.py` | Recording system status categories. | ED-0016 | Generic recording system or adapter status values. |
 | `backend/app/contexts/production/session_window_product/__init__.py` | Production session window product package exports. | ED-0012 | Exports specialized session window product contracts. |
 | `backend/app/contexts/production/session_window_product/README.md` | Session window product package guide. | ED-0012 | Documents scope, lineage, boundary confidence, and relationship to ED-0005 `SessionWindow`. |
 | `backend/app/contexts/production/session_window_product/session_window_product.py` | Session window product contract. | ED-0012 | Verified media window for scheduled session information; references Operational Product by ID only. |
@@ -259,6 +270,7 @@ ED-0015 adds Production Event Dispatchers as the in-memory routing boundary from
 | `backend/tests/test_production_session_window_product_contracts.py` | Production session window product contract tests. | ED-0012 | Covers specialized product primitives, lineage, boundary confidence, summaries, and excluded behaviors. |
 | `backend/tests/test_production_timeline_contracts.py` | Production timeline contract tests. | ED-0005 | Tests are placed under `backend/tests/` per existing convention. |
 | `backend/tests/test_production_verification_contracts.py` | Production verification contract tests. | ED-0010 | Covers append-only verification primitives and boundary rules. |
+| `backend/tests/test_recording_system_adapter_contracts.py` | Recording system adapter contract tests. | ED-0016 | Covers adapter identity, status, capabilities, session events, Production Event mapping, summaries, and excluded behaviors. |
 | `backend/tests/test_shared_contracts.py` | Shared contract tests. | ED-0004 | Covers backend contract primitives. |
 
 ## Frontend Files
