@@ -22,6 +22,16 @@ Adapters will later emit Production Events, and a future Observation Engine may 
 
 Production Events remain provider-agnostic. Event types, sources, references, and payloads use generic runtime language instead of provider or tool names.
 
+## Production Event Interpreters
+
+ED-0014 adds foundational production event interpreter contracts only.
+
+Production Event Interpreters translate Production Events into Observations. They define which event types and sources they support, may return zero or more Observations, and preserve traceability back to the source Production Event.
+
+Interpreters do not reason. Evidence, Hypothesis, Finding, Verification Decision, and Operational Product generation all come later.
+
+ED-0014 does not implement provider adapters, ingestion, webhook handlers, file watching, transcription, OCR, AI analysis, persistence, APIs, queues, workers, frontend behavior, or workflow execution.
+
 ## Observation Primitives
 
 ED-0006 adds foundational production observation contracts only.
