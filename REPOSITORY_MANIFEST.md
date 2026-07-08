@@ -25,6 +25,20 @@ ED-0012 adds the first specialized Operational Product: the Session Window Produ
 
 Subsequent Engineering Directives build on this completed reasoning model and specialized product foundation rather than extending the reasoning layer.
 
+## Architecture Release AR-1.5
+
+Clarifies terminology between reasoning-layer timeline artifacts and execution-layer operational products.
+
+Introduces the concept:
+
+Timeline Window Candidate
+
+Clarifies that:
+
+Session Window Product
+
+is a specialized Operational Product produced after verification.
+
 ## Directories
 
 | Path | Purpose | Owning Engineering Directive | Notes |

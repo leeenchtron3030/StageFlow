@@ -63,3 +63,29 @@ Finding
 Verification Decision
 ↓
 Operational Product
+
+## ADR-0010 — Timeline Candidates Are Not Operational Products
+
+Early versions of StageFlow used the term Session Window for timeline-level candidate ranges.
+
+As the reasoning architecture matured, it became clear that this object belongs to the timeline reasoning layer rather than the execution layer.
+
+The timeline layer proposes possible media ranges.
+
+Operational Products represent verified work products.
+
+Therefore:
+
+TimelineWindowCandidate
+
+and
+
+SessionWindowProduct
+
+represent different concepts.
+
+TimelineWindowCandidate exists before verification.
+
+SessionWindowProduct exists after verification.
+
+The distinction preserves a clean separation between reasoning and execution.
