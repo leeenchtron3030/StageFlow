@@ -118,6 +118,16 @@ Observation Interpreters may create Observations, but they do not create Evidenc
 
 The ED-0014 `production/interpreter` package remains in place for now. ED-0023 documents and implements the more explicit Observation Interpreter contract layer without consolidating or renaming the earlier generic interpreter primitives.
 
+## Recording Activity Observation Interpreter
+
+ED-0024 adds the first concrete Observation Interpreter and serves as the reference implementation pattern for future interpreters.
+
+The Recording Activity Observation Interpreter translates recording-system `ProductionEvent` objects into objective recording activity `Observation` objects: recording activity began, paused, resumed, or ended.
+
+It preserves source Production Event traceability and does not infer sessions, clips, schedules, speakers, performances, production readiness, Evidence, Hypotheses, Findings, Verification Decisions, Operational Products, provider behavior, persistence, APIs, queues, workers, or frontend behavior.
+
+Because the current `Observation` contract requires a timeline location while recording activity Production Events do not yet carry precise media offsets, ED-0024 records generated observations against the referenced recording block and recommends a future directive for explicit event-to-timeline positioning.
+
 ## Observation Primitives
 
 ED-0006 adds foundational production observation contracts only.
