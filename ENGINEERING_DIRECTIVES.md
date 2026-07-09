@@ -32,6 +32,7 @@ Engineering Directives are the implementation authority for StageFlow. Each dire
 | ED-0022 | Operator Source Adapter Contract | Approved / Implemented | Establishes backend-only Production Context operator source adapter contracts that emit generic Production Events without UI, authentication, permissions, workflows, review systems, correctness determination, reasoning, APIs, persistence, queues, workers, or frontend behavior. |
 | ED-0023 | Observation Interpreter Contract | Approved / Implemented | Establishes backend-only Production Context Observation Interpreter contracts for translating Production Events into objective Observations without provider adapters, Evidence, Hypotheses, Findings, Verification Decisions, Operational Products, APIs, persistence, queues, workers, or frontend behavior. |
 | AR-2.0 | Observational Intelligence Architecture | Approved / Documented | Follows ED-0022 and establishes StageFlow as an observational intelligence system for live event media, with Production Events as the universal ingress language and reasoning as the path from Observations to Operational Products. |
+| ED-0024 | Recording Activity Observation Interpreter Contract | Approved / Implemented | Establishes the first concrete backend-only Observation Interpreter, translating recording activity Production Events into objective recording activity Observations without reasoning, cross-domain interpretation, provider-specific behavior, APIs, persistence, queues, workers, AI, or frontend behavior. |
 
 ## Process
 
