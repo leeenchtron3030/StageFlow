@@ -59,6 +59,8 @@ ED-0021 adds Vision Source Adapter contracts for visual detection reporting, pre
 
 ED-0022 adds Operator Source Adapter contracts for intentional human input, preserving that human-supplied information enters the same reasoning pipeline as every other source.
 
+ED-0023 adds explicit Observation Interpreter contracts for translating one or more Production Events into objective Observations without creating later reasoning artifacts.
+
 ## Architecture Release AR-2.0
 
 AR-2.0 formalizes StageFlow as an observational intelligence system for live event media.
@@ -91,7 +93,7 @@ It also marks the transition from foundational architecture to observational int
 | `backend/app/contexts/identity/` | Identity & Access context package boundary. | ED-0002 | Empty package boundary. |
 | `backend/app/contexts/integration/` | Integration context package boundary. | ED-0002 | Empty package boundary. |
 | `backend/app/contexts/packaging/` | Packaging & Delivery context package boundary. | ED-0002 | Empty package boundary. |
-| `backend/app/contexts/production/` | Production context package. | ED-0002 / ED-0005 / ED-0012 / ED-0013 / ED-0014 / ED-0015 / ED-0016 / ED-0017 / ED-0018 / ED-0019 / ED-0020 / ED-0021 / ED-0022 | ED-0005 adds production timeline contracts; ED-0012 adds the first specialized operational product; ED-0013 adds runtime input events; ED-0014 adds event interpreter contracts; ED-0015 adds event dispatcher contracts; ED-0016 adds recording adapter contracts; ED-0017 adds media artifact adapter contracts; ED-0018 adds schedule adapter contracts; ED-0019 adds runtime clock contracts; ED-0020 adds transcript adapter contracts; ED-0021 adds vision adapter contracts; ED-0022 adds operator adapter contracts. |
+| `backend/app/contexts/production/` | Production context package. | ED-0002 / ED-0005 / ED-0012 / ED-0013 / ED-0014 / ED-0015 / ED-0016 / ED-0017 / ED-0018 / ED-0019 / ED-0020 / ED-0021 / ED-0022 / ED-0023 | ED-0005 adds production timeline contracts; ED-0012 adds the first specialized operational product; ED-0013 adds runtime input events; ED-0014 adds event interpreter contracts; ED-0015 adds event dispatcher contracts; ED-0016 adds recording adapter contracts; ED-0017 adds media artifact adapter contracts; ED-0018 adds schedule adapter contracts; ED-0019 adds runtime clock contracts; ED-0020 adds transcript adapter contracts; ED-0021 adds vision adapter contracts; ED-0022 adds operator adapter contracts; ED-0023 adds observation interpreter contracts. |
 | `backend/app/contexts/production/dispatcher/` | Production event dispatcher contract package. | ED-0015 | Backend-only in-memory routing boundary from Production Events to matching interpreters; no interpretation, reasoning, infrastructure, persistence, APIs, adapters, or frontend behavior. |
 | `backend/app/contexts/production/evidence/` | Production evidence contract package. | ED-0007 | Backend-only evidence primitives; no reasoning, proposals, or scoring policy. |
 | `backend/app/contexts/production/finding/` | Production finding contract package. | ED-0009 | Backend-only human-reviewable reasoning artifacts; no verification or workflow behavior. |
@@ -99,6 +101,7 @@ It also marks the transition from foundational architecture to observational int
 | `backend/app/contexts/production/interpreter/` | Production event interpreter contract package. | ED-0014 | Backend-only translation boundary from Production Events to Observations; no adapters, reasoning, persistence, APIs, queues, workers, or frontend behavior. |
 | `backend/app/contexts/production/media_artifact_adapter/` | Production media artifact adapter contract package. | ED-0017 | Backend-only adapter-facing artifact availability contracts that emit generic Production Events; no filesystem watching, ingestion, validation, chunk registration, persistence, APIs, queues, workers, or frontend behavior. |
 | `backend/app/contexts/production/observation/` | Production observation contract package. | ED-0006 | Backend-only observation primitives; no reasoning or detection logic. |
+| `backend/app/contexts/production/observation_interpreter/` | Production observation interpreter contract package. | ED-0023 | Backend-only AR-2.0 interpreter contracts for translating Production Events into objective Observations; no Evidence, Hypotheses, Findings, Verification Decisions, Operational Products, persistence, APIs, queues, workers, adapters, or frontend behavior. |
 | `backend/app/contexts/production/operator_adapter/` | Production operator source adapter contract package. | ED-0022 | Backend-only intentional human input contracts that emit generic Production Events; no UI, authentication, permissions, workflows, review systems, correctness determination, reasoning, persistence, APIs, queues, workers, or frontend behavior. |
 | `backend/app/contexts/production/operational_product/` | Production operational product contract package. | ED-0011 | Backend-only generic execution-layer primitives; no specialized products, persistence, APIs, queues, or workers. |
 | `backend/app/contexts/production/production_event/` | Production event contract package. | ED-0013 | Backend-only provider-agnostic runtime input primitives; no adapters, observation generation, persistence, APIs, queues, workers, or frontend behavior. |
@@ -246,6 +249,14 @@ It also marks the transition from foundational architecture to observational int
 | `backend/app/contexts/production/observation/observation_location.py` | Observation location contract. | ED-0006 | Point or range on a production timeline. |
 | `backend/app/contexts/production/observation/observation_source.py` | Observation source categories. | ED-0006 | Generic source categories only. |
 | `backend/app/contexts/production/observation/observation_type.py` | Observation type categories. | ED-0006 | Generic observation types only; no conclusions. |
+| `backend/app/contexts/production/observation_interpreter/__init__.py` | Observation interpreter package exports. | ED-0023 | Exports Observation Interpreter contracts. |
+| `backend/app/contexts/production/observation_interpreter/README.md` | Observation interpreter package guide. | ED-0023 | Documents the Production Event to Observation boundary and relationship to ED-0014. |
+| `backend/app/contexts/production/observation_interpreter/observation_interpreter.py` | Observation interpreter contract. | ED-0023 | Generic contract for translating one or more Production Events into objective Observations. |
+| `backend/app/contexts/production/observation_interpreter/observation_interpreter_context.py` | Observation interpreter context contract. | ED-0023 | Lightweight context without adapter, persistence, or session aggregate objects. |
+| `backend/app/contexts/production/observation_interpreter/observation_interpreter_policy.py` | Observation interpreter policy contract. | ED-0023 | Small policy settings without scoring, reasoning, or workflow behavior. |
+| `backend/app/contexts/production/observation_interpreter/observation_interpreter_result.py` | Observation interpreter result contract. | ED-0023 | Traceable result containing source Production Event IDs and Observations only. |
+| `backend/app/contexts/production/observation_interpreter/observation_interpreter_rule.py` | Observation interpreter rule contract. | ED-0023 | Declarative interpretation intent without execution or Observation creation. |
+| `backend/app/contexts/production/observation_interpreter/observation_interpreter_summary.py` | Observation interpreter summary contract. | ED-0023 | Lightweight diagnostics summary without interpretation or provider details. |
 | `backend/app/contexts/production/operator_adapter/__init__.py` | Operator source adapter package exports. | ED-0022 | Exports operator adapter contracts. |
 | `backend/app/contexts/production/operator_adapter/README.md` | Operator source adapter package guide. | ED-0022 | Documents intentional human input reporting, Production Event mapping, and exclusions. |
 | `backend/app/contexts/production/operator_adapter/operator_adapter_capability.py` | Operator adapter capability categories. | ED-0022 | Describes what operator input an adapter can report without implementing behavior. |
@@ -344,6 +355,7 @@ It also marks the transition from foundational architecture to observational int
 | `backend/tests/README.md` | Backend test suite guide. | ED-0002 | Documents health-only coverage. |
 | `backend/tests/test_health.py` | Health endpoint test. | ED-0002 | Verifies startup through FastAPI TestClient. |
 | `backend/tests/test_media_artifact_adapter_contracts.py` | Media artifact adapter contract tests. | ED-0017 | Covers adapter identity, artifact events, types, statuses, capabilities, Production Event mapping, summaries, and excluded behaviors. |
+| `backend/tests/test_observation_interpreter_contracts.py` | Observation interpreter contract tests. | ED-0023 | Covers interpreter creation, support declarations, single and multi-event interpretation, result traceability, policy, summaries, and excluded behaviors. |
 | `backend/tests/test_operator_source_adapter_contracts.py` | Operator source adapter contract tests. | ED-0022 | Covers adapter identity, operator events, types, statuses, capabilities, Production Event mapping, summaries, and excluded behaviors. |
 | `backend/tests/test_production_dispatcher_contracts.py` | Production event dispatcher contract tests. | ED-0015 | Covers dispatch routing, contexts, rules, summaries, unchanged interpreter results, and excluded infrastructure behaviors. |
 | `backend/tests/test_production_evidence_contracts.py` | Production evidence contract tests. | ED-0007 | Covers evidence primitives and boundary rules. |
