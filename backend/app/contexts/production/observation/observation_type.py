@@ -7,6 +7,7 @@ class ObservationType(StrEnum):
     TIME_BOUNDARY = "time_boundary"
     SCHEDULE_ACTIVITY = "schedule_activity"
     TRANSCRIPT_ACTIVITY = "transcript_activity"
+    VISION_ACTIVITY = "vision_activity"
     SPEECH_DETECTED = "speech_detected"
     TITLE_DETECTED = "title_detected"
     GRAPHIC_CHANGED = "graphic_changed"
