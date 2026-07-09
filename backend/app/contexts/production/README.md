@@ -168,6 +168,16 @@ It observes language availability only. It does not summarize transcript text, i
 
 Language is observable. Meaning is reasoning. Transcript Observations may preserve text excerpts exactly as observed data, but they do not interpret that text.
 
+## Vision Observation Interpreter
+
+ED-0030 adds the sixth concrete Observation Interpreter.
+
+The Vision Observation Interpreter translates vision-source `ProductionEvent` objects into objective vision `Observation` objects: visual text region was detected, visual slide change was detected, visual image change was detected, visual camera obstruction was detected, generic visual phenomenon was detected, or vision source status changed.
+
+It observes visual phenomena only. It does not perform OCR, interpret detected text, identify logos, identify faces or people, classify scene meaning, infer sessions, infer clips, infer production state, create reasoning artifacts, introduce persistence, APIs, queues, workers, AI, provider-specific behavior, or frontend behavior.
+
+Vision is observable. Visual meaning is reasoning. Vision Observations may preserve visual detection metadata exactly as observed data, but they do not interpret that metadata.
+
 ## Observation Location Refinement
 
 ED-0025 refines `ObservationLocation` so media timeline anchors are not the only valid location kind.

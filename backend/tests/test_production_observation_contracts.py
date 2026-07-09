@@ -55,6 +55,7 @@ def test_observation_type_allowed_values() -> None:
         "time_boundary",
         "schedule_activity",
         "transcript_activity",
+        "vision_activity",
         "speech_detected",
         "title_detected",
         "graphic_changed",
