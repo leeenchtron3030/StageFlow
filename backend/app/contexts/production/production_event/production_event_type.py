@@ -15,6 +15,7 @@ class ProductionEventType(StrEnum):
     OCR_TEXT_AVAILABLE = "ocr_text_available"
     AUDIO_LEVEL_CHANGED = "audio_level_changed"
     AUDIO_SPIKE_DETECTED = "audio_spike_detected"
+    OPERATOR_INPUT_RECEIVED = "operator_input_received"
     MANUAL_MARKER_ADDED = "manual_marker_added"
     OPERATOR_NOTE_ADDED = "operator_note_added"
     LIVESTREAM_STATUS_CHANGED = "livestream_status_changed"

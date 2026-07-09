@@ -90,6 +90,14 @@ Vision Source Adapters report that visual detections or visual artifacts exist. 
 
 Semantic interpretation belongs to later Interpreters and reasoning. A visual detection becoming available is a Production Event, not an Observation, session boundary, speaker appearance, title match, recognized logo, slide meaning, or clip-worthy moment.
 
+## Operator Source Adapters
+
+ED-0022 adds foundational operator source adapter contracts only.
+
+Operator Source Adapters report information intentionally supplied by a human operator. They emit generic `ProductionEvent` objects and do not implement UI, authentication, permissions, workflows, review systems, validation, correctness determination, or reasoning.
+
+Human input is observable information, not automatically truth. It participates in reasoning like every other observation source and does not bypass Observations, Evidence, Hypotheses, Findings, or Verification.
+
 ## Production Event Interpreters
 
 ED-0014 adds foundational production event interpreter contracts only.

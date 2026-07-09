@@ -29,6 +29,7 @@ Engineering Directives are the implementation authority for StageFlow. Each dire
 | ED-0019 | Runtime Clock Contract | Approved / Implemented | Establishes backend-only Production Context runtime clock contracts that emit generic Production Events for crossed time boundaries without scheduling infrastructure, retries, reconciliation, APIs, persistence, queues, workers, or frontend behavior. |
 | ED-0020 | Transcript Source Adapter Contract | Approved / Implemented | Establishes backend-only Production Context transcript source adapter contracts that emit generic Production Events without transcription execution, audio processing, model calls, Observations, reasoning, APIs, persistence, queues, workers, or frontend behavior. |
 | ED-0021 | Vision Source Adapter Contract | Approved / Implemented | Establishes backend-only Production Context vision source adapter contracts that emit generic Production Events without OCR, computer vision execution, model calls, Observations, reasoning, APIs, persistence, queues, workers, or frontend behavior. |
+| ED-0022 | Operator Source Adapter Contract | Approved / Implemented | Establishes backend-only Production Context operator source adapter contracts that emit generic Production Events without UI, authentication, permissions, workflows, review systems, correctness determination, reasoning, APIs, persistence, queues, workers, or frontend behavior. |
 
 ## Process
 
