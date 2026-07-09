@@ -108,6 +108,16 @@ Interpreters do not reason. Evidence, Hypothesis, Finding, Verification Decision
 
 ED-0014 does not implement provider adapters, ingestion, webhook handlers, file watching, transcription, OCR, AI analysis, persistence, APIs, queues, workers, frontend behavior, or workflow execution.
 
+## Observation Interpreters
+
+ED-0023 adds explicit Observation Interpreter contracts for AR-2.0.
+
+Observation Interpreters translate one or more `ProductionEvent` objects into zero or more objective `Observation` objects. Production Events are runtime facts; Observations are objective things StageFlow noticed about those facts.
+
+Observation Interpreters may create Observations, but they do not create Evidence, Hypotheses, Findings, Verification Decisions, Operational Products, provider adapters, persistence, APIs, queues, workers, or frontend behavior.
+
+The ED-0014 `production/interpreter` package remains in place for now. ED-0023 documents and implements the more explicit Observation Interpreter contract layer without consolidating or renaming the earlier generic interpreter primitives.
+
 ## Observation Primitives
 
 ED-0006 adds foundational production observation contracts only.
