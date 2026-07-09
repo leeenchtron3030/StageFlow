@@ -138,6 +138,16 @@ It observes artifact availability and lifecycle changes only. It does not ingest
 
 The interpreter uses ED-0025 `ObservationLocation` anchors truthfully: recording block when available, otherwise wall-clock event time.
 
+## Runtime Clock Observation Interpreter
+
+ED-0027 adds the third concrete Observation Interpreter.
+
+The Runtime Clock Observation Interpreter translates runtime clock `ProductionEvent` objects into objective time-boundary `Observation` objects: scheduled time boundary was reached, timer boundary elapsed, or runtime clock status changed.
+
+It observes time-boundary facts only. It does not reconcile schedules, infer sessions, infer activity start or end, infer recording failures, infer production delays, execute retries, execute timeouts, create reasoning artifacts, introduce persistence, APIs, queues, workers, AI, provider-specific behavior, or frontend behavior.
+
+The interpreter uses ED-0025 `ObservationLocation` anchors truthfully and prefers wall-clock event time. A time boundary being crossed is temporal information, not proof that production activity happened.
+
 ## Observation Location Refinement
 
 ED-0025 refines `ObservationLocation` so media timeline anchors are not the only valid location kind.

@@ -4,6 +4,7 @@ from enum import StrEnum
 class ObservationType(StrEnum):
     RECORDING_ACTIVITY = "recording_activity"
     MEDIA_ARTIFACT = "media_artifact"
+    TIME_BOUNDARY = "time_boundary"
     SPEECH_DETECTED = "speech_detected"
     TITLE_DETECTED = "title_detected"
     GRAPHIC_CHANGED = "graphic_changed"
