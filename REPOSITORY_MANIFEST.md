@@ -53,6 +53,8 @@ ED-0018 adds Schedule Source Adapter contracts for planned activities, preservin
 
 ED-0019 adds Runtime Clock contracts as a time-boundary ingress source that emits generic Production Events without scheduling work.
 
+ED-0020 adds Transcript Source Adapter contracts for transcript availability reporting, preserving the separation between words becoming available and later text meaning.
+
 ## Directories
 
 | Path | Purpose | Owning Engineering Directive | Notes |
@@ -73,7 +75,7 @@ ED-0019 adds Runtime Clock contracts as a time-boundary ingress source that emit
 | `backend/app/contexts/identity/` | Identity & Access context package boundary. | ED-0002 | Empty package boundary. |
 | `backend/app/contexts/integration/` | Integration context package boundary. | ED-0002 | Empty package boundary. |
 | `backend/app/contexts/packaging/` | Packaging & Delivery context package boundary. | ED-0002 | Empty package boundary. |
-| `backend/app/contexts/production/` | Production context package. | ED-0002 / ED-0005 / ED-0012 / ED-0013 / ED-0014 / ED-0015 / ED-0016 / ED-0017 / ED-0018 / ED-0019 | ED-0005 adds production timeline contracts; ED-0012 adds the first specialized operational product; ED-0013 adds runtime input events; ED-0014 adds event interpreter contracts; ED-0015 adds event dispatcher contracts; ED-0016 adds recording adapter contracts; ED-0017 adds media artifact adapter contracts; ED-0018 adds schedule adapter contracts; ED-0019 adds runtime clock contracts. |
+| `backend/app/contexts/production/` | Production context package. | ED-0002 / ED-0005 / ED-0012 / ED-0013 / ED-0014 / ED-0015 / ED-0016 / ED-0017 / ED-0018 / ED-0019 / ED-0020 | ED-0005 adds production timeline contracts; ED-0012 adds the first specialized operational product; ED-0013 adds runtime input events; ED-0014 adds event interpreter contracts; ED-0015 adds event dispatcher contracts; ED-0016 adds recording adapter contracts; ED-0017 adds media artifact adapter contracts; ED-0018 adds schedule adapter contracts; ED-0019 adds runtime clock contracts; ED-0020 adds transcript adapter contracts. |
 | `backend/app/contexts/production/dispatcher/` | Production event dispatcher contract package. | ED-0015 | Backend-only in-memory routing boundary from Production Events to matching interpreters; no interpretation, reasoning, infrastructure, persistence, APIs, adapters, or frontend behavior. |
 | `backend/app/contexts/production/evidence/` | Production evidence contract package. | ED-0007 | Backend-only evidence primitives; no reasoning, proposals, or scoring policy. |
 | `backend/app/contexts/production/finding/` | Production finding contract package. | ED-0009 | Backend-only human-reviewable reasoning artifacts; no verification or workflow behavior. |
@@ -88,6 +90,7 @@ ED-0019 adds Runtime Clock contracts as a time-boundary ingress source that emit
 | `backend/app/contexts/production/schedule_adapter/` | Production schedule source adapter contract package. | ED-0018 | Backend-only planned-activity contracts that emit generic Production Events; no provider integrations, Sessions, Observations, reasoning, persistence, APIs, queues, workers, or frontend behavior. |
 | `backend/app/contexts/production/session_window_product/` | Production session window product contract package. | ED-0012 | Backend-only specialized operational product connecting schedule references to verified timeline ranges; no Session aggregate, media storage, packages, persistence, APIs, or frontend behavior. |
 | `backend/app/contexts/production/timeline/` | Production timeline contract package. | ED-0005 | Backend-only continuous recording and session window primitives. |
+| `backend/app/contexts/production/transcript_adapter/` | Production transcript source adapter contract package. | ED-0020 | Backend-only transcript availability contracts that emit generic Production Events; no transcription execution, audio processing, model calls, text interpretation, persistence, APIs, queues, workers, or frontend behavior. |
 | `backend/app/contexts/production/verification/` | Production verification protocol package. | ED-0010 | Backend-only append-only judgment records; no workflow or operational product behavior. |
 | `backend/app/contexts/publishing/` | Publishing & Analytics context package boundary. | ED-0002 | Empty package boundary. |
 | `backend/app/contexts/rendering/` | Media Rendering context package boundary. | ED-0002 | Empty package boundary. |
@@ -278,6 +281,15 @@ ED-0019 adds Runtime Clock contracts as a time-boundary ingress source that emit
 | `backend/app/contexts/production/timeline/session_window.py` | Session window contract. | ED-0005 | Connects schedule reference to verified or proposed media range. |
 | `backend/app/contexts/production/timeline/timeline_position.py` | Timeline position contract. | ED-0005 | Offset within a recording block. |
 | `backend/app/contexts/production/timeline/timeline_range.py` | Timeline range contract. | ED-0005 | Span within one recording block. |
+| `backend/app/contexts/production/transcript_adapter/__init__.py` | Transcript source adapter package exports. | ED-0020 | Exports transcript adapter contracts. |
+| `backend/app/contexts/production/transcript_adapter/README.md` | Transcript source adapter package guide. | ED-0020 | Documents transcript availability reporting, Production Event mapping, and exclusions. |
+| `backend/app/contexts/production/transcript_adapter/transcript_adapter_capability.py` | Transcript adapter capability categories. | ED-0020 | Describes what transcript information an adapter can report without implementing behavior. |
+| `backend/app/contexts/production/transcript_adapter/transcript_adapter_identity.py` | Transcript adapter identity contract. | ED-0020 | Generic adapter identity and kind values without source-specific names. |
+| `backend/app/contexts/production/transcript_adapter/transcript_adapter_summary.py` | Transcript adapter summary contract. | ED-0020 | Lightweight diagnostics summary without event dispatch or interpretation. |
+| `backend/app/contexts/production/transcript_adapter/transcript_artifact_type.py` | Transcript artifact type categories. | ED-0020 | Generic transcript artifact categories without source-specific assumptions. |
+| `backend/app/contexts/production/transcript_adapter/transcript_segment_event.py` | Transcript segment event contract. | ED-0020 | Adapter-level transcript activity event with generic Production Event mapping helper. |
+| `backend/app/contexts/production/transcript_adapter/transcript_segment_status.py` | Transcript segment status categories. | ED-0020 | Transcript artifact availability status values, not correctness or approval states. |
+| `backend/app/contexts/production/transcript_adapter/transcript_source_adapter.py` | Transcript source adapter contract. | ED-0020 | Generic transcript adapter contract that emits Production Events only. |
 | `backend/app/contexts/production/verification/__init__.py` | Production verification package exports. | ED-0010 | Exports verification protocol contracts. |
 | `backend/app/contexts/production/verification/verification_action.py` | Verification action categories. | ED-0010 | Judgment action values; not workflow states. |
 | `backend/app/contexts/production/verification/verification_actor.py` | Verification actor contract. | ED-0010 | References decision actor IDs without user/auth behavior. |
@@ -311,6 +323,7 @@ ED-0019 adds Runtime Clock contracts as a time-boundary ingress source that emit
 | `backend/tests/test_runtime_clock_contracts.py` | Runtime clock contract tests. | ED-0019 | Covers clock contracts, time boundaries, boundary evaluation, Production Event mapping, summaries, and excluded behaviors. |
 | `backend/tests/test_schedule_source_adapter_contracts.py` | Schedule source adapter contract tests. | ED-0018 | Covers planned activity contracts, schedule adapter capabilities, Production Event mapping, summaries, and excluded behaviors. |
 | `backend/tests/test_shared_contracts.py` | Shared contract tests. | ED-0004 | Covers backend contract primitives. |
+| `backend/tests/test_transcript_source_adapter_contracts.py` | Transcript source adapter contract tests. | ED-0020 | Covers adapter identity, segment events, artifact types, statuses, capabilities, Production Event mapping, summaries, and excluded behaviors. |
 
 ## Frontend Files
 
