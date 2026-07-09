@@ -89,3 +89,39 @@ TimelineWindowCandidate exists before verification.
 SessionWindowProduct exists after verification.
 
 The distinction preserves a clean separation between reasoning and execution.
+
+## ADR-0011 — Production Events Are The Universal Ingress Language
+
+Every source of observable reality enters StageFlow as a Production Event before it can become an Observation.
+
+Recording systems, media artifact sources, schedule sources, runtime clocks, transcript sources, vision sources, and operator sources all emit Production Events through adapter contracts.
+
+Adapters do not create Observations, Evidence, Hypotheses, Findings, Verification Decisions, or Operational Products.
+
+This keeps ingress small, generic, and explainable.
+
+## ADR-0012 — Recorded Media Anchors Observable Reality
+
+Recorded media is the primary reference for what actually happened.
+
+Schedules, transcripts, vision detections, operator input, clock events, and other production signals enrich and contextualize recorded media, but they do not replace it.
+
+Reasoning may use those signals to explain production reality, but recorded production remains the anchor for observable reality.
+
+## ADR-0013 — Planned Reality And Observed Reality Remain Separate
+
+Schedules describe intent.
+
+Observations describe perceived reality.
+
+StageFlow must never treat planned intent as proof that production activity occurred.
+
+Reasoning reconciles planned intent with observed media and supporting production signals.
+
+## ADR-0014 — Runtime Component Status Should Be Shared
+
+Adapter and runtime component status concepts have repeated across multiple Engineering Directives.
+
+Separate status enums were acceptable while the ingress architecture was still forming, but the repetition now indicates a stable shared concept.
+
+A future directive should introduce a shared runtime component status contract rather than continuing separate status enums indefinitely.
