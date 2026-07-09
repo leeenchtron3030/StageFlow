@@ -19,10 +19,10 @@ def _empty_metadata() -> Mapping[str, Any]:
 
 @dataclass(frozen=True, slots=True)
 class Observation:
-    """A timestamped statement about something noticed on a production timeline."""
+    """A timestamped statement about something objectively noticed."""
 
     id: EntityId
-    recording_block_id: EntityId
+    recording_block_id: EntityId | None
     observation_type: ObservationType
     observation_source: ObservationSource
     location: ObservationLocation
@@ -34,6 +34,13 @@ class Observation:
     notes: str | None = None
 
     def __post_init__(self) -> None:
-        if self.location.recording_block_id != self.recording_block_id:
+        location_recording_block_id = self.location.recording_block_id
+        if self.recording_block_id is None and location_recording_block_id is not None:
+            object.__setattr__(self, "recording_block_id", location_recording_block_id)
+        elif (
+            self.recording_block_id is not None
+            and location_recording_block_id is not None
+            and location_recording_block_id != self.recording_block_id
+        ):
             raise ValueError("Observation location must belong to recording_block_id.")
         object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))

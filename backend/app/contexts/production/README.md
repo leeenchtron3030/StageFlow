@@ -126,13 +126,21 @@ The Recording Activity Observation Interpreter translates recording-system `Prod
 
 It preserves source Production Event traceability and does not infer sessions, clips, schedules, speakers, performances, production readiness, Evidence, Hypotheses, Findings, Verification Decisions, Operational Products, provider behavior, persistence, APIs, queues, workers, or frontend behavior.
 
-Because the current `Observation` contract requires a timeline location while recording activity Production Events do not yet carry precise media offsets, ED-0024 records generated observations against the referenced recording block and recommends a future directive for explicit event-to-timeline positioning.
+ED-0025 removes the original zero-offset workaround by allowing recording activity Observations to anchor to a recording block when available, or to wall-clock time when no recording block is known.
+
+## Observation Location Refinement
+
+ED-0025 refines `ObservationLocation` so media timeline anchors are not the only valid location kind.
+
+Observation location describes where or when the Observation was anchored. Supported anchors include timeline positions, timeline ranges, recording blocks, wall-clock timestamps, stages, composite context, and explicit unknown locations.
+
+Observations remain objective. A location does not explain why something matters, and it does not create Evidence, Hypotheses, Findings, Verification Decisions, Operational Products, persistence, APIs, queues, workers, or frontend behavior.
 
 ## Observation Primitives
 
 ED-0006 adds foundational production observation contracts only.
 
-Observation primitives describe what was noticed at a timeline point or range. Observations may come from humans, transcripts, audio, graphics, schedules, livestream systems, or other generic sources.
+Observation primitives describe what was noticed and where or when it was anchored. Observations may come from humans, transcripts, audio, graphics, schedules, livestream systems, or other generic sources.
 
 Reasoning will later decide what observations mean. Observations do not create timeline conclusions by themselves.
 

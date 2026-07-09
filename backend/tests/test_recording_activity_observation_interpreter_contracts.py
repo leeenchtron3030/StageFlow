@@ -2,7 +2,7 @@ from dataclasses import fields
 from datetime import UTC, datetime, timedelta
 from inspect import getmembers, isfunction
 
-from app.contexts.production.observation import ObservationType
+from app.contexts.production.observation import ObservationLocationKind, ObservationType
 from app.contexts.production.observation_interpreter import (
     ObservationInterpreterContext,
     ObservationInterpreterStatus,
@@ -107,7 +107,10 @@ def _assert_single_observation(
     assert observation.recording_block_id == recording_block_id
     assert observation.observation_type is ObservationType.RECORDING_ACTIVITY
     assert observation.notes == expected_note
-    assert observation.location.is_point
+    assert observation.location.kind is ObservationLocationKind.RECORDING_BLOCK
+    assert observation.location.is_recording_block
+    assert not observation.location.is_point
+    assert observation.location.point is None
     assert observation.correlation_id == event.correlation_id
     assert dict(observation.metadata)["source_production_event_ids"] == (
         event.id.to_json(),
@@ -214,7 +217,7 @@ def test_unknown_event_handling_returns_zero_observations() -> None:
     assert result.warnings == ("ProductionEvent group is not supported by this interpreter.",)
 
 
-def test_missing_recording_block_returns_zero_observations() -> None:
+def test_missing_recording_block_uses_wall_clock_location() -> None:
     event = _recording_event(
         "recording_started",
         ProductionEventType.RECORDING_BLOCK_STARTED,
@@ -223,7 +226,12 @@ def test_missing_recording_block_returns_zero_observations() -> None:
     result = _interpreter().interpret(event, _context())
 
     assert result.source_production_event_ids == (event.id,)
-    assert result.observations == ()
+    assert len(result.observations) == 1
+    observation = result.observations[0]
+    assert observation.recording_block_id is None
+    assert observation.location.kind is ObservationLocationKind.WALL_CLOCK
+    assert observation.location.wall_clock_at == event.occurred_at
+    assert not observation.location.is_point
 
 
 def test_context_recording_block_can_supply_location_when_event_lacks_reference() -> None:
