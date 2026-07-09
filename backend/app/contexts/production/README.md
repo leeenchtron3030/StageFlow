@@ -82,6 +82,14 @@ Transcript Source Adapters report that transcript-related artifacts, segments, o
 
 Text meaning is handled later by interpreters and reasoning. A transcript segment becoming available is a Production Event, not an Observation, session boundary, editorial moment, speaker introduction, quote, or other production conclusion.
 
+## Vision Source Adapters
+
+ED-0021 adds foundational vision source adapter contracts only.
+
+Vision Source Adapters report that visual detections or visual artifacts exist. They emit generic `ProductionEvent` objects and do not execute OCR, object detection, face recognition, logo recognition, scene understanding, model calls, or visual meaning interpretation.
+
+Semantic interpretation belongs to later Interpreters and reasoning. A visual detection becoming available is a Production Event, not an Observation, session boundary, speaker appearance, title match, recognized logo, slide meaning, or clip-worthy moment.
+
 ## Production Event Interpreters
 
 ED-0014 adds foundational production event interpreter contracts only.

@@ -55,6 +55,8 @@ ED-0019 adds Runtime Clock contracts as a time-boundary ingress source that emit
 
 ED-0020 adds Transcript Source Adapter contracts for transcript availability reporting, preserving the separation between words becoming available and later text meaning.
 
+ED-0021 adds Vision Source Adapter contracts for visual detection reporting, preserving the separation between visual phenomena becoming available and later semantic meaning.
+
 ## Directories
 
 | Path | Purpose | Owning Engineering Directive | Notes |
@@ -75,7 +77,7 @@ ED-0020 adds Transcript Source Adapter contracts for transcript availability rep
 | `backend/app/contexts/identity/` | Identity & Access context package boundary. | ED-0002 | Empty package boundary. |
 | `backend/app/contexts/integration/` | Integration context package boundary. | ED-0002 | Empty package boundary. |
 | `backend/app/contexts/packaging/` | Packaging & Delivery context package boundary. | ED-0002 | Empty package boundary. |
-| `backend/app/contexts/production/` | Production context package. | ED-0002 / ED-0005 / ED-0012 / ED-0013 / ED-0014 / ED-0015 / ED-0016 / ED-0017 / ED-0018 / ED-0019 / ED-0020 | ED-0005 adds production timeline contracts; ED-0012 adds the first specialized operational product; ED-0013 adds runtime input events; ED-0014 adds event interpreter contracts; ED-0015 adds event dispatcher contracts; ED-0016 adds recording adapter contracts; ED-0017 adds media artifact adapter contracts; ED-0018 adds schedule adapter contracts; ED-0019 adds runtime clock contracts; ED-0020 adds transcript adapter contracts. |
+| `backend/app/contexts/production/` | Production context package. | ED-0002 / ED-0005 / ED-0012 / ED-0013 / ED-0014 / ED-0015 / ED-0016 / ED-0017 / ED-0018 / ED-0019 / ED-0020 / ED-0021 | ED-0005 adds production timeline contracts; ED-0012 adds the first specialized operational product; ED-0013 adds runtime input events; ED-0014 adds event interpreter contracts; ED-0015 adds event dispatcher contracts; ED-0016 adds recording adapter contracts; ED-0017 adds media artifact adapter contracts; ED-0018 adds schedule adapter contracts; ED-0019 adds runtime clock contracts; ED-0020 adds transcript adapter contracts; ED-0021 adds vision adapter contracts. |
 | `backend/app/contexts/production/dispatcher/` | Production event dispatcher contract package. | ED-0015 | Backend-only in-memory routing boundary from Production Events to matching interpreters; no interpretation, reasoning, infrastructure, persistence, APIs, adapters, or frontend behavior. |
 | `backend/app/contexts/production/evidence/` | Production evidence contract package. | ED-0007 | Backend-only evidence primitives; no reasoning, proposals, or scoring policy. |
 | `backend/app/contexts/production/finding/` | Production finding contract package. | ED-0009 | Backend-only human-reviewable reasoning artifacts; no verification or workflow behavior. |
@@ -92,6 +94,7 @@ ED-0020 adds Transcript Source Adapter contracts for transcript availability rep
 | `backend/app/contexts/production/timeline/` | Production timeline contract package. | ED-0005 | Backend-only continuous recording and session window primitives. |
 | `backend/app/contexts/production/transcript_adapter/` | Production transcript source adapter contract package. | ED-0020 | Backend-only transcript availability contracts that emit generic Production Events; no transcription execution, audio processing, model calls, text interpretation, persistence, APIs, queues, workers, or frontend behavior. |
 | `backend/app/contexts/production/verification/` | Production verification protocol package. | ED-0010 | Backend-only append-only judgment records; no workflow or operational product behavior. |
+| `backend/app/contexts/production/vision_adapter/` | Production vision source adapter contract package. | ED-0021 | Backend-only visual detection contracts that emit generic Production Events; no OCR, computer vision execution, model calls, semantic interpretation, persistence, APIs, queues, workers, or frontend behavior. |
 | `backend/app/contexts/publishing/` | Publishing & Analytics context package boundary. | ED-0002 | Empty package boundary. |
 | `backend/app/contexts/rendering/` | Media Rendering context package boundary. | ED-0002 | Empty package boundary. |
 | `backend/app/contexts/simulation/` | Simulation context package boundary. | ED-0002 | Empty package boundary. |
@@ -242,7 +245,7 @@ ED-0020 adds Transcript Source Adapter contracts for transcript availability rep
 | `backend/app/contexts/production/production_event/production_event_reference.py` | Production event reference contract. | ED-0013 | Lightweight ID or external string references without embedded target objects. |
 | `backend/app/contexts/production/production_event/production_event_source.py` | Production event source categories. | ED-0013 | Provider-agnostic source categories only. |
 | `backend/app/contexts/production/production_event/production_event_summary.py` | Production event summary contract. | ED-0013 | Lightweight log and diagnostics summary without reasoning or workflow triggers. |
-| `backend/app/contexts/production/production_event/production_event_type.py` | Production event type categories. | ED-0013 | Generic happened-event types without conclusion-oriented names. |
+| `backend/app/contexts/production/production_event/production_event_type.py` | Production event type categories. | ED-0013 / ED-0021 | Generic happened-event types without conclusion-oriented names; ED-0021 adds `visual_detection_available`. |
 | `backend/app/contexts/production/recording_adapter/__init__.py` | Recording system adapter package exports. | ED-0016 | Exports recording adapter contracts. |
 | `backend/app/contexts/production/recording_adapter/README.md` | Recording system adapter package guide. | ED-0016 | Documents adapter scope, generic Production Event mapping, and exclusions. |
 | `backend/app/contexts/production/recording_adapter/recording_adapter_capability.py` | Recording adapter capability categories. | ED-0016 | Describes what a recording adapter can report without implementing behavior. |
@@ -298,6 +301,15 @@ ED-0020 adds Transcript Source Adapter contracts for transcript availability rep
 | `backend/app/contexts/production/verification/verification_note.py` | Verification note contract. | ED-0010 | Explanatory note attached to a decision. |
 | `backend/app/contexts/production/verification/verification_reason.py` | Verification reason categories. | ED-0010 | Provider-agnostic reason values. |
 | `backend/app/contexts/production/verification/verification_summary.py` | Verification summary contract. | ED-0010 | Summarizes decision history without final policy. |
+| `backend/app/contexts/production/vision_adapter/__init__.py` | Vision source adapter package exports. | ED-0021 | Exports vision adapter contracts. |
+| `backend/app/contexts/production/vision_adapter/README.md` | Vision source adapter package guide. | ED-0021 | Documents visual detection reporting, Production Event mapping, and exclusions. |
+| `backend/app/contexts/production/vision_adapter/vision_adapter_capability.py` | Vision adapter capability categories. | ED-0021 | Describes what visual phenomena an adapter can report without implementing behavior. |
+| `backend/app/contexts/production/vision_adapter/vision_adapter_identity.py` | Vision adapter identity contract. | ED-0021 | Generic adapter identity and kind values without source-specific names. |
+| `backend/app/contexts/production/vision_adapter/vision_adapter_summary.py` | Vision adapter summary contract. | ED-0021 | Lightweight diagnostics summary without event dispatch or interpretation. |
+| `backend/app/contexts/production/vision_adapter/vision_source_adapter.py` | Vision source adapter contract. | ED-0021 | Generic vision adapter contract that emits Production Events only. |
+| `backend/app/contexts/production/vision_adapter/visual_detection_event.py` | Visual detection event contract. | ED-0021 | Adapter-level visual detection activity event with generic Production Event mapping helper. |
+| `backend/app/contexts/production/vision_adapter/visual_detection_status.py` | Visual detection status categories. | ED-0021 | Visual detection availability status values. |
+| `backend/app/contexts/production/vision_adapter/visual_detection_type.py` | Visual detection type categories. | ED-0021 | Generic observable visual phenomena categories without semantic meaning. |
 | `backend/app/shared/domain_events/domain_event.py` | Base domain event contract. | ED-0004 | Generic event ID, type, timestamp, correlation, actor, and metadata. |
 | `backend/app/shared/errors/errors.py` | Structured error contracts. | ED-0004 | Generic error categories only. |
 | `backend/app/shared/ids/correlation_id.py` | Correlation ID contract. | ED-0004 | Generic UUID-compatible workflow tracing ID. |
@@ -324,6 +336,7 @@ ED-0020 adds Transcript Source Adapter contracts for transcript availability rep
 | `backend/tests/test_schedule_source_adapter_contracts.py` | Schedule source adapter contract tests. | ED-0018 | Covers planned activity contracts, schedule adapter capabilities, Production Event mapping, summaries, and excluded behaviors. |
 | `backend/tests/test_shared_contracts.py` | Shared contract tests. | ED-0004 | Covers backend contract primitives. |
 | `backend/tests/test_transcript_source_adapter_contracts.py` | Transcript source adapter contract tests. | ED-0020 | Covers adapter identity, segment events, artifact types, statuses, capabilities, Production Event mapping, summaries, and excluded behaviors. |
+| `backend/tests/test_vision_source_adapter_contracts.py` | Vision source adapter contract tests. | ED-0021 | Covers adapter identity, visual detection events, types, statuses, capabilities, Production Event mapping, summaries, and excluded behaviors. |
 
 ## Frontend Files
 
