@@ -158,6 +158,16 @@ It observes planned reality only. It does not reconcile schedules with recorded 
 
 Planned reality and observed reality are allowed to disagree. Schedule Observations preserve planned reality faithfully so later reasoning can compare it against observed production signals.
 
+## Transcript Observation Interpreter
+
+ED-0029 adds the fifth concrete Observation Interpreter.
+
+The Transcript Observation Interpreter translates transcript-source `ProductionEvent` objects into objective transcript `Observation` objects: transcript segment became available or transcript source status changed.
+
+It observes language availability only. It does not summarize transcript text, infer meaning, infer speakers, infer topics, infer sentiment, infer sessions, create reasoning artifacts, introduce persistence, APIs, queues, workers, AI, provider-specific behavior, or frontend behavior.
+
+Language is observable. Meaning is reasoning. Transcript Observations may preserve text excerpts exactly as observed data, but they do not interpret that text.
+
 ## Observation Location Refinement
 
 ED-0025 refines `ObservationLocation` so media timeline anchors are not the only valid location kind.

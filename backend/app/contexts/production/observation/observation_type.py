@@ -6,6 +6,7 @@ class ObservationType(StrEnum):
     MEDIA_ARTIFACT = "media_artifact"
     TIME_BOUNDARY = "time_boundary"
     SCHEDULE_ACTIVITY = "schedule_activity"
+    TRANSCRIPT_ACTIVITY = "transcript_activity"
     SPEECH_DETECTED = "speech_detected"
     TITLE_DETECTED = "title_detected"
     GRAPHIC_CHANGED = "graphic_changed"

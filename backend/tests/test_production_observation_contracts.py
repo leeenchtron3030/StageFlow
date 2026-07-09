@@ -54,6 +54,7 @@ def test_observation_type_allowed_values() -> None:
         "media_artifact",
         "time_boundary",
         "schedule_activity",
+        "transcript_activity",
         "speech_detected",
         "title_detected",
         "graphic_changed",
