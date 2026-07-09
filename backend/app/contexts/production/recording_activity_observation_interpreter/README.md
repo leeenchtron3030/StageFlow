@@ -24,4 +24,6 @@ The interpreter does not infer sessions, clips, speakers, performances, schedule
 
 ## Location Note
 
-The current `Observation` contract requires a recording timeline location. Recording activity Production Events identify a recording block but do not yet carry a precise media offset. ED-0024 therefore records the generated observation at the start of the referenced recording block and recommends a future directive for explicit event-to-timeline positioning.
+ED-0025 refines `ObservationLocation` so recording activity Observations no longer need a fake zero-offset media timeline point.
+
+The interpreter anchors generated Observations to a recording block when one is available. If no recording block is known, it anchors to the source event's wall-clock occurrence time.

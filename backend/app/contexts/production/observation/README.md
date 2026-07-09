@@ -2,24 +2,33 @@
 
 ## Purpose
 
-This package contains the foundational observation contracts introduced by ED-0006.
+This package contains the foundational observation contracts introduced by ED-0006 and refined by ED-0025.
 
-An Observation records something noticed on a production timeline. It does not decide what that observation means.
+An Observation records something objectively noticed by StageFlow. It does not decide what that observation means.
+
+## Location Anchors
+
+`ObservationLocation` describes where or when an Observation is anchored.
+
+Media timeline location is one kind of Observation location, not the only kind. Recorded media remains StageFlow's primary observable reality, but not every Observation begins with a precise media offset.
+
+Approved initial location kinds are:
+
+- `timeline_position`
+- `timeline_range`
+- `recording_block`
+- `wall_clock`
+- `stage`
+- `composite`
+- `unknown`
+
+Unknown location must be explicit. Observation location is not optional by accident.
 
 ## Timeline vs Observation
 
-Timeline primitives describe where things happen:
+Timeline primitives describe media offsets inside continuous recording blocks. Observation primitives describe what was noticed and where or when that notice is anchored.
 
-- `TimelinePosition`
-- `TimelineRange`
-
-Observation primitives describe what was noticed at that point or over that range:
-
-- `Observation`
-- `ObservationType`
-- `ObservationSource`
-- `ObservationConfidence`
-- `ObservationLocation`
+Recording activity, schedule boundaries, timer events, or operator input may be anchored to a recording block, wall-clock timestamp, stage, composite context, or explicit unknown location before a precise media timeline offset is available.
 
 ## Sources
 

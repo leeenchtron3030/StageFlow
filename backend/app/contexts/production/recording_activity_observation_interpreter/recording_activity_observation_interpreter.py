@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import timedelta
 from types import MappingProxyType
 from typing import Any
 
@@ -26,7 +25,6 @@ from app.contexts.production.production_event import (
     ProductionEventSource,
     ProductionEventType,
 )
-from app.contexts.production.timeline import TimelinePosition
 from app.shared.ids import EntityId
 
 from .recording_activity_interpreter_rule import (
@@ -151,7 +149,7 @@ class RecordingActivityObservationInterpreter:
     ) -> tuple[Observation, ...]:
         mapping = self._mapping_for_event(event)
         recording_block_id = self._recording_block_id(event, context)
-        if mapping is None or recording_block_id is None:
+        if mapping is None:
             return ()
 
         return (
@@ -160,9 +158,7 @@ class RecordingActivityObservationInterpreter:
                 recording_block_id=recording_block_id,
                 observation_type=ObservationType.RECORDING_ACTIVITY,
                 observation_source=ObservationSource.SYSTEM,
-                location=ObservationLocation.at_point(
-                    TimelinePosition(recording_block_id, timedelta(0))
-                ),
+                location=self._location_for_event(event, recording_block_id),
                 confidence=ObservationConfidence(1.0),
                 correlation_id=event.correlation_id,
                 observed_at=context.current_timestamp,
@@ -197,3 +193,12 @@ class RecordingActivityObservationInterpreter:
             if reference.reference_type is ProductionEventReferenceType.RECORDING_BLOCK:
                 return reference.referenced_id
         return context.recording_block_id
+
+    def _location_for_event(
+        self,
+        event: ProductionEvent,
+        recording_block_id: EntityId | None,
+    ) -> ObservationLocation:
+        if recording_block_id is not None:
+            return ObservationLocation.for_recording_block(recording_block_id)
+        return ObservationLocation.at_wall_clock(event.occurred_at)
