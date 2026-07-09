@@ -71,6 +71,7 @@ def test_production_event_type_allowed_values() -> None:
         "schedule_artifact_updated",
         "schedule_boundary_reached",
         "transcript_segment_available",
+        "visual_detection_available",
         "ocr_text_available",
         "audio_level_changed",
         "audio_spike_detected",

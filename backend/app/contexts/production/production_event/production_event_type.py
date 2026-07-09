@@ -11,6 +11,7 @@ class ProductionEventType(StrEnum):
     SCHEDULE_ARTIFACT_UPDATED = "schedule_artifact_updated"
     SCHEDULE_BOUNDARY_REACHED = "schedule_boundary_reached"
     TRANSCRIPT_SEGMENT_AVAILABLE = "transcript_segment_available"
+    VISUAL_DETECTION_AVAILABLE = "visual_detection_available"
     OCR_TEXT_AVAILABLE = "ocr_text_available"
     AUDIO_LEVEL_CHANGED = "audio_level_changed"
     AUDIO_SPIKE_DETECTED = "audio_spike_detected"
