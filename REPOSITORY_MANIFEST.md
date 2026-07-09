@@ -59,6 +59,18 @@ ED-0021 adds Vision Source Adapter contracts for visual detection reporting, pre
 
 ED-0022 adds Operator Source Adapter contracts for intentional human input, preserving that human-supplied information enters the same reasoning pipeline as every other source.
 
+## Architecture Release AR-2.0
+
+AR-2.0 formalizes StageFlow as an observational intelligence system for live event media.
+
+It documents the complete ingress architecture:
+
+Observable Reality -> Production Events -> Dispatcher -> Interpreters -> Observations
+
+It establishes Production Events as the universal ingress language across recording, media artifact, schedule, runtime clock, transcript, vision, and operator sources.
+
+It also marks the transition from foundational architecture to observational intelligence: StageFlow observes recorded reality, incorporates supporting production signals, reasons transparently, and produces explainable operational products.
+
 ## Directories
 
 | Path | Purpose | Owning Engineering Directive | Notes |
@@ -386,3 +398,4 @@ ED-0022 adds Operator Source Adapter contracts for intentional human input, pres
 | `docs/03.6_Architecture_Layers.md` | Architecture Layers specification. | Existing architecture work | Preserved by ED-0001. |
 | `docs/04.5_Bounded_Contexts.md` | Bounded Contexts specification. | Existing architecture work | Preserved by ED-0001. |
 | `docs/04.6_Integration_Architecture.md` | Integration Architecture specification. | Existing architecture work | Preserved by ED-0001. |
+| `docs/05_Reasoning_Model.md` | Reasoning Model architecture reference. | AR-1.4 / AR-2.0 | AR-2.0 updates this as a primary reference for ingress, Observations, reasoning, and Operational Products. |

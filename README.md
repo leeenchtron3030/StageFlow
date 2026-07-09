@@ -1,16 +1,20 @@
-StageFlow
+# StageFlow
 
-A Real-Time Conference Content Operating System
+An observational intelligence system for live event media.
 
 ⸻
 
 Overview
 
-StageFlow is a specification-driven software platform designed to transform how conferences produce, review, package, and deliver media.
+StageFlow is an observational intelligence system for live event media.
 
-Rather than treating content creation as post-production, StageFlow performs transcription, editorial analysis, clip review, rendering, and package assembly continuously while sessions are still taking place.
+It observes recorded reality, incorporates supporting production signals, reasons transparently, and produces explainable operational products for conference media teams.
 
-The result is a workflow where social media clips can be published during a presentation, and complete speaker media packages can be delivered within minutes of a session ending.
+Rather than treating content creation as post-production, StageFlow moves observation, reasoning, review, rendering, and package assembly closer to live production while preserving human editorial authority.
+
+Architecture summary:
+
+Observable Reality -> Production Events -> Observations -> Reasoning -> Operational Products
 
 ⸻
 
@@ -203,7 +207,7 @@ Before implementing new functionality:
 
 Long-Term Vision
 
-StageFlow is intended to become the operational backbone of conference media production.
+StageFlow is intended to become the observational intelligence backbone of conference media production.
 
 The long-term objective is not simply to create clips more quickly, but to redefine how live events approach content creation by moving editorial work into the live production process itself.
 
@@ -213,11 +217,9 @@ Current Status
 
 Current repository phase:
 
-Specification v1.0
+Architecture Release AR-2.0
 
-Software implementation has not yet begun.
-
-The current objective is to complete the engineering specification library before implementation.
+Foundational backend contracts are being implemented through approved Engineering Directives. The current objective is to preserve a clear architecture in which runtime ingress remains small and explainable while reasoning stays traceable.
 
 ⸻
 

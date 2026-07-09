@@ -1,7 +1,7 @@
 StageFlow Reasoning Model
 
 Document: docs/05_Reasoning_Model.md
-Architecture Release: AR-1.4
+Architecture Release: AR-2.0
 Status: Approved
 
 ⸻
@@ -14,13 +14,58 @@ The reasoning model describes how StageFlow progresses from raw production reali
 
 Its purpose is to ensure every operational decision can be understood, audited, and traced back to its supporting evidence.
 
+AR-2.0 establishes StageFlow as an observational intelligence system for live event media.
+
+StageFlow observes recorded reality, incorporates supporting production signals, reasons transparently, and produces explainable operational products.
+
+## AR-2.0 Core Principles
+
+1. Recorded media is StageFlow's primary source of observable reality.
+2. Schedules express intent, not reality.
+3. Production Events are the universal ingress language.
+4. Meaning does not enter StageFlow directly; meaning emerges through reasoning.
+5. Human operator input is valuable, but not privileged truth.
+6. StageFlow observes production; it does not control production.
+7. Operational Products must remain traceable to their reasoning chain.
+8. Every runtime layer should stay small, boring, and explainable.
+
 ⸻
 
-Core Reasoning Model
+Core Ingress Model
 
-Reality
+Observable Reality
 ↓
-Timeline
+Recording Adapter
+Media Artifact Adapter
+Schedule Source Adapter
+Runtime Clock
+Transcript Source Adapter
+Vision Source Adapter
+Operator Source Adapter
+↓
+Production Events
+↓
+Dispatcher
+↓
+Interpreters
+↓
+Observations
+
+Adapters emit Production Events only.
+
+Dispatchers route events only.
+
+Interpreters translate Production Events into Observations only.
+
+Observations begin the reasoning chain.
+
+No adapter creates Evidence, Hypotheses, Findings, Verification Decisions, or Operational Products.
+
+⸻
+
+Complete Reasoning Chain
+
+Production Event
 ↓
 Observation
 ↓
@@ -34,11 +79,79 @@ Verification Decision
 ↓
 Operational Product
 
+Production Events say something happened.
+
+Observations say StageFlow noticed something meaningful.
+
+Evidence organizes observations.
+
+Hypotheses express possible meaning.
+
+Findings are human-reviewable reasoning artifacts.
+
+Verification Decisions preserve judgment history.
+
+Operational Products are downstream outputs of verified reasoning.
+
 Everything above Verification Decision contributes knowledge.
 
 Everything below Verification Decision contributes operational outcomes.
 
 No layer should assume the responsibility of another.
+
+⸻
+
+Observable Reality
+
+Recorded media is StageFlow's primary source of observable reality.
+
+Schedules, transcript availability, vision detections, operator input, runtime clock events, and media artifact reports enrich reasoning, but they do not replace recorded production reality.
+
+Meaning does not enter StageFlow directly. Meaning emerges through reasoning.
+
+⸻
+
+Planned World vs Observed World
+
+The planned world describes what should happen.
+
+The observed world describes what appears to have happened.
+
+StageFlow never mistakes intention for reality.
+
+Schedule data enriches reasoning but does not prove production reality.
+
+Schedules express intent. Recorded production expresses reality. StageFlow reasons about the difference.
+
+⸻
+
+Human Input
+
+Human input enters through Operator Source Adapters.
+
+Operator input becomes Production Events.
+
+Human input is valuable but does not bypass reasoning.
+
+A human marker, note, or flag is still evidence to be interpreted, not automatic truth.
+
+Human input is another source of observable information, not privileged truth.
+
+⸻
+
+Runtime Philosophy
+
+StageFlow is not show control.
+
+StageFlow does not initiate production.
+
+StageFlow does not replace producers.
+
+StageFlow observes, reasons, explains, and prepares operational outputs.
+
+Runtime components should remain simple and in-memory unless future directives explicitly require persistence or infrastructure.
+
+StageFlow should have a rich domain model riding atop an intentionally boring runtime.
 
 ⸻
 
@@ -224,6 +337,8 @@ For example:
 
 Pretalx Schedule
 ↓
+Production Event
+↓
 Observation
 ↓
 Evidence
@@ -235,6 +350,8 @@ Finding
 Likewise:
 
 Transcript Engine
+↓
+Production Event
 ↓
 Observation
 ↓
@@ -276,3 +393,7 @@ Initial reasoning model introduced.
 AR-1.4
 
 Reasoning architecture completed with Verification Decision and Operational Product layers.
+
+AR-2.0
+
+Observational Intelligence Architecture established. Production Events are now documented as the universal ingress language before Observations, and the complete ingress and reasoning chains are explicit.

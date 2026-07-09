@@ -347,6 +347,18 @@ Operational products should always be traceable back through the complete reason
 
 ⸻
 
+## Principle 24 — Observable Reality Before Automation
+
+Recorded media is StageFlow's primary source of observable reality.
+
+Schedules, transcripts, vision detections, operator input, and clock events enrich observation, but they do not replace recorded production reality.
+
+StageFlow must not treat planned intent or human input as automatic truth.
+
+The platform observes and explains before it automates.
+
+⸻
+
 Constitutional Test
 
 Every proposed feature should satisfy the following questions:
