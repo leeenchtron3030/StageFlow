@@ -1,0 +1,200 @@
+from __future__ import annotations
+
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, field
+from types import MappingProxyType
+from typing import Any
+
+from app.contexts.production.observation import (
+    Observation,
+    ObservationConfidence,
+    ObservationLocation,
+    ObservationSource,
+    ObservationType,
+)
+from app.contexts.production.observation_interpreter import (
+    ObservationInterpreter,
+    ObservationInterpreterContext,
+    ObservationInterpreterPolicy,
+    ObservationInterpreterResult,
+    ObservationInterpreterStatus,
+)
+from app.contexts.production.production_event import (
+    ProductionEvent,
+    ProductionEventReferenceType,
+    ProductionEventSource,
+    ProductionEventType,
+)
+from app.shared.ids import EntityId
+
+from .media_artifact_interpreter_rule import MediaArtifactInterpreterRule
+from .media_artifact_observation_mapping import (
+    MEDIA_ARTIFACT_OBSERVATION_MAPPINGS,
+    MediaArtifactObservationMapping,
+    mapping_for_media_artifact,
+)
+
+
+def _empty_metadata() -> Mapping[str, Any]:
+    return {}
+
+
+_INTERPRETABLE_STATUSES = {
+    ObservationInterpreterStatus.READY,
+    ObservationInterpreterStatus.ACTIVE,
+    ObservationInterpreterStatus.DEGRADED,
+}
+
+
+@dataclass(frozen=True, slots=True)
+class MediaArtifactObservationInterpreter:
+    """Concrete interpreter for objective media artifact observations."""
+
+    id: EntityId
+    name: str = "Media artifact observation interpreter"
+    status: ObservationInterpreterStatus = ObservationInterpreterStatus.ACTIVE
+    policy: ObservationInterpreterPolicy = field(default_factory=ObservationInterpreterPolicy)
+    mappings: Sequence[MediaArtifactObservationMapping] = field(
+        default_factory=lambda: MEDIA_ARTIFACT_OBSERVATION_MAPPINGS
+    )
+    rules: Sequence[MediaArtifactInterpreterRule] = field(default_factory=tuple)
+    metadata: Mapping[str, Any] = field(default_factory=_empty_metadata)
+
+    def __post_init__(self) -> None:
+        if not self.name.strip():
+            raise ValueError("MediaArtifactObservationInterpreter name must not be empty.")
+        object.__setattr__(self, "mappings", tuple(self.mappings))
+        object.__setattr__(self, "rules", tuple(self.rules))
+        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+
+    @property
+    def supported_event_types(self) -> tuple[ProductionEventType, ...]:
+        return tuple(dict.fromkeys(mapping.production_event_type for mapping in self.mappings))
+
+    @property
+    def supported_event_sources(self) -> tuple[ProductionEventSource, ...]:
+        return (ProductionEventSource.INTERNAL_SYSTEM,)
+
+    @property
+    def intended_observation_types(self) -> tuple[ObservationType, ...]:
+        return (ObservationType.MEDIA_ARTIFACT,)
+
+    def supports_event_type(self, event_type: ProductionEventType) -> bool:
+        return event_type in self.supported_event_types
+
+    def supports_source(self, source: ProductionEventSource) -> bool:
+        return source in self.supported_event_sources
+
+    def can_interpret_event(self, event: ProductionEvent) -> bool:
+        return (
+            self.status in _INTERPRETABLE_STATUSES
+            and self.supports_event_type(event.event_type)
+            and self.supports_source(event.source)
+            and self._mapping_for_event(event) is not None
+        )
+
+    def can_interpret_events(self, events: Sequence[ProductionEvent]) -> bool:
+        return bool(events) and all(self.can_interpret_event(event) for event in events)
+
+    def interpret(
+        self,
+        events: ProductionEvent | Sequence[ProductionEvent],
+        context: ObservationInterpreterContext,
+    ) -> ObservationInterpreterResult:
+        event_tuple = self._event_tuple(events)
+        observations = tuple(
+            observation
+            for event in event_tuple
+            for observation in self._observation_for_event(event, context)
+        )
+
+        return self._base_interpreter().interpret(
+            event_tuple,
+            context,
+            observations=observations,
+        )
+
+    def _base_interpreter(self) -> ObservationInterpreter:
+        return ObservationInterpreter(
+            id=self.id,
+            name=self.name,
+            supported_event_types=self.supported_event_types,
+            supported_event_sources=self.supported_event_sources,
+            intended_observation_types=self.intended_observation_types,
+            status=self.status,
+            policy=self.policy,
+            rules=tuple(rule.to_observation_interpreter_rule() for rule in self.rules),
+            metadata=self.metadata,
+        )
+
+    def _event_tuple(
+        self,
+        events: ProductionEvent | Sequence[ProductionEvent],
+    ) -> tuple[ProductionEvent, ...]:
+        if isinstance(events, ProductionEvent):
+            return (events,)
+        event_tuple = tuple(events)
+        if not event_tuple:
+            raise ValueError(
+                "MediaArtifactObservationInterpreter requires at least one ProductionEvent."
+            )
+        return event_tuple
+
+    def _observation_for_event(
+        self,
+        event: ProductionEvent,
+        context: ObservationInterpreterContext,
+    ) -> tuple[Observation, ...]:
+        mapping = self._mapping_for_event(event)
+        if mapping is None:
+            return ()
+
+        recording_block_id = self._recording_block_id(event, context)
+        return (
+            Observation(
+                id=EntityId.new(),
+                recording_block_id=recording_block_id,
+                observation_type=ObservationType.MEDIA_ARTIFACT,
+                observation_source=ObservationSource.SYSTEM,
+                location=self._location_for_event(event, recording_block_id),
+                confidence=ObservationConfidence(1.0),
+                correlation_id=event.correlation_id,
+                observed_at=context.current_timestamp,
+                metadata={
+                    "artifact_lifecycle": mapping.artifact_lifecycle,
+                    "artifact_id": event.payload.get("artifact_id"),
+                    "artifact_status": event.payload.get("artifact_status"),
+                    "artifact_type": event.payload.get("artifact_type"),
+                },
+                notes=mapping.observation_note,
+            ),
+        )
+
+    def _mapping_for_event(
+        self,
+        event: ProductionEvent,
+    ) -> MediaArtifactObservationMapping | None:
+        if not self.supports_event_type(event.event_type) or not self.supports_source(
+            event.source
+        ):
+            return None
+        return mapping_for_media_artifact(event.event_type)
+
+    def _recording_block_id(
+        self,
+        event: ProductionEvent,
+        context: ObservationInterpreterContext,
+    ) -> EntityId | None:
+        for reference in event.references:
+            if reference.reference_type is ProductionEventReferenceType.RECORDING_BLOCK:
+                return reference.referenced_id
+        return context.recording_block_id
+
+    def _location_for_event(
+        self,
+        event: ProductionEvent,
+        recording_block_id: EntityId | None,
+    ) -> ObservationLocation:
+        if recording_block_id is not None:
+            return ObservationLocation.for_recording_block(recording_block_id)
+        return ObservationLocation.at_wall_clock(event.occurred_at)
