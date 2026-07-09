@@ -74,6 +74,14 @@ The Runtime Clock does not start StageFlow, schedule work, execute retries, exec
 
 A crossed time boundary only means that a temporal boundary is now relevant. It is not proof that production activity occurred.
 
+## Transcript Source Adapters
+
+ED-0020 adds foundational transcript source adapter contracts only.
+
+Transcript Source Adapters report that transcript-related artifacts, segments, or text updates exist. They emit generic `ProductionEvent` objects and do not perform transcription, process audio, create transcript files, call models, or interpret text.
+
+Text meaning is handled later by interpreters and reasoning. A transcript segment becoming available is a Production Event, not an Observation, session boundary, editorial moment, speaker introduction, quote, or other production conclusion.
+
 ## Production Event Interpreters
 
 ED-0014 adds foundational production event interpreter contracts only.
