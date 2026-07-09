@@ -75,6 +75,7 @@ def test_production_event_type_allowed_values() -> None:
         "ocr_text_available",
         "audio_level_changed",
         "audio_spike_detected",
+        "operator_input_received",
         "manual_marker_added",
         "operator_note_added",
         "livestream_status_changed",
