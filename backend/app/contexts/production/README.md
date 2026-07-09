@@ -128,6 +128,16 @@ It preserves source Production Event traceability and does not infer sessions, c
 
 ED-0025 removes the original zero-offset workaround by allowing recording activity Observations to anchor to a recording block when available, or to wall-clock time when no recording block is known.
 
+## Media Artifact Observation Interpreter
+
+ED-0026 adds the second concrete Observation Interpreter.
+
+The Media Artifact Observation Interpreter translates media artifact `ProductionEvent` objects into objective media artifact `Observation` objects: media artifact was created, finalized, or failed.
+
+It observes artifact availability and lifecycle changes only. It does not ingest media, validate codecs, inspect file contents, register chunks, infer recording completeness, infer sessions, infer clips, infer package readiness, create reasoning artifacts, introduce persistence, APIs, queues, workers, AI, provider-specific behavior, or frontend behavior.
+
+The interpreter uses ED-0025 `ObservationLocation` anchors truthfully: recording block when available, otherwise wall-clock event time.
+
 ## Observation Location Refinement
 
 ED-0025 refines `ObservationLocation` so media timeline anchors are not the only valid location kind.

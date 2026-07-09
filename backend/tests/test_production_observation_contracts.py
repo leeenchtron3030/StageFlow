@@ -51,6 +51,7 @@ def test_observation_creation() -> None:
 def test_observation_type_allowed_values() -> None:
     assert {observation_type.value for observation_type in ObservationType} == {
         "recording_activity",
+        "media_artifact",
         "speech_detected",
         "title_detected",
         "graphic_changed",
