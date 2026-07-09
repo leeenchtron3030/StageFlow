@@ -148,6 +148,16 @@ It observes time-boundary facts only. It does not reconcile schedules, infer ses
 
 The interpreter uses ED-0025 `ObservationLocation` anchors truthfully and prefers wall-clock event time. A time boundary being crossed is temporal information, not proof that production activity happened.
 
+## Schedule Observation Interpreter
+
+ED-0028 adds the fourth concrete Observation Interpreter.
+
+The Schedule Observation Interpreter translates schedule-source `ProductionEvent` objects into objective schedule `Observation` objects: scheduled activity was updated, cancelled, entered its planned time window, or schedule source status changed.
+
+It observes planned reality only. It does not reconcile schedules with recorded media, infer production activity, infer sessions, infer recordings, infer speakers, infer audience presence, create reasoning artifacts, introduce persistence, APIs, queues, workers, AI, provider-specific behavior, or frontend behavior.
+
+Planned reality and observed reality are allowed to disagree. Schedule Observations preserve planned reality faithfully so later reasoning can compare it against observed production signals.
+
 ## Observation Location Refinement
 
 ED-0025 refines `ObservationLocation` so media timeline anchors are not the only valid location kind.
