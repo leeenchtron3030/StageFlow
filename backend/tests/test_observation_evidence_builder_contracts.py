@@ -2,7 +2,13 @@ from dataclasses import fields
 from datetime import UTC, datetime
 from inspect import getmembers, isfunction
 
-from app.contexts.production.evidence import EvidencePurpose, EvidenceSet, EvidenceStrength
+from app.contexts.production.evidence import (
+    EvidenceConcern,
+    EvidencePurpose,
+    EvidenceRole,
+    EvidenceSet,
+    EvidenceStrength,
+)
 from app.contexts.production.evidence_builder import (
     EvidenceBuilderContext,
     EvidenceBuilderResult,
@@ -97,9 +103,10 @@ def test_builder_groups_single_observation_into_evidence() -> None:
     evidence = result.evidence_sets[0]
     assert isinstance(evidence, EvidenceSet)
     assert evidence.recording_block_id == recording_block_id
-    assert evidence.purpose is EvidencePurpose.GENERAL_CONTEXT
-    assert evidence.metadata["operational_concern"] == "recording_activity"
+    assert evidence.concern is EvidenceConcern.RECORDING_COVERAGE
+    assert evidence.purpose is EvidencePurpose.OPERATIONAL_CONTEXT
     assert evidence.items[0].observation_id == observation.id
+    assert evidence.items[0].role is EvidenceRole.SUPPORTS
     assert evidence.items[0].strength is EvidenceStrength.MODERATE
 
 
@@ -115,10 +122,14 @@ def test_builder_groups_multiple_observations_by_independent_concern() -> None:
     )
 
     concerns = {
-        evidence.metadata["operational_concern"] for evidence in result.evidence_sets
+        evidence.concern for evidence in result.evidence_sets
     }
     assert result.evidence_count == 3
-    assert concerns == {"recording_activity", "transcript_activity", "vision_activity"}
+    assert concerns == {
+        EvidenceConcern.RECORDING_COVERAGE,
+        EvidenceConcern.TRANSCRIPT_CONTINUITY,
+        EvidenceConcern.VISUAL_TRANSITION_CONTEXT,
+    }
 
 
 def test_builder_may_leave_observations_ungrouped() -> None:
@@ -138,7 +149,7 @@ def test_builder_attaches_supporting_contradicting_and_contextual_references() -
     contextual = _observation(ObservationType.SCHEDULE_ACTIVITY)
     rule = EvidenceBuilderRule(
         id=EntityId.new(),
-        operational_concern="recording_activity",
+        operational_concern=EvidenceConcern.RECORDING_COVERAGE,
         supporting_observation_types=(ObservationType.RECORDING_ACTIVITY,),
         contradicting_observation_types=(ObservationType.TRANSCRIPT_ACTIVITY,),
         contextual_observation_types=(ObservationType.SCHEDULE_ACTIVITY,),
@@ -153,12 +164,14 @@ def test_builder_attaches_supporting_contradicting_and_contextual_references() -
         contradicting.id.to_json(),
     )
     assert evidence.metadata["contextual_observation_ids"] == (contextual.id.to_json(),)
-    strengths_by_observation = {
-        item.observation_id: item.strength for item in evidence.items
-    }
+    strengths_by_observation = {item.observation_id: item.strength for item in evidence.items}
+    roles_by_observation = {item.observation_id: item.role for item in evidence.items}
     assert strengths_by_observation[supporting.id] is EvidenceStrength.MODERATE
     assert strengths_by_observation[contradicting.id] is EvidenceStrength.CONTRADICTORY
     assert strengths_by_observation[contextual.id] is EvidenceStrength.UNKNOWN
+    assert roles_by_observation[supporting.id] is EvidenceRole.SUPPORTS
+    assert roles_by_observation[contradicting.id] is EvidenceRole.CONTRADICTS
+    assert roles_by_observation[contextual.id] is EvidenceRole.CONTEXTUALIZES
 
 
 def test_contradictory_observations_remain_attached() -> None:
@@ -166,7 +179,7 @@ def test_contradictory_observations_remain_attached() -> None:
     contradicting = _observation(ObservationType.TRANSCRIPT_ACTIVITY)
     rule = EvidenceBuilderRule(
         id=EntityId.new(),
-        operational_concern="scheduled_activity",
+        operational_concern=EvidenceConcern.SCHEDULE_ALIGNMENT,
         supporting_observation_types=(ObservationType.SCHEDULE_ACTIVITY,),
         contradicting_observation_types=(ObservationType.TRANSCRIPT_ACTIVITY,),
     )
@@ -203,10 +216,12 @@ def test_evidence_explains_concern_roles_and_observations() -> None:
 
     evidence = builder.build((observation,), _context()).evidence_sets[0]
 
-    assert evidence.notes == "Evidence organized for operational concern: vision_activity."
-    assert evidence.metadata["operational_concern"] == "vision_activity"
+    assert evidence.notes == (
+        "Evidence organized for concern: visual_transition_context."
+    )
+    assert evidence.concern is EvidenceConcern.VISUAL_TRANSITION_CONTEXT
     assert evidence.metadata["supporting_observation_ids"] == (observation.id.to_json(),)
-    assert evidence.items[0].metadata["evidence_role"] == "supporting"
+    assert evidence.items[0].role is EvidenceRole.SUPPORTS
     assert evidence.items[0].rationale is not None
 
 
@@ -221,11 +236,11 @@ def test_evidence_builder_context_creation() -> None:
 def test_evidence_builder_rule_requires_one_operational_concern() -> None:
     rule = EvidenceBuilderRule(
         id=EntityId.new(),
-        operational_concern="transcript_activity",
+        operational_concern=EvidenceConcern.TRANSCRIPT_CONTINUITY,
         supporting_observation_types=(ObservationType.TRANSCRIPT_ACTIVITY,),
     )
 
-    assert rule.role_for(ObservationType.TRANSCRIPT_ACTIVITY) == "supporting"
+    assert rule.role_for(ObservationType.TRANSCRIPT_ACTIVITY) is EvidenceRole.SUPPORTS
     assert rule.role_for(ObservationType.VISION_ACTIVITY) is None
 
 
@@ -237,7 +252,7 @@ def test_evidence_builder_summary_generation() -> None:
     assert summary.builder_id == builder.id
     assert summary.builder_name == builder.name
     assert summary.rule_count == len(builder.rules)
-    assert summary.operational_concern_count == len(builder.rules)
+    assert summary.operational_concern_count == len({rule.concern for rule in builder.rules})
 
 
 def test_evidence_set_can_represent_non_recording_block_observations() -> None:
@@ -247,7 +262,7 @@ def test_evidence_set_can_represent_non_recording_block_observations() -> None:
     evidence = builder.build((observation,), _context()).evidence_sets[0]
 
     assert evidence.recording_block_id is None
-    assert evidence.metadata["operational_concern"] == "time_boundary"
+    assert evidence.concern is EvidenceConcern.SCHEDULE_ALIGNMENT
 
 
 def test_builder_does_not_create_later_reasoning_artifacts() -> None:

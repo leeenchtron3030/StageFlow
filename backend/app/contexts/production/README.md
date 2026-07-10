@@ -200,11 +200,19 @@ ED-0007 adds foundational production evidence contracts only.
 
 Evidence organizes observation references into support for a possible future conclusion. Evidence is still not a conclusion, and it must remain separate from reasoning and proposal generation.
 
+ED-0032 refines Evidence semantics so concern, purpose, role, strength, and weight remain distinct. An `EvidenceSet` now has one explicit `EvidenceConcern`; each `EvidenceItem` now has a first-class `EvidenceRole`; and `EvidenceObservationReference` provides an ID-only Observation participation contract.
+
+Concern asks what operational question the Evidence relates to. Purpose asks why the Evidence is being assembled. Role asks how an Observation relates to the concern. Strength describes the individual contribution. Weight is optional relative influence without policy meaning.
+
+Contradicting and supporting Evidence can coexist. Evidence does not update Operational State, generate Hypotheses, generate Findings, create Verification Decisions, or create Operational Products.
+
 ## Observation Evidence Builder
 
 ED-0031 adds the first Reasoning component after the completed Perception Layer.
 
 The Observation Evidence Builder consumes objective `Observation` objects and organizes them into explainable `EvidenceSet` objects using the existing ED-0007 Evidence contracts.
+
+ED-0032 updates the builder to use first-class `EvidenceConcern` and `EvidenceRole` semantics instead of relying on metadata for core meaning.
 
 It groups Observations around exactly one operational concern at a time, preserves supporting, contradicting, and contextual Observation references, and carries forward source Production Event traceability when Observations already include it.
 

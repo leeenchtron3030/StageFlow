@@ -2,6 +2,8 @@
 
 ED-0031 adds the generic Observation Evidence Builder.
 
+ED-0032 refines the builder so concern and role are first-class Evidence semantics rather than metadata-only conventions.
+
 The builder is the first Reasoning component after the Perception Layer.
 
 Production Events become objective Observations through Observation Interpreters. The Observation Evidence Builder then organizes those objective Observations into explainable `EvidenceSet` objects using the existing ED-0007 Evidence contracts.
@@ -17,10 +19,10 @@ Meaning comes later.
 The builder may:
 
 - consume Observations
-- group related Observations around one operational concern
+- group related Observations around one `EvidenceConcern`
 - construct Evidence
 - preserve Observation and Production Event traceability
-- identify supporting, contradicting, and contextual Observation references
+- identify supporting, contradicting, contextual, neutral, and unknown Observation references
 
 The builder must not:
 
@@ -32,25 +34,31 @@ The builder must not:
 - assign semantic confidence
 - conclude that a session, clip, package, speaker identity, production state, or other meaning is true
 
-## Operational Concerns
+## Evidence Semantics
 
-Each `EvidenceSet` built by this package is organized around exactly one operational concern.
+Each `EvidenceSet` built by this package is organized around exactly one `EvidenceConcern`.
 
-Initial default concerns are deliberately single-domain:
+Builder rules declare:
 
-- recording activity
-- media artifact availability
-- time boundary
-- scheduled activity
-- transcript activity
-- vision activity
+- one `EvidenceConcern`
+- one `EvidencePurpose`
+- supporting Observation types
+- contradicting Observation types
+- contextual Observation types
+- neutral Observation types
+
+The builder writes concern to `EvidenceSet.concern` and role to `EvidenceItem.role`.
+
+Metadata remains available for secondary details, but core concern and role semantics are first-class.
+
+Initial default rules remain deliberately conservative and map single-domain Observations into StageFlow-focused concerns such as recording coverage, media availability, schedule alignment, transcript continuity, and visual transition context.
 
 Multi-domain concerns such as session started are intentionally excluded. Those belong to later reasoning directives.
 
 ## Traceability
 
-The current Evidence contract stores Observation references through `EvidenceItem.observation_id`.
+The current Evidence contract stores Observation references through `EvidenceItem.observation_id` and `EvidenceObservationReference`.
 
-ED-0031 also preserves supporting, contradicting, and contextual Observation IDs in Evidence metadata. When an Observation carries source Production Event IDs in metadata, that traceability is carried forward as observed traceability metadata.
+When an Observation carries source Production Event IDs in metadata, that traceability is carried forward as observed traceability metadata.
 
-This package does not redesign Observation traceability.
+This package does not redesign Observation-to-Production-Event traceability.
