@@ -1,7 +1,7 @@
 StageFlow Reasoning Model
 
 Document: docs/05_Reasoning_Model.md
-Architecture Release: AR-2.0
+Architecture Release: AR-2.1
 Status: Approved
 
 ⸻
@@ -17,6 +17,10 @@ Its purpose is to ensure every operational decision can be understood, audited, 
 AR-2.0 establishes StageFlow as an observational intelligence system for live event media.
 
 StageFlow observes recorded reality, incorporates supporting production signals, reasons transparently, and produces explainable operational products.
+
+AR-2.1 consolidates the Perception Layer.
+
+Phenomena are observations. Meaning is reasoning.
 
 ## AR-2.0 Core Principles
 
@@ -63,6 +67,55 @@ No adapter creates Evidence, Hypotheses, Findings, Verification Decisions, or Op
 
 ⸻
 
+Perception Layer
+
+The Perception Layer transforms Production Events into objective Observations.
+
+Production Events
+↓
+Perception Layer
+↓
+Objective Observations
+↓
+Evidence
+↓
+Hypothesis
+↓
+Finding
+↓
+Verification Decision
+↓
+Operational Product
+
+Observation Interpreters are the concrete units of the Perception Layer.
+
+The completed first pass includes:
+
+* Recording Activity Observation Interpreter
+* Media Artifact Observation Interpreter
+* Runtime Clock Observation Interpreter
+* Schedule Source Observation Interpreter
+* Transcript Source Observation Interpreter
+* Vision Source Observation Interpreter
+
+Each interpreter follows the same pattern:
+
+Production Event
+↓
+Observation Interpreter
+↓
+Objective Observation
+
+Perception is not reasoning.
+
+Observation Interpreters observe signals, not semantics. They do not infer sessions, clips, package readiness, speaker identity, schedule compliance, visual meaning, transcript meaning, or production readiness.
+
+Each interpreter translates only within its own domain. No interpreter correlates across domains yet.
+
+Evidence is the first layer allowed to organize Observations toward interpretation. Meaning emerges after Observations, not inside them.
+
+⸻
+
 Complete Reasoning Chain
 
 Production Event
@@ -81,7 +134,7 @@ Operational Product
 
 Production Events say something happened.
 
-Observations say StageFlow noticed something meaningful.
+Observations say StageFlow noticed something objective.
 
 Evidence organizes observations.
 
@@ -187,6 +240,16 @@ Examples include:
 Observations are objective statements.
 
 They are not conclusions.
+
+ObservationLocation is the location authority for Observations.
+
+Supported anchors include timeline position, timeline range, recording block, wall clock, stage, composite context, and explicit unknown location.
+
+Media timeline is one possible anchor, not the only anchor. Fake timeline offsets should never be introduced. Location describes where or when an Observation is anchored, not what the Observation means.
+
+Observations currently preserve source Production Event traceability through metadata. This is acceptable for now, but future architecture should make traceability a first-class Observation contract.
+
+Transcript text, visual metadata, and operator notes currently live in metadata when carried forward. A future directive should consider a first-class ObservationPayload model without allowing Observations to become interpretations.
 
 ⸻
 
@@ -397,3 +460,7 @@ Reasoning architecture completed with Verification Decision and Operational Prod
 AR-2.0
 
 Observational Intelligence Architecture established. Production Events are now documented as the universal ingress language before Observations, and the complete ingress and reasoning chains are explicit.
+
+AR-2.1
+
+Perception Layer consolidated. Production Events now flow through Observation Interpreters into Objective Observations before Evidence or reasoning layers organize meaning.

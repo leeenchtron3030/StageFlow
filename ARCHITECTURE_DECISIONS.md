@@ -125,3 +125,39 @@ Adapter and runtime component status concepts have repeated across multiple Engi
 Separate status enums were acceptable while the ingress architecture was still forming, but the repetition now indicates a stable shared concept.
 
 A future directive should introduce a shared runtime component status contract rather than continuing separate status enums indefinitely.
+
+## ADR-0015 — Observation Interpreters Produce Objective Observations
+
+Observation Interpreters translate Production Events into Observations.
+
+They do not create Evidence, Hypotheses, Findings, Verification Decisions, or Operational Products.
+
+They observe signals, not semantics.
+
+Phenomena are observations. Meaning is reasoning.
+
+## ADR-0016 — ObservationLocation Is The Location Authority
+
+Observation location is not limited to media timeline.
+
+An Observation may be anchored to a timeline position, timeline range, recording block, wall-clock timestamp, stage, composite context, or explicit unknown location.
+
+Fake timeline offsets must not be introduced when a more truthful non-timeline anchor exists.
+
+Location describes where or when an Observation is anchored, not what the Observation means.
+
+## ADR-0017 — Observation Traceability Should Become First-Class
+
+Observations currently preserve source Production Event traceability through metadata.
+
+This compromise is acceptable while the Perception Layer contracts settle.
+
+Future architecture should promote source Production Event references to first-class Observation fields so traceability is explicit and consistently validated.
+
+## ADR-0018 — Observation Payloads May Need First-Class Modeling
+
+Transcript text, visual metadata, and operator notes currently live in Observation metadata when carried forward.
+
+This keeps the current Observation contracts small, but repeated payload patterns indicate a stable concept.
+
+Future architecture may introduce an ObservationPayload model for source-specific observed data without allowing interpreters to infer meaning.

@@ -359,6 +359,18 @@ The platform observes and explains before it automates.
 
 ⸻
 
+## Principle 25 — Phenomena Before Meaning
+
+StageFlow observes phenomena before assigning meaning.
+
+Observation Interpreters must remain objective.
+
+Meaning belongs to Evidence, Hypothesis, Finding, and Verification layers.
+
+No interpreter should infer across domains.
+
+⸻
+
 Constitutional Test
 
 Every proposed feature should satisfy the following questions:

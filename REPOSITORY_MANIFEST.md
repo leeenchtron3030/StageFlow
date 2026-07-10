@@ -87,6 +87,23 @@ It establishes Production Events as the universal ingress language across record
 
 It also marks the transition from foundational architecture to observational intelligence: StageFlow observes recorded reality, incorporates supporting production signals, reasons transparently, and produces explainable operational products.
 
+## Architecture Release AR-2.1
+
+AR-2.1 consolidates the Perception Layer.
+
+It documents the concrete Observation Interpreters completed through ED-0030:
+
+- Recording Activity Observation Interpreter
+- Media Artifact Observation Interpreter
+- Runtime Clock Observation Interpreter
+- Schedule Source Observation Interpreter
+- Transcript Source Observation Interpreter
+- Vision Source Observation Interpreter
+
+The Perception Layer transforms Production Events into objective Observations. It does not create Evidence, Hypotheses, Findings, Verification Decisions, or Operational Products.
+
+AR-2.1 also captures future refinement targets: first-class Observation traceability, first-class Observation payloads, a shared `RuntimeComponentStatus` contract, and source/context vocabulary for broad Production Event types such as `system_status_changed`.
+
 ## Directories
 
 | Path | Purpose | Owning Engineering Directive | Notes |
@@ -467,9 +484,9 @@ It also marks the transition from foundational architecture to observational int
 | Path | Purpose | Owning Engineering Directive | Notes |
 | --- | --- | --- | --- |
 | `docs/00_Glossary.md` | Shared terminology. | Existing architecture work | Preserved by ED-0001. |
-| `docs/00.5_Domain_Model.md` | StageFlow domain model. | Existing architecture work | Preserved by ED-0001. |
+| `docs/00.5_Domain_Model.md` | StageFlow domain model. | Existing architecture work / AR-2.1 | AR-2.1 adds concise Perception Layer, objective Observation, ObservationLocation, traceability, and payload notes. |
 | `docs/03.5_Technology_Selections.md` | Technology selections specification. | Existing architecture work | Empty at ED-0002 implementation time; preserved by ED-0002. |
 | `docs/03.6_Architecture_Layers.md` | Architecture Layers specification. | Existing architecture work | Preserved by ED-0001. |
-| `docs/04.5_Bounded_Contexts.md` | Bounded Contexts specification. | Existing architecture work | Preserved by ED-0001. |
-| `docs/04.6_Integration_Architecture.md` | Integration Architecture specification. | Existing architecture work | Preserved by ED-0001. |
-| `docs/05_Reasoning_Model.md` | Reasoning Model architecture reference. | AR-1.4 / AR-2.0 | AR-2.0 updates this as a primary reference for ingress, Observations, reasoning, and Operational Products. |
+| `docs/04.5_Bounded_Contexts.md` | Bounded Contexts specification. | Existing architecture work / AR-2.1 | AR-2.1 notes that Perception Layer contracts remain in Production pending future bounded-context realignment. |
+| `docs/04.6_Integration_Architecture.md` | Integration Architecture specification. | Existing architecture work / AR-2.1 | AR-2.1 clarifies adapters emit Production Events and Observation Interpreters produce objective Observations before reasoning. |
+| `docs/05_Reasoning_Model.md` | Reasoning Model architecture reference. | AR-1.4 / AR-2.0 / AR-2.1 | AR-2.1 consolidates the Perception Layer between Production Events and Objective Observations. |
