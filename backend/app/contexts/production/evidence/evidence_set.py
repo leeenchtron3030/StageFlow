@@ -20,7 +20,7 @@ class EvidenceSet:
     """A group of evidence items that may support a future conclusion."""
 
     id: EntityId
-    recording_block_id: EntityId
+    recording_block_id: EntityId | None
     purpose: EvidencePurpose
     items: Sequence[EvidenceItem]
     correlation_id: CorrelationId

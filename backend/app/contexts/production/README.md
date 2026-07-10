@@ -200,6 +200,18 @@ ED-0007 adds foundational production evidence contracts only.
 
 Evidence organizes observation references into support for a possible future conclusion. Evidence is still not a conclusion, and it must remain separate from reasoning and proposal generation.
 
+## Observation Evidence Builder
+
+ED-0031 adds the first Reasoning component after the completed Perception Layer.
+
+The Observation Evidence Builder consumes objective `Observation` objects and organizes them into explainable `EvidenceSet` objects using the existing ED-0007 Evidence contracts.
+
+It groups Observations around exactly one operational concern at a time, preserves supporting, contradicting, and contextual Observation references, and carries forward source Production Event traceability when Observations already include it.
+
+The builder organizes related facts. It does not interpret meaning, generate Hypotheses, generate Findings, create Verification Decisions, create Operational Products, update Operational State, introduce AI, persistence, APIs, queues, workers, provider-specific behavior, or frontend behavior.
+
+ED-0031 also allows an `EvidenceSet` to omit a recording block ID when the source Observations are truthfully anchored elsewhere, such as wall-clock or stage context.
+
 ## Hypothesis Primitives
 
 ED-0008 adds foundational production hypothesis contracts only.
