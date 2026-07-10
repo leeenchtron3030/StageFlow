@@ -230,6 +230,18 @@ Operational State families distinguish directly observable state, evidence-deriv
 
 `OperationalStateBasis` preserves traceability through Observation IDs and EvidenceSet IDs only. ED-0033 does not implement transition graphs, transition thresholds, transition policy, state machines, automatic supersession, repositories, persistence, APIs, queues, workers, AI, frontend behavior, Hypotheses, Findings, Verification Decisions, or Operational Products.
 
+## Operational State Transition Policies
+
+ED-0034 adds deterministic Operational State Transition Policy contracts.
+
+Policy evaluates. Evaluation explains. State records. Execution is deferred.
+
+An `OperationalStateTransitionPolicy` receives an optional current `OperationalState` and applicable `EvidenceSet` objects, then returns a `TransitionEvaluation`. The evaluation records the evaluated state kind, optional current state, optional proposed state value, outcome, supporting Evidence IDs, blocking Evidence IDs, rationale, timestamp, and metadata.
+
+ED-0034 also adds the Recording Transition Policy. It evaluates recording coverage Evidence only and supports proposed recording values of active, paused, and stopped. It ignores transcript, vision, schedule, editorial, media artifact, and unrelated Evidence.
+
+Transition evaluations do not mutate state, execute transitions, dispatch events, persist state, implement repositories, implement state machines, call AI, create Hypotheses, create Findings, create Verification Decisions, create Operational Products, expose APIs, use queues or workers, or add frontend behavior.
+
 ## Hypothesis Primitives
 
 ED-0008 adds foundational production hypothesis contracts only.
