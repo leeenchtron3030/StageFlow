@@ -10,6 +10,7 @@ from .recording_coverage_evidence_mapping import (
     mapping_for_recording_activity,
     mapping_for_recording_event_kind,
     mapping_for_recording_observation,
+    mapping_for_recording_semantic_value,
 )
 from .recording_coverage_evidence_result import RecordingCoverageEvidenceResult
 from .recording_coverage_evidence_rule import RecordingCoverageEvidenceRule
@@ -28,4 +29,5 @@ __all__ = [
     "mapping_for_recording_activity",
     "mapping_for_recording_event_kind",
     "mapping_for_recording_observation",
+    "mapping_for_recording_semantic_value",
 ]

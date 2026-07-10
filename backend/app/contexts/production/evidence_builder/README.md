@@ -10,6 +10,8 @@ ED-0036 adds the first concrete Evidence Builder: Recording Coverage Evidence Bu
 
 ED-0037 adds the second concrete Evidence Builder: Transcript Continuity Evidence Builder.
 
+ED-0038 extracts generic semantic-selection mechanics proven by the two concrete builders.
+
 The builder is the first Reasoning component after the Perception Layer.
 
 Production Events become objective Observations through Observation Interpreters. The Observation Evidence Builder then organizes those objective Observations into explainable `EvidenceSet` objects using the existing ED-0007 Evidence contracts.
@@ -72,6 +74,23 @@ It is intentionally separate from the generic Observation Evidence Builder. It p
 The Transcript Continuity Evidence Builder converts objective transcript activity Observations into transcript continuity Evidence and first-class transcript Evidence Signals. It handles accumulating transcript streams, distinguishes availability from continuity, and requires explicit interruption or ending Observations before producing interruption or ending Signals.
 
 Both concrete builders suggest a reusable semantic-selector shape may be useful later, but ED-0037 keeps the logic domain-specific until another directive formalizes that abstraction.
+
+## Semantic Selection Mechanics
+
+ED-0038 adds shared mechanics for concrete Evidence Builders:
+
+- structured semantic selection from explicitly configured Observation metadata keys
+- deterministic normalization of structured values
+- deterministic Observation ordering
+- duplicate Observation ID handling
+- generic recognized, ignored, unsupported, and duplicate reporting
+- context-key comparison for domain-provided grouping keys
+
+The generic foundation owns mechanics only. It does not decide Evidence Concern, Evidence Purpose, Evidence Role, Evidence Strength, Signal mappings, grouping meaning, or rationale language.
+
+Semantic selectors do not inspect free-form transcript text, infer missing semantics, infer transcript interruption from silence, or map values to Signals. Concrete builders continue to own operational meaning.
+
+ED-0038 is not a runtime-configurable rules engine. There are no external rule files, expression languages, plugins, repositories, APIs, queues, workers, or frontend behavior.
 
 ## Traceability
 

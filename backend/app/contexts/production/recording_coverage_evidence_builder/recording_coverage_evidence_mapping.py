@@ -90,6 +90,14 @@ def mapping_for_recording_observation(
     return None
 
 
+def mapping_for_recording_semantic_value(
+    semantic_value: str,
+) -> RecordingCoverageEvidenceMapping | None:
+    return mapping_for_recording_activity(
+        semantic_value
+    ) or mapping_for_recording_event_kind(semantic_value)
+
+
 def mapping_for_recording_activity(
     recording_activity: str,
 ) -> RecordingCoverageEvidenceMapping | None:
@@ -103,6 +111,9 @@ def mapping_for_recording_event_kind(
     recording_event_kind: str,
 ) -> RecordingCoverageEvidenceMapping | None:
     for mapping in RECORDING_COVERAGE_EVIDENCE_MAPPINGS:
-        if mapping.recording_event_kind == recording_event_kind:
+        if (
+            mapping.recording_event_kind == recording_event_kind
+            or mapping.recording_activity == recording_event_kind
+        ):
             return mapping
     return None

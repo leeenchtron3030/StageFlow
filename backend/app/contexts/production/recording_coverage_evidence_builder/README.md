@@ -2,6 +2,8 @@
 
 ED-0036 adds the first concrete domain-specific Evidence Builder.
 
+ED-0038 refactors this builder to use the generic Evidence Builder semantic-selection mechanics while preserving recording-specific meaning.
+
 The Recording Coverage Evidence Builder converts objective recording activity `Observation` objects into recording-coverage `EvidenceSet` objects with first-class `EvidenceSignalReference` values.
 
 It validates the deterministic path:
@@ -22,6 +24,8 @@ The builder recognizes structured recording Observation metadata produced by the
 `recording_event_kind` remains a structured fallback when `recording_activity` is absent.
 
 The builder does not parse free-form Observation notes and does not use `EvidenceSignal.UNKNOWN` as a catch-all.
+
+The generic foundation performs structured key lookup, normalization, deterministic ordering, duplicate handling, input reporting, and context-key comparison. This builder still owns the recording mappings, recording coverage concern, transition-support purpose, support role, strength assumption, and rationale text.
 
 ## Grouping
 
