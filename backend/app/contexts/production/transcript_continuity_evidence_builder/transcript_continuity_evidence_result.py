@@ -6,6 +6,7 @@ from types import MappingProxyType
 from typing import Any
 
 from app.contexts.production.evidence import EvidenceSet
+from app.contexts.production.evidence_builder import EvidenceBuilderInputReport
 from app.shared.ids import EntityId
 
 
@@ -23,6 +24,7 @@ class TranscriptContinuityEvidenceResult:
     unsupported_observation_ids: Sequence[EntityId]
     duplicate_observation_ids: Sequence[EntityId]
     applied_rule_ids: Sequence[EntityId]
+    input_report: EvidenceBuilderInputReport | None = None
     metadata: Mapping[str, Any] = field(default_factory=_empty_metadata)
 
     def __post_init__(self) -> None:

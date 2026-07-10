@@ -150,6 +150,20 @@ def test_recording_paused_observation_mapping() -> None:
     assert result.evidence_sets[0].signals[0].signal is EvidenceSignal.RECORDING_PAUSE_INDICATED
 
 
+def test_recording_fallback_semantic_key_still_works() -> None:
+    observation = _observation(
+        None,
+        recording_block_id=EntityId.new(),
+        metadata={"recording_event_kind": "paused"},
+    )
+
+    result = make_recording_coverage_evidence_builder().build((observation,))
+
+    assert result.evidence_sets[0].signals[0].signal is EvidenceSignal.RECORDING_PAUSE_INDICATED
+    assert result.input_report is not None
+    assert result.input_report.selections[0].matched_semantic_key == "recording_event_kind"
+
+
 def test_recording_resumed_observation_mapping() -> None:
     result = _build_one("resumed")
 

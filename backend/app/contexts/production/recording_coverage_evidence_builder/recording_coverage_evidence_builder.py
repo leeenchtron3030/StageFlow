@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import timedelta
 from enum import StrEnum
 from types import MappingProxyType
 from typing import Any
@@ -14,13 +14,21 @@ from app.contexts.production.evidence import (
     EvidenceSet,
     EvidenceSignalReference,
 )
+from app.contexts.production.evidence_builder import (
+    EvidenceBuilderContextKey,
+    EvidenceBuilderInputReport,
+    ObservationSemanticSelection,
+    ObservationSemanticSelectionStatus,
+    ObservationSemanticSelector,
+    deduplicate_observations,
+)
 from app.contexts.production.observation import Observation, ObservationType
 from app.shared.ids import EntityId
 
 from .recording_coverage_evidence_mapping import (
     RECORDING_COVERAGE_EVIDENCE_MAPPINGS,
     RecordingCoverageEvidenceMapping,
-    mapping_for_recording_observation,
+    mapping_for_recording_semantic_value,
 )
 from .recording_coverage_evidence_result import (
     RecordingCoverageEvidenceResult,
@@ -68,6 +76,13 @@ def default_recording_coverage_evidence_rules() -> tuple[
     )
 
 
+def default_recording_coverage_semantic_selector() -> ObservationSemanticSelector:
+    return ObservationSemanticSelector(
+        accepted_observation_types=(ObservationType.RECORDING_ACTIVITY,),
+        semantic_keys=("recording_activity", "recording_event_kind"),
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class RecordingCoverageEvidenceBuilder:
     """Builds recording coverage Evidence from objective recording Observations."""
@@ -82,6 +97,9 @@ class RecordingCoverageEvidenceBuilder:
     )
     mappings: Sequence[RecordingCoverageEvidenceMapping] = field(
         default_factory=lambda: RECORDING_COVERAGE_EVIDENCE_MAPPINGS
+    )
+    semantic_selector: ObservationSemanticSelector = field(
+        default_factory=default_recording_coverage_semantic_selector
     )
     metadata: Mapping[str, Any] = field(default_factory=_empty_metadata)
 
@@ -108,6 +126,15 @@ class RecordingCoverageEvidenceBuilder:
                 unsupported_observation_ids=(),
                 duplicate_observation_ids=(),
                 applied_rule_ids=(),
+                input_report=EvidenceBuilderInputReport(
+                    recognized_observation_ids=(),
+                    ignored_observation_ids=tuple(
+                        observation.id for observation in observation_tuple
+                    ),
+                    unsupported_observation_ids=(),
+                    duplicate_observation_ids=(),
+                    metadata={"builder_status": self.status.value},
+                ),
                 metadata={
                     "builder_id": self.id.to_json(),
                     "input_observation_count": len(observation_tuple),
@@ -115,36 +142,62 @@ class RecordingCoverageEvidenceBuilder:
                 },
             )
 
-        ordered_unique, duplicate_ids = self._ordered_unique_observations(
-            observation_tuple
-        )
+        deduplication = deduplicate_observations(observation_tuple)
         ignored_ids: list[EntityId] = []
         unsupported_ids: list[EntityId] = []
-        recognized: list[tuple[Observation, RecordingCoverageEvidenceMapping]] = []
+        selections: list[ObservationSemanticSelection] = list(
+            deduplication.duplicate_selections
+        )
+        recognized: list[
+            tuple[
+                Observation,
+                RecordingCoverageEvidenceMapping,
+                ObservationSemanticSelection,
+            ]
+        ] = []
 
-        for observation in ordered_unique:
-            if observation.observation_type is not ObservationType.RECORDING_ACTIVITY:
+        for observation in deduplication.retained_observations:
+            selection = self.semantic_selector.select(
+                observation,
+                supported_values=self._supported_semantic_values(),
+            )
+            selections.append(selection)
+            if (
+                selection.status
+                is ObservationSemanticSelectionStatus.IGNORED_OBSERVATION_TYPE
+            ):
                 ignored_ids.append(observation.id)
                 continue
+            if selection.status is not ObservationSemanticSelectionStatus.SELECTED:
+                unsupported_ids.append(observation.id)
+                continue
 
-            mapping = self._mapping_for_observation(observation)
+            mapping = self._mapping_for_selection(selection)
             if mapping is None:
                 unsupported_ids.append(observation.id)
                 continue
 
-            recognized.append((observation, mapping))
+            recognized.append((observation, mapping, selection))
 
         evidence_sets, applied_rule_ids = self._evidence_sets_for_recognized(
             tuple(recognized)
         )
+        input_report = EvidenceBuilderInputReport.from_selections(
+            selections,
+            applied_rule_ids=applied_rule_ids,
+            metadata={"selector_keys": self.semantic_selector.semantic_keys},
+        )
 
         return RecordingCoverageEvidenceResult(
             evidence_sets=evidence_sets,
-            consumed_observation_ids=tuple(observation.id for observation, _ in recognized),
+            consumed_observation_ids=tuple(
+                observation.id for observation, _mapping, _selection in recognized
+            ),
             ignored_observation_ids=tuple(ignored_ids),
             unsupported_observation_ids=tuple(unsupported_ids),
-            duplicate_observation_ids=duplicate_ids,
+            duplicate_observation_ids=deduplication.duplicate_observation_ids,
             applied_rule_ids=applied_rule_ids,
+            input_report=input_report,
             metadata={
                 "builder_id": self.id.to_json(),
                 "input_observation_count": len(observation_tuple),
@@ -154,16 +207,27 @@ class RecordingCoverageEvidenceBuilder:
             },
         )
 
-    def _mapping_for_observation(
+    def _mapping_for_selection(
         self,
-        observation: Observation,
+        selection: ObservationSemanticSelection,
     ) -> RecordingCoverageEvidenceMapping | None:
-        mapping = mapping_for_recording_observation(observation)
+        if selection.normalized_semantic_value is None:
+            return None
+        mapping = mapping_for_recording_semantic_value(
+            selection.normalized_semantic_value
+        )
         if mapping is None:
             return None
         if mapping not in self.mappings:
             return None
         return mapping
+
+    def _supported_semantic_values(self) -> tuple[str, ...]:
+        values: list[str] = []
+        for mapping in self.mappings:
+            values.append(mapping.recording_activity)
+            values.append(mapping.recording_event_kind)
+        return tuple(dict.fromkeys(values))
 
     def _rule_for_mapping(
         self,
@@ -177,53 +241,30 @@ class RecordingCoverageEvidenceBuilder:
                 return rule
         return None
 
-    def _ordered_unique_observations(
-        self,
-        observations: tuple[Observation, ...],
-    ) -> tuple[tuple[Observation, ...], tuple[EntityId, ...]]:
-        sorted_observations = tuple(sorted(observations, key=self._ordering_key))
-        seen_ids: set[EntityId] = set()
-        unique: list[Observation] = []
-        duplicate_ids: list[EntityId] = []
-
-        for observation in sorted_observations:
-            if observation.id in seen_ids:
-                duplicate_ids.append(observation.id)
-                continue
-            seen_ids.add(observation.id)
-            unique.append(observation)
-
-        return tuple(unique), tuple(duplicate_ids)
-
-    def _ordering_key(
-        self,
-        observation: Observation,
-    ) -> tuple[datetime, float, str]:
-        return (
-            observation.observed_at,
-            self._timeline_order_value(observation),
-            observation.id.to_json(),
-        )
-
-    def _timeline_order_value(self, observation: Observation) -> float:
-        location = observation.location
-        if location.point is not None:
-            return location.point.offset.total_seconds()
-        if location.range is not None:
-            return location.range.start.offset.total_seconds()
-        return float("inf")
-
     def _evidence_sets_for_recognized(
         self,
-        recognized: tuple[tuple[Observation, RecordingCoverageEvidenceMapping], ...],
+        recognized: tuple[
+            tuple[
+                Observation,
+                RecordingCoverageEvidenceMapping,
+                ObservationSemanticSelection,
+            ],
+            ...,
+        ],
     ) -> tuple[tuple[EvidenceSet, ...], tuple[EntityId, ...]]:
         grouped: dict[
-            tuple[str | None, str | None],
-            list[tuple[Observation, RecordingCoverageEvidenceMapping]],
+            EvidenceBuilderContextKey,
+            list[
+                tuple[
+                    Observation,
+                    RecordingCoverageEvidenceMapping,
+                    ObservationSemanticSelection,
+                ]
+            ],
         ] = {}
-        for observation, mapping in recognized:
+        for observation, mapping, selection in recognized:
             grouped.setdefault(self._group_key(observation), []).append(
-                (observation, mapping)
+                (observation, mapping, selection)
             )
 
         evidence_sets: list[EvidenceSet] = []
@@ -248,27 +289,41 @@ class RecordingCoverageEvidenceBuilder:
     def _group_key(
         self,
         observation: Observation,
-    ) -> tuple[str | None, str | None]:
+    ) -> EvidenceBuilderContextKey:
         recording_block_id = observation.recording_block_id
         stage_id = observation.location.stage_id
-        return (
-            recording_block_id.to_json() if recording_block_id is not None else None,
-            stage_id.to_json() if stage_id is not None else None,
+        return EvidenceBuilderContextKey.from_components(
+            recording_block_id=(
+                recording_block_id.to_json() if recording_block_id is not None else None
+            ),
+            stage_id=stage_id.to_json() if stage_id is not None else None,
         )
 
     def _evidence_set_for_group(
         self,
-        group: tuple[tuple[Observation, RecordingCoverageEvidenceMapping], ...],
+        group: tuple[
+            tuple[
+                Observation,
+                RecordingCoverageEvidenceMapping,
+                ObservationSemanticSelection,
+            ],
+            ...,
+        ],
     ) -> tuple[EvidenceSet | None, tuple[EntityId, ...]]:
         items: list[EvidenceItem] = []
         signals: list[EvidenceSignalReference] = []
         applied_rule_ids: list[EntityId] = []
 
-        for observation, mapping in group:
+        for observation, mapping, selection in group:
             rule = self._rule_for_mapping(mapping)
             if rule is None:
                 continue
-            item = self._evidence_item_for_observation(observation, mapping, rule)
+            item = self._evidence_item_for_observation(
+                observation,
+                mapping,
+                rule,
+                selection,
+            )
             items.append(item)
             signals.append(
                 self._signal_reference_for_observation(
@@ -276,6 +331,7 @@ class RecordingCoverageEvidenceBuilder:
                     mapping=mapping,
                     rule=rule,
                     item=item,
+                    selection=selection,
                 )
             )
             applied_rule_ids.append(rule.id)
@@ -298,7 +354,8 @@ class RecordingCoverageEvidenceBuilder:
                 metadata={
                     "recording_coverage_evidence_builder_id": self.id.to_json(),
                     "source_observation_ids": tuple(
-                        observation.id.to_json() for observation, _ in group
+                        observation.id.to_json()
+                        for observation, _mapping, _selection in group
                     ),
                     "recording_block_id": (
                         first_observation.recording_block_id.to_json()
@@ -321,6 +378,7 @@ class RecordingCoverageEvidenceBuilder:
         observation: Observation,
         mapping: RecordingCoverageEvidenceMapping,
         rule: RecordingCoverageEvidenceRule,
+        selection: ObservationSemanticSelection,
     ) -> EvidenceItem:
         return EvidenceItem(
             id=EntityId.new(),
@@ -332,6 +390,8 @@ class RecordingCoverageEvidenceBuilder:
                 "recording_activity": mapping.recording_activity,
                 "recording_event_kind": mapping.recording_event_kind,
                 "evidence_builder_rule_id": rule.id.to_json(),
+                "matched_semantic_key": selection.matched_semantic_key,
+                "normalized_semantic_value": selection.normalized_semantic_value,
                 "observation_observed_at": observation.observed_at.isoformat(),
                 "observation_location": self._location_metadata(observation),
             },
@@ -344,6 +404,7 @@ class RecordingCoverageEvidenceBuilder:
         mapping: RecordingCoverageEvidenceMapping,
         rule: RecordingCoverageEvidenceRule,
         item: EvidenceItem,
+        selection: ObservationSemanticSelection,
     ) -> EvidenceSignalReference:
         return EvidenceSignalReference(
             signal=mapping.evidence_signal,
@@ -353,6 +414,8 @@ class RecordingCoverageEvidenceBuilder:
             metadata={
                 "evidence_builder_rule_id": rule.id.to_json(),
                 "recording_activity": mapping.recording_activity,
+                "matched_semantic_key": selection.matched_semantic_key,
+                "normalized_semantic_value": selection.normalized_semantic_value,
                 "recording_block_id": (
                     observation.recording_block_id.to_json()
                     if observation.recording_block_id is not None

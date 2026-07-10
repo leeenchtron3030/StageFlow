@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import timedelta
 from enum import StrEnum
 from types import MappingProxyType
 from typing import Any, cast
@@ -15,13 +15,21 @@ from app.contexts.production.evidence import (
     EvidenceSignal,
     EvidenceSignalReference,
 )
+from app.contexts.production.evidence_builder import (
+    EvidenceBuilderContextKey,
+    EvidenceBuilderInputReport,
+    ObservationSemanticSelection,
+    ObservationSemanticSelectionStatus,
+    ObservationSemanticSelector,
+    deduplicate_observations,
+)
 from app.contexts.production.observation import Observation, ObservationType
 from app.shared.ids import EntityId
 
 from .transcript_continuity_evidence_mapping import (
     TRANSCRIPT_CONTINUITY_EVIDENCE_MAPPINGS,
     TranscriptContinuityEvidenceMapping,
-    mapping_for_transcript_observation,
+    mapping_for_transcript_lifecycle,
 )
 from .transcript_continuity_evidence_result import TranscriptContinuityEvidenceResult
 from .transcript_continuity_evidence_rule import TranscriptContinuityEvidenceRule
@@ -71,6 +79,18 @@ def default_transcript_continuity_evidence_rules() -> tuple[
     return tuple(rules)
 
 
+def default_transcript_continuity_semantic_selector() -> ObservationSemanticSelector:
+    return ObservationSemanticSelector(
+        accepted_observation_types=(ObservationType.TRANSCRIPT_ACTIVITY,),
+        semantic_keys=(
+            "transcript_lifecycle",
+            "transcript_activity",
+            "transcript_event_kind",
+            "status",
+        ),
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class TranscriptContinuityEvidenceBuilder:
     """Builds transcript continuity Evidence from objective transcript Observations."""
@@ -85,6 +105,9 @@ class TranscriptContinuityEvidenceBuilder:
     )
     mappings: Sequence[TranscriptContinuityEvidenceMapping] = field(
         default_factory=lambda: TRANSCRIPT_CONTINUITY_EVIDENCE_MAPPINGS
+    )
+    semantic_selector: ObservationSemanticSelector = field(
+        default_factory=default_transcript_continuity_semantic_selector
     )
     metadata: Mapping[str, Any] = field(default_factory=_empty_metadata)
 
@@ -111,6 +134,15 @@ class TranscriptContinuityEvidenceBuilder:
                 unsupported_observation_ids=(),
                 duplicate_observation_ids=(),
                 applied_rule_ids=(),
+                input_report=EvidenceBuilderInputReport(
+                    recognized_observation_ids=(),
+                    ignored_observation_ids=tuple(
+                        observation.id for observation in observation_tuple
+                    ),
+                    unsupported_observation_ids=(),
+                    duplicate_observation_ids=(),
+                    metadata={"builder_status": self.status.value},
+                ),
                 metadata={
                     "builder_id": self.id.to_json(),
                     "input_observation_count": len(observation_tuple),
@@ -118,36 +150,62 @@ class TranscriptContinuityEvidenceBuilder:
                 },
             )
 
-        ordered_unique, duplicate_ids = self._ordered_unique_observations(
-            observation_tuple
-        )
+        deduplication = deduplicate_observations(observation_tuple)
         ignored_ids: list[EntityId] = []
         unsupported_ids: list[EntityId] = []
-        recognized: list[tuple[Observation, TranscriptContinuityEvidenceMapping]] = []
+        selections: list[ObservationSemanticSelection] = list(
+            deduplication.duplicate_selections
+        )
+        recognized: list[
+            tuple[
+                Observation,
+                TranscriptContinuityEvidenceMapping,
+                ObservationSemanticSelection,
+            ]
+        ] = []
 
-        for observation in ordered_unique:
-            if observation.observation_type is not ObservationType.TRANSCRIPT_ACTIVITY:
+        for observation in deduplication.retained_observations:
+            selection = self.semantic_selector.select(
+                observation,
+                supported_values=self._supported_semantic_values(),
+            )
+            selections.append(selection)
+            if (
+                selection.status
+                is ObservationSemanticSelectionStatus.IGNORED_OBSERVATION_TYPE
+            ):
                 ignored_ids.append(observation.id)
                 continue
+            if selection.status is not ObservationSemanticSelectionStatus.SELECTED:
+                unsupported_ids.append(observation.id)
+                continue
 
-            mapping = self._mapping_for_observation(observation)
+            mapping = self._mapping_for_selection(selection)
             if mapping is None:
                 unsupported_ids.append(observation.id)
                 continue
 
-            recognized.append((observation, mapping))
+            recognized.append((observation, mapping, selection))
 
         evidence_sets, applied_rule_ids = self._evidence_sets_for_recognized(
             tuple(recognized)
         )
+        input_report = EvidenceBuilderInputReport.from_selections(
+            selections,
+            applied_rule_ids=applied_rule_ids,
+            metadata={"selector_keys": self.semantic_selector.semantic_keys},
+        )
 
         return TranscriptContinuityEvidenceResult(
             evidence_sets=evidence_sets,
-            consumed_observation_ids=tuple(observation.id for observation, _ in recognized),
+            consumed_observation_ids=tuple(
+                observation.id for observation, _mapping, _selection in recognized
+            ),
             ignored_observation_ids=tuple(ignored_ids),
             unsupported_observation_ids=tuple(unsupported_ids),
-            duplicate_observation_ids=duplicate_ids,
+            duplicate_observation_ids=deduplication.duplicate_observation_ids,
             applied_rule_ids=applied_rule_ids,
+            input_report=input_report,
             metadata={
                 "builder_id": self.id.to_json(),
                 "input_observation_count": len(observation_tuple),
@@ -159,16 +217,23 @@ class TranscriptContinuityEvidenceBuilder:
             },
         )
 
-    def _mapping_for_observation(
+    def _mapping_for_selection(
         self,
-        observation: Observation,
+        selection: ObservationSemanticSelection,
     ) -> TranscriptContinuityEvidenceMapping | None:
-        mapping = mapping_for_transcript_observation(observation)
+        if selection.normalized_semantic_value is None:
+            return None
+        mapping = mapping_for_transcript_lifecycle(selection.normalized_semantic_value)
         if mapping is None:
             return None
         if mapping not in self.mappings:
             return None
         return mapping
+
+    def _supported_semantic_values(self) -> tuple[str, ...]:
+        return tuple(
+            dict.fromkeys(mapping.transcript_lifecycle for mapping in self.mappings)
+        )
 
     def _rule_for_mapping_signal(
         self,
@@ -183,50 +248,30 @@ class TranscriptContinuityEvidenceBuilder:
                 return rule
         return None
 
-    def _ordered_unique_observations(
-        self,
-        observations: tuple[Observation, ...],
-    ) -> tuple[tuple[Observation, ...], tuple[EntityId, ...]]:
-        sorted_observations = tuple(sorted(observations, key=self._ordering_key))
-        seen_ids: set[EntityId] = set()
-        unique: list[Observation] = []
-        duplicate_ids: list[EntityId] = []
-
-        for observation in sorted_observations:
-            if observation.id in seen_ids:
-                duplicate_ids.append(observation.id)
-                continue
-            seen_ids.add(observation.id)
-            unique.append(observation)
-
-        return tuple(unique), tuple(duplicate_ids)
-
-    def _ordering_key(self, observation: Observation) -> tuple[datetime, float, str]:
-        return (
-            observation.observed_at,
-            self._timeline_order_value(observation),
-            observation.id.to_json(),
-        )
-
-    def _timeline_order_value(self, observation: Observation) -> float:
-        location = observation.location
-        if location.point is not None:
-            return location.point.offset.total_seconds()
-        if location.range is not None:
-            return location.range.start.offset.total_seconds()
-        return float("inf")
-
     def _evidence_sets_for_recognized(
         self,
-        recognized: tuple[tuple[Observation, TranscriptContinuityEvidenceMapping], ...],
+        recognized: tuple[
+            tuple[
+                Observation,
+                TranscriptContinuityEvidenceMapping,
+                ObservationSemanticSelection,
+            ],
+            ...,
+        ],
     ) -> tuple[tuple[EvidenceSet, ...], tuple[EntityId, ...]]:
         grouped: dict[
-            tuple[str | None, str | None, str | None],
-            list[tuple[Observation, TranscriptContinuityEvidenceMapping]],
+            EvidenceBuilderContextKey,
+            list[
+                tuple[
+                    Observation,
+                    TranscriptContinuityEvidenceMapping,
+                    ObservationSemanticSelection,
+                ]
+            ],
         ] = {}
-        for observation, mapping in recognized:
+        for observation, mapping, selection in recognized:
             grouped.setdefault(self._group_key(observation), []).append(
-                (observation, mapping)
+                (observation, mapping, selection)
             )
 
         evidence_sets: list[EvidenceSet] = []
@@ -248,14 +293,16 @@ class TranscriptContinuityEvidenceBuilder:
         )
         return tuple(evidence_sets), tuple(applied_rule_ids)
 
-    def _group_key(self, observation: Observation) -> tuple[str | None, str | None, str | None]:
+    def _group_key(self, observation: Observation) -> EvidenceBuilderContextKey:
         recording_block_id = observation.recording_block_id
         stage_id = observation.location.stage_id
         transcript_stream_id = self._transcript_stream_id(observation)
-        return (
-            recording_block_id.to_json() if recording_block_id is not None else None,
-            stage_id.to_json() if stage_id is not None else None,
-            transcript_stream_id,
+        return EvidenceBuilderContextKey.from_components(
+            recording_block_id=(
+                recording_block_id.to_json() if recording_block_id is not None else None
+            ),
+            stage_id=stage_id.to_json() if stage_id is not None else None,
+            transcript_stream_id=transcript_stream_id,
         )
 
     def _transcript_stream_id(self, observation: Observation) -> str | None:
@@ -267,19 +314,32 @@ class TranscriptContinuityEvidenceBuilder:
 
     def _evidence_set_for_group(
         self,
-        group: tuple[tuple[Observation, TranscriptContinuityEvidenceMapping], ...],
+        group: tuple[
+            tuple[
+                Observation,
+                TranscriptContinuityEvidenceMapping,
+                ObservationSemanticSelection,
+            ],
+            ...,
+        ],
     ) -> tuple[EvidenceSet | None, tuple[EntityId, ...]]:
         items: list[EvidenceItem] = []
         signals: list[EvidenceSignalReference] = []
         applied_rule_ids: list[EntityId] = []
         transcript_activity_seen = False
 
-        for observation, mapping in group:
+        for observation, mapping, selection in group:
             signal = self._signal_for_mapping(mapping, transcript_activity_seen)
             rule = self._rule_for_mapping_signal(mapping, signal)
             if rule is None:
                 continue
-            item = self._evidence_item_for_observation(observation, mapping, rule, signal)
+            item = self._evidence_item_for_observation(
+                observation,
+                mapping,
+                rule,
+                signal,
+                selection,
+            )
             items.append(item)
             signals.append(
                 self._signal_reference_for_observation(
@@ -288,6 +348,7 @@ class TranscriptContinuityEvidenceBuilder:
                     rule=rule,
                     item=item,
                     signal=signal,
+                    selection=selection,
                 )
             )
             applied_rule_ids.append(rule.id)
@@ -315,7 +376,8 @@ class TranscriptContinuityEvidenceBuilder:
                 metadata={
                     "transcript_continuity_evidence_builder_id": self.id.to_json(),
                     "source_observation_ids": tuple(
-                        observation.id.to_json() for observation, _ in group
+                        observation.id.to_json()
+                        for observation, _mapping, _selection in group
                     ),
                     "recording_block_id": (
                         first_observation.recording_block_id.to_json()
@@ -349,6 +411,7 @@ class TranscriptContinuityEvidenceBuilder:
         mapping: TranscriptContinuityEvidenceMapping,
         rule: TranscriptContinuityEvidenceRule,
         signal: EvidenceSignal,
+        selection: ObservationSemanticSelection,
     ) -> EvidenceItem:
         return EvidenceItem(
             id=EntityId.new(),
@@ -360,6 +423,8 @@ class TranscriptContinuityEvidenceBuilder:
                 "transcript_lifecycle": mapping.transcript_lifecycle,
                 "evidence_signal": signal.value,
                 "evidence_builder_rule_id": rule.id.to_json(),
+                "matched_semantic_key": selection.matched_semantic_key,
+                "normalized_semantic_value": selection.normalized_semantic_value,
                 "observation_observed_at": observation.observed_at.isoformat(),
                 "transcript_stream_id": self._transcript_stream_id(observation),
                 "transcript_segment_id": observation.metadata.get("transcript_segment_id"),
@@ -378,6 +443,7 @@ class TranscriptContinuityEvidenceBuilder:
         rule: TranscriptContinuityEvidenceRule,
         item: EvidenceItem,
         signal: EvidenceSignal,
+        selection: ObservationSemanticSelection,
     ) -> EvidenceSignalReference:
         return EvidenceSignalReference(
             signal=signal,
@@ -387,6 +453,8 @@ class TranscriptContinuityEvidenceBuilder:
             metadata={
                 "evidence_builder_rule_id": rule.id.to_json(),
                 "transcript_lifecycle": mapping.transcript_lifecycle,
+                "matched_semantic_key": selection.matched_semantic_key,
+                "normalized_semantic_value": selection.normalized_semantic_value,
                 "transcript_stream_id": self._transcript_stream_id(observation),
                 "recording_block_id": (
                     observation.recording_block_id.to_json()

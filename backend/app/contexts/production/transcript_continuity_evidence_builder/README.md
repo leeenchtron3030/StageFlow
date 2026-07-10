@@ -2,6 +2,8 @@
 
 ED-0037 adds the second concrete domain-specific Evidence Builder.
 
+ED-0038 refactors this builder to use the generic Evidence Builder semantic-selection mechanics while preserving transcript-specific meaning.
+
 The Transcript Continuity Evidence Builder converts objective transcript activity `Observation` objects into transcript continuity `EvidenceSet` objects with first-class `EvidenceSignalReference` values.
 
 Transcript Evidence is accumulating and time-based. A segment arriving is observable; a stream explicitly ending is observable; a session ending is not.
@@ -19,6 +21,8 @@ The builder recognizes structured `transcript_lifecycle` Observation metadata:
 The current transcript Observation Interpreter naturally emits `segment_available` and `transcript_source_status_changed`. The latter is reported as unsupported because it is not enough by itself to distinguish interruption from ending.
 
 The builder does not parse transcript text, inspect language meaning, infer speakers, infer session state, infer interruption from silence, or emit `unknown` as a fallback Signal.
+
+The generic foundation performs structured key lookup, normalization, deterministic ordering, duplicate handling, input reporting, and context-key comparison. This builder still owns transcript lifecycle mappings, stream grouping, first-segment versus later-segment behavior, transcript continuity concern, support role, strength assumption, and rationale text.
 
 ## Grouping
 

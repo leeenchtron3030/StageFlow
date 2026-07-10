@@ -149,6 +149,22 @@ def test_transcript_continuation_mapping() -> None:
     assert evidence.signals[0].signal is EvidenceSignal.TRANSCRIPT_CONTINUITY_INDICATED
 
 
+def test_transcript_fallback_semantic_key_still_works() -> None:
+    observation = _observation(
+        None,
+        metadata={"transcript_activity": "transcript_activity_interrupted"},
+    )
+
+    result = make_transcript_continuity_evidence_builder().build((observation,))
+
+    assert (
+        result.evidence_sets[0].signals[0].signal
+        is EvidenceSignal.TRANSCRIPT_INTERRUPTION_INDICATED
+    )
+    assert result.input_report is not None
+    assert result.input_report.selections[0].matched_semantic_key == "transcript_activity"
+
+
 def test_explicit_interruption_mapping() -> None:
     evidence = _build_one("transcript_activity_interrupted").evidence_sets[0]
 
@@ -234,6 +250,18 @@ def test_transcript_stream_context_preserved() -> None:
 
     assert evidence.metadata["transcript_stream_id"] == "stream-a"
     assert evidence.signals[0].metadata["transcript_stream_id"] == "stream-a"
+
+
+def test_transcript_stream_fallback_identity_preserved() -> None:
+    evidence = _build_one_for_observation(
+        _observation(
+            "segment_available",
+            transcript_stream_id=None,
+            metadata={"stream_id": "fallback-stream"},
+        )
+    )
+
+    assert evidence.metadata["transcript_stream_id"] == "fallback-stream"
 
 
 def test_recording_block_context_preserved() -> None:

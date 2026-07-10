@@ -250,6 +250,16 @@ Transcript Evidence is accumulating and time-based. The builder groups by record
 
 The builder does not infer interruption from silence or elapsed time, does not inspect transcript text for meaning, does not infer speaker identity, does not infer session state, and does not create policies, Operational State, Transition Evaluations, Hypotheses, Findings, Verification Decisions, Operational Products, AI, persistence, APIs, queues, workers, or frontend behavior.
 
+## Generic Evidence Builder Semantic Selection
+
+ED-0038 extracts shared mechanics proven by the Recording Coverage and Transcript Continuity Evidence Builders.
+
+The generic Evidence Builder foundation now owns structured semantic selection, deterministic Observation ordering, duplicate Observation ID handling, input classification/reporting, and context-key comparison.
+
+Concrete builders still own operational meaning: accepted Observation types, semantic keys, semantic-to-Signal mappings, Evidence Concern, Evidence Purpose, Evidence Role, Evidence Strength, grouping context construction, and rationale language.
+
+Semantic selectors inspect only explicitly configured structured keys. Missing or unsupported semantics are reported and never guessed. The generic foundation is not a runtime-configurable rules engine and does not introduce Session Boundary Evidence, Session Transition Policy, Operational State, Transition Evaluations, persistence, repositories, plugins, AI, APIs, queues, workers, or frontend behavior.
+
 ## Operational State Taxonomy
 
 ED-0033 adds the foundational Operational State taxonomy.
