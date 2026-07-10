@@ -54,6 +54,8 @@ One `EvidenceSet` may carry zero or more `EvidenceSignalReference` objects. A si
 
 Metadata may carry secondary detail, but concern, role, and signal are no longer metadata-only semantics.
 
+ED-0036 validates this model with the Recording Coverage Evidence Builder. Recording activity Observations become recording coverage Evidence with explicit Signals such as `recording_continuity_established`, `recording_pause_indicated`, `recording_continuity_restored`, and `recording_end_indicated`. The Evidence layer still does not evaluate or record state.
+
 ## What Does Not Belong Here
 
 - Full Observation objects embedded in evidence items.
