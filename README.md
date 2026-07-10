@@ -16,6 +16,10 @@ Architecture summary:
 
 Observable Reality -> Production Events -> Observations -> Reasoning -> Operational Products
 
+Perception Layer summary:
+
+Production Events -> Observation Interpreters -> Objective Observations
+
 ⸻
 
 Mission
@@ -217,7 +221,7 @@ Current Status
 
 Current repository phase:
 
-Architecture Release AR-2.0
+Architecture Release AR-2.1
 
 Foundational backend contracts are being implemented through approved Engineering Directives. The current objective is to preserve a clear architecture in which runtime ingress remains small and explainable while reasoning stays traceable.
 
