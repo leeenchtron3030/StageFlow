@@ -6,6 +6,8 @@ ED-0032 refines the builder so concern and role are first-class Evidence semanti
 
 ED-0035 lets builder rules declare first-class Evidence Signals.
 
+ED-0036 adds the first concrete Evidence Builder: Recording Coverage Evidence Builder.
+
 The builder is the first Reasoning component after the Perception Layer.
 
 Production Events become objective Observations through Observation Interpreters. The Observation Evidence Builder then organizes those objective Observations into explainable `EvidenceSet` objects using the existing ED-0007 Evidence contracts.
@@ -58,6 +60,12 @@ Metadata remains available for secondary details, but core concern, role, and si
 Initial default rules remain deliberately conservative and map single-domain Observations into StageFlow-focused concerns such as recording coverage, media availability, schedule alignment, transcript continuity, and visual transition context.
 
 Multi-domain concerns such as session started are intentionally excluded. Those belong to later reasoning directives.
+
+## Concrete Builders
+
+The Recording Coverage Evidence Builder converts objective recording activity Observations into recording-coverage Evidence and first-class recording Evidence Signals.
+
+It is intentionally separate from the generic Observation Evidence Builder. It proves concrete signal production while staying below Operational State: it does not call transition policies, mutate state, infer sessions, persist Evidence, or create downstream reasoning artifacts.
 
 ## Traceability
 

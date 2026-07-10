@@ -27,6 +27,8 @@ The policy ignores transcript, vision, schedule, editorial, media artifact, and 
 
 Legacy metadata markers such as `recording_active`, `recording_paused`, and `recording_stopped` remain readable only as transitional compatibility when an EvidenceSet has no first-class signals. `EvidenceSignal` is authoritative for core transition meaning.
 
+ED-0036 adds the Recording Coverage Evidence Builder, which produces compatible recording coverage Evidence and Signals from objective recording Observations. The builder does not call this policy; the policy consumes its output separately.
+
 ## Deferred
 
 The Recording Transition Policy does not mutate state, execute transitions, persist state, implement repositories, dispatch events, create Hypotheses, create Findings, create Verification Decisions, create Operational Products, call AI, use queues or workers, expose APIs, or add frontend behavior.

@@ -220,6 +220,21 @@ The builder organizes related facts. It does not interpret meaning, generate Hyp
 
 ED-0031 also allows an `EvidenceSet` to omit a recording block ID when the source Observations are truthfully anchored elsewhere, such as wall-clock or stage context.
 
+## Recording Coverage Evidence Builder
+
+ED-0036 adds the first concrete Evidence Builder.
+
+The Recording Coverage Evidence Builder converts objective recording activity Observations into recording coverage Evidence with first-class recording Evidence Signals:
+
+- recording activity began -> `recording_continuity_established`
+- recording activity paused -> `recording_pause_indicated`
+- recording activity resumed -> `recording_continuity_restored`
+- recording activity ended -> `recording_end_indicated`
+
+It preserves Observation and EvidenceItem traceability, recording-block context, stage context where available, and timeline context where available. It ignores unrelated Observations, does not guess unsupported recording semantics, and does not create Session Evidence, editorial Evidence, transcript Evidence, visual Evidence, Operational State, Transition Evaluations, Hypotheses, Findings, Verification Decisions, Operational Products, AI, persistence, APIs, queues, workers, or frontend behavior.
+
+The Recording Transition Policy consumes the builder output separately. The builder itself does not evaluate or mutate state.
+
 ## Operational State Taxonomy
 
 ED-0033 adds the foundational Operational State taxonomy.
