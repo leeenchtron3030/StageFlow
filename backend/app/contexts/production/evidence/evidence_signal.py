@@ -16,6 +16,8 @@ class EvidenceSignal(StrEnum):
     SCHEDULED_ACTIVITY_CANCELLED = "scheduled_activity_cancelled"
     SPEECH_ACTIVITY_AVAILABLE = "speech_activity_available"
     TRANSCRIPT_CONTINUITY_INDICATED = "transcript_continuity_indicated"
+    TRANSCRIPT_INTERRUPTION_INDICATED = "transcript_interruption_indicated"
+    TRANSCRIPT_END_INDICATED = "transcript_end_indicated"
     VISUAL_ACTIVITY_AVAILABLE = "visual_activity_available"
     PRESENTATION_TRANSITION_INDICATED = "presentation_transition_indicated"
     VISUAL_OBSTRUCTION_INDICATED = "visual_obstruction_indicated"

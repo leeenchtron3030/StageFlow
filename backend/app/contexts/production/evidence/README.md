@@ -56,6 +56,8 @@ Metadata may carry secondary detail, but concern, role, and signal are no longer
 
 ED-0036 validates this model with the Recording Coverage Evidence Builder. Recording activity Observations become recording coverage Evidence with explicit Signals such as `recording_continuity_established`, `recording_pause_indicated`, `recording_continuity_restored`, and `recording_end_indicated`. The Evidence layer still does not evaluate or record state.
 
+ED-0037 validates the same model in an accumulating transcript domain. Transcript activity Observations may become transcript continuity Evidence with Signals such as `speech_activity_available`, `transcript_continuity_indicated`, `transcript_interruption_indicated`, and `transcript_end_indicated`. Transcript interruption and ending Signals require explicit structured Observation semantics; absence of transcript activity is not Evidence of interruption.
+
 ## What Does Not Belong Here
 
 - Full Observation objects embedded in evidence items.

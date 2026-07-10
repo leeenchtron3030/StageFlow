@@ -8,6 +8,8 @@ ED-0035 lets builder rules declare first-class Evidence Signals.
 
 ED-0036 adds the first concrete Evidence Builder: Recording Coverage Evidence Builder.
 
+ED-0037 adds the second concrete Evidence Builder: Transcript Continuity Evidence Builder.
+
 The builder is the first Reasoning component after the Perception Layer.
 
 Production Events become objective Observations through Observation Interpreters. The Observation Evidence Builder then organizes those objective Observations into explainable `EvidenceSet` objects using the existing ED-0007 Evidence contracts.
@@ -66,6 +68,10 @@ Multi-domain concerns such as session started are intentionally excluded. Those 
 The Recording Coverage Evidence Builder converts objective recording activity Observations into recording-coverage Evidence and first-class recording Evidence Signals.
 
 It is intentionally separate from the generic Observation Evidence Builder. It proves concrete signal production while staying below Operational State: it does not call transition policies, mutate state, infer sessions, persist Evidence, or create downstream reasoning artifacts.
+
+The Transcript Continuity Evidence Builder converts objective transcript activity Observations into transcript continuity Evidence and first-class transcript Evidence Signals. It handles accumulating transcript streams, distinguishes availability from continuity, and requires explicit interruption or ending Observations before producing interruption or ending Signals.
+
+Both concrete builders suggest a reusable semantic-selector shape may be useful later, but ED-0037 keeps the logic domain-specific until another directive formalizes that abstraction.
 
 ## Traceability
 
