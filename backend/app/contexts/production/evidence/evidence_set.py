@@ -9,6 +9,9 @@ from typing import Any
 from app.contexts.production.evidence.evidence_concern import EvidenceConcern
 from app.contexts.production.evidence.evidence_item import EvidenceItem
 from app.contexts.production.evidence.evidence_purpose import EvidencePurpose
+from app.contexts.production.evidence.evidence_signal_reference import (
+    EvidenceSignalReference,
+)
 from app.shared.ids import CorrelationId, EntityId
 
 
@@ -26,6 +29,7 @@ class EvidenceSet:
     items: Sequence[EvidenceItem]
     correlation_id: CorrelationId
     concern: EvidenceConcern = EvidenceConcern.UNKNOWN
+    signals: Sequence[EvidenceSignalReference] = field(default_factory=tuple)
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     notes: str | None = None
     metadata: Mapping[str, Any] = field(default_factory=_empty_metadata)
@@ -34,4 +38,5 @@ class EvidenceSet:
         if len(self.items) == 0:
             raise ValueError("EvidenceSet requires at least one EvidenceItem.")
         object.__setattr__(self, "items", tuple(self.items))
+        object.__setattr__(self, "signals", tuple(self.signals))
         object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))

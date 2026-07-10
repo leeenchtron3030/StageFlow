@@ -9,6 +9,7 @@ from app.contexts.production.evidence import (
     EvidenceConcern,
     EvidencePurpose,
     EvidenceRole,
+    EvidenceSignal,
     EvidenceStrength,
 )
 from app.contexts.production.observation import ObservationType
@@ -45,6 +46,7 @@ class EvidenceBuilderRule:
     operational_concern: EvidenceConcern | str
     supporting_observation_types: Sequence[ObservationType] = field(default_factory=tuple)
     evidence_purpose: EvidencePurpose = EvidencePurpose.OPERATIONAL_CONTEXT
+    evidence_signal: EvidenceSignal = EvidenceSignal.UNKNOWN
     supporting_strength: EvidenceStrength = EvidenceStrength.MODERATE
     contradicting_observation_types: Sequence[ObservationType] = field(default_factory=tuple)
     contextual_observation_types: Sequence[ObservationType] = field(default_factory=tuple)

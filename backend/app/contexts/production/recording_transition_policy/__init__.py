@@ -2,6 +2,7 @@ from .recording_transition_mapping import (
     RECORDING_TRANSITION_MAPPINGS,
     RecordingTransitionMapping,
     mapping_for_recording_marker,
+    mapping_for_recording_signal,
 )
 from .recording_transition_policy import (
     RecordingTransitionPolicy,
@@ -18,4 +19,5 @@ __all__ = [
     "RecordingTransitionSummary",
     "default_recording_transition_rules",
     "mapping_for_recording_marker",
+    "mapping_for_recording_signal",
 ]

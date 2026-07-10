@@ -9,6 +9,8 @@ from app.contexts.production.evidence import (
     EvidencePurpose,
     EvidenceRole,
     EvidenceSet,
+    EvidenceSignal,
+    EvidenceSignalReference,
     EvidenceStrength,
     EvidenceSummary,
 )
@@ -247,6 +249,35 @@ def test_evidence_summary_counts_roles() -> None:
     assert summary.contradicting_count == 1
     assert summary.contextual_count == 1
     assert summary.neutral_count == 1
+
+
+def test_evidence_summary_reports_signals() -> None:
+    first_item = _item(EvidenceStrength.STRONG)
+    second_item = _item(EvidenceStrength.MODERATE)
+    evidence_set = EvidenceSet(
+        id=EntityId.new(),
+        recording_block_id=EntityId.new(),
+        concern=EvidenceConcern.RECORDING_COVERAGE,
+        purpose=EvidencePurpose.TRANSITION_SUPPORT,
+        items=(first_item, second_item),
+        signals=(
+            EvidenceSignalReference(
+                signal=EvidenceSignal.RECORDING_CONTINUITY_ESTABLISHED,
+                evidence_item_ids=(first_item.id, second_item.id),
+                observation_ids=(first_item.observation_id, second_item.observation_id),
+            ),
+        ),
+        correlation_id=CorrelationId.new(),
+    )
+
+    summary = EvidenceSummary.from_evidence_set(evidence_set)
+
+    assert summary.signal_count == 1
+    assert summary.signals == (EvidenceSignal.RECORDING_CONTINUITY_ESTABLISHED,)
+    assert (
+        summary.item_count_by_signal[EvidenceSignal.RECORDING_CONTINUITY_ESTABLISHED]
+        == 2
+    )
 
 
 def test_evidence_summary_does_not_produce_decision_metric() -> None:

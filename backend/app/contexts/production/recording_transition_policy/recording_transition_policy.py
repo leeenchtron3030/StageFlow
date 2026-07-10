@@ -5,7 +5,12 @@ from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Any
 
-from app.contexts.production.evidence import EvidenceConcern, EvidenceRole, EvidenceSet
+from app.contexts.production.evidence import (
+    EvidenceConcern,
+    EvidenceRole,
+    EvidenceSet,
+    EvidenceSignal,
+)
 from app.contexts.production.operational_state import (
     OperationalState,
     OperationalStateKind,
@@ -14,6 +19,7 @@ from app.contexts.production.operational_state import (
 from app.contexts.production.recording_transition_policy.recording_transition_mapping import (
     RECORDING_TRANSITION_MAPPINGS,
     mapping_for_recording_marker,
+    mapping_for_recording_signal,
 )
 from app.contexts.production.recording_transition_policy.recording_transition_rule import (
     RecordingTransitionRule,
@@ -34,8 +40,9 @@ def default_recording_transition_rules() -> tuple[RecordingTransitionRule, ...]:
     return tuple(
         RecordingTransitionRule(
             id=EntityId.new(),
-            evidence_marker=mapping.evidence_marker,
+            evidence_signal=mapping.evidence_signal,
             proposed_state=mapping.proposed_state,
+            legacy_evidence_marker=mapping.legacy_evidence_marker,
             description=mapping.rationale,
         )
         for mapping in RECORDING_TRANSITION_MAPPINGS
@@ -75,6 +82,7 @@ class RecordingTransitionPolicy:
             if evidence_set.concern is EvidenceConcern.RECORDING_COVERAGE
         )
         examined_ids = tuple(evidence_set.id.to_json() for evidence_set in recording_evidence)
+        examined_signal_values = self._examined_signal_values(recording_evidence)
 
         if not recording_evidence:
             return self._evaluation(
@@ -85,6 +93,7 @@ class RecordingTransitionPolicy:
                 blocking_evidence=(),
                 rationale="Recording Evidence incomplete.",
                 examined_ids=examined_ids,
+                examined_signal_values=examined_signal_values,
             )
 
         blocking_evidence = self._blocking_evidence(recording_evidence)
@@ -97,6 +106,7 @@ class RecordingTransitionPolicy:
                 blocking_evidence=blocking_evidence,
                 rationale="Recording Evidence argues against transition.",
                 examined_ids=examined_ids,
+                examined_signal_values=examined_signal_values,
             )
 
         supported = self._supported_evidence(recording_evidence)
@@ -109,6 +119,7 @@ class RecordingTransitionPolicy:
                 blocking_evidence=(),
                 rationale="Recording Evidence incomplete.",
                 examined_ids=examined_ids,
+                examined_signal_values=examined_signal_values,
             )
 
         proposed_state, supporting_evidence, rationale = self._proposed_state(supported)
@@ -119,8 +130,9 @@ class RecordingTransitionPolicy:
                 outcome=TransitionPolicyResult.INSUFFICIENT_EVIDENCE,
                 supporting_evidence=(),
                 blocking_evidence=(),
-                rationale="Recording Evidence missing a supported recording transition marker.",
+                rationale="Recording Evidence missing a supported recording transition Signal.",
                 examined_ids=examined_ids,
+                examined_signal_values=examined_signal_values,
             )
 
         if current_state is not None and current_state.value is proposed_state:
@@ -132,6 +144,7 @@ class RecordingTransitionPolicy:
                 blocking_evidence=(),
                 rationale="Current recording state already matches supported Evidence.",
                 examined_ids=examined_ids,
+                examined_signal_values=examined_signal_values,
             )
 
         return self._evaluation(
@@ -142,6 +155,7 @@ class RecordingTransitionPolicy:
             blocking_evidence=(),
             rationale=rationale,
             examined_ids=examined_ids,
+            examined_signal_values=examined_signal_values,
         )
 
     def _blocking_evidence(
@@ -172,18 +186,46 @@ class RecordingTransitionPolicy:
             matching_evidence = tuple(
                 evidence_set
                 for evidence_set in evidence_sets
-                if evidence_set.metadata.get("recording_transition_marker")
-                == rule.evidence_marker
+                if self._evidence_has_signal(evidence_set, rule.evidence_signal)
             )
             if matching_evidence:
-                mapping = mapping_for_recording_marker(rule.evidence_marker)
+                mapping = mapping_for_recording_signal(rule.evidence_signal)
                 rationale = mapping.rationale if mapping is not None else rule.description
                 return (
                     rule.proposed_state,
                     matching_evidence,
                     rationale or "Recording Evidence supports transition.",
                 )
+
+            legacy_evidence_marker = rule.legacy_evidence_marker
+            if legacy_evidence_marker is None:
+                continue
+            legacy_matching_evidence = tuple(
+                evidence_set
+                for evidence_set in evidence_sets
+                if not evidence_set.signals
+                and evidence_set.metadata.get("recording_transition_marker")
+                == legacy_evidence_marker
+            )
+            if legacy_matching_evidence:
+                mapping = mapping_for_recording_marker(legacy_evidence_marker)
+                rationale = mapping.rationale if mapping is not None else rule.description
+                return (
+                    rule.proposed_state,
+                    legacy_matching_evidence,
+                    rationale or "Recording Evidence supports transition.",
+                )
         return None, (), ""
+
+    def _evidence_has_signal(
+        self,
+        evidence_set: EvidenceSet,
+        evidence_signal: EvidenceSignal,
+    ) -> bool:
+        return any(
+            signal_reference.signal is evidence_signal
+            for signal_reference in evidence_set.signals
+        )
 
     def _evaluation(
         self,
@@ -195,6 +237,7 @@ class RecordingTransitionPolicy:
         blocking_evidence: tuple[EvidenceSet, ...],
         rationale: str,
         examined_ids: tuple[str, ...],
+        examined_signal_values: tuple[str, ...],
     ) -> TransitionEvaluation:
         return TransitionEvaluation(
             id=EntityId.new(),
@@ -212,5 +255,16 @@ class RecordingTransitionPolicy:
             metadata={
                 "policy_id": self.id.to_json(),
                 "examined_evidence_ids": examined_ids,
+                "examined_signal_values": examined_signal_values,
             },
+        )
+
+    def _examined_signal_values(
+        self,
+        evidence_sets: tuple[EvidenceSet, ...],
+    ) -> tuple[str, ...]:
+        return tuple(
+            signal_reference.signal.value
+            for evidence_set in evidence_sets
+            for signal_reference in evidence_set.signals
         )
