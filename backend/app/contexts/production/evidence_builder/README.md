@@ -4,6 +4,8 @@ ED-0031 adds the generic Observation Evidence Builder.
 
 ED-0032 refines the builder so concern and role are first-class Evidence semantics rather than metadata-only conventions.
 
+ED-0035 lets builder rules declare first-class Evidence Signals.
+
 The builder is the first Reasoning component after the Perception Layer.
 
 Production Events become objective Observations through Observation Interpreters. The Observation Evidence Builder then organizes those objective Observations into explainable `EvidenceSet` objects using the existing ED-0007 Evidence contracts.
@@ -23,6 +25,7 @@ The builder may:
 - construct Evidence
 - preserve Observation and Production Event traceability
 - identify supporting, contradicting, contextual, neutral, and unknown Observation references
+- identify the Evidence Signal contributed by a rule
 
 The builder must not:
 
@@ -42,14 +45,15 @@ Builder rules declare:
 
 - one `EvidenceConcern`
 - one `EvidencePurpose`
+- one optional `EvidenceSignal`
 - supporting Observation types
 - contradicting Observation types
 - contextual Observation types
 - neutral Observation types
 
-The builder writes concern to `EvidenceSet.concern` and role to `EvidenceItem.role`.
+The builder writes concern to `EvidenceSet.concern`, role to `EvidenceItem.role`, and declared signals to `EvidenceSet.signals`.
 
-Metadata remains available for secondary details, but core concern and role semantics are first-class.
+Metadata remains available for secondary details, but core concern, role, and signal semantics are first-class.
 
 Initial default rules remain deliberately conservative and map single-domain Observations into StageFlow-focused concerns such as recording coverage, media availability, schedule alignment, transcript continuity, and visual transition context.
 

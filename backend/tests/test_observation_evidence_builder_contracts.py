@@ -7,6 +7,7 @@ from app.contexts.production.evidence import (
     EvidencePurpose,
     EvidenceRole,
     EvidenceSet,
+    EvidenceSignal,
     EvidenceStrength,
 )
 from app.contexts.production.evidence_builder import (
@@ -108,6 +109,8 @@ def test_builder_groups_single_observation_into_evidence() -> None:
     assert evidence.items[0].observation_id == observation.id
     assert evidence.items[0].role is EvidenceRole.SUPPORTS
     assert evidence.items[0].strength is EvidenceStrength.MODERATE
+    assert evidence.signals[0].signal is EvidenceSignal.RECORDING_CONTINUITY_ESTABLISHED
+    assert evidence.signals[0].observation_ids == (observation.id,)
 
 
 def test_builder_groups_multiple_observations_by_independent_concern() -> None:
@@ -242,6 +245,26 @@ def test_evidence_builder_rule_requires_one_operational_concern() -> None:
 
     assert rule.role_for(ObservationType.TRANSCRIPT_ACTIVITY) is EvidenceRole.SUPPORTS
     assert rule.role_for(ObservationType.VISION_ACTIVITY) is None
+    assert rule.evidence_signal is EvidenceSignal.UNKNOWN
+
+
+def test_evidence_builder_rule_can_declare_signal() -> None:
+    rule = EvidenceBuilderRule(
+        id=EntityId.new(),
+        operational_concern=EvidenceConcern.MEDIA_AVAILABILITY,
+        supporting_observation_types=(ObservationType.MEDIA_ARTIFACT,),
+        evidence_signal=EvidenceSignal.MEDIA_FINALIZATION_INDICATED,
+    )
+    observation = _observation(ObservationType.MEDIA_ARTIFACT)
+    builder = _builder(rule)
+
+    evidence = builder.build((observation,), _context()).evidence_sets[0]
+
+    assert evidence.signals[0].signal is EvidenceSignal.MEDIA_FINALIZATION_INDICATED
+    assert evidence.signals[0].evidence_item_ids == (evidence.items[0].id,)
+    assert evidence.metadata["evidence_signals"] == (
+        EvidenceSignal.MEDIA_FINALIZATION_INDICATED.value,
+    )
 
 
 def test_evidence_builder_summary_generation() -> None:
@@ -253,6 +276,9 @@ def test_evidence_builder_summary_generation() -> None:
     assert summary.builder_name == builder.name
     assert summary.rule_count == len(builder.rules)
     assert summary.operational_concern_count == len({rule.concern for rule in builder.rules})
+    assert summary.declared_signal_count == len(
+        {rule.evidence_signal for rule in builder.rules}
+    )
 
 
 def test_evidence_set_can_represent_non_recording_block_observations() -> None:

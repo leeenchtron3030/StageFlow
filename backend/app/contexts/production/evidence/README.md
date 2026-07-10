@@ -2,11 +2,13 @@
 
 ## Purpose
 
-This package contains the foundational evidence contracts introduced by ED-0007 and refined by ED-0032.
+This package contains the foundational evidence contracts introduced by ED-0007 and refined by ED-0032 and ED-0035.
 
 Evidence organizes observations as support for a possible future conclusion. Evidence is still not a conclusion.
 
 ED-0032 makes Evidence semantics first-class.
+
+ED-0035 adds first-class Evidence Signals.
 
 ## Timeline, Observation, Evidence
 
@@ -23,27 +25,34 @@ Reasoning and proposal generation come later.
 - `EvidenceObservationReference`
 - `EvidenceRole`
 - `EvidenceSet`
+- `EvidenceSignal`
+- `EvidenceSignalReference`
 - `EvidenceStrength`
 - `EvidencePurpose`
 - `EvidenceSummary`
 
 ## Evidence Semantics
 
-Evidence separates five concepts:
+Evidence separates six concepts:
 
 - Concern: what operational question this Evidence is about.
 - Purpose: why this Evidence is being assembled or retained.
 - Role: how one Observation relates to the concern.
 - Strength: how strong one Evidence contribution is.
+- Signal: what operational indication the Evidence contributes.
 - Weight: optional relative influence without policy meaning.
 
 One `EvidenceSet` addresses exactly one `EvidenceConcern`.
 
 One `EvidenceItem` references one Observation ID and carries one first-class `EvidenceRole`.
 
+One `EvidenceSet` may carry zero or more `EvidenceSignalReference` objects. A signal indicates; it does not conclude. Signals remain distinct from concerns, roles, strengths, Operational State, Hypotheses, Findings, Verification Decisions, and Operational Products.
+
 `EvidenceObservationReference` is the lightweight ID-only reference shape for an Observation participating in Evidence.
 
-Metadata may carry secondary detail, but concern and role are no longer metadata-only semantics.
+`EvidenceSignalReference` is the lightweight ID-only reference shape for a Signal participating in Evidence. It references EvidenceItem IDs and Observation IDs rather than embedding either object.
+
+Metadata may carry secondary detail, but concern, role, and signal are no longer metadata-only semantics.
 
 ## What Does Not Belong Here
 

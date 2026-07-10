@@ -11,6 +11,8 @@ from app.contexts.production.evidence import (
     EvidenceItem,
     EvidenceRole,
     EvidenceSet,
+    EvidenceSignal,
+    EvidenceSignalReference,
 )
 from app.contexts.production.evidence_builder.evidence_builder_context import (
     EvidenceBuilderContext,
@@ -55,36 +57,42 @@ def default_evidence_builder_rules() -> tuple[EvidenceBuilderRule, ...]:
             id=EntityId.new(),
             operational_concern=EvidenceConcern.RECORDING_COVERAGE,
             supporting_observation_types=(ObservationType.RECORDING_ACTIVITY,),
+            evidence_signal=EvidenceSignal.RECORDING_CONTINUITY_ESTABLISHED,
             description="Groups recording activity Observations.",
         ),
         EvidenceBuilderRule(
             id=EntityId.new(),
             operational_concern=EvidenceConcern.MEDIA_AVAILABILITY,
             supporting_observation_types=(ObservationType.MEDIA_ARTIFACT,),
+            evidence_signal=EvidenceSignal.MEDIA_AVAILABILITY_INDICATED,
             description="Groups media artifact availability Observations.",
         ),
         EvidenceBuilderRule(
             id=EntityId.new(),
             operational_concern=EvidenceConcern.SCHEDULE_ALIGNMENT,
             supporting_observation_types=(ObservationType.TIME_BOUNDARY,),
+            evidence_signal=EvidenceSignal.SCHEDULED_WINDOW_ACTIVE,
             description="Groups runtime clock time-boundary Observations.",
         ),
         EvidenceBuilderRule(
             id=EntityId.new(),
             operational_concern=EvidenceConcern.SCHEDULE_ALIGNMENT,
             supporting_observation_types=(ObservationType.SCHEDULE_ACTIVITY,),
+            evidence_signal=EvidenceSignal.SCHEDULED_ACTIVITY_CHANGED,
             description="Groups planned schedule activity Observations.",
         ),
         EvidenceBuilderRule(
             id=EntityId.new(),
             operational_concern=EvidenceConcern.TRANSCRIPT_CONTINUITY,
             supporting_observation_types=(ObservationType.TRANSCRIPT_ACTIVITY,),
+            evidence_signal=EvidenceSignal.TRANSCRIPT_CONTINUITY_INDICATED,
             description="Groups transcript availability Observations.",
         ),
         EvidenceBuilderRule(
             id=EntityId.new(),
             operational_concern=EvidenceConcern.VISUAL_TRANSITION_CONTEXT,
             supporting_observation_types=(ObservationType.VISION_ACTIVITY,),
+            evidence_signal=EvidenceSignal.VISUAL_ACTIVITY_AVAILABLE,
             description="Groups visual phenomena Observations.",
         ),
     )
@@ -202,6 +210,7 @@ class ObservationEvidenceBuilder:
         )
         role_ids = self._role_ids(matches)
         recording_block_id = self._recording_block_id(matches, context)
+        signals = self._signal_references(rule=rule, matches=matches, items=items)
 
         return EvidenceSet(
             id=EntityId.new(),
@@ -209,6 +218,7 @@ class ObservationEvidenceBuilder:
             concern=rule.concern,
             purpose=rule.evidence_purpose,
             items=items,
+            signals=signals,
             correlation_id=context.correlation_id,
             created_at=context.current_timestamp,
             notes=f"Evidence organized for concern: {rule.concern.value}.",
@@ -216,6 +226,7 @@ class ObservationEvidenceBuilder:
                 "evidence_builder_id": self.id.to_json(),
                 "evidence_builder_rule_id": rule.id.to_json(),
                 "operational_concern": rule.concern.value,
+                "evidence_signals": tuple(signal.signal.value for signal in signals),
                 "supporting_observation_ids": role_ids[EvidenceRole.SUPPORTS],
                 "contradicting_observation_ids": role_ids[EvidenceRole.CONTRADICTS],
                 "contextual_observation_ids": role_ids[EvidenceRole.CONTEXTUALIZES],
@@ -279,6 +290,28 @@ class ObservationEvidenceBuilder:
                 source_ids = tuple(str(source_id) for source_id in raw_source_ids)
             traceability[observation.id.to_json()] = source_ids
         return MappingProxyType(traceability)
+
+    def _signal_references(
+        self,
+        *,
+        rule: EvidenceBuilderRule,
+        matches: tuple[tuple[Observation, EvidenceRole], ...],
+        items: tuple[EvidenceItem, ...],
+    ) -> tuple[EvidenceSignalReference, ...]:
+        if rule.evidence_signal is EvidenceSignal.UNKNOWN:
+            return ()
+
+        return (
+            EvidenceSignalReference(
+                signal=rule.evidence_signal,
+                evidence_item_ids=tuple(item.id for item in items),
+                observation_ids=tuple(observation.id for observation, _role in matches),
+                rationale=(
+                    f"Evidence contributes {rule.evidence_signal.value} "
+                    f"for {rule.concern.value}."
+                ),
+            ),
+        )
 
     def _recording_block_id(
         self,

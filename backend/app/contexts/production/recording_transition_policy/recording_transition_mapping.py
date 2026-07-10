@@ -2,41 +2,60 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from app.contexts.production.evidence import EvidenceSignal
 from app.contexts.production.operational_state import OperationalStateValue
 
 
 @dataclass(frozen=True, slots=True)
 class RecordingTransitionMapping:
-    """Declarative mapping from recording evidence marker to proposed recording state."""
+    """Declarative mapping from Evidence Signal to proposed recording state."""
 
-    evidence_marker: str
+    evidence_signal: EvidenceSignal
     proposed_state: OperationalStateValue
     rationale: str
+    legacy_evidence_marker: str | None = None
 
 
 RECORDING_TRANSITION_MAPPINGS: tuple[RecordingTransitionMapping, ...] = (
     RecordingTransitionMapping(
-        evidence_marker="recording_active",
+        evidence_signal=EvidenceSignal.RECORDING_CONTINUITY_ESTABLISHED,
         proposed_state=OperationalStateValue.ACTIVE,
         rationale="Recording Coverage Evidence supports active recording.",
+        legacy_evidence_marker="recording_active",
     ),
     RecordingTransitionMapping(
-        evidence_marker="recording_paused",
+        evidence_signal=EvidenceSignal.RECORDING_PAUSE_INDICATED,
         proposed_state=OperationalStateValue.PAUSED,
         rationale="Recording pause Evidence supports paused recording.",
+        legacy_evidence_marker="recording_paused",
     ),
     RecordingTransitionMapping(
-        evidence_marker="recording_stopped",
+        evidence_signal=EvidenceSignal.RECORDING_CONTINUITY_RESTORED,
+        proposed_state=OperationalStateValue.ACTIVE,
+        rationale="Recording continuity restoration Evidence supports active recording.",
+    ),
+    RecordingTransitionMapping(
+        evidence_signal=EvidenceSignal.RECORDING_END_INDICATED,
         proposed_state=OperationalStateValue.STOPPED,
         rationale="Recording stop Evidence supports stopped recording.",
+        legacy_evidence_marker="recording_stopped",
     ),
 )
+
+
+def mapping_for_recording_signal(
+    evidence_signal: EvidenceSignal,
+) -> RecordingTransitionMapping | None:
+    for mapping in RECORDING_TRANSITION_MAPPINGS:
+        if mapping.evidence_signal is evidence_signal:
+            return mapping
+    return None
 
 
 def mapping_for_recording_marker(
     evidence_marker: str,
 ) -> RecordingTransitionMapping | None:
     for mapping in RECORDING_TRANSITION_MAPPINGS:
-        if mapping.evidence_marker == evidence_marker:
+        if mapping.legacy_evidence_marker == evidence_marker:
             return mapping
     return None

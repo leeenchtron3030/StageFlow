@@ -7,6 +7,7 @@ from app.contexts.production.evidence.evidence_concern import EvidenceConcern
 from app.contexts.production.evidence.evidence_purpose import EvidencePurpose
 from app.contexts.production.evidence.evidence_role import EvidenceRole
 from app.contexts.production.evidence.evidence_set import EvidenceSet
+from app.contexts.production.evidence.evidence_signal import EvidenceSignal
 from app.contexts.production.evidence.evidence_strength import EvidenceStrength
 from app.shared.ids import EntityId
 
@@ -29,6 +30,9 @@ class EvidenceSummary:
     total_item_count: int
     count_by_strength: MappingProxyType[EvidenceStrength, int]
     count_by_role: MappingProxyType[EvidenceRole, int]
+    signal_count: int = 0
+    signals: tuple[EvidenceSignal, ...] = ()
+    item_count_by_signal: MappingProxyType[EvidenceSignal, int] = MappingProxyType({})
     recording_block_id: EntityId | None = None
 
     @classmethod
@@ -38,6 +42,10 @@ class EvidenceSummary:
         for item in evidence_set.items:
             counts[item.strength] += 1
             role_counts[item.role] += 1
+        signal_item_counts = {
+            signal_reference.signal: len(signal_reference.evidence_item_ids)
+            for signal_reference in evidence_set.signals
+        }
 
         return cls(
             evidence_set_id=evidence_set.id,
@@ -46,6 +54,9 @@ class EvidenceSummary:
             total_item_count=len(evidence_set.items),
             count_by_strength=MappingProxyType(counts),
             count_by_role=MappingProxyType(role_counts),
+            signal_count=len(evidence_set.signals),
+            signals=tuple(signal_reference.signal for signal_reference in evidence_set.signals),
+            item_count_by_signal=MappingProxyType(signal_item_counts),
             recording_block_id=evidence_set.recording_block_id,
         )
 

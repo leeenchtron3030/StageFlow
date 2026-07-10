@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Any
 
-from app.contexts.production.evidence import EvidenceConcern
+from app.contexts.production.evidence import EvidenceConcern, EvidenceSignal
 from app.contexts.production.operational_state import OperationalStateValue
 from app.shared.ids import EntityId
 
@@ -19,15 +19,14 @@ class RecordingTransitionRule:
     """Declarative rule for one supported recording transition target."""
 
     id: EntityId
-    evidence_marker: str
+    evidence_signal: EvidenceSignal
     proposed_state: OperationalStateValue
     required_concern: EvidenceConcern = EvidenceConcern.RECORDING_COVERAGE
+    legacy_evidence_marker: str | None = None
     description: str | None = None
     metadata: Mapping[str, Any] = field(default_factory=_empty_metadata)
 
     def __post_init__(self) -> None:
-        if not self.evidence_marker.strip():
-            raise ValueError("RecordingTransitionRule evidence_marker must not be empty.")
         if self.proposed_state not in {
             OperationalStateValue.ACTIVE,
             OperationalStateValue.PAUSED,

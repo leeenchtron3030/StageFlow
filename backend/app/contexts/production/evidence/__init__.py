@@ -8,6 +8,10 @@ from app.contexts.production.evidence.evidence_observation_reference import (
 from app.contexts.production.evidence.evidence_purpose import EvidencePurpose
 from app.contexts.production.evidence.evidence_role import EvidenceRole
 from app.contexts.production.evidence.evidence_set import EvidenceSet
+from app.contexts.production.evidence.evidence_signal import EvidenceSignal
+from app.contexts.production.evidence.evidence_signal_reference import (
+    EvidenceSignalReference,
+)
 from app.contexts.production.evidence.evidence_strength import EvidenceStrength
 from app.contexts.production.evidence.evidence_summary import EvidenceSummary
 
@@ -18,6 +22,8 @@ __all__ = [
     "EvidencePurpose",
     "EvidenceRole",
     "EvidenceSet",
+    "EvidenceSignal",
+    "EvidenceSignalReference",
     "EvidenceStrength",
     "EvidenceSummary",
 ]

@@ -200,9 +200,9 @@ ED-0007 adds foundational production evidence contracts only.
 
 Evidence organizes observation references into support for a possible future conclusion. Evidence is still not a conclusion, and it must remain separate from reasoning and proposal generation.
 
-ED-0032 refines Evidence semantics so concern, purpose, role, strength, and weight remain distinct. An `EvidenceSet` now has one explicit `EvidenceConcern`; each `EvidenceItem` now has a first-class `EvidenceRole`; and `EvidenceObservationReference` provides an ID-only Observation participation contract.
+ED-0032 refines Evidence semantics so concern, purpose, role, strength, and weight remain distinct. ED-0035 adds first-class Evidence Signals so Evidence can state the operational indication it contributes without relying on metadata markers. An `EvidenceSet` now has one explicit `EvidenceConcern`; may carry zero or more `EvidenceSignalReference` objects; each `EvidenceItem` now has a first-class `EvidenceRole`; and `EvidenceObservationReference` provides an ID-only Observation participation contract.
 
-Concern asks what operational question the Evidence relates to. Purpose asks why the Evidence is being assembled. Role asks how an Observation relates to the concern. Strength describes the individual contribution. Weight is optional relative influence without policy meaning.
+Concern asks what operational question the Evidence relates to. Purpose asks why the Evidence is being assembled. Signal asks what operational indication the Evidence contributes. Role asks how an Observation relates to the concern. Strength describes the individual contribution. Weight is optional relative influence without policy meaning.
 
 Contradicting and supporting Evidence can coexist. Evidence does not update Operational State, generate Hypotheses, generate Findings, create Verification Decisions, or create Operational Products.
 
@@ -212,7 +212,7 @@ ED-0031 adds the first Reasoning component after the completed Perception Layer.
 
 The Observation Evidence Builder consumes objective `Observation` objects and organizes them into explainable `EvidenceSet` objects using the existing ED-0007 Evidence contracts.
 
-ED-0032 updates the builder to use first-class `EvidenceConcern` and `EvidenceRole` semantics instead of relying on metadata for core meaning.
+ED-0032 updates the builder to use first-class `EvidenceConcern` and `EvidenceRole` semantics instead of relying on metadata for core meaning. ED-0035 lets rules declare first-class `EvidenceSignal` values as the operational indication carried by output Evidence.
 
 It groups Observations around exactly one operational concern at a time, preserves supporting, contradicting, and contextual Observation references, and carries forward source Production Event traceability when Observations already include it.
 
@@ -239,6 +239,8 @@ Policy evaluates. Evaluation explains. State records. Execution is deferred.
 An `OperationalStateTransitionPolicy` receives an optional current `OperationalState` and applicable `EvidenceSet` objects, then returns a `TransitionEvaluation`. The evaluation records the evaluated state kind, optional current state, optional proposed state value, outcome, supporting Evidence IDs, blocking Evidence IDs, rationale, timestamp, and metadata.
 
 ED-0034 also adds the Recording Transition Policy. It evaluates recording coverage Evidence only and supports proposed recording values of active, paused, and stopped. It ignores transcript, vision, schedule, editorial, media artifact, and unrelated Evidence.
+
+ED-0035 refines the Recording Transition Policy so it consumes first-class `EvidenceSignal` values: `recording_continuity_established` and `recording_continuity_restored` propose active, `recording_pause_indicated` proposes paused, and `recording_end_indicated` proposes stopped. Legacy metadata markers remain transitional compatibility only and are not authoritative when signals are present.
 
 Transition evaluations do not mutate state, execute transitions, dispatch events, persist state, implement repositories, implement state machines, call AI, create Hypotheses, create Findings, create Verification Decisions, create Operational Products, expose APIs, use queues or workers, or add frontend behavior.
 
