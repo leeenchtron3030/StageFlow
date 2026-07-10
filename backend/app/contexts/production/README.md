@@ -220,6 +220,16 @@ The builder organizes related facts. It does not interpret meaning, generate Hyp
 
 ED-0031 also allows an `EvidenceSet` to omit a recording block ID when the source Observations are truthfully anchored elsewhere, such as wall-clock or stage context.
 
+## Operational State Taxonomy
+
+ED-0033 adds the foundational Operational State taxonomy.
+
+Operational State is perspective-dependent. StageFlow models only state required for its mission as the fastest, most reliable observer of recorded event media for editorial and session production.
+
+Operational State families distinguish directly observable state, evidence-derived state, StageFlow readiness, environmental context, and unknown state. Recording active and transcript flowing can be directly observable. Session active and editorial moment candidate active are evidence-derived. StageFlow readiness describes StageFlow's own ability to observe or reason, not whether speakers, stage managers, lighting, cameras, or production teams are ready. Livestream health, venue network condition, lighting health, camera battery, and audio-console status are environmental context unless they directly affect StageFlow responsibilities.
+
+`OperationalStateBasis` preserves traceability through Observation IDs and EvidenceSet IDs only. ED-0033 does not implement transition graphs, transition thresholds, transition policy, state machines, automatic supersession, repositories, persistence, APIs, queues, workers, AI, frontend behavior, Hypotheses, Findings, Verification Decisions, or Operational Products.
+
 ## Hypothesis Primitives
 
 ED-0008 adds foundational production hypothesis contracts only.
