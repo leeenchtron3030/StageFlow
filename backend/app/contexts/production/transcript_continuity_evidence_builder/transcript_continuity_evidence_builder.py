@@ -1,0 +1,462 @@
+from __future__ import annotations
+
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
+from enum import StrEnum
+from types import MappingProxyType
+from typing import Any, cast
+
+from app.contexts.production.evidence import (
+    EvidenceConcern,
+    EvidenceItem,
+    EvidencePurpose,
+    EvidenceSet,
+    EvidenceSignal,
+    EvidenceSignalReference,
+)
+from app.contexts.production.observation import Observation, ObservationType
+from app.shared.ids import EntityId
+
+from .transcript_continuity_evidence_mapping import (
+    TRANSCRIPT_CONTINUITY_EVIDENCE_MAPPINGS,
+    TranscriptContinuityEvidenceMapping,
+    mapping_for_transcript_observation,
+)
+from .transcript_continuity_evidence_result import TranscriptContinuityEvidenceResult
+from .transcript_continuity_evidence_rule import TranscriptContinuityEvidenceRule
+
+
+class TranscriptContinuityEvidenceBuilderStatus(StrEnum):
+    UNKNOWN = "unknown"
+    CONFIGURED = "configured"
+    READY = "ready"
+    ACTIVE = "active"
+    DEGRADED = "degraded"
+    FAILED = "failed"
+    DISABLED = "disabled"
+    ARCHIVED = "archived"
+
+
+def _empty_metadata() -> Mapping[str, Any]:
+    return {}
+
+
+_BUILDABLE_STATUSES = {
+    TranscriptContinuityEvidenceBuilderStatus.READY,
+    TranscriptContinuityEvidenceBuilderStatus.ACTIVE,
+    TranscriptContinuityEvidenceBuilderStatus.DEGRADED,
+}
+
+
+def default_transcript_continuity_evidence_rules() -> tuple[
+    TranscriptContinuityEvidenceRule,
+    ...,
+]:
+    rules: list[TranscriptContinuityEvidenceRule] = []
+    for mapping in TRANSCRIPT_CONTINUITY_EVIDENCE_MAPPINGS:
+        signals = (mapping.evidence_signal,)
+        if mapping.continuation_signal is not None:
+            signals = signals + (mapping.continuation_signal,)
+        for signal in signals:
+            rules.append(
+                TranscriptContinuityEvidenceRule(
+                    id=EntityId.new(),
+                    recognized_observation_type=ObservationType.TRANSCRIPT_ACTIVITY,
+                    recognized_transcript_lifecycle=mapping.transcript_lifecycle,
+                    target_signal=signal,
+                    rationale_template=mapping.rationale,
+                )
+            )
+    return tuple(rules)
+
+
+@dataclass(frozen=True, slots=True)
+class TranscriptContinuityEvidenceBuilder:
+    """Builds transcript continuity Evidence from objective transcript Observations."""
+
+    id: EntityId
+    name: str = "Transcript Continuity Evidence Builder"
+    status: TranscriptContinuityEvidenceBuilderStatus = (
+        TranscriptContinuityEvidenceBuilderStatus.READY
+    )
+    rules: Sequence[TranscriptContinuityEvidenceRule] = field(
+        default_factory=default_transcript_continuity_evidence_rules
+    )
+    mappings: Sequence[TranscriptContinuityEvidenceMapping] = field(
+        default_factory=lambda: TRANSCRIPT_CONTINUITY_EVIDENCE_MAPPINGS
+    )
+    metadata: Mapping[str, Any] = field(default_factory=_empty_metadata)
+
+    def __post_init__(self) -> None:
+        if not self.name.strip():
+            raise ValueError("TranscriptContinuityEvidenceBuilder name must not be empty.")
+        object.__setattr__(self, "rules", tuple(self.rules))
+        object.__setattr__(self, "mappings", tuple(self.mappings))
+        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+
+    def can_build(self) -> bool:
+        return self.status in _BUILDABLE_STATUSES
+
+    def build(
+        self,
+        observations: Sequence[Observation],
+    ) -> TranscriptContinuityEvidenceResult:
+        observation_tuple = tuple(observations)
+        if not self.can_build():
+            return TranscriptContinuityEvidenceResult(
+                evidence_sets=(),
+                consumed_observation_ids=(),
+                ignored_observation_ids=tuple(observation.id for observation in observation_tuple),
+                unsupported_observation_ids=(),
+                duplicate_observation_ids=(),
+                applied_rule_ids=(),
+                metadata={
+                    "builder_id": self.id.to_json(),
+                    "input_observation_count": len(observation_tuple),
+                    "builder_status": self.status.value,
+                },
+            )
+
+        ordered_unique, duplicate_ids = self._ordered_unique_observations(
+            observation_tuple
+        )
+        ignored_ids: list[EntityId] = []
+        unsupported_ids: list[EntityId] = []
+        recognized: list[tuple[Observation, TranscriptContinuityEvidenceMapping]] = []
+
+        for observation in ordered_unique:
+            if observation.observation_type is not ObservationType.TRANSCRIPT_ACTIVITY:
+                ignored_ids.append(observation.id)
+                continue
+
+            mapping = self._mapping_for_observation(observation)
+            if mapping is None:
+                unsupported_ids.append(observation.id)
+                continue
+
+            recognized.append((observation, mapping))
+
+        evidence_sets, applied_rule_ids = self._evidence_sets_for_recognized(
+            tuple(recognized)
+        )
+
+        return TranscriptContinuityEvidenceResult(
+            evidence_sets=evidence_sets,
+            consumed_observation_ids=tuple(observation.id for observation, _ in recognized),
+            ignored_observation_ids=tuple(ignored_ids),
+            unsupported_observation_ids=tuple(unsupported_ids),
+            duplicate_observation_ids=duplicate_ids,
+            applied_rule_ids=applied_rule_ids,
+            metadata={
+                "builder_id": self.id.to_json(),
+                "input_observation_count": len(observation_tuple),
+                "grouping_behavior": "recording_block_stage_transcript_stream",
+                "ordering_behavior": "observed_at_then_timeline_then_observation_id",
+                "duplicate_behavior": "first_deterministic_observation_kept",
+                "interruption_behavior": "explicit_observation_required",
+                "timeline_span_seconds": self._timeline_span_seconds(evidence_sets),
+            },
+        )
+
+    def _mapping_for_observation(
+        self,
+        observation: Observation,
+    ) -> TranscriptContinuityEvidenceMapping | None:
+        mapping = mapping_for_transcript_observation(observation)
+        if mapping is None:
+            return None
+        if mapping not in self.mappings:
+            return None
+        return mapping
+
+    def _rule_for_mapping_signal(
+        self,
+        mapping: TranscriptContinuityEvidenceMapping,
+        signal: EvidenceSignal,
+    ) -> TranscriptContinuityEvidenceRule | None:
+        for rule in self.rules:
+            if (
+                rule.recognized_transcript_lifecycle == mapping.transcript_lifecycle
+                and rule.target_signal is signal
+            ):
+                return rule
+        return None
+
+    def _ordered_unique_observations(
+        self,
+        observations: tuple[Observation, ...],
+    ) -> tuple[tuple[Observation, ...], tuple[EntityId, ...]]:
+        sorted_observations = tuple(sorted(observations, key=self._ordering_key))
+        seen_ids: set[EntityId] = set()
+        unique: list[Observation] = []
+        duplicate_ids: list[EntityId] = []
+
+        for observation in sorted_observations:
+            if observation.id in seen_ids:
+                duplicate_ids.append(observation.id)
+                continue
+            seen_ids.add(observation.id)
+            unique.append(observation)
+
+        return tuple(unique), tuple(duplicate_ids)
+
+    def _ordering_key(self, observation: Observation) -> tuple[datetime, float, str]:
+        return (
+            observation.observed_at,
+            self._timeline_order_value(observation),
+            observation.id.to_json(),
+        )
+
+    def _timeline_order_value(self, observation: Observation) -> float:
+        location = observation.location
+        if location.point is not None:
+            return location.point.offset.total_seconds()
+        if location.range is not None:
+            return location.range.start.offset.total_seconds()
+        return float("inf")
+
+    def _evidence_sets_for_recognized(
+        self,
+        recognized: tuple[tuple[Observation, TranscriptContinuityEvidenceMapping], ...],
+    ) -> tuple[tuple[EvidenceSet, ...], tuple[EntityId, ...]]:
+        grouped: dict[
+            tuple[str | None, str | None, str | None],
+            list[tuple[Observation, TranscriptContinuityEvidenceMapping]],
+        ] = {}
+        for observation, mapping in recognized:
+            grouped.setdefault(self._group_key(observation), []).append(
+                (observation, mapping)
+            )
+
+        evidence_sets: list[EvidenceSet] = []
+        applied_rule_ids: list[EntityId] = []
+        for group in grouped.values():
+            evidence_set, rule_ids = self._evidence_set_for_group(tuple(group))
+            if evidence_set is not None:
+                evidence_sets.append(evidence_set)
+                applied_rule_ids.extend(rule_ids)
+
+        evidence_sets.sort(
+            key=lambda evidence_set: (
+                min(
+                    str(item.metadata.get("observation_observed_at", ""))
+                    for item in evidence_set.items
+                ),
+                evidence_set.id.to_json(),
+            )
+        )
+        return tuple(evidence_sets), tuple(applied_rule_ids)
+
+    def _group_key(self, observation: Observation) -> tuple[str | None, str | None, str | None]:
+        recording_block_id = observation.recording_block_id
+        stage_id = observation.location.stage_id
+        transcript_stream_id = self._transcript_stream_id(observation)
+        return (
+            recording_block_id.to_json() if recording_block_id is not None else None,
+            stage_id.to_json() if stage_id is not None else None,
+            transcript_stream_id,
+        )
+
+    def _transcript_stream_id(self, observation: Observation) -> str | None:
+        for key in ("transcript_stream_id", "stream_id", "transcript_source_id"):
+            value = observation.metadata.get(key)
+            if isinstance(value, str) and value.strip():
+                return value
+        return None
+
+    def _evidence_set_for_group(
+        self,
+        group: tuple[tuple[Observation, TranscriptContinuityEvidenceMapping], ...],
+    ) -> tuple[EvidenceSet | None, tuple[EntityId, ...]]:
+        items: list[EvidenceItem] = []
+        signals: list[EvidenceSignalReference] = []
+        applied_rule_ids: list[EntityId] = []
+        transcript_activity_seen = False
+
+        for observation, mapping in group:
+            signal = self._signal_for_mapping(mapping, transcript_activity_seen)
+            rule = self._rule_for_mapping_signal(mapping, signal)
+            if rule is None:
+                continue
+            item = self._evidence_item_for_observation(observation, mapping, rule, signal)
+            items.append(item)
+            signals.append(
+                self._signal_reference_for_observation(
+                    observation=observation,
+                    mapping=mapping,
+                    rule=rule,
+                    item=item,
+                    signal=signal,
+                )
+            )
+            applied_rule_ids.append(rule.id)
+            if signal in {
+                EvidenceSignal.SPEECH_ACTIVITY_AVAILABLE,
+                EvidenceSignal.TRANSCRIPT_CONTINUITY_INDICATED,
+            }:
+                transcript_activity_seen = True
+
+        if not items:
+            return None, ()
+
+        first_observation = group[0][0]
+        return (
+            EvidenceSet(
+                id=EntityId.new(),
+                recording_block_id=first_observation.recording_block_id,
+                concern=EvidenceConcern.TRANSCRIPT_CONTINUITY,
+                purpose=EvidencePurpose.TRANSITION_SUPPORT,
+                items=tuple(items),
+                signals=tuple(signals),
+                correlation_id=first_observation.correlation_id,
+                created_at=first_observation.observed_at,
+                notes="Evidence organized for transcript continuity.",
+                metadata={
+                    "transcript_continuity_evidence_builder_id": self.id.to_json(),
+                    "source_observation_ids": tuple(
+                        observation.id.to_json() for observation, _ in group
+                    ),
+                    "recording_block_id": (
+                        first_observation.recording_block_id.to_json()
+                        if first_observation.recording_block_id is not None
+                        else None
+                    ),
+                    "stage_id": (
+                        first_observation.location.stage_id.to_json()
+                        if first_observation.location.stage_id is not None
+                        else None
+                    ),
+                    "transcript_stream_id": self._transcript_stream_id(first_observation),
+                    "semantic_conclusion": None,
+                },
+            ),
+            tuple(applied_rule_ids),
+        )
+
+    def _signal_for_mapping(
+        self,
+        mapping: TranscriptContinuityEvidenceMapping,
+        transcript_activity_seen: bool,
+    ) -> EvidenceSignal:
+        if transcript_activity_seen and mapping.continuation_signal is not None:
+            return mapping.continuation_signal
+        return mapping.evidence_signal
+
+    def _evidence_item_for_observation(
+        self,
+        observation: Observation,
+        mapping: TranscriptContinuityEvidenceMapping,
+        rule: TranscriptContinuityEvidenceRule,
+        signal: EvidenceSignal,
+    ) -> EvidenceItem:
+        return EvidenceItem(
+            id=EntityId.new(),
+            observation_id=observation.id,
+            role=rule.evidence_role,
+            strength=rule.evidence_strength,
+            rationale=rule.rationale(),
+            metadata={
+                "transcript_lifecycle": mapping.transcript_lifecycle,
+                "evidence_signal": signal.value,
+                "evidence_builder_rule_id": rule.id.to_json(),
+                "observation_observed_at": observation.observed_at.isoformat(),
+                "transcript_stream_id": self._transcript_stream_id(observation),
+                "transcript_segment_id": observation.metadata.get("transcript_segment_id"),
+                "timeline_range_reference": observation.metadata.get(
+                    "timeline_range_reference"
+                ),
+                "observation_location": self._location_metadata(observation),
+            },
+        )
+
+    def _signal_reference_for_observation(
+        self,
+        *,
+        observation: Observation,
+        mapping: TranscriptContinuityEvidenceMapping,
+        rule: TranscriptContinuityEvidenceRule,
+        item: EvidenceItem,
+        signal: EvidenceSignal,
+    ) -> EvidenceSignalReference:
+        return EvidenceSignalReference(
+            signal=signal,
+            evidence_item_ids=(item.id,),
+            observation_ids=(observation.id,),
+            rationale=mapping.rationale,
+            metadata={
+                "evidence_builder_rule_id": rule.id.to_json(),
+                "transcript_lifecycle": mapping.transcript_lifecycle,
+                "transcript_stream_id": self._transcript_stream_id(observation),
+                "recording_block_id": (
+                    observation.recording_block_id.to_json()
+                    if observation.recording_block_id is not None
+                    else None
+                ),
+                "stage_id": (
+                    observation.location.stage_id.to_json()
+                    if observation.location.stage_id is not None
+                    else None
+                ),
+                "timeline_range_reference": observation.metadata.get(
+                    "timeline_range_reference"
+                ),
+                "observation_location": self._location_metadata(observation),
+            },
+        )
+
+    def _location_metadata(self, observation: Observation) -> Mapping[str, Any]:
+        location = observation.location
+        metadata: dict[str, Any] = {
+            "kind": location.kind.value if location.kind is not None else None,
+            "recording_block_id": (
+                observation.recording_block_id.to_json()
+                if observation.recording_block_id is not None
+                else None
+            ),
+            "stage_id": location.stage_id.to_json() if location.stage_id is not None else None,
+        }
+        if location.point is not None:
+            metadata["timeline_offset_seconds"] = self._seconds(location.point.offset)
+        if location.range is not None:
+            metadata["timeline_range_start_seconds"] = self._seconds(
+                location.range.start.offset
+            )
+            metadata["timeline_range_end_seconds"] = self._seconds(
+                location.range.end.offset
+            )
+        if location.wall_clock_at is not None:
+            metadata["wall_clock_at"] = location.wall_clock_at.isoformat()
+        return MappingProxyType(metadata)
+
+    def _timeline_span_seconds(
+        self,
+        evidence_sets: tuple[EvidenceSet, ...],
+    ) -> tuple[float, float] | None:
+        offsets: list[float] = []
+        for evidence_set in evidence_sets:
+            for item in evidence_set.items:
+                location_raw = item.metadata.get("observation_location", {})
+                if not isinstance(location_raw, Mapping):
+                    continue
+                location = cast(Mapping[str, object], location_raw)
+                point_offset = location.get("timeline_offset_seconds")
+                range_start = location.get("timeline_range_start_seconds")
+                range_end = location.get("timeline_range_end_seconds")
+                for value in (point_offset, range_start, range_end):
+                    if isinstance(value, int | float):
+                        offsets.append(float(value))
+        if not offsets:
+            return None
+        return min(offsets), max(offsets)
+
+    def _seconds(self, value: timedelta) -> float:
+        return value.total_seconds()
+
+
+def make_transcript_continuity_evidence_builder(
+    *,
+    builder_id: EntityId | None = None,
+    name: str = "Transcript Continuity Evidence Builder",
+) -> TranscriptContinuityEvidenceBuilder:
+    return TranscriptContinuityEvidenceBuilder(id=builder_id or EntityId.new(), name=name)

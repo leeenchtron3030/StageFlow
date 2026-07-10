@@ -38,6 +38,8 @@ def test_evidence_signal_allowed_values() -> None:
         "scheduled_activity_cancelled",
         "speech_activity_available",
         "transcript_continuity_indicated",
+        "transcript_interruption_indicated",
+        "transcript_end_indicated",
         "visual_activity_available",
         "presentation_transition_indicated",
         "visual_obstruction_indicated",

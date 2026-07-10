@@ -235,6 +235,21 @@ It preserves Observation and EvidenceItem traceability, recording-block context,
 
 The Recording Transition Policy consumes the builder output separately. The builder itself does not evaluate or mutate state.
 
+## Transcript Continuity Evidence Builder
+
+ED-0037 adds the second concrete Evidence Builder.
+
+The Transcript Continuity Evidence Builder converts objective transcript activity Observations into transcript continuity Evidence with first-class transcript Evidence Signals:
+
+- transcript activity began or first segment available -> `speech_activity_available`
+- subsequent compatible transcript segments -> `transcript_continuity_indicated`
+- explicit transcript interruption -> `transcript_interruption_indicated`
+- explicit transcript ending -> `transcript_end_indicated`
+
+Transcript Evidence is accumulating and time-based. The builder groups by recording block, stage, and transcript stream when available; repeated segment Observations remain individually traceable.
+
+The builder does not infer interruption from silence or elapsed time, does not inspect transcript text for meaning, does not infer speaker identity, does not infer session state, and does not create policies, Operational State, Transition Evaluations, Hypotheses, Findings, Verification Decisions, Operational Products, AI, persistence, APIs, queues, workers, or frontend behavior.
+
 ## Operational State Taxonomy
 
 ED-0033 adds the foundational Operational State taxonomy.
