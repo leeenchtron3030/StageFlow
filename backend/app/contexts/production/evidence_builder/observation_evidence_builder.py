@@ -7,7 +7,9 @@ from types import MappingProxyType
 from typing import Any
 
 from app.contexts.production.evidence import (
+    EvidenceConcern,
     EvidenceItem,
+    EvidenceRole,
     EvidenceSet,
 )
 from app.contexts.production.evidence_builder.evidence_builder_context import (
@@ -51,37 +53,37 @@ def default_evidence_builder_rules() -> tuple[EvidenceBuilderRule, ...]:
     return (
         EvidenceBuilderRule(
             id=EntityId.new(),
-            operational_concern="recording_activity",
+            operational_concern=EvidenceConcern.RECORDING_COVERAGE,
             supporting_observation_types=(ObservationType.RECORDING_ACTIVITY,),
             description="Groups recording activity Observations.",
         ),
         EvidenceBuilderRule(
             id=EntityId.new(),
-            operational_concern="media_artifact_availability",
+            operational_concern=EvidenceConcern.MEDIA_AVAILABILITY,
             supporting_observation_types=(ObservationType.MEDIA_ARTIFACT,),
             description="Groups media artifact availability Observations.",
         ),
         EvidenceBuilderRule(
             id=EntityId.new(),
-            operational_concern="time_boundary",
+            operational_concern=EvidenceConcern.SCHEDULE_ALIGNMENT,
             supporting_observation_types=(ObservationType.TIME_BOUNDARY,),
             description="Groups runtime clock time-boundary Observations.",
         ),
         EvidenceBuilderRule(
             id=EntityId.new(),
-            operational_concern="scheduled_activity",
+            operational_concern=EvidenceConcern.SCHEDULE_ALIGNMENT,
             supporting_observation_types=(ObservationType.SCHEDULE_ACTIVITY,),
             description="Groups planned schedule activity Observations.",
         ),
         EvidenceBuilderRule(
             id=EntityId.new(),
-            operational_concern="transcript_activity",
+            operational_concern=EvidenceConcern.TRANSCRIPT_CONTINUITY,
             supporting_observation_types=(ObservationType.TRANSCRIPT_ACTIVITY,),
             description="Groups transcript availability Observations.",
         ),
         EvidenceBuilderRule(
             id=EntityId.new(),
-            operational_concern="vision_activity",
+            operational_concern=EvidenceConcern.VISUAL_TRANSITION_CONTEXT,
             supporting_observation_types=(ObservationType.VISION_ACTIVITY,),
             description="Groups visual phenomena Observations.",
         ),
@@ -175,8 +177,8 @@ class ObservationEvidenceBuilder:
         self,
         rule: EvidenceBuilderRule,
         observations: tuple[Observation, ...],
-    ) -> tuple[tuple[Observation, str], ...]:
-        matches: list[tuple[Observation, str]] = []
+    ) -> tuple[tuple[Observation, EvidenceRole], ...]:
+        matches: list[tuple[Observation, EvidenceRole]] = []
         for observation in observations:
             role = rule.role_for(observation.observation_type)
             if role is not None:
@@ -187,7 +189,7 @@ class ObservationEvidenceBuilder:
         self,
         *,
         rule: EvidenceBuilderRule,
-        matches: tuple[tuple[Observation, str], ...],
+        matches: tuple[tuple[Observation, EvidenceRole], ...],
         context: EvidenceBuilderContext,
     ) -> EvidenceSet:
         items = tuple(
@@ -204,18 +206,20 @@ class ObservationEvidenceBuilder:
         return EvidenceSet(
             id=EntityId.new(),
             recording_block_id=recording_block_id,
+            concern=rule.concern,
             purpose=rule.evidence_purpose,
             items=items,
             correlation_id=context.correlation_id,
             created_at=context.current_timestamp,
-            notes=f"Evidence organized for operational concern: {rule.operational_concern}.",
+            notes=f"Evidence organized for concern: {rule.concern.value}.",
             metadata={
                 "evidence_builder_id": self.id.to_json(),
                 "evidence_builder_rule_id": rule.id.to_json(),
-                "operational_concern": rule.operational_concern,
-                "supporting_observation_ids": role_ids["supporting"],
-                "contradicting_observation_ids": role_ids["contradicting"],
-                "contextual_observation_ids": role_ids["contextual"],
+                "operational_concern": rule.concern.value,
+                "supporting_observation_ids": role_ids[EvidenceRole.SUPPORTS],
+                "contradicting_observation_ids": role_ids[EvidenceRole.CONTRADICTS],
+                "contextual_observation_ids": role_ids[EvidenceRole.CONTEXTUALIZES],
+                "neutral_observation_ids": role_ids[EvidenceRole.NEUTRAL],
                 "observation_traceability": self._observation_traceability(matches),
                 "semantic_conclusion": None,
             },
@@ -225,12 +229,10 @@ class ObservationEvidenceBuilder:
         self,
         *,
         observation: Observation,
-        role: str,
+        role: EvidenceRole,
         rule: EvidenceBuilderRule,
     ) -> EvidenceItem:
         metadata: dict[str, Any] = {
-            "evidence_role": role,
-            "operational_concern": rule.operational_concern,
             "observation_type": observation.observation_type.value,
         }
         source_event_ids = observation.metadata.get("source_production_event_ids")
@@ -241,26 +243,32 @@ class ObservationEvidenceBuilder:
             id=EntityId.new(),
             observation_id=observation.id,
             strength=rule.strength_for_role(role),
-            rationale=f"Observation grouped as {role} evidence for {rule.operational_concern}.",
+            role=role,
+            rationale=f"Observation grouped as {role.value} evidence for {rule.concern.value}.",
             metadata=metadata,
         )
 
     def _role_ids(
         self,
-        matches: tuple[tuple[Observation, str], ...],
-    ) -> dict[str, tuple[str, ...]]:
+        matches: tuple[tuple[Observation, EvidenceRole], ...],
+    ) -> dict[EvidenceRole, tuple[str, ...]]:
         return {
             role: tuple(
                 observation.id.to_json()
                 for observation, observation_role in matches
                 if observation_role == role
             )
-            for role in ("supporting", "contradicting", "contextual")
+            for role in (
+                EvidenceRole.SUPPORTS,
+                EvidenceRole.CONTRADICTS,
+                EvidenceRole.CONTEXTUALIZES,
+                EvidenceRole.NEUTRAL,
+            )
         }
 
     def _observation_traceability(
         self,
-        matches: tuple[tuple[Observation, str], ...],
+        matches: tuple[tuple[Observation, EvidenceRole], ...],
     ) -> Mapping[str, tuple[str, ...]]:
         traceability: dict[str, tuple[str, ...]] = {}
         for observation, _role in matches:
@@ -274,7 +282,7 @@ class ObservationEvidenceBuilder:
 
     def _recording_block_id(
         self,
-        matches: tuple[tuple[Observation, str], ...],
+        matches: tuple[tuple[Observation, EvidenceRole], ...],
         context: EvidenceBuilderContext,
     ) -> EntityId | None:
         if context.recording_block_id is not None:

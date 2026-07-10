@@ -16,7 +16,7 @@ class EvidenceBuilderSummary:
 
     @classmethod
     def from_builder(cls, builder: ObservationEvidenceBuilder) -> EvidenceBuilderSummary:
-        concerns = {rule.operational_concern for rule in builder.rules}
+        concerns = {rule.concern for rule in builder.rules}
         return cls(
             builder_id=builder.id,
             builder_name=builder.name,

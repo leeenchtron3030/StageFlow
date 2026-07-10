@@ -3,8 +3,11 @@ from dataclasses import fields
 import pytest
 
 from app.contexts.production.evidence import (
+    EvidenceConcern,
     EvidenceItem,
+    EvidenceObservationReference,
     EvidencePurpose,
+    EvidenceRole,
     EvidenceSet,
     EvidenceStrength,
     EvidenceSummary,
@@ -28,6 +31,7 @@ def test_evidence_item_creation() -> None:
     )
 
     assert item.strength is EvidenceStrength.STRONG
+    assert item.role is EvidenceRole.UNKNOWN
     assert item.weight is None
     assert item.rationale is None
     assert dict(item.metadata) == {}
@@ -56,6 +60,24 @@ def test_evidence_item_accepts_optional_rationale() -> None:
     )
 
     assert item.rationale == "Several nearby observations support this purpose."
+
+
+def test_evidence_item_exposes_observation_reference() -> None:
+    observation_id = EntityId.new()
+    item = EvidenceItem(
+        id=EntityId.new(),
+        observation_id=observation_id,
+        role=EvidenceRole.SUPPORTS,
+        strength=EvidenceStrength.STRONG,
+        rationale="Observation supports the concern.",
+    )
+
+    reference = item.observation_reference
+
+    assert isinstance(reference, EvidenceObservationReference)
+    assert reference.observation_id == observation_id
+    assert reference.role is EvidenceRole.SUPPORTS
+    assert reference.strength is EvidenceStrength.STRONG
 
 
 def test_evidence_item_accepts_optional_weight() -> None:
@@ -91,6 +113,11 @@ def test_evidence_strength_allowed_values() -> None:
 
 def test_evidence_purpose_allowed_values() -> None:
     assert {purpose.value for purpose in EvidencePurpose} == {
+        "operational_context",
+        "transition_support",
+        "historical_explanation",
+        "reasoning_input",
+        "review_support",
         "potential_session_start",
         "potential_session_end",
         "potential_session_continuation",
@@ -119,6 +146,7 @@ def test_evidence_set_uses_generic_entity_id_and_correlation_id() -> None:
     evidence_set = EvidenceSet(
         id=evidence_set_id,
         recording_block_id=recording_block_id,
+        concern=EvidenceConcern.POSSIBLE_SESSION_START,
         purpose=EvidencePurpose.POTENTIAL_TRANSITION,
         items=[_item()],
         correlation_id=correlation_id,
@@ -126,6 +154,7 @@ def test_evidence_set_uses_generic_entity_id_and_correlation_id() -> None:
 
     assert evidence_set.id == evidence_set_id
     assert evidence_set.recording_block_id == recording_block_id
+    assert evidence_set.concern is EvidenceConcern.POSSIBLE_SESSION_START
     assert evidence_set.correlation_id == correlation_id
     assert isinstance(evidence_set.items, tuple)
 
@@ -153,6 +182,7 @@ def test_evidence_summary_counts_evidence_items() -> None:
     summary = EvidenceSummary.from_evidence_set(evidence_set)
 
     assert summary.total_item_count == 3
+    assert summary.concern is EvidenceConcern.UNKNOWN
     assert summary.count_by_strength[EvidenceStrength.STRONG] == 2
     assert summary.count_by_strength[EvidenceStrength.MODERATE] == 1
     assert summary.strongest_strength is EvidenceStrength.STRONG
@@ -174,6 +204,49 @@ def test_evidence_summary_counts_contradictory_evidence() -> None:
     summary = EvidenceSummary.from_evidence_set(evidence_set)
 
     assert summary.contradictory_count == 2
+
+
+def test_evidence_summary_counts_roles() -> None:
+    evidence_set = EvidenceSet(
+        id=EntityId.new(),
+        recording_block_id=EntityId.new(),
+        concern=EvidenceConcern.RECORDING_COVERAGE,
+        purpose=EvidencePurpose.OPERATIONAL_CONTEXT,
+        items=[
+            EvidenceItem(
+                id=EntityId.new(),
+                observation_id=EntityId.new(),
+                role=EvidenceRole.SUPPORTS,
+                strength=EvidenceStrength.MODERATE,
+            ),
+            EvidenceItem(
+                id=EntityId.new(),
+                observation_id=EntityId.new(),
+                role=EvidenceRole.CONTRADICTS,
+                strength=EvidenceStrength.CONTRADICTORY,
+            ),
+            EvidenceItem(
+                id=EntityId.new(),
+                observation_id=EntityId.new(),
+                role=EvidenceRole.CONTEXTUALIZES,
+                strength=EvidenceStrength.UNKNOWN,
+            ),
+            EvidenceItem(
+                id=EntityId.new(),
+                observation_id=EntityId.new(),
+                role=EvidenceRole.NEUTRAL,
+                strength=EvidenceStrength.UNKNOWN,
+            ),
+        ],
+        correlation_id=CorrelationId.new(),
+    )
+
+    summary = EvidenceSummary.from_evidence_set(evidence_set)
+
+    assert summary.supporting_count == 1
+    assert summary.contradicting_count == 1
+    assert summary.contextual_count == 1
+    assert summary.neutral_count == 1
 
 
 def test_evidence_summary_does_not_produce_decision_metric() -> None:

@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from types import MappingProxyType
 from typing import Any
 
+from app.contexts.production.evidence.evidence_concern import EvidenceConcern
 from app.contexts.production.evidence.evidence_item import EvidenceItem
 from app.contexts.production.evidence.evidence_purpose import EvidencePurpose
 from app.shared.ids import CorrelationId, EntityId
@@ -24,6 +25,7 @@ class EvidenceSet:
     purpose: EvidencePurpose
     items: Sequence[EvidenceItem]
     correlation_id: CorrelationId
+    concern: EvidenceConcern = EvidenceConcern.UNKNOWN
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     notes: str | None = None
     metadata: Mapping[str, Any] = field(default_factory=_empty_metadata)

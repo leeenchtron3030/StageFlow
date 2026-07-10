@@ -5,7 +5,12 @@ from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Any
 
-from app.contexts.production.evidence import EvidencePurpose, EvidenceStrength
+from app.contexts.production.evidence import (
+    EvidenceConcern,
+    EvidencePurpose,
+    EvidenceRole,
+    EvidenceStrength,
+)
 from app.contexts.production.observation import ObservationType
 from app.shared.ids import EntityId
 
@@ -14,26 +19,45 @@ def _empty_metadata() -> Mapping[str, Any]:
     return {}
 
 
+_LEGACY_CONCERN_VALUES = {
+    "recording_activity": EvidenceConcern.RECORDING_COVERAGE,
+    "media_artifact_availability": EvidenceConcern.MEDIA_AVAILABILITY,
+    "time_boundary": EvidenceConcern.SCHEDULE_ALIGNMENT,
+    "scheduled_activity": EvidenceConcern.SCHEDULE_ALIGNMENT,
+    "transcript_activity": EvidenceConcern.TRANSCRIPT_CONTINUITY,
+    "vision_activity": EvidenceConcern.VISUAL_TRANSITION_CONTEXT,
+}
+
+
+def _coerce_concern(concern: EvidenceConcern | str) -> EvidenceConcern:
+    if isinstance(concern, EvidenceConcern):
+        return concern
+    if concern in _LEGACY_CONCERN_VALUES:
+        return _LEGACY_CONCERN_VALUES[concern]
+    return EvidenceConcern(concern)
+
+
 @dataclass(frozen=True, slots=True)
 class EvidenceBuilderRule:
     """Declarative grouping intent for one operational concern."""
 
     id: EntityId
-    operational_concern: str
-    supporting_observation_types: Sequence[ObservationType]
-    evidence_purpose: EvidencePurpose = EvidencePurpose.GENERAL_CONTEXT
+    operational_concern: EvidenceConcern | str
+    supporting_observation_types: Sequence[ObservationType] = field(default_factory=tuple)
+    evidence_purpose: EvidencePurpose = EvidencePurpose.OPERATIONAL_CONTEXT
     supporting_strength: EvidenceStrength = EvidenceStrength.MODERATE
     contradicting_observation_types: Sequence[ObservationType] = field(default_factory=tuple)
     contextual_observation_types: Sequence[ObservationType] = field(default_factory=tuple)
+    neutral_observation_types: Sequence[ObservationType] = field(default_factory=tuple)
     description: str | None = None
     metadata: Mapping[str, Any] = field(default_factory=_empty_metadata)
 
     def __post_init__(self) -> None:
-        if not self.operational_concern.strip():
-            raise ValueError("EvidenceBuilderRule requires exactly one operational concern.")
+        concern = _coerce_concern(self.operational_concern)
         if self.supporting_strength is EvidenceStrength.CONTRADICTORY:
             raise ValueError("Supporting EvidenceBuilderRule strength must not be contradictory.")
 
+        object.__setattr__(self, "operational_concern", concern)
         object.__setattr__(
             self,
             "supporting_observation_types",
@@ -49,20 +73,31 @@ class EvidenceBuilderRule:
             "contextual_observation_types",
             tuple(self.contextual_observation_types),
         )
+        object.__setattr__(
+            self,
+            "neutral_observation_types",
+            tuple(self.neutral_observation_types),
+        )
         object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
 
-    def role_for(self, observation_type: ObservationType) -> str | None:
+    @property
+    def concern(self) -> EvidenceConcern:
+        return _coerce_concern(self.operational_concern)
+
+    def role_for(self, observation_type: ObservationType) -> EvidenceRole | None:
         if observation_type in self.supporting_observation_types:
-            return "supporting"
+            return EvidenceRole.SUPPORTS
         if observation_type in self.contradicting_observation_types:
-            return "contradicting"
+            return EvidenceRole.CONTRADICTS
         if observation_type in self.contextual_observation_types:
-            return "contextual"
+            return EvidenceRole.CONTEXTUALIZES
+        if observation_type in self.neutral_observation_types:
+            return EvidenceRole.NEUTRAL
         return None
 
-    def strength_for_role(self, role: str) -> EvidenceStrength:
-        if role == "supporting":
+    def strength_for_role(self, role: EvidenceRole) -> EvidenceStrength:
+        if role is EvidenceRole.SUPPORTS:
             return self.supporting_strength
-        if role == "contradicting":
+        if role is EvidenceRole.CONTRADICTS:
             return EvidenceStrength.CONTRADICTORY
         return EvidenceStrength.UNKNOWN
