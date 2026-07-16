@@ -12,6 +12,8 @@ ED-0037 adds the second concrete Evidence Builder: Transcript Continuity Evidenc
 
 ED-0038 extracts generic semantic-selection mechanics proven by the two concrete builders.
 
+ED-0039 adds the first cross-domain Evidence Builder: Session Boundary Evidence Builder.
+
 The builder is the first Reasoning component after the Perception Layer.
 
 Production Events become objective Observations through Observation Interpreters. The Observation Evidence Builder then organizes those objective Observations into explainable `EvidenceSet` objects using the existing ED-0007 Evidence contracts.
@@ -63,7 +65,9 @@ Metadata remains available for secondary details, but core concern, role, and si
 
 Initial default rules remain deliberately conservative and map single-domain Observations into StageFlow-focused concerns such as recording coverage, media availability, schedule alignment, transcript continuity, and visual transition context.
 
-Multi-domain concerns such as session started are intentionally excluded. Those belong to later reasoning directives.
+Conclusive multi-domain concerns such as session started remain excluded. ED-0039 may
+compose existing domain Evidence only into the non-conclusive concerns
+`possible_session_start` and `possible_session_end`.
 
 ## Concrete Builders
 
@@ -74,6 +78,14 @@ It is intentionally separate from the generic Observation Evidence Builder. It p
 The Transcript Continuity Evidence Builder converts objective transcript activity Observations into transcript continuity Evidence and first-class transcript Evidence Signals. It handles accumulating transcript streams, distinguishes availability from continuity, and requires explicit interruption or ending Observations before producing interruption or ending Signals.
 
 Both concrete builders suggest a reusable semantic-selector shape may be useful later, but ED-0037 keeps the logic domain-specific until another directive formalizes that abstraction.
+
+The Session Boundary Evidence Builder consumes the outputs of domain builders rather
+than Observations. It maps source Concern plus Signal to boundary Concern and Role,
+preserves ID-only lineage and source strength, and groups compatible contributions by
+recording block, stage, known scheduled activity, correlation, and a bounded temporal
+neighborhood. It does not invoke domain builders or transition policy. Its temporal
+window and earliest-start/latest-end anchors organize Evidence only and do not prove or
+select a boundary.
 
 ## Semantic Selection Mechanics
 

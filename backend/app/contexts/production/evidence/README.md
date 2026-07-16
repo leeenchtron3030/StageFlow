@@ -58,6 +58,14 @@ ED-0036 validates this model with the Recording Coverage Evidence Builder. Recor
 
 ED-0037 validates the same model in an accumulating transcript domain. Transcript activity Observations may become transcript continuity Evidence with Signals such as `speech_activity_available`, `transcript_continuity_indicated`, `transcript_interruption_indicated`, and `transcript_end_indicated`. Transcript interruption and ending Signals require explicit structured Observation semantics; absence of transcript activity is not Evidence of interruption.
 
+ED-0039 validates cross-domain composition without changing the Evidence taxonomy. The
+Session Boundary Evidence Builder consumes structured domain Evidence and organizes
+supported Concern-and-Signal pairs under the existing `possible_session_start` and
+`possible_session_end` concerns with `transition_support` purpose. It preserves source
+Signals and item strength rather than creating aggregate confidence or proof. Temporal
+grouping and its organizational anchor do not establish a session boundary; missing
+Signals do not become contradictory Evidence.
+
 ## What Does Not Belong Here
 
 - Full Observation objects embedded in evidence items.
