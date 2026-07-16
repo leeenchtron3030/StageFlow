@@ -67,7 +67,8 @@ set is consumed when at least one supported Concern-and-Signal contribution is b
 ignored when its concern is unrelated, and unsupported when its concern is boundary-
 relevant but it has no supported structured combination or usable item linkage.
 
-The builder is deterministic and side-effect-free. It does not create Session Operational
-State, Transition Evaluations, transition policy, Hypotheses, Findings, Verification
-Decisions, Operational Products, scores, probabilities, persistence, APIs, queues,
-workers, AI behavior, or frontend behavior.
+The builder is deterministic and side-effect-free. ED-0040 may consume its output through
+the separate Session Transition Policy, but this builder does not invoke that policy or
+create Session Operational State, Transition Evaluations, Hypotheses, Findings,
+Verification Decisions, Operational Products, scores, probabilities, persistence, APIs,
+queues, workers, AI behavior, or frontend behavior.
