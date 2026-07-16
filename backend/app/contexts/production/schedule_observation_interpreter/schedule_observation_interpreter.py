@@ -18,6 +18,8 @@ from app.contexts.production.observation_interpreter import (
     ObservationInterpreterPolicy,
     ObservationInterpreterResult,
     ObservationInterpreterStatus,
+    observation_context_from_event,
+    observation_provenance_from_event,
 )
 from app.contexts.production.production_event import (
     ProductionEvent,
@@ -148,10 +150,16 @@ class ScheduleObservationInterpreter:
         if mapping is None:
             return ()
 
+        observation_context = observation_context_from_event(event, context)
+        rule_id = next(
+            (rule.id for rule in self.rules if mapping in rule.mappings),
+            f"schedule:{event.event_type.value}:{mapping.schedule_lifecycle}",
+        )
+
         return (
             Observation(
                 id=EntityId.new(),
-                recording_block_id=None,
+                recording_block_id=observation_context.recording_block_id,
                 observation_type=ObservationType.SCHEDULE_ACTIVITY,
                 observation_source=ObservationSource.SCHEDULE,
                 location=self._location_for_event(event),
@@ -166,6 +174,13 @@ class ScheduleObservationInterpreter:
                     "activity_type": event.payload.get("activity_type"),
                 },
                 notes=mapping.observation_note,
+                provenance=observation_provenance_from_event(
+                    event,
+                    interpreter_id=self.id,
+                    interpreter_kind="schedule_activity_interpreter",
+                    interpretation_rule_id=rule_id,
+                ),
+                context=observation_context,
             ),
         )
 

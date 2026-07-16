@@ -22,7 +22,22 @@ Future architecture work may consolidate the generic interpreter package and thi
 
 `ObservationInterpreterResult` preserves source Production Event IDs.
 
-When an `ObservationInterpreter` returns Observations through its helper method, the observations receive lightweight metadata containing `source_production_event_ids` and `observation_interpreter_id`. This avoids refactoring the existing Observation contract while preserving traceability.
+ED-0043 makes exact lineage first-class on each interpreter-produced Observation.
+`Observation.provenance` preserves one exact source Event ID and type, source occurrence
+time, interpreter ID and stable kind, and applied rule identity. Compatibility metadata
+containing `source_production_event_ids` and `observation_interpreter_id` remains
+available but is secondary.
+
+`event_observation_lineage.py` centralizes context extraction. The deterministic order
+is Event references, structured Event payload, structured Event metadata, then the
+explicit interpreter context for stage and recording block compatibility. Each retained
+fallback records its source in `ObservationContext.metadata`. Transcript stream lookup
+uses `transcript_stream_id`, then `stream_id`, then `transcript_source_id`; text is never
+inspected. First-class Observation context is authoritative downstream.
+
+Interpreters do not compare source and Observation timestamps. They preserve Event time
+and assign Observation time independently, remain side-effect free, and do not mutate
+Production Events.
 
 ## Exclusions
 
