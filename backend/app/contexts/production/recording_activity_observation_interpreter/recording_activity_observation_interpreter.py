@@ -18,6 +18,8 @@ from app.contexts.production.observation_interpreter import (
     ObservationInterpreterPolicy,
     ObservationInterpreterResult,
     ObservationInterpreterStatus,
+    observation_context_from_event,
+    observation_provenance_from_event,
 )
 from app.contexts.production.production_event import (
     ProductionEvent,
@@ -148,9 +150,15 @@ class RecordingActivityObservationInterpreter:
         context: ObservationInterpreterContext,
     ) -> tuple[Observation, ...]:
         mapping = self._mapping_for_event(event)
-        recording_block_id = self._recording_block_id(event, context)
         if mapping is None:
             return ()
+
+        observation_context = observation_context_from_event(event, context)
+        recording_block_id = observation_context.recording_block_id
+        rule_id = next(
+            (rule.id for rule in self.rules if mapping in rule.mappings),
+            f"recording_activity:{event.event_type.value}:{mapping.recording_event_kind}",
+        )
 
         return (
             Observation(
@@ -167,6 +175,13 @@ class RecordingActivityObservationInterpreter:
                     "recording_event_kind": mapping.recording_event_kind,
                 },
                 notes=mapping.observation_note,
+                provenance=observation_provenance_from_event(
+                    event,
+                    interpreter_id=self.id,
+                    interpreter_kind="recording_activity_interpreter",
+                    interpretation_rule_id=rule_id,
+                ),
+                context=observation_context,
             ),
         )
 

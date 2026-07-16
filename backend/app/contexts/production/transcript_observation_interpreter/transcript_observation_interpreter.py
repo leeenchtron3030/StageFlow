@@ -18,6 +18,8 @@ from app.contexts.production.observation_interpreter import (
     ObservationInterpreterPolicy,
     ObservationInterpreterResult,
     ObservationInterpreterStatus,
+    observation_context_from_event,
+    observation_provenance_from_event,
 )
 from app.contexts.production.production_event import (
     ProductionEvent,
@@ -149,7 +151,12 @@ class TranscriptObservationInterpreter:
         if mapping is None:
             return ()
 
-        recording_block_id = self._recording_block_id(event, context)
+        observation_context = observation_context_from_event(event, context)
+        recording_block_id = observation_context.recording_block_id
+        rule_id = next(
+            (rule.id for rule in self.rules if mapping in rule.mappings),
+            f"transcript:{event.event_type.value}:{mapping.transcript_lifecycle}",
+        )
         return (
             Observation(
                 id=EntityId.new(),
@@ -176,6 +183,13 @@ class TranscriptObservationInterpreter:
                     "confidence": event.payload.get("confidence"),
                 },
                 notes=mapping.observation_note,
+                provenance=observation_provenance_from_event(
+                    event,
+                    interpreter_id=self.id,
+                    interpreter_kind="transcript_activity_interpreter",
+                    interpretation_rule_id=rule_id,
+                ),
+                context=observation_context,
             ),
         )
 

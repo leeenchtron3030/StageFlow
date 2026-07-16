@@ -4,7 +4,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from types import MappingProxyType
-from typing import Any
+from typing import Any, cast
 from uuid import NAMESPACE_URL, uuid5
 
 from app.contexts.production.evidence import (
@@ -893,6 +893,26 @@ class SessionTransitionPolicy:
             "boundary_concern": group.concern.value if group is not None else None,
             "contributing_evidence_item_ids": item_ids,
             "contributing_observation_ids": observation_ids,
+            "source_production_event_ids": (
+                profile.metadata.get("source_production_event_ids", ())
+                if profile is not None
+                else ()
+            ),
+            "source_production_event_types": (
+                profile.metadata.get("source_production_event_types", ())
+                if profile is not None
+                else ()
+            ),
+            "source_interpreter_ids": (
+                profile.metadata.get("source_interpreter_ids", ())
+                if profile is not None
+                else ()
+            ),
+            "source_interpretation_rule_ids": (
+                profile.metadata.get("source_interpretation_rule_ids", ())
+                if profile is not None
+                else ()
+            ),
             "contributing_signals": signal_values,
             "applied_rule_id": applied_rule_id.to_json() if applied_rule_id else None,
             "satisfied_requirement_ids": tuple(item.to_json() for item in satisfied_ids),
@@ -1014,8 +1034,31 @@ class SessionTransitionPolicy:
                     "distinct_observation_id_then_evidence_item_id_then_evidence_set_id"
                 ),
                 "ranking_applied": False,
+                **self._lineage_metadata(group),
             },
         )
+
+    def _lineage_metadata(self, group: _EvidenceGroup) -> Mapping[str, Any]:
+        singular_to_plural = {
+            "source_production_event_id": "source_production_event_ids",
+            "source_production_event_type": "source_production_event_types",
+            "observation_interpreter_id": "source_interpreter_ids",
+            "interpretation_rule_id": "source_interpretation_rule_ids",
+        }
+        output: dict[str, tuple[str, ...]] = {}
+        for singular, plural in singular_to_plural.items():
+            values: list[str] = []
+            for contribution in group.contributions:
+                item_value = contribution.evidence_item.metadata.get(singular)
+                if isinstance(item_value, str) and item_value and item_value not in values:
+                    values.append(item_value)
+                set_values = contribution.evidence_set.metadata.get(plural, ())
+                if isinstance(set_values, Sequence) and not isinstance(set_values, str):
+                    for value in cast(Sequence[object], set_values):
+                        if isinstance(value, str) and value and value not in values:
+                            values.append(value)
+            output[plural] = tuple(values)
+        return output
 
     def _context_entity_ids(
         self,

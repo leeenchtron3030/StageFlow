@@ -26,3 +26,10 @@ The interpreter does not ingest media, validate codecs, inspect files, register 
 Generated Observations anchor to a recording block when one is available. If no recording block is known, they anchor to the source event's wall-clock occurrence time.
 
 The interpreter never invents fake media timeline offsets.
+
+## ED-0043 Provenance
+
+Each produced Observation carries the exact media Production Event ID, type, and
+occurrence time; stable `media_artifact_interpreter` identity; applied mapping-rule
+identity; and known stage, recording-block, correlation, scheduled-activity, and media
+artifact context. Distinct artifacts remain distinct within a recording block.

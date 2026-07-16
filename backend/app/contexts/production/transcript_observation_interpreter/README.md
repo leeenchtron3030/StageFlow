@@ -29,3 +29,11 @@ Language is observable. Meaning is reasoning.
 This interpreter may carry transcript text as observed data, but it does not rewrite, summarize, normalize, classify, or interpret that text.
 
 Generated Observations anchor to a recording block when one is available. If no recording block is known, they anchor to the source event's wall-clock occurrence time.
+
+## ED-0043 Provenance
+
+Each produced Observation carries the exact transcript Production Event ID, type, and
+occurrence time; stable `transcript_activity_interpreter` identity; applied mapping-rule
+identity; and known stage, recording-block, correlation, transcript-stream, and timeline
+context. Stream identity is extracted structurally and never inferred from transcript
+text.

@@ -8,6 +8,9 @@ from typing import Any
 
 from app.contexts.production.observation.observation import Observation
 from app.contexts.production.observation.observation_type import ObservationType
+from app.contexts.production.observation_interpreter.event_observation_lineage import (
+    observation_provenance_from_event,
+)
 from app.contexts.production.observation_interpreter.observation_interpreter_context import (
     ObservationInterpreterContext,
 )
@@ -106,7 +109,7 @@ class ObservationInterpreter:
 
         traced_observations = self._observations_with_traceability(
             observations,
-            source_production_event_ids=tuple(event.id for event in event_tuple),
+            events=event_tuple,
         )
         self._validate_policy(traced_observations)
 
@@ -141,16 +144,42 @@ class ObservationInterpreter:
     def _observations_with_traceability(
         self,
         observations: Sequence[Observation],
-        source_production_event_ids: tuple[EntityId, ...],
+        events: tuple[ProductionEvent, ...],
     ) -> tuple[Observation, ...]:
         if not self.policy.require_source_event_traceability:
             return tuple(observations)
 
-        source_id_values = tuple(event_id.to_json() for event_id in source_production_event_ids)
+        source_id_values = tuple(event.id.to_json() for event in events)
         traced_observations: list[Observation] = []
         for observation in observations:
             metadata = dict(observation.metadata)
             metadata["source_production_event_ids"] = source_id_values
             metadata["observation_interpreter_id"] = self.id.to_json()
-            traced_observations.append(replace(observation, metadata=metadata))
+            provenance = observation.provenance
+            if provenance is None and len(events) == 1:
+                event = events[0]
+                matching_rule = next(
+                    (
+                        rule
+                        for rule in self.rules
+                        if event.event_type in rule.supported_event_types
+                        and event.source in rule.supported_event_sources
+                    ),
+                    None,
+                )
+                provenance = observation_provenance_from_event(
+                    event,
+                    interpreter_id=self.id,
+                    interpreter_kind="generic_observation_interpreter",
+                    interpretation_rule_id=(
+                        matching_rule.id if matching_rule is not None else None
+                    ),
+                )
+            traced_observations.append(
+                replace(
+                    observation,
+                    metadata=metadata,
+                    provenance=provenance,
+                )
+            )
         return tuple(traced_observations)

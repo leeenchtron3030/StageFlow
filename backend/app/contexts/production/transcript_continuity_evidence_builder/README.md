@@ -37,3 +37,11 @@ Duplicate Observation IDs are ignored after the first deterministic occurrence a
 ## Boundary
 
 The builder produces Evidence only. It does not call policies, create Transition Evaluations, mutate Operational State, persist Evidence, create Hypotheses, create Findings, create Verification Decisions, create Operational Products, call AI, expose APIs, use queues or workers, or add frontend behavior.
+## ED-0043 Lineage And Context
+
+The builder reads first-class recording-block, stage, and transcript-stream context
+before legacy fields or metadata. Transcript stream fallback remains
+`transcript_stream_id`, `stream_id`, then `transcript_source_id`. Structured source Event,
+interpreter, rule, stream, and timeline traceability is retained through EvidenceItem,
+EvidenceSignalReference, and EvidenceSet metadata without inspecting transcript text or
+changing generic Evidence contracts.

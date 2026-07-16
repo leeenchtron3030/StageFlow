@@ -22,7 +22,13 @@ from app.contexts.production.evidence_builder import (
     ObservationSemanticSelector,
     deduplicate_observations,
 )
-from app.contexts.production.observation import Observation, ObservationType
+from app.contexts.production.observation import (
+    Observation,
+    ObservationType,
+    observation_recording_block_id,
+    observation_stage_id,
+    observation_traceability_metadata,
+)
 from app.shared.ids import EntityId
 
 from .recording_coverage_evidence_mapping import (
@@ -290,8 +296,8 @@ class RecordingCoverageEvidenceBuilder:
         self,
         observation: Observation,
     ) -> EvidenceBuilderContextKey:
-        recording_block_id = observation.recording_block_id
-        stage_id = observation.location.stage_id
+        recording_block_id = observation_recording_block_id(observation)
+        stage_id = observation_stage_id(observation)
         return EvidenceBuilderContextKey.from_components(
             recording_block_id=(
                 recording_block_id.to_json() if recording_block_id is not None else None
@@ -340,10 +346,12 @@ class RecordingCoverageEvidenceBuilder:
             return None, ()
 
         first_observation = group[0][0]
+        first_recording_block_id = observation_recording_block_id(first_observation)
+        first_stage_id = observation_stage_id(first_observation)
         return (
             EvidenceSet(
                 id=EntityId.new(),
-                recording_block_id=first_observation.recording_block_id,
+                recording_block_id=first_recording_block_id,
                 concern=EvidenceConcern.RECORDING_COVERAGE,
                 purpose=EvidencePurpose.TRANSITION_SUPPORT,
                 items=tuple(items),
@@ -357,14 +365,30 @@ class RecordingCoverageEvidenceBuilder:
                         observation.id.to_json()
                         for observation, _mapping, _selection in group
                     ),
+                    "source_production_event_ids": self._lineage_values(
+                        group,
+                        "source_production_event_id",
+                    ),
+                    "source_production_event_types": self._lineage_values(
+                        group,
+                        "source_production_event_type",
+                    ),
+                    "source_interpreter_ids": self._lineage_values(
+                        group,
+                        "observation_interpreter_id",
+                    ),
+                    "source_interpretation_rule_ids": self._lineage_values(
+                        group,
+                        "interpretation_rule_id",
+                    ),
                     "recording_block_id": (
-                        first_observation.recording_block_id.to_json()
-                        if first_observation.recording_block_id is not None
+                        first_recording_block_id.to_json()
+                        if first_recording_block_id is not None
                         else None
                     ),
                     "stage_id": (
-                        first_observation.location.stage_id.to_json()
-                        if first_observation.location.stage_id is not None
+                        first_stage_id.to_json()
+                        if first_stage_id is not None
                         else None
                     ),
                     "semantic_conclusion": None,
@@ -387,6 +411,7 @@ class RecordingCoverageEvidenceBuilder:
             strength=rule.evidence_strength,
             rationale=rule.rationale(),
             metadata={
+                **observation_traceability_metadata(observation),
                 "recording_activity": mapping.recording_activity,
                 "recording_event_kind": mapping.recording_event_kind,
                 "evidence_builder_rule_id": rule.id.to_json(),
@@ -412,34 +437,52 @@ class RecordingCoverageEvidenceBuilder:
             observation_ids=(observation.id,),
             rationale=mapping.rationale,
             metadata={
+                **observation_traceability_metadata(observation),
                 "evidence_builder_rule_id": rule.id.to_json(),
                 "recording_activity": mapping.recording_activity,
                 "matched_semantic_key": selection.matched_semantic_key,
                 "normalized_semantic_value": selection.normalized_semantic_value,
-                "recording_block_id": (
-                    observation.recording_block_id.to_json()
-                    if observation.recording_block_id is not None
-                    else None
-                ),
-                "stage_id": (
-                    observation.location.stage_id.to_json()
-                    if observation.location.stage_id is not None
-                    else None
-                ),
                 "observation_location": self._location_metadata(observation),
             },
         )
 
+    def _lineage_values(
+        self,
+        group: tuple[
+            tuple[
+                Observation,
+                RecordingCoverageEvidenceMapping,
+                ObservationSemanticSelection,
+            ],
+            ...,
+        ],
+        key: str,
+    ) -> tuple[str, ...]:
+        return tuple(
+            dict.fromkeys(
+                value
+                for observation, _mapping, _selection in group
+                for value in (observation_traceability_metadata(observation).get(key),)
+                if isinstance(value, str) and value
+            )
+        )
+
     def _location_metadata(self, observation: Observation) -> Mapping[str, Any]:
         location = observation.location
+        recording_block_id = observation_recording_block_id(observation)
+        stage_id = observation_stage_id(observation)
         metadata: dict[str, Any] = {
             "kind": location.kind.value if location.kind is not None else None,
             "recording_block_id": (
-                observation.recording_block_id.to_json()
-                if observation.recording_block_id is not None
+                recording_block_id.to_json()
+                if recording_block_id is not None
                 else None
             ),
-            "stage_id": location.stage_id.to_json() if location.stage_id is not None else None,
+            "stage_id": (
+                stage_id.to_json()
+                if stage_id is not None
+                else None
+            ),
         }
         if location.point is not None:
             metadata["timeline_offset_seconds"] = self._seconds(location.point.offset)

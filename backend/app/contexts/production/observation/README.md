@@ -2,9 +2,34 @@
 
 ## Purpose
 
-This package contains the foundational observation contracts introduced by ED-0006 and refined by ED-0025.
+This package contains the foundational observation contracts introduced by ED-0006,
+refined by ED-0025, and given first-class lineage and operational context by ED-0043.
 
 An Observation records something objectively noticed by StageFlow. It does not decide what that observation means.
+
+## Provenance And Context
+
+`ObservationProvenance` preserves the exact source Production Event ID, source Event
+type, source occurrence time, stable interpreter identity, applied rule identity when
+applicable, and an optional producer identifier. References remain ID-only; the source
+Production Event object is never embedded.
+
+`ObservationContext` preserves known stage, recording block, correlation, scheduled
+activity, transcript stream, media artifact, and timeline context. Context may be
+partial. Missing identifiers remain absent and one context field never substitutes for
+another.
+
+First-class `Observation.context` values are authoritative. Legacy Observation fields
+and documented metadata keys remain compatibility fallbacks only. Legacy callers may
+continue constructing Observations without provenance; every Observation produced by a
+concrete interpreter must include provenance.
+
+## Time Semantics
+
+`ObservationProvenance.source_event_occurred_at` records when the source reported the
+Event occurred. `Observation.observed_at` records when StageFlow produced or recorded
+the Observation. They may be equal, but neither is substituted for the other. Existing
+timezone information is preserved, including legacy naive timestamps.
 
 ## Location Anchors
 

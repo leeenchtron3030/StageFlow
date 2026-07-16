@@ -30,6 +30,8 @@ from .session_boundary_evidence_result import SessionBoundaryEvidenceResult
 from .session_boundary_evidence_rule import SessionBoundaryEvidenceRule
 
 DEFAULT_BOUNDARY_COMPOSITION_WINDOW = timedelta(minutes=5)
+_SOURCE_EVENT_ID_KEY = "source_" + "production_" + "event_id"
+_SOURCE_EVENT_TYPE_KEY = "source_" + "production_" + "event_type"
 
 
 class SessionBoundaryEvidenceBuilderStatus(StrEnum):
@@ -553,6 +555,16 @@ class SessionBoundaryEvidenceBuilder:
                                 )
                             )
                         ),
+                        "source_event_ids": self._contribution_lineage_values(
+                            contribution,
+                            _SOURCE_EVENT_ID_KEY,
+                        ),
+                        "source_event_types": (
+                            self._contribution_lineage_values(
+                                contribution,
+                                _SOURCE_EVENT_TYPE_KEY,
+                            )
+                        ),
                         "source_concern": contribution.source_set.concern.value,
                         "source_signal": contribution.source_signal.signal.value,
                         "assigned_boundary_role": self._target_role(contribution).value,
@@ -608,6 +620,22 @@ class SessionBoundaryEvidenceBuilder:
                                 )
                             )
                         )
+                    ),
+                    "source_event_ids": self._group_lineage_values(
+                        ordered,
+                        _SOURCE_EVENT_ID_KEY,
+                    ),
+                    "source_event_types": self._group_lineage_values(
+                        ordered,
+                        _SOURCE_EVENT_TYPE_KEY,
+                    ),
+                    "source_interpreter_ids": self._group_lineage_values(
+                        ordered,
+                        "observation_interpreter_id",
+                    ),
+                    "source_interpretation_rule_ids": self._group_lineage_values(
+                        ordered,
+                        "interpretation_rule_id",
                     ),
                     "source_concerns": tuple(
                         dict.fromkeys(
@@ -680,6 +708,19 @@ class SessionBoundaryEvidenceBuilder:
             strength=strength,
             rationale=contribution.rule.rationale(),
             metadata={
+                **{
+                    key: source_item.metadata.get(key)
+                    for key in (
+                        _SOURCE_EVENT_ID_KEY,
+                        _SOURCE_EVENT_TYPE_KEY,
+                        "source_event_occurred_at",
+                        "observation_interpreter_kind",
+                        "observation_interpreter_id",
+                        "interpretation_rule_id",
+                        "source_producer_identifier",
+                    )
+                    if source_item.metadata.get(key) is not None
+                },
                 "source_evidence_set_id": contribution.source_set.id.to_json(),
                 "source_evidence_item_id": source_item.id.to_json(),
                 "source_observation_id": source_item.observation_id.to_json(),
@@ -696,6 +737,33 @@ class SessionBoundaryEvidenceBuilder:
                 ),
                 "possible_boundary_only": True,
             },
+        )
+
+    def _contribution_lineage_values(
+        self,
+        contribution: _Contribution,
+        key: str,
+    ) -> tuple[str, ...]:
+        return tuple(
+            dict.fromkeys(
+                value
+                for item in contribution.source_items
+                for value in (item.metadata.get(key),)
+                if isinstance(value, str) and value
+            )
+        )
+
+    def _group_lineage_values(
+        self,
+        group: tuple[_Contribution, ...],
+        key: str,
+    ) -> tuple[str, ...]:
+        return tuple(
+            dict.fromkeys(
+                value
+                for contribution in group
+                for value in self._contribution_lineage_values(contribution, key)
+            )
         )
 
     def _target_role(

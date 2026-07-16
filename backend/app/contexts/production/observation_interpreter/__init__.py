@@ -1,5 +1,9 @@
 """Production Observation Interpreter contracts."""
 
+from app.contexts.production.observation_interpreter.event_observation_lineage import (
+    observation_context_from_event,
+    observation_provenance_from_event,
+)
 from app.contexts.production.observation_interpreter.observation_interpreter import (
     ObservationInterpreter,
     ObservationInterpreterStatus,
@@ -28,4 +32,6 @@ __all__ = [
     "ObservationInterpreterRule",
     "ObservationInterpreterStatus",
     "ObservationInterpreterSummary",
+    "observation_context_from_event",
+    "observation_provenance_from_event",
 ]

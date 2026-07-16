@@ -118,6 +118,14 @@ Observation Interpreters may create Observations, but they do not create Evidenc
 
 The ED-0014 `production/interpreter` package remains in place for now. ED-0023 documents and implements the more explicit Observation Interpreter contract layer without consolidating or renaming the earlier generic interpreter primitives.
 
+ED-0043 closes ED0041-F002 by making exact Event-to-Observation provenance and known
+operational context first-class. Every concrete interpreter preserves the exact source
+Event ID, Event type, Event occurrence time, interpreter and rule identity, stage,
+recording block, correlation, scheduled activity, transcript stream, media artifact,
+and timeline context where supplied. Event time and Observation time remain distinct.
+References stay ID-only, and compatibility metadata is secondary to first-class
+Observation context.
+
 ## Recording Activity Observation Interpreter
 
 ED-0024 adds the first concrete Observation Interpreter and serves as the reference implementation pattern for future interpreters.

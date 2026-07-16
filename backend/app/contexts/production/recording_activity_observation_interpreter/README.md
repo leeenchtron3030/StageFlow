@@ -27,3 +27,10 @@ The interpreter does not infer sessions, clips, speakers, performances, schedule
 ED-0025 refines `ObservationLocation` so recording activity Observations no longer need a fake zero-offset media timeline point.
 
 The interpreter anchors generated Observations to a recording block when one is available. If no recording block is known, it anchors to the source event's wall-clock occurrence time.
+
+## ED-0043 Provenance
+
+Each produced Observation carries the exact recording Production Event ID, type, and
+occurrence time; stable `recording_activity_interpreter` identity; applied mapping-rule
+identity; and known stage, recording-block, correlation, and producer context. Event
+references are authoritative and compatibility metadata is fallback-only.

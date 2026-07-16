@@ -27,3 +27,10 @@ The interpreter does not reconcile schedules, infer sessions, infer activity sta
 Generated Observations anchor to the source event's wall-clock occurrence time. Recording block, stage, or unknown anchors are reserved for future cases where wall-clock time is unavailable.
 
 The interpreter never invents fake media timeline offsets.
+
+## ED-0043 Provenance
+
+Each produced Observation carries the exact clock Production Event ID, type, and
+occurrence time; stable `runtime_clock_interpreter` identity; applied mapping-rule
+identity; and explicitly supplied stage, recording-block, correlation, and scheduled
+activity context. Observation time remains separate from crossed-boundary Event time.

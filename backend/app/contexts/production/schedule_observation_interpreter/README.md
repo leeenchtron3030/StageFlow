@@ -30,3 +30,10 @@ Planned reality and observed reality are allowed to disagree.
 This interpreter preserves planned reality faithfully as Observations so later reasoning can compare it against observed production signals. It does not perform that comparison itself.
 
 Generated Observations anchor to the source event's wall-clock occurrence time and never invent media timeline offsets.
+
+## ED-0043 Provenance
+
+Each produced Observation carries the exact schedule Production Event ID, type, and
+occurrence time; stable `schedule_activity_interpreter` identity; applied mapping-rule
+identity; and explicitly supplied scheduled-activity, stage, recording-block, and
+correlation context. Timestamp alignment never invents schedule bindings.
