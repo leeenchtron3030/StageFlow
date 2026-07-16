@@ -276,8 +276,8 @@ Evidence; neither is a verified boundary timestamp.
 
 Boundary Evidence remains below Session State, Transition Evaluation, Hypothesis,
 Finding, Verification Decision, and Operational Product layers. Missing Signals are not
-contradictions, source strength is not inflated, and Session Transition Policy remains
-deferred.
+contradictions and source strength is not inflated. ED-0040 consumes this boundary layer
+through a separate Session Transition Policy.
 
 ## Operational State Taxonomy
 
@@ -302,6 +302,23 @@ ED-0034 also adds the Recording Transition Policy. It evaluates recording covera
 ED-0035 refines the Recording Transition Policy so it consumes first-class `EvidenceSignal` values: `recording_continuity_established` and `recording_continuity_restored` propose active, `recording_pause_indicated` proposes paused, and `recording_end_indicated` proposes stopped. Legacy metadata markers remain transitional compatibility only and are not authoritative when signals are present.
 
 Transition evaluations do not mutate state, execute transitions, dispatch events, persist state, implement repositories, implement state machines, call AI, create Hypotheses, create Findings, create Verification Decisions, create Operational Products, expose APIs, use queues or workers, or add frontend behavior.
+
+## Session Transition Policy
+
+ED-0040 adds the narrow Session Transition Policy. It consumes only ED-0039
+`possible_session_start` and `possible_session_end` Evidence and evaluates the Session
+lifecycle inactive, active, ending, and ended.
+
+Active requires a session-specific start Signal plus independently traceable
+corroboration. Ending accepts explicit session/transcript end Evidence or corroborated
+recording-end Evidence. Ended requires two independent end-oriented indications with at
+least one session/transcript-specific end Signal. A new active proposal after ended also
+requires an explicitly fresh boundary context.
+
+The policy uses categorical rules, compatible context, first-class Evidence roles, and
+Observation-ID independence. It does not score or rank candidates, treat ED-0039 timing
+as proof, mutate state, create Session identity, execute transitions, persist results, or
+select a final boundary timestamp.
 
 ## Hypothesis Primitives
 
