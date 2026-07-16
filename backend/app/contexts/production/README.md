@@ -260,6 +260,25 @@ Concrete builders still own operational meaning: accepted Observation types, sem
 
 Semantic selectors inspect only explicitly configured structured keys. Missing or unsupported semantics are reported and never guessed. The generic foundation is not a runtime-configurable rules engine and does not introduce Session Boundary Evidence, Session Transition Policy, Operational State, Transition Evaluations, persistence, repositories, plugins, AI, APIs, queues, workers, or frontend behavior.
 
+## Session Boundary Evidence Builder
+
+ED-0039 adds StageFlow's first cross-domain Evidence Builder. It consumes existing
+domain `EvidenceSet` objects—not raw Production Events or Observations—and organizes
+their structured Concerns and Signals into separate `possible_session_start` and
+`possible_session_end` EvidenceSets.
+
+The builder preserves source EvidenceSet, EvidenceItem, Signal, and Observation IDs,
+along with recording block, stage, known scheduled activity, transcript stream, media
+artifact, and timeline context. A conservative five-minute composition window prevents
+unrelated Signals from being grouped indefinitely. The earliest contributing anchor is
+used to organize possible-start Evidence and the latest to organize possible-end
+Evidence; neither is a verified boundary timestamp.
+
+Boundary Evidence remains below Session State, Transition Evaluation, Hypothesis,
+Finding, Verification Decision, and Operational Product layers. Missing Signals are not
+contradictions, source strength is not inflated, and Session Transition Policy remains
+deferred.
+
 ## Operational State Taxonomy
 
 ED-0033 adds the foundational Operational State taxonomy.
