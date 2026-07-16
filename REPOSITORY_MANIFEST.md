@@ -104,6 +104,14 @@ The Perception Layer transforms Production Events into objective Observations. I
 
 AR-2.1 also captures future refinement targets: first-class Observation traceability, first-class Observation payloads, a shared `RuntimeComponentStatus` contract, and source/context vocabulary for broad Production Event types such as `system_status_changed`.
 
+## Architecture Release AR-3.0 Review Checkpoint
+
+ED-0041 reviews the complete implemented backend reasoning path through ED-0040 before
+Operational State Acceptance. The review records evidence-backed findings, metadata and
+compatibility classifications, representative flow traces, state-acceptance readiness,
+and a prioritized directive roadmap. It does not implement state acceptance or change
+runtime policy behavior.
+
 ## Directories
 
 | Path | Purpose | Owning Engineering Directive | Notes |
@@ -172,8 +180,9 @@ AR-2.1 also captures future refinement targets: first-class Observation traceabi
 | `backend/app/shared/ids/` | Shared identifier package. | ED-0004 | Contains generic entity and correlation IDs only. |
 | `backend/app/shared/result/` | Shared result package. | ED-0004 | Contains explicit success/failure result contract. |
 | `backend/app/shared/time/` | Shared time package. | ED-0004 | Contains clocks, timestamp alias, and time range. |
-| `backend/tests/` | Backend test suite. | ED-0002 / ED-0004 | Contains health endpoint and shared contract coverage. |
+| `backend/tests/` | Backend test suite. | ED-0002 through ED-0040 / reviewed by ED-0041 | Contains 705 health, shared, Production Event, interpreter, Observation, Evidence, builder, Operational State, and transition policy tests. |
 | `docs/` | Canonical and supporting architecture documentation. | Existing architecture work | Preserved by ED-0001. |
+| `docs/reviews/` | Structured architecture and codebase review reports. | ED-0041 | Contains the ED-0041 review, findings register, and directive roadmap. |
 | `examples/` | Future examples that demonstrate approved implementation patterns. | ED-0001 | No application examples are created by ED-0001. |
 | `frontend/` | Next.js frontend workspace. | ED-0003 | Contains no backend communication or business logic in ED-0003. |
 | `frontend/app/` | Next.js App Router root. | ED-0003 | Contains only the root layout, root page, and global styles. |
@@ -213,12 +222,12 @@ AR-2.1 also captures future refinement targets: first-class Observation traceabi
 | `ARCHITECTURE_DECISIONS.md` | Architecture Decision Record index. | ED-0001 | Initialized with ADR-0001 through ADR-0005. |
 | `CHANGELOG.md` | Future release and change history. | Existing repository work | Preserved by ED-0001. |
 | `CONTRIBUTING.md` | Initial contributor guide and engineering process expectations. | ED-0001 | Establishes specification-first contribution rules. |
-| `ENGINEERING_DIRECTIVES.md` | Engineering Directive index. | ED-0001 | Registers ED-0001 and reserves ED-0002 through ED-0005. |
+| `ENGINEERING_DIRECTIVES.md` | Engineering Directive index. | ED-0001 / ED-0041 | Registers implemented and reviewed directives through ED-0041. |
 | `IMPLEMENTATION_PLAN.md` | High-level staged implementation plan. | ED-0001 | Governance only; no implementation detail. |
 | `LICENSE` | Repository license. | ED-0001 | MIT License. |
 | `PRODUCT_CONSTITUTION.md` | Canonical product constitution. | Existing architecture work | Preserved by ED-0001. |
 | `README.md` | Repository introduction. | Existing repository work | Preserved by ED-0001. |
-| `REPOSITORY_MANIFEST.md` | Repository structure and ownership manifest. | ED-0001 | Created by ED-0001. |
+| `REPOSITORY_MANIFEST.md` | Repository structure and ownership manifest. | ED-0001 / ED-0041 | Created by ED-0001 and updated for the AR-3.0 review checkpoint. |
 | `ROADMAP.md` | Future roadmap document. | Existing repository work | Preserved by ED-0001. |
 
 ## Backend Files
@@ -507,7 +516,7 @@ AR-2.1 also captures future refinement targets: first-class Observation traceabi
 | `backend/app/shared/result/result.py` | Result contract. | ED-0004 | Explicit success/failure result. |
 | `backend/app/shared/time/clock.py` | Clock contracts. | ED-0004 | System and fixed clocks with UTC timestamps. |
 | `backend/app/shared/time/time_range.py` | Time range contract. | ED-0004 | Immutable start/end/duration range. |
-| `backend/tests/README.md` | Backend test suite guide. | ED-0002 | Documents health-only coverage. |
+| `backend/tests/README.md` | Backend test suite guide. | ED-0002 / ED-0041 | Documents implemented backend coverage through ED-0040 and the ED-0041 review boundary. |
 | `backend/tests/test_health.py` | Health endpoint test. | ED-0002 | Verifies startup through FastAPI TestClient. |
 | `backend/tests/test_media_artifact_adapter_contracts.py` | Media artifact adapter contract tests. | ED-0017 | Covers adapter identity, artifact events, types, statuses, capabilities, Production Event mapping, summaries, and excluded behaviors. |
 | `backend/tests/test_media_artifact_observation_interpreter_contracts.py` | Media artifact observation interpreter contract tests. | ED-0026 | Covers concrete interpreter creation, supported media artifact event mappings, zero-observation handling, traceability, objective wording, truthful ED-0025 locations, and excluded behaviors. |
@@ -583,3 +592,6 @@ AR-2.1 also captures future refinement targets: first-class Observation traceabi
 | `docs/04.5_Bounded_Contexts.md` | Bounded Contexts specification. | Existing architecture work / AR-2.1 | AR-2.1 notes that Perception Layer contracts remain in Production pending future bounded-context realignment. |
 | `docs/04.6_Integration_Architecture.md` | Integration Architecture specification. | Existing architecture work / AR-2.1 | AR-2.1 clarifies adapters emit Production Events and Observation Interpreters produce objective Observations before reasoning. |
 | `docs/05_Reasoning_Model.md` | Reasoning Model architecture reference. | AR-1.4 / AR-2.0 / AR-2.1 | AR-2.1 consolidates the Perception Layer between Production Events and Objective Observations. |
+| `docs/reviews/ED-0041_ARCHITECTURE_CODEBASE_REVIEW.md` | Comprehensive architecture and codebase review through ED-0040. | ED-0041 | Covers all required review areas, four representative flow traces, repository health, state-acceptance readiness, positive findings, risks, and the explicit review decision. |
+| `docs/reviews/ED-0041_FINDINGS_REGISTER.md` | Evidence-backed ED-0041 findings register. | ED-0041 | Records severity, category, evidence, impact, response, change risk, directive, and disposition for every finding. |
+| `docs/reviews/ED-0041_DIRECTIVE_ROADMAP.md` | Prioritized post-review directive roadmap. | ED-0041 | Separates pre-ED-0042 blockers, ED-0042 constraints, targeted follow-ups, deferred improvements, and intentionally unchanged patterns. |

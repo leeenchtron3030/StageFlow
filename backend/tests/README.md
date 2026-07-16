@@ -6,23 +6,20 @@ This directory contains backend tests.
 
 ## Current Scope
 
-ED-0002 includes minimal coverage for application creation and the health endpoint.
+The suite covers the backend foundation and implemented Production Context through
+ED-0040. Coverage includes shared and timeline contracts; Production Events, adapters,
+dispatch, and both interpreter foundations; concrete recording, media, clock, schedule,
+transcript, and vision interpretation; Observation and Evidence semantics; generic and
+concrete Evidence Builders; Operational State and transition contracts; Recording
+Transition Policy; Session Boundary Evidence; and Session Transition Policy.
 
-ED-0004 adds shared contract tests for identifiers, results, errors, clocks, time ranges, and base domain events.
+Tests remain under `backend/tests/` rather than inside application packages. The suite
+emphasizes contract validation, negative architectural boundaries, deterministic
+ordering and deduplication, compatibility behavior, context isolation, immutability, and
+ID-only traceability.
 
-ED-0005 adds Production Context timeline contract tests under `backend/tests/`, following the existing backend test convention instead of nesting tests inside application packages.
-
-ED-0006 adds Production Context observation contract tests under `backend/tests/`, following the same convention.
-
-ED-0007 adds Production Context evidence contract tests under `backend/tests/`, continuing the convention that application packages do not contain test modules.
-
-ED-0008 adds Production Context hypothesis contract tests under `backend/tests/`, preserving the same backend test convention.
-
-ED-0009 adds Production Context finding contract tests under `backend/tests/`, keeping finding tests out of application packages.
-
-ED-0010 adds Production Context verification protocol contract tests under `backend/tests/`, preserving append-only judgment semantics without workflow tests.
-
-ED-0011 adds Production Context operational product contract tests under `backend/tests/`, keeping specialized product behavior out of this foundation.
+ED-0041 reviews test quality without adding speculative future-behavior tests. Findings
+and targeted missing regression cases are documented under `docs/reviews/`.
 
 ## What Does Not Belong Here
 
