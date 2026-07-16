@@ -28,6 +28,16 @@ The generic policy contract does not mutate state, persist state, execute transi
 
 Transition policy is the first layer that may justify a change in StageFlow's operational understanding. State mutation and execution remain out of scope.
 
+## Recording Context Safety
+
+ED-0042 makes the concrete Recording Transition Policy evaluate only one compatible
+recording Evidence context at a time. It validates recording-state kind, subject, value,
+and context compatibility before a lifecycle proposal. Multiple incompatible qualifying
+recording contexts, unresolved conflicting Signals, and unknown-context conflicts return
+conservative outcomes rather than selecting a first matching rule. This is a
+recording-policy-local safety correction; the generic `TransitionEvaluation` contract is
+unchanged and state acceptance remains deferred.
+
 ## Session Transition Policy
 
 ED-0040 adds a concrete Session Transition Policy above ED-0039 boundary Evidence. It

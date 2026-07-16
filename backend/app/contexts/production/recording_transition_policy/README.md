@@ -1,34 +1,92 @@
 # Recording Transition Policy
 
-ED-0034 adds the first concrete Operational State Transition Policy.
+ED-0034 introduced the first concrete Operational State Transition Policy. ED-0035 made
+first-class Evidence Signals authoritative. ED-0042 closes ED0041-F001 by making the
+policy conservative about recording context before it evaluates a lifecycle rule.
 
-ED-0035 updates this policy to consume first-class Evidence Signals for core recording transition meaning.
+`RecordingTransitionPolicy.evaluate()` preserves the generic public behavior and returns
+one `TransitionEvaluation`. `evaluate_result()` additionally returns a policy-local
+`RecordingTransitionResult` with a descriptive context and Evidence profile. Neither
+method accepts state, mutates state, executes a transition, or persists anything.
 
-The Recording Transition Policy evaluates recording-related `EvidenceSet` objects and returns a `TransitionEvaluation` for recording state only.
+## Supported Evidence And Lifecycle
 
-Supported proposed recording values:
+Only `EvidenceConcern.RECORDING_COVERAGE` is consumed. First-class Signals are
+authoritative:
 
-- `active`
-- `paused`
-- `stopped`
+| Signal | Proposed value | Allowed current values |
+| --- | --- | --- |
+| `recording_continuity_established` | `active` | `inactive`, `active` |
+| `recording_pause_indicated` | `paused` | `active`, `paused` |
+| `recording_continuity_restored` | `active` | `paused`, `active` |
+| `recording_end_indicated` | `stopped` | `active`, `paused`, `stopped` |
 
-`inactive` may be a current recording state, but the policy does not invent a new transition to inactive.
+An absent current state is explicitly evaluated as effective `inactive`. A valid Signal
+whose target is not allowed from that value returns `transition_not_supported`; its
+proposed value remains visible for compatibility and explanation. Unsupported state
+contracts return `unknown`. `already_current` is returned only for a validated current
+recording state whose value already matches the selected supported target.
 
-## Rules
+## Context Safety
 
-- Recording becomes active when Recording Coverage Evidence carries `recording_continuity_established` or `recording_continuity_restored`.
-- Recording becomes paused when Recording Coverage Evidence carries `recording_pause_indicated`.
-- Recording becomes stopped when Recording Coverage Evidence carries `recording_end_indicated`.
-- If Evidence is incomplete, the policy returns `insufficient_evidence`.
-- If current state already matches the proposed state, the policy returns `already_current`.
-- If recording Evidence blocks the transition, the policy returns `transition_not_supported`.
+Before selecting a Signal, the policy deduplicates EvidenceSet IDs, filters recording
+Evidence, extracts one `RecordingTransitionContext` per qualifying set, and separates
+compatible groups.
 
-The policy ignores transcript, vision, schedule, editorial, media artifact, and other unrelated Evidence.
+- Different known recording blocks cannot combine.
+- Different known stages cannot combine.
+- Correlation IDs remain workflow traceability, not recording identity.
+- Different media artifacts can contribute to one context only when they share a known
+  recording block, allowing segmented artifacts without treating unrelated artifacts as
+  one recording.
+- Timeline proximity supports ordering only; it never overrides recording-block or stage
+  identity.
+- A wholly unknown context never merges with a known context. Unknown contexts may
+  combine only when they carry one compatible Signal; conflicting unknown Signals return
+  `insufficient_evidence`.
+- More than one incompatible qualifying group returns `insufficient_evidence`; no first
+  set, rule declaration, Signal enum, timestamp, or strength wins.
 
-Legacy metadata markers such as `recording_active`, `recording_paused`, and `recording_stopped` remain readable only as transitional compatibility when an EvidenceSet has no first-class signals. `EvidenceSignal` is authoritative for core transition meaning.
+Recording block is read first-class from `EvidenceSet.recording_block_id` and otherwise
+from documented `recording_block_id` metadata. Stage and media artifact values are read
+from documented builder metadata (`stage_id`, `media_artifact_id`, or `artifact_id`),
+with a single consistent Signal/Item metadata fallback only when set metadata is absent.
+The optional numeric timeline range is read from documented recording-builder location
+metadata. These metadata paths remain policy-local compatibility dependencies pending
+the later first-class Evidence-context work; they are not a second context model.
 
-ED-0036 adds the Recording Coverage Evidence Builder, which produces compatible recording coverage Evidence and Signals from objective recording Observations. The builder does not call this policy; the policy consumes its output separately.
+## Conflict, Ordering, And Duplicates
 
-## Deferred
+Contradiction applies only when a Signal reference links to a contradictory EvidenceItem.
+Unlinked contradictory items do not block a different Signal contribution. Repeated
+Signal references and repeated Observation references do not create independent support.
+Different EvidenceSet IDs are not content-merged.
 
-The Recording Transition Policy does not mutate state, execute transitions, persist state, implement repositories, dispatch events, create Hypotheses, create Findings, create Verification Decisions, create Operational Products, call AI, use queues or workers, expose APIs, or add frontend behavior.
+When one compatible context contains different lifecycle Signals, the policy uses a
+reliable common ordering source in this order: timeline end/anchor, aware EvidenceSet
+timestamp, then aware source Observation timestamp. Equal or unavailable ordering is
+insufficient. The latest reliably ordered Signal is evaluated only as one transition from
+the supplied current value; the policy does not replay accumulated intermediate state
+changes. If that history would require an unaccepted intermediate transition, the outcome
+is `insufficient_evidence`.
+
+## Current-State Validation
+
+Current state must be `recording_state`, have `current` status, use a `recording_block`,
+`media_artifact`, or `stageflow` subject, and use `inactive`, `active`, `paused`, or
+`stopped`. A recording-block subject must contain a valid block Entity ID consistent with
+the state’s first-class block reference. A known current block, stage, or media artifact
+that conflicts with selected Evidence returns `transition_not_supported`; an unknown
+Evidence context that cannot match a known current target returns `insufficient_evidence`.
+
+## Compatibility And Scope
+
+Legacy `recording_transition_marker` metadata remains readable only when an EvidenceSet
+has no first-class Signals. If Signals exist, metadata cannot override them. Compatibility
+use, selected context, conflicting contexts, linked EvidenceItem and Observation IDs,
+Signals, applied rule ID, duplicate IDs, and current-state validation are exposed through
+the result profile and structured evaluation metadata.
+
+ED-0042 does not implement state acceptance, successor states, supersession, transition
+execution, persistence, repositories, global Evidence-context redesign, scoring,
+confidence, AI, APIs, workers, queues, or frontend behavior.

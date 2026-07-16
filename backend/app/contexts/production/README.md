@@ -301,6 +301,14 @@ ED-0034 also adds the Recording Transition Policy. It evaluates recording covera
 
 ED-0035 refines the Recording Transition Policy so it consumes first-class `EvidenceSignal` values: `recording_continuity_established` and `recording_continuity_restored` propose active, `recording_pause_indicated` proposes paused, and `recording_end_indicated` proposes stopped. Legacy metadata markers remain transitional compatibility only and are not authoritative when signals are present.
 
+ED-0042 closes the recording-policy context-safety finding from ED-0041. Recording
+Evidence is first separated into compatible recording contexts before lifecycle evaluation:
+different known recording blocks or stages never combine, multiple incompatible
+qualifying contexts return `insufficient_evidence`, and conflicting same-context Signals
+require reliable chronology. The policy validates current recording-state kind, subject,
+value, status, and known context compatibility. It remains descriptive only: no state
+acceptance, mutation, supersession, execution, or persistence is introduced.
+
 Transition evaluations do not mutate state, execute transitions, dispatch events, persist state, implement repositories, implement state machines, call AI, create Hypotheses, create Findings, create Verification Decisions, create Operational Products, expose APIs, use queues or workers, or add frontend behavior.
 
 ## Session Transition Policy
