@@ -61,6 +61,9 @@ the predecessor's persisted record authoritative as `superseded`. The accepted c
 state remains immutable and retains its original proposal status; repository status is
 represented by a separate record view.
 
-The taxonomy itself still does not transition or persist state. ED-0046 introduces no
-concrete storage implementation, state machine, execution, API, queue, worker, AI, or
-frontend behavior.
+ED-0047 adds one separate process-local in-memory implementation to prove the repository
+contract. It represents authoritative persisted supersession without mutating taxonomy
+objects and disappears with its repository instance or process.
+
+The taxonomy itself still does not transition or persist state. No production storage,
+state machine, execution, API, queue, worker, AI, or frontend behavior is introduced.

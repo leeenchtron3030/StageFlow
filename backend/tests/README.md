@@ -7,7 +7,7 @@ This directory contains backend tests.
 ## Current Scope
 
 The suite covers the backend foundation and implemented Production Context through
-ED-0046. Coverage includes shared and timeline contracts; Production Events, adapters,
+ED-0047. Coverage includes shared and timeline contracts; Production Events, adapters,
 dispatch, and both interpreter foundations; concrete recording, media, clock, schedule,
 transcript, and vision interpretation; Observation and Evidence semantics; generic and
 concrete Evidence Builders; Operational State and transition contracts; Recording
@@ -39,6 +39,15 @@ deterministic reasons, all-or-none commit shapes, actual persisted supersession,
 duplicate Evaluation/acceptance semantics, stale predecessor and initial-state conflict
 outcomes, and the absence of policy invocation, acceptance invocation, storage,
 execution, APIs, workers, queues, retries, publication, frontend behavior, and AI.
+
+ED-0047 adds the reusable `operational_state_repository_compliance.py` suite plus
+focused in-memory behavior, atomicity, concurrency, and architecture tests. The
+compliance suite is driven only by an `OperationalStateRepository` factory and can be
+reused by a future persistent implementation. Implementation-specific tests prove
+private-lock copy-and-swap behavior, exact snapshot preservation after rejection,
+read-only internal collections, commit-ID injection, repository-instance isolation,
+deployment neutrality, competing initial/successor single-winner behavior, duplicate
+and conflicting replay races, and coherent queries during a controlled commit.
 
 ED-0041 reviews test quality without adding speculative future-behavior tests. Findings
 and targeted missing regression cases are documented under `docs/reviews/`.
