@@ -1,5 +1,6 @@
-"""Operational State Repository contracts; no storage implementation."""
+"""Operational State Repository contracts and one process-local proof implementation."""
 
+from .in_memory_operational_state_repository import InMemoryOperationalStateRepository
 from .operational_state_repository import OperationalStateRepository
 from .operational_state_repository_commit_outcome import (
     OperationalStateRepositoryCommitOutcome,
@@ -32,6 +33,7 @@ from .operational_state_repository_record import (
 
 __all__ = [
     "OPERATIONAL_STATE_REPOSITORY_SUPPORTED_KINDS",
+    "InMemoryOperationalStateRepository",
     "OperationalStateRepository",
     "OperationalStateRepositoryCommitOutcome",
     "OperationalStateRepositoryCommitReason",

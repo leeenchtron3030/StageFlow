@@ -423,9 +423,16 @@ Repository commit time is timezone-aware and remains distinct from Event, Observ
 Evidence, organizational-anchor, Evaluation, state-derived, acceptance, and boundary
 times. Commit stores understanding only: it does not control a recorder or livestream,
 execute a transition, create a Session aggregate or product, verify a boundary, or
-change physical production reality. ED-0046 adds no concrete storage implementation,
-database, SQL, filesystem persistence, Redis, locks, retries, events, APIs, queues,
-workers, frontend behavior, or AI.
+change physical production reality.
+
+ED-0047 adds exactly one `InMemoryOperationalStateRepository` as a process-local
+development and contract-validation repository. One private lock and immutable
+copy-and-swap state snapshots prove atomic initial/successor commits, authoritative
+supersession, idempotency, ordered history, and concurrent single-winner behavior. It is
+disposable, instance-isolated, deployment-neutral, and not production persistence, an
+asset queue, or a Runtime coordinator. No database, SQL, filesystem persistence, Redis,
+network service, retries, events, APIs, queues, workers, frontend behavior, or AI is
+introduced.
 
 ## Hypothesis Primitives
 

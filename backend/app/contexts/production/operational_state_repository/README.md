@@ -1,12 +1,46 @@
 # Operational State Repository
 
 ED-0046 defines the backend-only, infrastructure-neutral persistence boundary for
-StageFlow's accepted Operational State. It stores answers that policy and Operational
+StageFlow's accepted Operational State. ED-0047 proves that contract with exactly one
+`InMemoryOperationalStateRepository`. It stores answers that policy and Operational
 State Acceptance have already justified. It never decides or executes a transition.
 
-The package contains contracts only. There is no in-memory store, database, SQL,
-filesystem persistence, Redis integration, transaction implementation, lock, retry,
-queue, worker, API, event publication, or frontend behavior.
+The implementation is a **development and contract-validation repository** within one
+process. It is not production persistence: all state disappears with the repository
+instance or process. There is no database, SQL, filesystem persistence, Redis, network
+service, retry, queue, worker, API, event publication, or frontend behavior.
+
+## In-memory proof implementation
+
+`InMemoryOperationalStateRepository` owns one immutable internal-state snapshot and one
+private `RLock`. Each commit captures the current snapshot, validates the request in a
+fixed order, builds all replacement records and indexes locally, and performs one
+copy-and-swap state assignment. Queries briefly use the same synchronization boundary,
+so they observe either the complete prior state or the complete committed state.
+
+Rejected commits, stale commits, conflicts, and duplicate replays never replace the
+internal snapshot. Initial and successor commits remain separate. A successful
+successor commit replaces the persisted predecessor record with a new immutable
+`superseded` record, stores one current successor, appends history, records Evaluation
+and acceptance identities, and increments the subject-kind revision together.
+
+Exact Evaluation or acceptance replay returns `already_committed` and references the
+original commit. Reusing either identity with different successor or lineage returns
+`lineage_conflict`; it is not treated as a harmless duplicate. A supplied expected
+revision is optional, per subject-kind, and must match when present.
+
+Commit outcome precedence is deterministic. Validation proceeds through request and
+accepted-result shape; successor status, kind, family, subject, and value; lineage,
+basis, and Evidence-context consistency; Evaluation replay; acceptance replay; state-ID
+reuse; initial-versus-successor and supersession shape; actual current state; and the
+optional revision before any new record, commit ID, or replacement snapshot is
+published. Metadata and mapping iteration order do not select an outcome.
+
+Repository instances are isolated. The implementation has no module-level mutable
+indexes or singleton state and provides synchronization only within one instance and
+process. It is not an asset queue or Runtime coordinator. Agent, Node, and future
+deployment provenance may remain upstream metadata, but deployment profile is never a
+repository key, lifecycle selector, or source of priority.
 
 ## Boundary and supported state
 
@@ -90,6 +124,12 @@ Repository persisted and commit timestamps must be timezone-aware. Event, Observ
 Evidence, organizational anchor, Evaluation, state-derived, acceptance, and repository
 commit times remain distinct. Commit time says only when accepted understanding was
 atomically stored; it is not a media boundary and does not verify a Session boundary.
+The accepted successor retains its Transition Evaluation time as
+`observed_or_derived_at`; the acceptance result's `accepted_at` is stored separately as
+the record's `accepted_at`; and the ED-0046 request's explicit `commit_at` becomes both
+the record's `persisted_at` and the successful result's `committed_at`. The repository
+does not read a clock. An exact replay returns the original result's `committed_at`, not
+the replay request's proposed `commit_at`.
 
 ## Mission boundary
 

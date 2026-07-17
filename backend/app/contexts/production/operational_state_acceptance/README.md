@@ -102,6 +102,12 @@ becomes the sole current record. The caller's predecessor object is never mutate
 Repository commit time remains separate from evaluation time, successor state time,
 acceptance time, organizational anchors, and any future verified boundary.
 
+ED-0047 proves this handoff with one process-local in-memory repository. It consumes the
+result unchanged, performs structural commit validation only, and distinguishes exact
+idempotent replay from conflicting lineage reuse. It never invokes this acceptance
+component. Rejected or stale commit attempts leave the repository unchanged, and the
+implementation is contract-validation infrastructure rather than production storage.
+
 ## Immutability note
 
 Acceptance contracts are frozen, normalize duplicate references, convert collections

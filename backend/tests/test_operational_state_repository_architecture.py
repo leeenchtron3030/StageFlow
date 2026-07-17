@@ -13,11 +13,15 @@ PACKAGE_ROOT = (
 )
 
 
-def _python_sources() -> tuple[tuple[Path, str], ...]:
-    return tuple((path, path.read_text()) for path in sorted(PACKAGE_ROOT.glob("*.py")))
+def _contract_python_sources() -> tuple[tuple[Path, str], ...]:
+    return tuple(
+        (path, path.read_text())
+        for path in sorted(PACKAGE_ROOT.glob("*.py"))
+        if not path.name.startswith("in_memory_")
+    )
 
 
-def test_repository_package_contains_contracts_and_no_storage_implementation() -> None:
+def test_repository_package_retains_all_contract_files_without_persistent_storage() -> None:
     filenames = {path.name for path in PACKAGE_ROOT.iterdir()}
     required = {
         "README.md",
@@ -33,7 +37,6 @@ def test_repository_package_contains_contracts_and_no_storage_implementation() -
         "operational_state_repository_record.py",
     }
     forbidden_fragments = {
-        "in_memory",
         "database",
         "sqlite",
         "sql",
@@ -69,7 +72,7 @@ def test_repository_contract_code_has_no_infrastructure_or_execution_imports() -
     }
     imported: set[str] = set()
 
-    for _, source in _python_sources():
+    for _, source in _contract_python_sources():
         tree = ast.parse(source)
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
@@ -89,7 +92,7 @@ def test_repository_contract_code_has_no_infrastructure_or_execution_imports() -
     )
 
 
-def test_no_concrete_repository_subclass_or_runtime_behavior_is_hidden_in_contracts() -> None:
+def test_no_concrete_repository_subclass_or_runtime_behavior_is_hidden_in_contract_files() -> None:
     concrete_subclasses: list[str] = []
     forbidden_methods = {
         "connect",
@@ -108,7 +111,7 @@ def test_no_concrete_repository_subclass_or_runtime_behavior_is_hidden_in_contra
     }
     methods: set[str] = set()
 
-    for _, source in _python_sources():
+    for _, source in _contract_python_sources():
         tree = ast.parse(source)
         for node in ast.walk(tree):
             if isinstance(node, ast.ClassDef):
@@ -140,7 +143,7 @@ def test_repository_documentation_preserves_atomicity_and_mission_boundaries() -
         "timezone-aware",
         "not a media boundary",
         "does not control physical reality",
-        "There is no in-memory store",
+        "not production persistence",
     ):
         assert phrase.lower() in normalized_readme.lower()
 
@@ -153,4 +156,4 @@ def test_repository_is_registered_as_backend_only_contract_scope() -> None:
     assert "operational_state_repository/" in manifest
     assert "ED-0046" in directives
     assert "Operational State Repository" in production
-    assert "no concrete storage implementation" in production
+    assert "not production persistence" in production
