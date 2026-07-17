@@ -295,7 +295,11 @@ Operational State is perspective-dependent. StageFlow models only state required
 
 Operational State families distinguish directly observable state, evidence-derived state, StageFlow readiness, environmental context, and unknown state. Recording active and transcript flowing can be directly observable. Session active and editorial moment candidate active are evidence-derived. StageFlow readiness describes StageFlow's own ability to observe or reason, not whether speakers, stage managers, lighting, cameras, or production teams are ready. Livestream health, venue network condition, lighting health, camera battery, and audio-console status are environmental context unless they directly affect StageFlow responsibilities.
 
-`OperationalStateBasis` preserves traceability through Observation IDs and EvidenceSet IDs only. ED-0033 does not implement transition graphs, transition thresholds, transition policy, state machines, automatic supersession, repositories, persistence, APIs, queues, workers, AI, frontend behavior, Hypotheses, Findings, Verification Decisions, or Operational Products.
+`OperationalStateBasis` preserves ID-only traceability through Observations and
+EvidenceSets. ED-0044 compatibly adds accepted Transition Evaluation, policy, and rule
+IDs for successor-state lineage. Operational State itself still has no transition,
+repository, persistence, execution, API, queue, worker, AI, frontend, or downstream
+reasoning behavior.
 
 ## Operational State Transition Policies
 
@@ -335,6 +339,32 @@ The policy uses categorical rules, compatible context, first-class Evidence role
 Observation-ID independence. It does not score or rank candidates, treat ED-0039 timing
 as proof, mutate state, create Session identity, execute transitions, persist results, or
 select a final boundary timestamp.
+
+## Operational State Acceptance
+
+ED-0044 adds the first layer allowed to create an immutable successor
+`OperationalState`. It accepts exactly one `TransitionEvaluation`, and only a
+`transition_supported` evaluation is eligible. Eligibility is still not sufficient:
+acceptance validates approved policy and rule identity, the exact evaluated current
+state, state kind and family, proposed lifecycle, explicit subject, known operational
+context, supporting Evidence, Observation lineage, exact Production Event lineage, and
+caller-supplied known acceptance history.
+
+Initial scope is deliberately narrow. Recording state uses the directly observable
+family and the inactive/active/paused/stopped acceptance graph. Session state uses the
+Evidence-derived family and the inactive/active/ending/ended graph. Other state kinds
+are rejected until their own policies and static acceptance mappings exist.
+
+An accepted result creates one new current successor record. A predecessor remains
+unchanged; intended supersession is described but not persisted. The successor state
+time comes from the evaluation, acceptance time is separate, and organizational
+boundary anchors remain unverified context. Duplicate detection is idempotent only
+relative to caller-supplied history.
+
+Acceptance does not invoke policies, reinterpret Evidence, persist state, query a
+repository, execute transitions, publish events, create Session aggregates, verify
+boundaries, or introduce APIs, queues, workers, frontend behavior, or AI. These
+invariants close ED0041-F003 while leaving persistence and execution deferred.
 
 ## Hypothesis Primitives
 

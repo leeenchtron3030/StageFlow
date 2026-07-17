@@ -18,10 +18,19 @@ class OperationalStateBasis:
 
     observation_ids: Sequence[EntityId] = field(default_factory=tuple)
     evidence_set_ids: Sequence[EntityId] = field(default_factory=tuple)
+    transition_evaluation_ids: Sequence[EntityId] = field(default_factory=tuple)
+    policy_ids: Sequence[EntityId] = field(default_factory=tuple)
+    transition_rule_ids: Sequence[EntityId] = field(default_factory=tuple)
     rationale: str | None = None
     metadata: Mapping[str, Any] = field(default_factory=_empty_metadata)
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "observation_ids", tuple(self.observation_ids))
-        object.__setattr__(self, "evidence_set_ids", tuple(self.evidence_set_ids))
+        for name in (
+            "observation_ids",
+            "evidence_set_ids",
+            "transition_evaluation_ids",
+            "policy_ids",
+            "transition_rule_ids",
+        ):
+            object.__setattr__(self, name, tuple(dict.fromkeys(getattr(self, name))))
         object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))

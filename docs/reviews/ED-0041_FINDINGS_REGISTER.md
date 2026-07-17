@@ -44,14 +44,14 @@
 - **Title:** Transition and state contracts lack acceptance-grade invariants and lineage
 - **Category:** contract_design
 - **Severity:** high
-- **Status:** open
+- **Status:** closed by ED-0044
 - **Affected files:** `transition_policy/transition_evaluation.py`; `transition_policy/transition_reason.py`; `operational_state/operational_state.py`; `operational_state/operational_state_basis.py`; Session transition result/summary; generic transition tests
 - **Observed evidence:** `TransitionEvaluation.__post_init__()` only tuple-normalizes IDs and wraps metadata. It does not validate current state kind, outcome/proposed-state compatibility, or supporting versus blocking shape. The generic test suite constructs a `transition_supported` evaluation containing both supporting and blocking IDs. Policy ID is metadata; applied rule and requirement IDs are Session-wrapper fields plus duplicated metadata; recording evaluations expose no selected rule ID. `OperationalStateBasis` has Observation and EvidenceSet IDs but no Transition Evaluation ID or prior state ID.
 - **Architectural or operational impact:** A generic acceptance layer cannot safely trust the evaluation shape or preserve the full acceptance lineage using first-class contracts. Metadata conventions could silently become authoritative.
 - **Recommended response:** Make evaluation validation, policy/rule lineage, predecessor state identity, accepted evaluation identity, and a distinct acceptance timestamp the first ED-0042 work. Reject unsupported/unknown/internally contradictory evaluations before creating a successor state.
 - **Risk of changing it:** Medium-high. Tightened validation may reject manually constructed fixtures or legacy evaluations. Introduce factories/migration paths rather than silently changing serialized meaning.
 - **Suggested directive:** Operational State Acceptance, constrained by Transition Evaluation Validation
-- **Disposition:** `address_during_ED_0042`
+- **Disposition:** `closed_by_ED_0044`
 
 ## ED0041-F004
 

@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from math import isfinite
 from types import MappingProxyType
 from typing import Any, cast
+from uuid import NAMESPACE_URL, uuid5
 
 from app.contexts.production.evidence import (
     EvidenceConcern,
@@ -57,10 +58,18 @@ def _empty_metadata() -> Mapping[str, Any]:
     return {}
 
 
+def recording_transition_rule_id(signal: EvidenceSignal) -> EntityId:
+    """Return the stable identity for one recording transition Signal rule."""
+
+    return EntityId.parse(
+        str(uuid5(NAMESPACE_URL, f"stageflow:recording-transition:rule:{signal.value}"))
+    )
+
+
 def default_recording_transition_rules() -> tuple[RecordingTransitionRule, ...]:
     return tuple(
         RecordingTransitionRule(
-            id=EntityId.new(),
+            id=recording_transition_rule_id(mapping.evidence_signal),
             evidence_signal=mapping.evidence_signal,
             proposed_state=mapping.proposed_state,
             legacy_evidence_marker=mapping.legacy_evidence_marker,
@@ -1035,6 +1044,7 @@ class RecordingTransitionPolicy:
                 "correlation_used_as_recording_identity": False,
                 "state_mutated": False,
                 "evaluation_persisted": False,
+                **self._lineage_metadata(all_contributions),
             },
         )
         supporting_ids = tuple(
@@ -1065,6 +1075,7 @@ class RecordingTransitionPolicy:
             evaluated_at=evaluated_at,
             metadata={
                 "policy_id": self.id.to_json(),
+                "policy_kind": "recording_transition_policy",
                 "current_state_id": current_state.id.to_json() if current_state else None,
                 "current_state_kind": current_state.kind.value if current_state else None,
                 "current_state_subject_type": (
@@ -1101,6 +1112,22 @@ class RecordingTransitionPolicy:
                 "contributing_observation_ids": tuple(
                     item.to_json() for item in profile.contributing_observation_ids
                 ),
+                "source_production_event_ids": profile.metadata.get(
+                    "source_production_event_ids",
+                    (),
+                ),
+                "source_production_event_types": profile.metadata.get(
+                    "source_production_event_types",
+                    (),
+                ),
+                "source_interpreter_ids": profile.metadata.get(
+                    "source_interpreter_ids",
+                    (),
+                ),
+                "source_interpretation_rule_ids": profile.metadata.get(
+                    "source_interpretation_rule_ids",
+                    (),
+                ),
                 "selected_context": self._context_metadata(selected_context),
                 "conflicting_contexts": tuple(
                     self._context_metadata(context) for context in conflicting_contexts
@@ -1124,6 +1151,31 @@ class RecordingTransitionPolicy:
                 "evaluation_persisted": False,
             },
         )
+
+    def _lineage_metadata(
+        self,
+        contributions: tuple[_SignalContribution, ...],
+    ) -> Mapping[str, Any]:
+        singular_to_plural = {
+            "source_production_event_id": "source_production_event_ids",
+            "source_production_event_type": "source_production_event_types",
+            "observation_interpreter_id": "source_interpreter_ids",
+            "interpretation_rule_id": "source_interpretation_rule_ids",
+        }
+        output: dict[str, tuple[str, ...]] = {}
+        for singular, plural in singular_to_plural.items():
+            values: list[str] = []
+            for contribution in contributions:
+                item_value = contribution.evidence_item.metadata.get(singular)
+                if isinstance(item_value, str) and item_value and item_value not in values:
+                    values.append(item_value)
+                set_values = contribution.evidence_set.metadata.get(plural, ())
+                if isinstance(set_values, Sequence) and not isinstance(set_values, str):
+                    for value in cast(Sequence[object], set_values):
+                        if isinstance(value, str) and value and value not in values:
+                            values.append(value)
+            output[plural] = tuple(values)
+        return output
 
     def _rule_and_mapping(
         self,

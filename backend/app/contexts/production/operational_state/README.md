@@ -25,20 +25,37 @@ Environmental context remains separate from core StageFlow state. Livestream hea
 
 ## Traceability
 
-`OperationalStateBasis` references Observation IDs and EvidenceSet IDs only.
+`OperationalStateBasis` references Observation IDs, EvidenceSet IDs, accepted
+Transition Evaluation IDs, policy IDs, and transition rule IDs only. ED-0044 adds the
+evaluation, policy, and rule references compatibly; existing construction remains
+valid because the new collections default to empty.
 
-It does not embed Observations or EvidenceSets.
+It does not embed Observations, EvidenceSets, evaluations, policies, or rules.
 
-The current traceability chain is:
+The acceptance-grade traceability chain is:
 
 Operational State
 ↓
-Observation ID or EvidenceSet ID
+Transition Evaluation, policy, rule, Observation, or EvidenceSet ID
 ↓
-Observation or Evidence metadata
+Acceptance lineage and Observation or Evidence traceability
 ↓
 Production Event ID
 
-## Deferred
+## Acceptance boundary
 
-ED-0033 does not define transition graphs, transition thresholds, transition policy, state machines, automatic supersession, repositories, persistence, APIs, queues, workers, AI, or frontend behavior.
+ED-0044 permits the separate Operational State Acceptance layer to create one immutable
+successor record after independently validating one supported evaluation. Recording
+state is mapped to directly observable state; Session state is mapped to
+Evidence-derived state. The predecessor is not mutated. Intended supersession is
+described in a separate immutable contract rather than applied.
+
+The successor state timestamp is the evaluation timestamp. Acceptance time and
+organizational boundary anchors remain separate and no boundary is thereby verified.
+
+## Still deferred
+
+The taxonomy itself does not transition state. ED-0044 adds only static Recording and
+Session acceptance graphs outside this package. Automatic supersession, repositories,
+persistence, execution, state machines, APIs, queues, workers, AI, and frontend
+behavior remain deferred.
