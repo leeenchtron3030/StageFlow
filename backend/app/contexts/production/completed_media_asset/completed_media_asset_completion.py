@@ -11,6 +11,7 @@ from app.shared.ids import EntityId
 from .completed_media_asset_validation import (
     freeze_metadata,
     normalize_entity_ids,
+    normalize_strings,
     require_aware,
 )
 
@@ -41,6 +42,7 @@ class CompletedMediaAssetCompletion:
     declaring_runtime_or_adapter_id: EntityId
     source_reference_ids: Sequence[EntityId] = field(default_factory=tuple)
     completion_marker_reference_id: EntityId | None = None
+    limitations: Sequence[str] = field(default_factory=tuple)
     metadata: Mapping[str, Any] = field(default_factory=_empty_metadata)
 
     def __post_init__(self) -> None:
@@ -54,6 +56,14 @@ class CompletedMediaAssetCompletion:
             normalize_entity_ids(
                 self.source_reference_ids,
                 "CompletedMediaAssetCompletion.source_reference_ids",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "limitations",
+            normalize_strings(
+                self.limitations,
+                "CompletedMediaAssetCompletion.limitations",
             ),
         )
         object.__setattr__(

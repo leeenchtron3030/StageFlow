@@ -462,9 +462,37 @@ always take priority over StageFlow.
 ED-0048 stops at the contract. It adds no Runtime package, Agent or Node implementation,
 directory watching, polling, stability or readiness detection, checksum calculation,
 container probing, transfer, ingest, queue, Production Event, Observation, Evidence,
-Operational State, repository storage, AI, API, worker, or frontend behavior. ED-0049
-should define Asset Stability and Readiness Detection while still stopping before
-transfer and queueing.
+Operational State, repository storage, AI, API, worker, or frontend behavior.
+
+## Asset Stability and Readiness Detection
+
+ED-0049 defines deterministic evaluation of supplied objective resource facts. A
+`MediaAssetCandidate` is a known resource that may later qualify; it is not a completed
+asset. Immutable snapshot, finalization, write-state, read-access, and presence facts
+are normalized into one bundle and evaluated by one conservative policy using explicit
+parameters and caller-supplied time.
+
+Strong finalization and stability-derived completion remain distinct. Supported
+recorder finalization, closed-segment, atomic-rename, and sidecar signals require
+post-finalization consistency and no later contradiction. Stability-derived completion
+requires a qualifying interval plus continued presence, non-destructive read
+confirmation, inactive write state under conservative parameters, stable identity, and
+no later change. Size stability or a suggestive filename alone never establishes
+completion. Manual declaration cannot override active writing, growth, absence,
+replacement, unreadability, or identity conflict.
+
+Outcomes and reasons are categorical, deterministic, and ID-oriented. A safe evaluation
+creates compatible ED-0048 completion and readiness declarations without assembling a
+full asset. Candidate, observation, finalization, filesystem, stability, evaluation,
+and readiness times remain distinct. Limitations remain first-class. Agent, Node, and
+external-compatible profiles use identical policy semantics.
+
+ED-0049 evaluates facts; it does not collect them. It adds no watcher, polling, sleep,
+file or recorder access, media probing, checksum execution, transfer, queue, Runtime,
+Agent, Node, Production Event, semantic Observation, Evidence, Operational State,
+repository storage, Session inference, AI, API, worker, or frontend behavior. The next
+Runtime contract may define deployment-neutral collection capabilities without
+implementing a running service.
 
 ## Hypothesis Primitives
 
