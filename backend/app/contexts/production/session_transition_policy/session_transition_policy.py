@@ -883,6 +883,7 @@ class SessionTransitionPolicy:
         )
         evaluation_metadata: dict[str, Any] = {
             "policy_id": self.id.to_json(),
+            "policy_kind": "session_transition_policy",
             "current_state_id": current_state.id.to_json() if current_state else None,
             "current_state_value": current_state.value.value if current_state else None,
             "effective_current_state_value": (

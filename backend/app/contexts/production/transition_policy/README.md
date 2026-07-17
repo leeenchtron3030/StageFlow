@@ -53,3 +53,21 @@ Session-specific result containing its Evidence profile and requirement diagnost
 Session evaluation does not mutate Operational State, execute a transition, create a
 Session aggregate, choose a final boundary timestamp, persist anything, or create
 downstream reasoning or Operational Products.
+
+## Operational State Acceptance
+
+ED-0044 adds a separate acceptance layer after policy evaluation. A
+`transition_supported` outcome is necessary but not sufficient for state creation.
+Acceptance independently validates the evaluation identity, approved policy kind and
+policy ID, applied rule ID, current state, proposed lifecycle, subject, known context,
+supporting Evidence, Observation lineage, exact source Production Event lineage, and
+caller-supplied acceptance history.
+
+The concrete Recording and Session policies expose stable policy/rule identity and
+post-ED-0043 lineage for this handoff. The generic `TransitionEvaluation` contract is
+not destructively redesigned; policy-specific result profiles populate a separate
+ID-only acceptance-lineage contract.
+
+Policy still does not create or mutate state. Acceptance never invokes a policy or
+re-evaluates whether Evidence was persuasive. It may create one immutable successor
+record, but it neither persists the successor nor executes a transition.

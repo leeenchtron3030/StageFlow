@@ -362,6 +362,10 @@ def test_no_state_transition_or_downstream_behavior_exists() -> None:
         )
         for field in fields(contract)
     }
+    contract_fields -= {
+        "transition_evaluation_ids",
+        "transition_rule_ids",
+    }
     method_names = {
         name
         for name, value in getmembers(OperationalState)
