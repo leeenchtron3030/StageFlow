@@ -17,7 +17,8 @@ successor-state context propagation; and Operational State Repository contracts.
 ED-0048 adds the canonical Completed Media Asset contract boundary. ED-0049 adds
 deterministic candidate stability and safe-to-read readiness evaluation. ED-0050 adds
 the deployment-neutral declarative StageFlow Runtime and combination validation.
-ED-0051 adds the first explicit in-process Software Agent Runtime lifecycle.
+ED-0051 adds the first explicit in-process Software Agent Runtime lifecycle. ED-0052
+adds explicit bounded media-candidate discovery and objective observation orchestration.
 
 Tests remain under `backend/tests/` rather than inside application packages. The suite
 emphasizes contract validation, negative architectural boundaries, deterministic
@@ -98,6 +99,18 @@ out-of-lock slow-sink and reentrant-read behavior, instance isolation,
 borrowed-hardware safety, and the absence of media, filesystem,
 recorder, readiness, asset, transfer, queue, persistence, network, downstream state,
 service, AI, API, worker, or frontend behavior.
+
+ED-0052 adds `media_collection_fixtures.py` plus focused contract/cycle,
+permission/replay/concurrency, deduplication/budget/failure, and
+validation/architecture suites. Coverage includes inert construction, ED-0050
+configuration authority, ED-0051 permission checkpoints, required-before-optional
+ordering, reduced deferral, interruption, explicit budgets, port exception isolation,
+candidate/proposed-asset/resource/observation conflicts, cross-cycle ED-0049 bundle
+accumulation, immutable typed queries and history, stale and replay behavior,
+single-active-cycle and out-of-lock slow-port behavior, deployment placement, borrowed
+hardware safety, and the absence of filesystem/recorder adapters, readiness execution,
+asset assembly, transfer, queues, persistence, networking, services, downstream
+semantic/state creation, AI, APIs, workers, or frontend behavior.
 
 ED-0041 reviews test quality without adding speculative future-behavior tests. Findings
 and targeted missing regression cases are documented under `docs/reviews/`.
