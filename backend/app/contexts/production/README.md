@@ -434,6 +434,38 @@ asset queue, or a Runtime coordinator. No database, SQL, filesystem persistence,
 network service, retries, events, APIs, queues, workers, frontend behavior, or AI is
 introduced.
 
+## Completed Media Asset
+
+ED-0048 begins the AR-4.0 Runtime foundation with one canonical immutable
+`CompletedMediaAsset`: a finalized logical media asset or segment that an upstream
+readiness process has categorically declared safe for StageFlow to read. A finalized
+60-second segment qualifies independently; the full recording and entire Session do not
+need to be complete. Open, unstable, unknown-readiness, or actively written files do not
+qualify.
+
+Asset, manifest, primary-resource, declaration, Runtime, and provenance identities are
+first-class and ID-oriented. The contract retains recorder and deployment provenance,
+explicit stage/recording-block/scheduled-activity context, optional recording-group and
+segment relationships, technical facts, integrity declarations, original filename,
+descriptive source location, size, and distinct timezone-aware recording, filesystem,
+finalization, readiness, integrity, and manifest times. Filenames never establish
+authoritative Stage, block, segment, asset, or Session identity. Scheduled activity is
+context, not Session identity.
+
+Completion, readiness, integrity, and technical description remain separate. Agent,
+Node, external-compatible, and future Runtime profiles share the same asset contract and
+validation; deployment profile changes provenance, never meaning, trust, priority, or
+downstream eligibility. Recording creation and control remain the responsibility of the
+production recording application, and production recording and livestream workloads
+always take priority over StageFlow.
+
+ED-0048 stops at the contract. It adds no Runtime package, Agent or Node implementation,
+directory watching, polling, stability or readiness detection, checksum calculation,
+container probing, transfer, ingest, queue, Production Event, Observation, Evidence,
+Operational State, repository storage, AI, API, worker, or frontend behavior. ED-0049
+should define Asset Stability and Readiness Detection while still stopping before
+transfer and queueing.
+
 ## Hypothesis Primitives
 
 ED-0008 adds foundational production hypothesis contracts only.
