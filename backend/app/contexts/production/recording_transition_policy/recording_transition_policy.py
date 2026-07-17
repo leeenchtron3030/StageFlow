@@ -3,18 +3,19 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from math import isfinite
 from types import MappingProxyType
 from typing import Any, cast
 from uuid import NAMESPACE_URL, uuid5
 
 from app.contexts.production.evidence import (
     EvidenceConcern,
+    EvidenceContextResolver,
     EvidenceItem,
     EvidenceRole,
     EvidenceSet,
     EvidenceSignal,
     EvidenceSignalReference,
+    resolve_evidence_set_context,
 )
 from app.contexts.production.operational_state import (
     OperationalState,
@@ -115,11 +116,7 @@ class _ContextGroup:
 
     @property
     def contributions(self) -> tuple[_SignalContribution, ...]:
-        return tuple(
-            contribution
-            for entry in self.entries
-            for contribution in entry.contributions
-        )
+        return tuple(contribution for entry in self.entries for contribution in entry.contributions)
 
     @property
     def has_recording_identity(self) -> bool:
@@ -291,8 +288,7 @@ class RecordingTransitionPolicy:
                 proposed_state=None,
                 outcome=TransitionPolicyResult.TRANSITION_NOT_SUPPORTED,
                 rationale=(
-                    "Compatible recording Evidence explicitly contradicts the requested "
-                    "transition."
+                    "Compatible recording Evidence explicitly contradicts the requested transition."
                 ),
                 selected_group=group,
                 conflicting_groups=(),
@@ -559,9 +555,7 @@ class RecordingTransitionPolicy:
             if isinstance(marker, str):
                 mapping = mapping_for_recording_marker(marker)
                 rule = (
-                    self._rule_for_signal(mapping.evidence_signal)
-                    if mapping is not None
-                    else None
+                    self._rule_for_signal(mapping.evidence_signal) if mapping is not None else None
                 )
                 if mapping is not None and rule is not None and len(evidence_set.items) == 1:
                     contributions.append(
@@ -608,8 +602,7 @@ class RecordingTransitionPolicy:
                 group
                 for group in known_groups
                 if all(
-                    self._contexts_compatible(entry.context, existing.context)
-                    for existing in group
+                    self._contexts_compatible(entry.context, existing.context) for existing in group
                 )
             )
             if len(matching_groups) == 1:
@@ -624,10 +617,7 @@ class RecordingTransitionPolicy:
         return tuple(
             sorted(
                 groups,
-                key=lambda group: tuple(
-                    context.compatibility_key()
-                    for context in group.contexts
-                ),
+                key=lambda group: tuple(context.compatibility_key() for context in group.contexts),
             )
         )
 
@@ -708,8 +698,7 @@ class RecordingTransitionPolicy:
             if len(latest) != len(by_signal) or len(set(latest.values())) != len(latest):
                 continue
             return tuple(
-                signal
-                for signal, _value in sorted(latest.items(), key=lambda pair: pair[1])
+                signal for signal, _value in sorted(latest.items(), key=lambda pair: pair[1])
             )
         return None
 
@@ -846,97 +835,36 @@ class RecordingTransitionPolicy:
         return None
 
     def _extract_context(self, evidence_set: EvidenceSet) -> RecordingTransitionContext:
-        metadata = evidence_set.metadata
+        resolution = resolve_evidence_set_context(evidence_set)
+        context = resolution.context
+        artifact_id = (
+            context.media_artifact_ids[0] if len(context.media_artifact_ids) == 1 else None
+        )
+        correlation_id = context.correlation_ids[0] if len(context.correlation_ids) == 1 else None
         return RecordingTransitionContext(
-            recording_block_id=evidence_set.recording_block_id
-            or self._metadata_entity(metadata, "recording_block_id"),
-            stage_id=self._context_entity(evidence_set, "stage_id"),
-            correlation_id=evidence_set.correlation_id,
-            media_artifact_id=self._context_text(
-                evidence_set,
-                ("media_artifact_id", "artifact_id"),
-            ),
+            recording_block_id=context.recording_block_id,
+            stage_id=context.stage_id,
+            correlation_id=correlation_id,
+            media_artifact_id=artifact_id,
             source_evidence_set_id=evidence_set.id,
-            timeline_range_seconds=self._context_timeline_range(evidence_set),
-            organizational_at=evidence_set.created_at,
+            timeline_range_seconds=context.timeline_range_seconds,
+            organizational_at=context.organizational_anchor or evidence_set.created_at,
             metadata={
-                "recording_block_source": (
-                    "first_class" if evidence_set.recording_block_id is not None else "metadata"
+                "context_sources": tuple(
+                    sorted((name, source.value) for name, source in resolution.sources.items())
                 ),
-                "stage_source": "metadata",
-                "correlation_source": "first_class_traceability_only",
-                "media_artifact_source": "metadata",
-                "timeline_source": "metadata",
+                "context_conflict_fields": tuple(
+                    conflict.field_name for conflict in resolution.conflicts
+                ),
+                "correlation_used_as_recording_identity": False,
+                "media_artifact_count": len(context.media_artifact_ids),
             },
         )
-
-    def _context_entity(self, evidence_set: EvidenceSet, key: str) -> EntityId | None:
-        direct = self._metadata_entity(evidence_set.metadata, key)
-        if direct is not None:
-            return direct
-        values = {
-            value
-            for source in (*evidence_set.signals, *evidence_set.items)
-            if (value := self._metadata_entity(source.metadata, key)) is not None
-        }
-        return next(iter(values)) if len(values) == 1 else None
-
-    def _context_text(
-        self,
-        evidence_set: EvidenceSet,
-        keys: tuple[str, ...],
-    ) -> str | None:
-        for key in keys:
-            value = evidence_set.metadata.get(key)
-            if isinstance(value, str) and value.strip():
-                return value
-        values = {
-            value
-            for source in (*evidence_set.signals, *evidence_set.items)
-            for key in keys
-            if isinstance(value := source.metadata.get(key), str) and value.strip()
-        }
-        return next(iter(values)) if len(values) == 1 else None
-
-    def _context_timeline_range(
-        self,
-        evidence_set: EvidenceSet,
-    ) -> tuple[float, float] | None:
-        sources = (evidence_set.metadata,) + tuple(
-            item.metadata for item in evidence_set.items
-        )
-        for source in sources:
-            location = source.get("observation_location")
-            start = self._number(
-                source.get(
-                    "timeline_range_start_seconds",
-                    self._mapping_value(location, "timeline_range_start_seconds"),
-                )
-            )
-            end = self._number(
-                source.get(
-                    "timeline_range_end_seconds",
-                    self._mapping_value(location, "timeline_range_end_seconds"),
-                )
-            )
-            point = self._number(
-                source.get(
-                    "timeline_offset_seconds",
-                    self._mapping_value(location, "timeline_offset_seconds"),
-                )
-            )
-            if start is not None and end is not None and end >= start:
-                return (start, end)
-            if point is not None:
-                return (point, point)
-        return None
 
     def _combined_context(self, group: _ContextGroup) -> RecordingTransitionContext:
         contexts = group.contexts
         block_ids = {
-            context.recording_block_id
-            for context in contexts
-            if context.recording_block_id
+            context.recording_block_id for context in contexts if context.recording_block_id
         }
         stage_ids = {context.stage_id for context in contexts if context.stage_id}
         artifact_ids = {
@@ -950,12 +878,8 @@ class RecordingTransitionPolicy:
         return RecordingTransitionContext(
             recording_block_id=next(iter(block_ids)) if len(block_ids) == 1 else None,
             stage_id=next(iter(stage_ids)) if len(stage_ids) == 1 else None,
-            correlation_id=(
-                next(iter(correlation_ids)) if len(correlation_ids) == 1 else None
-            ),
-            media_artifact_id=(
-                next(iter(artifact_ids)) if len(artifact_ids) == 1 else None
-            ),
+            correlation_id=(next(iter(correlation_ids)) if len(correlation_ids) == 1 else None),
+            media_artifact_id=(next(iter(artifact_ids)) if len(artifact_ids) == 1 else None),
             metadata={
                 "source_evidence_set_ids": tuple(
                     entry.evidence_set.id.to_json() for entry in group.entries
@@ -987,14 +911,21 @@ class RecordingTransitionPolicy:
         selected_context = (
             self._combined_context(selected_group) if selected_group is not None else None
         )
-        conflicting_contexts = tuple(
-            self._combined_context(group) for group in conflicting_groups
+        evaluation_context_resolution = EvidenceContextResolver().compose(
+            tuple(
+                resolve_evidence_set_context(entry.evidence_set)
+                for entry in (selected_group.entries if selected_group is not None else ())
+            ),
+            source_context_ids=tuple(
+                entry.evidence_set.id
+                for entry in (selected_group.entries if selected_group is not None else ())
+            ),
         )
+        conflicting_contexts = tuple(self._combined_context(group) for group in conflicting_groups)
         all_contributions = tuple(
             contribution
             for group in (
-                ((selected_group,) if selected_group is not None else ())
-                + conflicting_groups
+                ((selected_group,) if selected_group is not None else ()) + conflicting_groups
             )
             for contribution in group.contributions
         )
@@ -1007,9 +938,7 @@ class RecordingTransitionPolicy:
         )
         conflicting_ids = tuple(
             dict.fromkeys(
-                entry.evidence_set.id
-                for group in conflicting_groups
-                for entry in group.entries
+                entry.evidence_set.id for group in conflicting_groups for entry in group.entries
             )
         )
         profile = RecordingTransitionEvidenceProfile(
@@ -1019,14 +948,11 @@ class RecordingTransitionPolicy:
             unsupported_evidence_set_ids=unsupported_ids,
             duplicate_evidence_set_ids=duplicate_ids,
             contributing_evidence_item_ids=tuple(
-                dict.fromkeys(
-                    contribution.evidence_item.id for contribution in all_contributions
-                )
+                dict.fromkeys(contribution.evidence_item.id for contribution in all_contributions)
             ),
             contributing_observation_ids=tuple(
                 dict.fromkeys(
-                    contribution.evidence_item.observation_id
-                    for contribution in all_contributions
+                    contribution.evidence_item.observation_id for contribution in all_contributions
                 )
             ),
             contributing_signals=tuple(
@@ -1048,14 +974,10 @@ class RecordingTransitionPolicy:
             },
         )
         supporting_ids = tuple(
-            dict.fromkeys(
-                contribution.evidence_set.id for contribution in selected_contributions
-            )
+            dict.fromkeys(contribution.evidence_set.id for contribution in selected_contributions)
         )
         blocking_ids = tuple(
-            dict.fromkeys(
-                contribution.evidence_set.id for contribution in blocking_contributions
-            )
+            dict.fromkeys(contribution.evidence_set.id for contribution in blocking_contributions)
         )
         evaluation = TransitionEvaluation(
             id=EntityId.new(),
@@ -1073,6 +995,8 @@ class RecordingTransitionPolicy:
                 },
             ),
             evaluated_at=evaluated_at,
+            context=evaluation_context_resolution.context,
+            context_conflicts=evaluation_context_resolution.conflicts,
             metadata={
                 "policy_id": self.id.to_json(),
                 "policy_kind": "recording_transition_policy",
@@ -1100,9 +1024,7 @@ class RecordingTransitionPolicy:
                 "ignored_evidence_ids": tuple(item.to_json() for item in ignored_ids),
                 "unsupported_evidence_ids": tuple(item.to_json() for item in unsupported_ids),
                 "duplicate_evidence_ids": tuple(item.to_json() for item in duplicate_ids),
-                "conflicting_evidence_ids": tuple(
-                    item.to_json() for item in conflicting_ids
-                ),
+                "conflicting_evidence_ids": tuple(item.to_json() for item in conflicting_ids),
                 "examined_signal_values": tuple(
                     signal.value for signal in profile.contributing_signals
                 ),
@@ -1132,9 +1054,7 @@ class RecordingTransitionPolicy:
                 "conflicting_contexts": tuple(
                     self._context_metadata(context) for context in conflicting_contexts
                 ),
-                "ordered_lifecycle_signals": tuple(
-                    signal.value for signal in ordered_signals
-                ),
+                "ordered_lifecycle_signals": tuple(signal.value for signal in ordered_signals),
                 "applied_rule_id": applied_rule.id.to_json() if applied_rule else None,
                 "legacy_marker_used": profile.metadata["legacy_marker_used"],
                 "transition_executed": False,
@@ -1203,9 +1123,7 @@ class RecordingTransitionPolicy:
         input_index: int,
     ) -> tuple[int, float, int, float, str, int]:
         timeline_end = (
-            context.timeline_range_seconds[1]
-            if context.timeline_range_seconds is not None
-            else 0.0
+            context.timeline_range_seconds[1] if context.timeline_range_seconds is not None else 0.0
         )
         evidence_timestamp = self._aware_timestamp(evidence_set.created_at)
         return (
@@ -1224,10 +1142,7 @@ class RecordingTransitionPolicy:
         by_key: dict[tuple[str, str, str], _SignalContribution] = {}
         for contribution in contributions:
             by_key.setdefault(contribution.key, contribution)
-        return tuple(
-            by_key[key]
-            for key in sorted(by_key)
-        )
+        return tuple(by_key[key] for key in sorted(by_key))
 
     def _contribution_identity_key(
         self,
@@ -1235,31 +1150,11 @@ class RecordingTransitionPolicy:
     ) -> tuple[str, str, str]:
         return contribution.key
 
-    def _metadata_entity(self, metadata: Mapping[str, Any], key: str) -> EntityId | None:
-        value = metadata.get(key)
-        if isinstance(value, EntityId):
-            return value
-        if isinstance(value, str):
-            return self._entity_id(value)
-        return None
-
     def _entity_id(self, value: str) -> EntityId | None:
         try:
             return EntityId.parse(value)
         except ValueError:
             return None
-
-    def _number(self, value: object) -> float | None:
-        if not isinstance(value, int | float) or isinstance(value, bool):
-            return None
-        number = float(value)
-        return number if isfinite(number) else None
-
-    def _mapping_value(self, value: object, key: str) -> object | None:
-        if not isinstance(value, Mapping):
-            return None
-        mapping = cast(Mapping[object, object], value)
-        return mapping.get(key)
 
     def _metadata_timestamp(self, value: object) -> float | None:
         if not isinstance(value, str):
@@ -1289,9 +1184,7 @@ class RecordingTransitionPolicy:
             ),
             "stage_id": context.stage_id.to_json() if context.stage_id is not None else None,
             "correlation_id": (
-                context.correlation_id.to_json()
-                if context.correlation_id is not None
-                else None
+                context.correlation_id.to_json() if context.correlation_id is not None else None
             ),
             "media_artifact_id": context.media_artifact_id,
             "source_evidence_set_id": (

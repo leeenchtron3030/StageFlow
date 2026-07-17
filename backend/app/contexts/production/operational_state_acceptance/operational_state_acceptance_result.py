@@ -45,21 +45,13 @@ class OperationalStateAcceptanceResult:
             if self.accepted_evaluation_id != self.lineage.evaluation_id:
                 raise ValueError("Accepted result Evaluation ID must match lineage.")
             if self.successor_state is None or self.applied_acceptance_rule_id is None:
-                raise ValueError(
-                    "Accepted result requires successor state and acceptance rule."
-                )
+                raise ValueError("Accepted result requires successor state and acceptance rule.")
             if self.current_state_id is not None and self.supersession is None:
-                raise ValueError(
-                    "Accepted result with a predecessor requires supersession."
-                )
+                raise ValueError("Accepted result with a predecessor requires supersession.")
             if self.current_state_id is None and self.supersession is not None:
-                raise ValueError(
-                    "Initial accepted result must not contain supersession."
-                )
+                raise ValueError("Initial accepted result must not contain supersession.")
         elif self.successor_state is not None or self.supersession is not None:
-            raise ValueError(
-                "Non-accepted result must not contain successor or supersession."
-            )
+            raise ValueError("Non-accepted result must not contain successor or supersession.")
 
         object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
 

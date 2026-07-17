@@ -7,6 +7,10 @@ from types import MappingProxyType
 from typing import Any
 
 from app.contexts.production.evidence.evidence_concern import EvidenceConcern
+from app.contexts.production.evidence.evidence_context import EvidenceContext
+from app.contexts.production.evidence.evidence_context_resolution import (
+    EvidenceContextResolution,
+)
 from app.contexts.production.evidence.evidence_item import EvidenceItem
 from app.contexts.production.evidence.evidence_purpose import EvidencePurpose
 from app.contexts.production.evidence.evidence_signal_reference import (
@@ -33,6 +37,8 @@ class EvidenceSet:
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     notes: str | None = None
     metadata: Mapping[str, Any] = field(default_factory=_empty_metadata)
+    context: EvidenceContext = field(default_factory=EvidenceContext.unknown)
+    context_resolution: EvidenceContextResolution | None = None
 
     def __post_init__(self) -> None:
         if len(self.items) == 0:

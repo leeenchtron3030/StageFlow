@@ -9,11 +9,13 @@ from typing import Any, cast
 
 from app.contexts.production.evidence import (
     EvidenceConcern,
+    EvidenceContextResolver,
     EvidenceItem,
     EvidencePurpose,
     EvidenceSet,
     EvidenceSignal,
     EvidenceSignalReference,
+    resolve_observation_evidence_context,
 )
 from app.contexts.production.evidence_builder import (
     EvidenceBuilderContextKey,
@@ -159,9 +161,7 @@ class TranscriptContinuityEvidenceBuilder:
         deduplication = deduplicate_observations(observation_tuple)
         ignored_ids: list[EntityId] = []
         unsupported_ids: list[EntityId] = []
-        selections: list[ObservationSemanticSelection] = list(
-            deduplication.duplicate_selections
-        )
+        selections: list[ObservationSemanticSelection] = list(deduplication.duplicate_selections)
         recognized: list[
             tuple[
                 Observation,
@@ -176,10 +176,7 @@ class TranscriptContinuityEvidenceBuilder:
                 supported_values=self._supported_semantic_values(),
             )
             selections.append(selection)
-            if (
-                selection.status
-                is ObservationSemanticSelectionStatus.IGNORED_OBSERVATION_TYPE
-            ):
+            if selection.status is ObservationSemanticSelectionStatus.IGNORED_OBSERVATION_TYPE:
                 ignored_ids.append(observation.id)
                 continue
             if selection.status is not ObservationSemanticSelectionStatus.SELECTED:
@@ -193,9 +190,7 @@ class TranscriptContinuityEvidenceBuilder:
 
             recognized.append((observation, mapping, selection))
 
-        evidence_sets, applied_rule_ids = self._evidence_sets_for_recognized(
-            tuple(recognized)
-        )
+        evidence_sets, applied_rule_ids = self._evidence_sets_for_recognized(tuple(recognized))
         input_report = EvidenceBuilderInputReport.from_selections(
             selections,
             applied_rule_ids=applied_rule_ids,
@@ -237,9 +232,7 @@ class TranscriptContinuityEvidenceBuilder:
         return mapping
 
     def _supported_semantic_values(self) -> tuple[str, ...]:
-        return tuple(
-            dict.fromkeys(mapping.transcript_lifecycle for mapping in self.mappings)
-        )
+        return tuple(dict.fromkeys(mapping.transcript_lifecycle for mapping in self.mappings))
 
     def _rule_for_mapping_signal(
         self,
@@ -300,25 +293,21 @@ class TranscriptContinuityEvidenceBuilder:
         return tuple(evidence_sets), tuple(applied_rule_ids)
 
     def _group_key(self, observation: Observation) -> EvidenceBuilderContextKey:
-        recording_block_id = observation_recording_block_id(observation)
-        stage_id = observation_stage_id(observation)
+        context = resolve_observation_evidence_context(observation).context
         transcript_stream_id = self._transcript_stream_id(observation)
         return EvidenceBuilderContextKey.from_components(
             recording_block_id=(
-                recording_block_id.to_json() if recording_block_id is not None else None
+                context.recording_block_id.to_json()
+                if context.recording_block_id is not None
+                else None
             ),
-            stage_id=stage_id.to_json() if stage_id is not None else None,
+            stage_id=context.stage_id.to_json() if context.stage_id is not None else None,
             transcript_stream_id=transcript_stream_id,
         )
 
     def _transcript_stream_id(self, observation: Observation) -> str | None:
-        if observation.context.transcript_stream_id is not None:
-            return observation.context.transcript_stream_id
-        for key in ("transcript_stream_id", "stream_id", "transcript_source_id"):
-            value = observation.metadata.get(key)
-            if isinstance(value, str) and value.strip():
-                return value
-        return None
+        streams = resolve_observation_evidence_context(observation).context.transcript_stream_ids
+        return streams[0] if len(streams) == 1 else None
 
     def _evidence_set_for_group(
         self,
@@ -370,8 +359,15 @@ class TranscriptContinuityEvidenceBuilder:
             return None, ()
 
         first_observation = group[0][0]
-        first_recording_block_id = observation_recording_block_id(first_observation)
-        first_stage_id = observation_stage_id(first_observation)
+        context_resolution = EvidenceContextResolver().compose(
+            tuple(
+                resolve_observation_evidence_context(observation)
+                for observation, _mapping, _selection in group
+            ),
+            source_context_ids=tuple(observation.id for observation, _mapping, _selection in group),
+        )
+        first_recording_block_id = context_resolution.context.recording_block_id
+        first_stage_id = context_resolution.context.stage_id
         return (
             EvidenceSet(
                 id=EntityId.new(),
@@ -383,11 +379,12 @@ class TranscriptContinuityEvidenceBuilder:
                 correlation_id=first_observation.correlation_id,
                 created_at=first_observation.observed_at,
                 notes="Evidence organized for transcript continuity.",
+                context=context_resolution.context,
+                context_resolution=context_resolution,
                 metadata={
                     "transcript_continuity_evidence_builder_id": self.id.to_json(),
                     "source_observation_ids": tuple(
-                        observation.id.to_json()
-                        for observation, _mapping, _selection in group
+                        observation.id.to_json() for observation, _mapping, _selection in group
                     ),
                     "source_production_event_ids": self._lineage_values(
                         group,
@@ -410,11 +407,7 @@ class TranscriptContinuityEvidenceBuilder:
                         if first_recording_block_id is not None
                         else None
                     ),
-                    "stage_id": (
-                        first_stage_id.to_json()
-                        if first_stage_id is not None
-                        else None
-                    ),
+                    "stage_id": (first_stage_id.to_json() if first_stage_id is not None else None),
                     "transcript_stream_id": self._transcript_stream_id(first_observation),
                     "semantic_conclusion": None,
                 },
@@ -455,9 +448,7 @@ class TranscriptContinuityEvidenceBuilder:
                 "observation_observed_at": observation.observed_at.isoformat(),
                 "transcript_stream_id": self._transcript_stream_id(observation),
                 "transcript_segment_id": observation.metadata.get("transcript_segment_id"),
-                "timeline_range_reference": observation.metadata.get(
-                    "timeline_range_reference"
-                ),
+                "timeline_range_reference": observation.metadata.get("timeline_range_reference"),
                 "observation_location": self._location_metadata(observation),
             },
         )
@@ -484,9 +475,7 @@ class TranscriptContinuityEvidenceBuilder:
                 "matched_semantic_key": selection.matched_semantic_key,
                 "normalized_semantic_value": selection.normalized_semantic_value,
                 "transcript_stream_id": self._transcript_stream_id(observation),
-                "timeline_range_reference": observation.metadata.get(
-                    "timeline_range_reference"
-                ),
+                "timeline_range_reference": observation.metadata.get("timeline_range_reference"),
                 "observation_location": self._location_metadata(observation),
             },
         )
@@ -519,25 +508,15 @@ class TranscriptContinuityEvidenceBuilder:
         metadata: dict[str, Any] = {
             "kind": location.kind.value if location.kind is not None else None,
             "recording_block_id": (
-                recording_block_id.to_json()
-                if recording_block_id is not None
-                else None
+                recording_block_id.to_json() if recording_block_id is not None else None
             ),
-            "stage_id": (
-                stage_id.to_json()
-                if stage_id is not None
-                else None
-            ),
+            "stage_id": (stage_id.to_json() if stage_id is not None else None),
         }
         if location.point is not None:
             metadata["timeline_offset_seconds"] = self._seconds(location.point.offset)
         if location.range is not None:
-            metadata["timeline_range_start_seconds"] = self._seconds(
-                location.range.start.offset
-            )
-            metadata["timeline_range_end_seconds"] = self._seconds(
-                location.range.end.offset
-            )
+            metadata["timeline_range_start_seconds"] = self._seconds(location.range.start.offset)
+            metadata["timeline_range_end_seconds"] = self._seconds(location.range.end.offset)
         if location.wall_clock_at is not None:
             metadata["wall_clock_at"] = location.wall_clock_at.isoformat()
         return MappingProxyType(metadata)

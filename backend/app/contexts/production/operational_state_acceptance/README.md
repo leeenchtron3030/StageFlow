@@ -1,7 +1,8 @@
 # Operational State Acceptance
 
 ED-0044 adds the first layer allowed to create an immutable successor
-`OperationalState` from one `TransitionEvaluation`.
+`OperationalState` from one `TransitionEvaluation`. ED-0045 makes the evaluation’s
+first-class Evidence context authoritative during that acceptance.
 
 Policy and acceptance remain separate. A policy decides whether Evidence supports a
 proposal. Acceptance does not reconsider that Evidence. It verifies that a supported
@@ -53,15 +54,19 @@ An absent predecessor is allowed only for an explicitly recorded effective inact
 assumption and an approved inactive-to-active rule. Acceptance does not create a
 synthetic inactive predecessor.
 
-Context is partial and ID-only. Known stage, recording-block, schedule, stream,
-artifact, correlation, boundary-context, or organizational-anchor conflicts cause a
-rejection. Unknown context remains unknown and cannot override a known conflict.
+Context is partial and ID-only. Acceptance compares evaluation context first, then
+first-class lineage, request, and predecessor context as supplements. Known stage,
+recording-block, schedule, stream, artifact, boundary-context, or organizational-anchor
+conflicts cause `rejected_context_mismatch`; metadata cannot override evaluation context.
+Correlation remains traceability rather than operational identity. Unknown context stays
+unknown and cannot override a known conflict.
 
 ## Successor and supersession
 
 An accepted result creates exactly one new immutable successor with status `current`.
 Its basis preserves Observation, EvidenceSet, Transition Evaluation, policy, and rule
-IDs. Production Event and EvidenceItem lineage remains in structured basis metadata.
+IDs plus the validated first-class `EvidenceContext`. Production Event and EvidenceItem
+lineage remains in structured basis metadata.
 No rejected or already-accepted result contains a successor.
 
 When a predecessor exists, the result also contains an

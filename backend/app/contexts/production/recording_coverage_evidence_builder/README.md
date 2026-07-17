@@ -40,10 +40,12 @@ Duplicate Observation IDs are ignored after the first deterministic occurrence a
 The builder produces Evidence only. The Recording Transition Policy consumes that Evidence separately and may return a `TransitionEvaluation`.
 
 Session reasoning remains deferred.
-## ED-0043 Lineage And Context
+## ED-0043/ED-0045 Lineage And Context
 
 The builder reads `Observation.context.recording_block_id` and
 `Observation.context.stage_id` before legacy Observation fields. It copies structured
 source Event, interpreter, rule, and operational-context traceability into EvidenceItem,
 EvidenceSignalReference, and EvidenceSet metadata without embedding an Event or changing
-generic Evidence contracts. Metadata context remains fallback-only.
+Evidence semantics. ED-0045 also emits authoritative aggregate `EvidenceSet.context`,
+including compatible media artifacts, correlations, timeline, and source Observation
+IDs. Metadata context remains fallback-only and conflicts stay structured.

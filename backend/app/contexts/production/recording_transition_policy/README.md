@@ -3,6 +3,7 @@
 ED-0034 introduced the first concrete Operational State Transition Policy. ED-0035 made
 first-class Evidence Signals authoritative. ED-0042 closes ED0041-F001 by making the
 policy conservative about recording context before it evaluates a lifecycle rule.
+ED-0045 makes first-class `EvidenceSet.context` authoritative for that context.
 
 `RecordingTransitionPolicy.evaluate()` preserves the generic public behavior and returns
 one `TransitionEvaluation`. `evaluate_result()` additionally returns a policy-local
@@ -47,13 +48,12 @@ compatible groups.
 - More than one incompatible qualifying group returns `insufficient_evidence`; no first
   set, rule declaration, Signal enum, timestamp, or strength wins.
 
-Recording block is read first-class from `EvidenceSet.recording_block_id` and otherwise
-from documented `recording_block_id` metadata. Stage and media artifact values are read
-from documented builder metadata (`stage_id`, `media_artifact_id`, or `artifact_id`),
-with a single consistent Signal/Item metadata fallback only when set metadata is absent.
-The optional numeric timeline range is read from documented recording-builder location
-metadata. These metadata paths remain policy-local compatibility dependencies pending
-the later first-class Evidence-context work; they are not a second context model.
+ED-0045 projects centrally resolved `EvidenceContext` into the policy-local
+`RecordingTransitionContext`. The shared resolver prefers first-class context, then the
+legacy `EvidenceSet.recording_block_id`/correlation fields, then documented metadata
+aliases. It also resolves stage, media artifact, and timeline context. The policy no
+longer implements its own arbitrary metadata parser. First-class/legacy conflicts remain
+visible on the generic evaluation and metadata cannot override first-class context.
 
 ## Conflict, Ordering, And Duplicates
 
@@ -85,8 +85,10 @@ Legacy `recording_transition_marker` metadata remains readable only when an Evid
 has no first-class Signals. If Signals exist, metadata cannot override them. Compatibility
 use, selected context, conflicting contexts, linked EvidenceItem and Observation IDs,
 Signals, applied rule ID, duplicate IDs, and current-state validation are exposed through
-the result profile and structured evaluation metadata.
+the result profile and structured evaluation metadata. The accepted group’s first-class
+context and structured conflicts are also exposed on `TransitionEvaluation` for
+Operational State Acceptance.
 
-ED-0042 does not implement state acceptance, successor states, supersession, transition
-execution, persistence, repositories, global Evidence-context redesign, scoring,
+The policy does not implement state acceptance, successor states, supersession, transition
+execution, persistence, repositories, scoring,
 confidence, AI, APIs, workers, queues, or frontend behavior.

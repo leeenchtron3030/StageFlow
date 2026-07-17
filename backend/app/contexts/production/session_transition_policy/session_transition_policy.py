@@ -9,12 +9,14 @@ from uuid import NAMESPACE_URL, uuid5
 
 from app.contexts.production.evidence import (
     EvidenceConcern,
+    EvidenceContextResolver,
     EvidenceItem,
     EvidenceRole,
     EvidenceSet,
     EvidenceSignal,
     EvidenceSignalReference,
     EvidenceStrength,
+    resolve_evidence_set_context,
 )
 from app.contexts.production.operational_state import (
     OperationalState,
@@ -118,9 +120,7 @@ class SessionTransitionPolicy:
 
     id: EntityId
     name: str = "Session Transition Policy"
-    rules: Sequence[SessionTransitionRule] = field(
-        default_factory=lambda: SESSION_TRANSITION_RULES
-    )
+    rules: Sequence[SessionTransitionRule] = field(default_factory=lambda: SESSION_TRANSITION_RULES)
     metadata: Mapping[str, Any] = field(default_factory=_empty_metadata)
 
     def __post_init__(self) -> None:
@@ -210,8 +210,7 @@ class SessionTransitionPolicy:
                         group.context_key for group, _assessment in qualifying
                     ),
                     "qualifying_rule_ids": tuple(
-                        assessment.rule.id.to_json()
-                        for _group, assessment in qualifying
+                        assessment.rule.id.to_json() for _group, assessment in qualifying
                     ),
                 },
             )
@@ -331,9 +330,7 @@ class SessionTransitionPolicy:
                 caller_metadata={
                     **caller_metadata,
                     "rejected_rule_id": assessment.rule.id.to_json(),
-                    "rejected_proposed_state": (
-                        assessment.rule.proposed_state_value.value
-                    ),
+                    "rejected_proposed_state": (assessment.rule.proposed_state_value.value),
                 },
             )
 
@@ -451,9 +448,7 @@ class SessionTransitionPolicy:
                 unsupported.append(evidence_set.id)
                 continue
             key = self._context_key(evidence_set)
-            grouped.setdefault(key, []).append(
-                (evidence_set, contributions, unsupported_count)
-            )
+            grouped.setdefault(key, []).append((evidence_set, contributions, unsupported_count))
 
         groups: list[_EvidenceGroup] = []
         for key in sorted(grouped):
@@ -573,17 +568,18 @@ class SessionTransitionPolicy:
         return (f"evidence-item:{item.id.to_json()}",)
 
     def _context_key(self, evidence_set: EvidenceSet) -> tuple[str, ...]:
-        block = self._optional_id(evidence_set.recording_block_id)
-        stage = self._metadata_id(evidence_set.metadata, "stage_id")
-        activity = self._metadata_id(evidence_set.metadata, "scheduled_activity_id")
-        boundary_context = self._metadata_text(
-            evidence_set.metadata,
-            "boundary_context_id",
+        context = resolve_evidence_set_context(evidence_set).context
+        block = self._optional_id(context.recording_block_id)
+        stage = self._optional_id(context.stage_id)
+        activity = self._optional_id(context.scheduled_activity_id)
+        boundary_context = (
+            context.boundary_context_id.to_json()
+            if context.boundary_context_id is not None
+            else None
         )
         discriminator = evidence_set.id.to_json() if boundary_context is None else ""
         return (
             evidence_set.concern.value,
-            evidence_set.correlation_id.to_json(),
             block,
             stage,
             activity,
@@ -598,23 +594,25 @@ class SessionTransitionPolicy:
     ) -> bool:
         if evidence_set.concern is not context.boundary_concern:
             return False
-        actual_boundary_context = self._metadata_text(
-            evidence_set.metadata,
-            "boundary_context_id",
+        evidence_context = resolve_evidence_set_context(evidence_set).context
+        actual_boundary_context = (
+            evidence_context.boundary_context_id.to_json()
+            if evidence_context.boundary_context_id is not None
+            else None
         )
         if actual_boundary_context is not None and actual_boundary_context != context.id.to_json():
             return False
         checks = (
             (
-                self._optional_id(evidence_set.recording_block_id),
+                self._optional_id(evidence_context.recording_block_id),
                 self._optional_id(context.recording_block_id),
             ),
             (
-                self._metadata_id(evidence_set.metadata, "stage_id"),
+                self._optional_id(evidence_context.stage_id),
                 self._optional_id(context.stage_id),
             ),
             (
-                self._metadata_id(evidence_set.metadata, "scheduled_activity_id"),
+                self._optional_id(evidence_context.scheduled_activity_id),
                 self._optional_id(context.scheduled_activity_id),
             ),
         )
@@ -666,11 +664,7 @@ class SessionTransitionPolicy:
             unmet.append(last_requirement_id)
 
         used = self._unique_contributions(
-            tuple(
-                contribution
-                for candidates in candidate_sets
-                for contribution in candidates
-            )
+            tuple(contribution for candidates in candidate_sets for contribution in candidates)
         )
         return _RuleAssessment(
             rule=rule,
@@ -717,9 +711,7 @@ class SessionTransitionPolicy:
         first = source_sets[0]
         for later in source_sets[1:]:
             if not any(
-                first_source != later_source
-                for first_source in first
-                for later_source in later
+                first_source != later_source for first_source in first for later_source in later
             ):
                 return False
         return True
@@ -743,23 +735,42 @@ class SessionTransitionPolicy:
         ):
             return True
         candidate_activity = self._first_known(group, "scheduled_activity_id")
-        current_activity = self._metadata_text(
-            current_state.metadata,
-            "scheduled_activity_id",
+        current_evidence_context = current_state.basis.evidence_context
+        current_activity = (
+            current_evidence_context.scheduled_activity_id.to_json()
+            if current_evidence_context is not None
+            and current_evidence_context.scheduled_activity_id is not None
+            else self._metadata_text(
+                current_state.metadata,
+                "scheduled_activity_id",
+            )
         )
         if current_activity and candidate_activity and current_activity != candidate_activity:
             return True
         candidate_context = self._first_known(group, "boundary_context_id")
-        current_context = self._metadata_text(current_state.metadata, "boundary_context_id")
+        current_context = (
+            current_evidence_context.boundary_context_id.to_json()
+            if current_evidence_context is not None
+            and current_evidence_context.boundary_context_id is not None
+            else self._metadata_text(current_state.metadata, "boundary_context_id")
+        )
         if current_context and candidate_context and current_context != candidate_context:
             return True
         candidate_anchor = self._numeric_anchor(group)
-        current_anchor = self._number(current_state.metadata.get("boundary_anchor_seconds"))
+        current_anchor = (
+            current_evidence_context.organizational_anchor_seconds
+            if current_evidence_context is not None
+            and current_evidence_context.organizational_anchor_seconds is not None
+            else self._number(current_state.metadata.get("boundary_anchor_seconds"))
+        )
         if current_anchor is not None and candidate_anchor is not None:
             return candidate_anchor > current_anchor
         candidate_anchor_at = self._datetime_anchor(group)
-        current_anchor_at = self._datetime_value(
-            current_state.metadata.get("boundary_anchor_at")
+        current_anchor_at = (
+            current_evidence_context.organizational_anchor
+            if current_evidence_context is not None
+            and current_evidence_context.organizational_anchor is not None
+            else self._datetime_value(current_state.metadata.get("boundary_anchor_at"))
         )
         return bool(
             current_anchor_at is not None
@@ -849,9 +860,7 @@ class SessionTransitionPolicy:
         )
         profile = self._profile(group) if group is not None else None
         applied_rule_id = assessment.rule.id if assessment is not None else None
-        satisfied_ids = (
-            assessment.satisfied_requirement_ids if assessment is not None else ()
-        )
+        satisfied_ids = assessment.satisfied_requirement_ids if assessment is not None else ()
         unmet_ids = assessment.unmet_requirement_ids if assessment is not None else ()
         signal_values = (
             tuple(signal.value for signal in profile.contributing_signals)
@@ -878,8 +887,17 @@ class SessionTransitionPolicy:
             f"{self.id.to_json()}:{current_state.id.to_json() if current_state else 'none'}:"
             f"{effective_current.value if effective_current else 'unknown'}:"
             f"{proposed_state.value if proposed_state else 'none'}:{outcome.value}:"
-            f"{applied_rule_id.to_json() if applied_rule_id else 'none'}:"
-            + ":".join(evidence_ids)
+            f"{applied_rule_id.to_json() if applied_rule_id else 'none'}:" + ":".join(evidence_ids)
+        )
+        evaluation_context_resolution = EvidenceContextResolver().compose(
+            tuple(
+                resolve_evidence_set_context(evidence_set)
+                for evidence_set in (group.evidence_sets if group is not None else ())
+            ),
+            source_context_ids=tuple(
+                evidence_set.id
+                for evidence_set in (group.evidence_sets if group is not None else ())
+            ),
         )
         evaluation_metadata: dict[str, Any] = {
             "policy_id": self.id.to_json(),
@@ -905,9 +923,7 @@ class SessionTransitionPolicy:
                 else ()
             ),
             "source_interpreter_ids": (
-                profile.metadata.get("source_interpreter_ids", ())
-                if profile is not None
-                else ()
+                profile.metadata.get("source_interpreter_ids", ()) if profile is not None else ()
             ),
             "source_interpretation_rule_ids": (
                 profile.metadata.get("source_interpretation_rule_ids", ())
@@ -938,16 +954,14 @@ class SessionTransitionPolicy:
             rationale=TransitionReason(
                 rationale,
                 metadata={
-                    "applied_rule_id": (
-                        applied_rule_id.to_json() if applied_rule_id else None
-                    ),
-                    "unmet_requirement_ids": tuple(
-                        item.to_json() for item in unmet_ids
-                    ),
+                    "applied_rule_id": (applied_rule_id.to_json() if applied_rule_id else None),
+                    "unmet_requirement_ids": tuple(item.to_json() for item in unmet_ids),
                 },
             ),
             evaluated_at=evaluated_at,
             metadata=evaluation_metadata,
+            context=evaluation_context_resolution.context,
+            context_conflicts=evaluation_context_resolution.conflicts,
         )
         return SessionTransitionResult(
             evaluation=evaluation,
@@ -985,9 +999,7 @@ class SessionTransitionPolicy:
         sets = tuple(sets_by_id.values())
         items = tuple(items_by_id.values())
         source_keys = {
-            source_key
-            for contribution in contributions
-            for source_key in contribution.source_keys
+            source_key for contribution in contributions for source_key in contribution.source_keys
         }
         return SessionTransitionEvidenceProfile(
             target_boundary_concern=group.concern,
@@ -1004,16 +1016,13 @@ class SessionTransitionPolicy:
             ),
             strengths=tuple(contribution.strength for contribution in contributions),
             supporting_count=sum(
-                contribution.role is EvidenceRole.SUPPORTS
-                for contribution in contributions
+                contribution.role is EvidenceRole.SUPPORTS for contribution in contributions
             ),
             contradicting_count=sum(
-                contribution.role is EvidenceRole.CONTRADICTS
-                for contribution in contributions
+                contribution.role is EvidenceRole.CONTRADICTS for contribution in contributions
             ),
             contextual_count=sum(
-                contribution.role is EvidenceRole.CONTEXTUALIZES
-                for contribution in contributions
+                contribution.role is EvidenceRole.CONTEXTUALIZES for contribution in contributions
             ),
             unsupported_count=group.unsupported_count
             + sum(
@@ -1068,10 +1077,10 @@ class SessionTransitionPolicy:
     ) -> tuple[EntityId, ...]:
         values: list[EntityId] = []
         for evidence_set in group.evidence_sets:
-            if key == "recording_block_id":
-                value = evidence_set.recording_block_id
-            else:
-                value = self._entity(evidence_set.metadata.get(key))
+            context = resolve_evidence_set_context(evidence_set).context
+            value = getattr(context, key, None)
+            if not isinstance(value, EntityId):
+                value = None
             if value is not None and value not in values:
                 values.append(value)
         return tuple(values)
@@ -1079,10 +1088,13 @@ class SessionTransitionPolicy:
     def _anchors(self, group: _EvidenceGroup) -> tuple[str, ...]:
         anchors: list[str] = []
         for evidence_set in group.evidence_sets:
-            for key in ("boundary_anchor_seconds", "boundary_anchor_at"):
-                value = evidence_set.metadata.get(key)
-                if isinstance(value, str | int | float):
-                    rendered = str(value)
+            context = resolve_evidence_set_context(evidence_set).context
+            for value in (
+                context.organizational_anchor_seconds,
+                context.organizational_anchor,
+            ):
+                if value is not None:
+                    rendered = value.isoformat() if isinstance(value, datetime) else str(value)
                     if rendered not in anchors:
                         anchors.append(rendered)
         return tuple(anchors)
@@ -1097,39 +1109,37 @@ class SessionTransitionPolicy:
         return tuple(by_key.values())
 
     def _anchor_order(self, evidence_set: EvidenceSet) -> str:
-        for key in ("boundary_anchor_at", "boundary_anchor_seconds"):
-            value = evidence_set.metadata.get(key)
-            if isinstance(value, str | int | float):
-                return str(value)
+        context = resolve_evidence_set_context(evidence_set).context
+        if context.organizational_anchor is not None:
+            return context.organizational_anchor.isoformat()
+        if context.organizational_anchor_seconds is not None:
+            return str(context.organizational_anchor_seconds)
         return ""
 
     def _first_known(self, group: _EvidenceGroup, key: str) -> str | None:
         for evidence_set in group.evidence_sets:
-            if key == "recording_block_id":
-                value = self._optional_id(evidence_set.recording_block_id)
-            else:
-                value = self._metadata_text(evidence_set.metadata, key)
+            context = resolve_evidence_set_context(evidence_set).context
+            raw = getattr(context, key, None)
+            value = raw.to_json() if isinstance(raw, EntityId) else None
             if value:
                 return value
         return None
 
     def _numeric_anchor(self, group: _EvidenceGroup) -> float | None:
         values = tuple(
-            value
+            context.organizational_anchor_seconds
             for evidence_set in group.evidence_sets
-            for value in (self._number(evidence_set.metadata.get("boundary_anchor_seconds")),)
-            if value is not None
+            for context in (resolve_evidence_set_context(evidence_set).context,)
+            if context.organizational_anchor_seconds is not None
         )
         return min(values) if values else None
 
     def _datetime_anchor(self, group: _EvidenceGroup) -> datetime | None:
         values = tuple(
-            value
+            context.organizational_anchor
             for evidence_set in group.evidence_sets
-            for value in (
-                self._datetime_value(evidence_set.metadata.get("boundary_anchor_at")),
-            )
-            if value is not None
+            for context in (resolve_evidence_set_context(evidence_set).context,)
+            if context.organizational_anchor is not None
         )
         return min(values) if values else None
 

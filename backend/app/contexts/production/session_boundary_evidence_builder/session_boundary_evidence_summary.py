@@ -70,9 +70,7 @@ class SessionBoundaryEvidenceSummary:
     ) -> SessionBoundaryEvidenceSummary:
         evidence_sets = result.evidence_sets
         signals = tuple(
-            reference.signal
-            for evidence_set in evidence_sets
-            for reference in evidence_set.signals
+            reference.signal for evidence_set in evidence_sets for reference in evidence_set.signals
         )
         source_concerns = {
             concern
@@ -118,16 +116,12 @@ class SessionBoundaryEvidenceSummary:
             if context.scheduled_activity_id is not None
         }
         return cls(
-            total_input_evidence_set_count=int(
-                result.metadata.get("input_evidence_set_count", 0)
-            ),
+            total_input_evidence_set_count=int(result.metadata.get("input_evidence_set_count", 0)),
             consumed_count=len(result.consumed_source_evidence_set_ids),
             ignored_count=len(result.ignored_source_evidence_set_ids),
             unsupported_count=len(result.unsupported_source_evidence_set_ids),
             duplicate_count=len(result.duplicate_source_evidence_set_ids),
-            possible_start_evidence_set_count=len(
-                result.start_boundary_evidence_sets
-            ),
+            possible_start_evidence_set_count=len(result.start_boundary_evidence_sets),
             possible_end_evidence_set_count=len(result.end_boundary_evidence_sets),
             produced_evidence_item_count=sum(
                 len(evidence_set.items) for evidence_set in evidence_sets
@@ -139,9 +133,7 @@ class SessionBoundaryEvidenceSummary:
             stage_count=len(stages),
             scheduled_activity_count=len(activities),
             boundary_context_count=len(result.generated_boundary_contexts),
-            timeline_span=(min(timeline_values), max(timeline_values))
-            if timeline_values
-            else None,
+            timeline_span=(min(timeline_values), max(timeline_values)) if timeline_values else None,
             source_role_distribution=source_roles,
             source_strength_distribution=source_strengths,
         )

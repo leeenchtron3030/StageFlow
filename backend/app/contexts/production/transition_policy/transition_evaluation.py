@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from types import MappingProxyType
 from typing import Any
 
+from app.contexts.production.evidence import EvidenceContext, EvidenceContextConflict
 from app.contexts.production.operational_state import (
     OperationalState,
     OperationalStateKind,
@@ -36,6 +37,8 @@ class TransitionEvaluation:
     rationale: TransitionReason
     evaluated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     metadata: Mapping[str, Any] = field(default_factory=_empty_metadata)
+    context: EvidenceContext = field(default_factory=EvidenceContext.unknown)
+    context_conflicts: Sequence[EvidenceContextConflict] = field(default_factory=tuple)
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -48,4 +51,5 @@ class TransitionEvaluation:
             "blocking_evidence_ids",
             tuple(self.blocking_evidence_ids),
         )
+        object.__setattr__(self, "context_conflicts", tuple(self.context_conflicts))
         object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
