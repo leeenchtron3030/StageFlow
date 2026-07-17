@@ -83,6 +83,25 @@ Acceptance is idempotent relative to the supplied acceptance history. A known
 Transition Evaluation ID returns `already_accepted` without a successor or
 supersession. With no repository, this package does not claim global idempotency.
 
+## Repository handoff
+
+ED-0046 defines a separate Operational State Repository contract. The repository
+consumes one existing acceptance result; it never invokes this component or repeats its
+Evidence reasoning. Only an `accepted` result with one successor and complete lineage
+is commit-eligible. Invalid shape is rejected with a typed no-change repository result.
+
+The repository is authoritative for idempotency within its own scope: one Evaluation ID
+and one acceptance ID may each be committed at most once. It also compares the expected
+predecessor with stored current state. A stale predecessor cannot overwrite newer state,
+and an initial acceptance conflicts when that subject-kind key already has current
+state.
+
+ED-0044 supersession remains descriptive until a successful atomic repository commit.
+At that point, the persisted predecessor record becomes `superseded` and the successor
+becomes the sole current record. The caller's predecessor object is never mutated.
+Repository commit time remains separate from evaluation time, successor state time,
+acceptance time, organizational anchors, and any future verified boundary.
+
 ## Immutability note
 
 Acceptance contracts are frozen, normalize duplicate references, convert collections
@@ -96,5 +115,5 @@ fields and does not rely on nested metadata mutability.
 This package has no persistence, repository queries, state mutation, transition
 execution, policy invocation, Evidence reinterpretation, event publication, Session
 aggregate creation, final boundary verification, APIs, queues, workers, frontend
-behavior, or AI. Persistence and global idempotency belong to a later directive;
-execution remains later still.
+behavior, or AI. ED-0046 gives persistence and repository-scoped idempotency to a
+separate contract; execution remains later still.
