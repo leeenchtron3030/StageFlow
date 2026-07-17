@@ -26,7 +26,10 @@ The generic foundation performs structured key lookup, normalization, determinis
 
 ## Grouping
 
-Recognized transcript Observations are grouped by recording block, stage, and transcript stream. The stream identifier is read from structured metadata keys in this order: `transcript_stream_id`, `stream_id`, `transcript_source_id`.
+Recognized transcript Observations are grouped by resolved recording block, stage, and
+transcript stream. `Observation.context.transcript_stream_id` is authoritative; the
+central resolver retains `transcript_stream_id`, `stream_id`, and `transcript_source_id`
+as compatibility aliases.
 
 If no transcript stream identifier exists, the builder uses recording block plus stage as the narrowest stable context.
 
@@ -37,11 +40,12 @@ Duplicate Observation IDs are ignored after the first deterministic occurrence a
 ## Boundary
 
 The builder produces Evidence only. It does not call policies, create Transition Evaluations, mutate Operational State, persist Evidence, create Hypotheses, create Findings, create Verification Decisions, create Operational Products, call AI, expose APIs, use queues or workers, or add frontend behavior.
-## ED-0043 Lineage And Context
+## ED-0043/ED-0045 Lineage And Context
 
 The builder reads first-class recording-block, stage, and transcript-stream context
-before legacy fields or metadata. Transcript stream fallback remains
+before legacy fields or metadata and emits aggregate first-class `EvidenceSet.context`.
+Transcript stream fallback remains
 `transcript_stream_id`, `stream_id`, then `transcript_source_id`. Structured source Event,
 interpreter, rule, stream, and timeline traceability is retained through EvidenceItem,
 EvidenceSignalReference, and EvidenceSet metadata without inspecting transcript text or
-changing generic Evidence contracts.
+changing Evidence semantics.

@@ -19,10 +19,16 @@ activity, transcript stream, media artifact, and timeline context. Context may b
 partial. Missing identifiers remain absent and one context field never substitutes for
 another.
 
-First-class `Observation.context` values are authoritative. Legacy Observation fields
-and documented metadata keys remain compatibility fallbacks only. Legacy callers may
-continue constructing Observations without provenance; every Observation produced by a
-concrete interpreter must include provenance.
+First-class `Observation.context` values are authoritative. ED-0045 enforces the order
+`Observation.context` -> documented legacy field/location -> documented metadata ->
+absent. A conflicting legacy field remains available for centralized diagnostic
+resolution but cannot overwrite the first-class value. Builders consume that centralized
+resolution and do not merge incompatible known context.
+
+Legacy callers may continue constructing Observations without provenance or an explicit
+context; compatible legacy fields are projected into `Observation.context`. Every
+Observation produced by a concrete interpreter must include provenance. Observation
+semantics, confidence, source, time, and notes are unchanged by context resolution.
 
 ## Time Semantics
 

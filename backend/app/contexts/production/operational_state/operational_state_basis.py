@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Any
 
+from app.contexts.production.evidence import EvidenceContext
 from app.shared.ids import EntityId
 
 
@@ -21,6 +22,7 @@ class OperationalStateBasis:
     transition_evaluation_ids: Sequence[EntityId] = field(default_factory=tuple)
     policy_ids: Sequence[EntityId] = field(default_factory=tuple)
     transition_rule_ids: Sequence[EntityId] = field(default_factory=tuple)
+    evidence_context: EvidenceContext | None = None
     rationale: str | None = None
     metadata: Mapping[str, Any] = field(default_factory=_empty_metadata)
 

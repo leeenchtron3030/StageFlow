@@ -10,6 +10,9 @@ from uuid import NAMESPACE_URL, uuid5
 
 from app.contexts.production.evidence import (
     EvidenceConcern,
+    EvidenceContextConflict,
+    EvidenceContextResolution,
+    EvidenceContextSource,
     EvidenceItem,
     EvidencePurpose,
     EvidenceRole,
@@ -17,8 +20,9 @@ from app.contexts.production.evidence import (
     EvidenceSignal,
     EvidenceSignalReference,
     EvidenceStrength,
+    resolve_evidence_set_context,
 )
-from app.shared.ids import EntityId
+from app.shared.ids import CorrelationId, EntityId
 
 from .session_boundary_evidence_context import SessionBoundaryEvidenceContext
 from .session_boundary_evidence_mapping import (
@@ -99,6 +103,8 @@ class _Contribution:
     scheduled_activity_id: EntityId | None
     transcript_stream_ids: tuple[str, ...]
     media_artifact_ids: tuple[str, ...]
+    correlation_ids: tuple[CorrelationId, ...]
+    context_conflicts: tuple[EvidenceContextConflict, ...]
     timeline_start_seconds: float | None
     timeline_end_seconds: float | None
     anchor_seconds: float | None
@@ -241,9 +247,7 @@ class SessionBoundaryEvidenceBuilder:
                     "source_created_at_then_timeline_then_evidence_set_id_then_input_index"
                 ),
                 "duplicate_behavior": "first_deterministic_evidence_set_kept",
-                "anchor_behavior": (
-                    "earliest_contributing_anchor_for_start_latest_for_end"
-                ),
+                "anchor_behavior": ("earliest_contributing_anchor_for_start_latest_for_end"),
                 "unsupported_combinations": tuple(unsupported_combinations),
                 "semantic_conclusion": None,
                 "possible_boundary_only": True,
@@ -387,9 +391,20 @@ class SessionBoundaryEvidenceBuilder:
         rule: SessionBoundaryEvidenceRule,
         input_index: int,
     ) -> _Contribution:
+        context_resolution = resolve_evidence_set_context(evidence_set)
+        resolved_context = context_resolution.context
         metadata_sources = self._metadata_sources(evidence_set, source_signal, source_items)
         timeline_starts, timeline_ends = self._timeline_values(metadata_sources)
-        anchor_seconds: float | None = None
+        if resolved_context.timeline_range_seconds is not None:
+            timeline_starts = (
+                resolved_context.timeline_range_seconds[0],
+                *timeline_starts,
+            )
+            timeline_ends = (
+                *timeline_ends,
+                resolved_context.timeline_range_seconds[1],
+            )
+        anchor_seconds = resolved_context.organizational_anchor_seconds
         if mapping.target_concern is EvidenceConcern.POSSIBLE_SESSION_START:
             if timeline_starts:
                 anchor_seconds = min(timeline_starts)
@@ -398,12 +413,13 @@ class SessionBoundaryEvidenceBuilder:
         timestamps = tuple(
             timestamp
             for timestamp in (
-                self._timestamp_from_metadata(source.metadata)
-                for source in source_items
+                self._timestamp_from_metadata(source.metadata) for source in source_items
             )
             if timestamp is not None
         )
-        if mapping.target_concern is EvidenceConcern.POSSIBLE_SESSION_START:
+        if resolved_context.organizational_anchor is not None:
+            anchor_at = resolved_context.organizational_anchor
+        elif mapping.target_concern is EvidenceConcern.POSSIBLE_SESSION_START:
             anchor_at = min(timestamps) if timestamps else evidence_set.created_at
         else:
             anchor_at = max(timestamps) if timestamps else evidence_set.created_at
@@ -414,21 +430,13 @@ class SessionBoundaryEvidenceBuilder:
             mapping=mapping,
             rule=rule,
             source_items=source_items,
-            recording_block_id=evidence_set.recording_block_id
-            or self._entity_from_sources(metadata_sources, ("recording_block_id",)),
-            stage_id=self._entity_from_sources(metadata_sources, ("stage_id",)),
-            scheduled_activity_id=self._entity_from_sources(
-                metadata_sources,
-                ("scheduled_activity_id", "schedule_activity_id"),
-            ),
-            transcript_stream_ids=self._identifiers_from_sources(
-                metadata_sources,
-                ("transcript_stream_ids", "transcript_stream_id", "stream_id"),
-            ),
-            media_artifact_ids=self._identifiers_from_sources(
-                metadata_sources,
-                ("media_artifact_ids", "media_artifact_id", "artifact_id"),
-            ),
+            recording_block_id=resolved_context.recording_block_id,
+            stage_id=resolved_context.stage_id,
+            scheduled_activity_id=resolved_context.scheduled_activity_id,
+            transcript_stream_ids=tuple(resolved_context.transcript_stream_ids),
+            media_artifact_ids=tuple(resolved_context.media_artifact_ids),
+            correlation_ids=tuple(resolved_context.correlation_ids),
+            context_conflicts=tuple(context_resolution.conflicts),
             timeline_start_seconds=min(timeline_starts) if timeline_starts else None,
             timeline_end_seconds=max(timeline_ends) if timeline_ends else None,
             anchor_seconds=anchor_seconds,
@@ -471,7 +479,6 @@ class SessionBoundaryEvidenceBuilder:
                 unknown_discriminator = contribution.source_set.id.to_json()
             key = (
                 contribution.mapping.target_concern.value,
-                contribution.source_set.correlation_id.to_json(),
                 self._id_value(contribution.recording_block_id),
                 self._id_value(contribution.stage_id),
                 self._id_value(contribution.scheduled_activity_id),
@@ -503,7 +510,70 @@ class SessionBoundaryEvidenceBuilder:
                     cluster_coordinate = coordinate
             if current:
                 groups.append(tuple(current))
+
+        # A schedule-only contribution may supplement one otherwise compatible
+        # stage/block group. Merge partial groups only when the match is mutual and
+        # unique, so a context-poor contribution can never bridge incompatible known
+        # identities or select an arbitrary winner.
+        while True:
+            compatible_indexes = {
+                index: tuple(
+                    candidate_index
+                    for candidate_index, candidate in enumerate(groups)
+                    if candidate_index != index and self._groups_can_compose(group, candidate)
+                )
+                for index, group in enumerate(groups)
+            }
+            pair = next(
+                (
+                    (index, matches[0])
+                    for index, matches in sorted(compatible_indexes.items())
+                    if len(matches) == 1 and compatible_indexes.get(matches[0]) == (index,)
+                ),
+                None,
+            )
+            if pair is None:
+                break
+            left, right = sorted(pair)
+            merged = tuple(
+                sorted((*groups[left], *groups[right]), key=self._contribution_ordering_key)
+            )
+            groups = [group for index, group in enumerate(groups) if index not in {left, right}]
+            groups.append(merged)
+            groups.sort(
+                key=lambda group: tuple(
+                    self._contribution_ordering_key(contribution) for contribution in group
+                )
+            )
         return tuple(groups)
+
+    def _groups_can_compose(
+        self,
+        left: tuple[_Contribution, ...],
+        right: tuple[_Contribution, ...],
+    ) -> bool:
+        if any(
+            contribution.recording_block_id is None
+            and contribution.stage_id is None
+            and contribution.scheduled_activity_id is None
+            for contribution in (*left, *right)
+        ):
+            return False
+        if left[0].mapping.target_concern is not right[0].mapping.target_concern:
+            return False
+        for name in ("recording_block_id", "stage_id", "scheduled_activity_id"):
+            known = {
+                getattr(contribution, name)
+                for contribution in (*left, *right)
+                if getattr(contribution, name) is not None
+            }
+            if len(known) > 1:
+                return False
+        coordinates = tuple(self._coordinate(contribution) for contribution in (*left, *right))
+        if len({kind for kind, _value in coordinates}) != 1:
+            return False
+        values = tuple(value for _kind, value in coordinates)
+        return max(values) - min(values) <= self.composition_window.total_seconds()
 
     def _build_group(
         self,
@@ -531,17 +601,12 @@ class SessionBoundaryEvidenceBuilder:
                     observation_ids=tuple(
                         dict.fromkeys(
                             contribution.source_signal.observation_ids
-                            + tuple(
-                                item.observation_id
-                                for item in contribution.source_items
-                            )
+                            + tuple(item.observation_id for item in contribution.source_items)
                         )
                     ),
                     rationale=contribution.rule.rationale(),
                     metadata={
-                        "source_evidence_set_ids": (
-                            contribution.source_set.id.to_json(),
-                        ),
+                        "source_evidence_set_ids": (contribution.source_set.id.to_json(),),
                         "source_evidence_item_ids": tuple(
                             item.id.to_json() for item in contribution.source_items
                         ),
@@ -549,10 +614,7 @@ class SessionBoundaryEvidenceBuilder:
                             observation_id.to_json()
                             for observation_id in dict.fromkeys(
                                 contribution.source_signal.observation_ids
-                                + tuple(
-                                    item.observation_id
-                                    for item in contribution.source_items
-                                )
+                                + tuple(item.observation_id for item in contribution.source_items)
                             )
                         ),
                         "source_event_ids": self._contribution_lineage_values(
@@ -581,6 +643,26 @@ class SessionBoundaryEvidenceBuilder:
             + ":".join(source_id.to_json() for source_id in source_set_ids)
         )
         anchor_at = context.boundary_anchor_at or ordered[0].source_set.created_at
+        evidence_context = context.to_evidence_context()
+        context_resolution = EvidenceContextResolution(
+            context=evidence_context,
+            sources={
+                "stage_id": EvidenceContextSource.COMPOSED_FROM_SOURCES,
+                "recording_block_id": EvidenceContextSource.COMPOSED_FROM_SOURCES,
+                "scheduled_activity_id": EvidenceContextSource.COMPOSED_FROM_SOURCES,
+                "transcript_stream_ids": EvidenceContextSource.COMPOSED_FROM_SOURCES,
+                "media_artifact_ids": EvidenceContextSource.COMPOSED_FROM_SOURCES,
+                "correlation_ids": EvidenceContextSource.COMPOSED_FROM_SOURCES,
+                "timeline": EvidenceContextSource.COMPOSED_FROM_SOURCES,
+                "organizational_anchor": EvidenceContextSource.EXPLICIT_BUILDER_INPUT,
+                "boundary_context_id": EvidenceContextSource.EXPLICIT_BUILDER_INPUT,
+                "source_context_ids": EvidenceContextSource.COMPOSED_FROM_SOURCES,
+            },
+            conflicts=tuple(
+                conflict for contribution in ordered for conflict in contribution.context_conflicts
+            ),
+            metadata={"boundary_context_is_session_identity": False},
+        )
         return (
             EvidenceSet(
                 id=output_id,
@@ -595,6 +677,8 @@ class SessionBoundaryEvidenceBuilder:
                     "Evidence organized for a possible session boundary; no boundary, "
                     "transition, or Session State is concluded."
                 ),
+                context=evidence_context,
+                context_resolution=context_resolution,
                 metadata={
                     "session_boundary_evidence_builder_id": self.id.to_json(),
                     "boundary_context_id": context.id.to_json(),
@@ -614,10 +698,7 @@ class SessionBoundaryEvidenceBuilder:
                             for contribution in ordered
                             for observation_id in (
                                 contribution.source_signal.observation_ids
-                                + tuple(
-                                    item.observation_id
-                                    for item in contribution.source_items
-                                )
+                                + tuple(item.observation_id for item in contribution.source_items)
                             )
                         )
                     ),
@@ -639,26 +720,18 @@ class SessionBoundaryEvidenceBuilder:
                     ),
                     "source_concerns": tuple(
                         dict.fromkeys(
-                            contribution.source_set.concern.value
-                            for contribution in ordered
+                            contribution.source_set.concern.value for contribution in ordered
                         )
                     ),
                     "source_signals": tuple(
-                        contribution.source_signal.signal.value
-                        for contribution in ordered
+                        contribution.source_signal.signal.value for contribution in ordered
                     ),
                     "applied_rule_ids": tuple(rule_id.to_json() for rule_id in rule_ids),
                     "recording_block_id": self._optional_json(context.recording_block_id),
                     "stage_id": self._optional_json(context.stage_id),
-                    "scheduled_activity_id": self._optional_json(
-                        context.scheduled_activity_id
-                    ),
-                    "transcript_stream_ids": tuple(
-                        context.transcript_stream_ids
-                    ),
-                    "media_artifact_ids": tuple(
-                        context.media_artifact_ids
-                    ),
+                    "scheduled_activity_id": self._optional_json(context.scheduled_activity_id),
+                    "transcript_stream_ids": tuple(context.transcript_stream_ids),
+                    "media_artifact_ids": tuple(context.media_artifact_ids),
                     "timeline_start_seconds": context.timeline_start_seconds,
                     "timeline_end_seconds": context.timeline_end_seconds,
                     "boundary_anchor_seconds": context.boundary_anchor_seconds,
@@ -673,9 +746,9 @@ class SessionBoundaryEvidenceBuilder:
                         else "latest_contributing_anchor"
                     ),
                     "grouping_rationale": (
-                        "Compatible source Evidence shares boundary orientation, correlation, "
+                        "Compatible source Evidence shares boundary orientation, non-conflicting "
                         "recording block, stage, known scheduled activity, and the configured "
-                        "composition window."
+                        "composition window; correlation remains traceability only."
                     ),
                     "composition_window_seconds": self.composition_window.total_seconds(),
                     "semantic_conclusion": None,
@@ -772,8 +845,7 @@ class SessionBoundaryEvidenceBuilder:
         source_item: EvidenceItem | None = None,
     ) -> EvidenceRole:
         if source_item is None and any(
-            item.role is EvidenceRole.CONTRADICTS
-            or item.strength is EvidenceStrength.CONTRADICTORY
+            item.role is EvidenceRole.CONTRADICTS or item.strength is EvidenceStrength.CONTRADICTORY
             for item in contribution.source_items
         ):
             return EvidenceRole.CONTRADICTS
@@ -789,9 +861,12 @@ class SessionBoundaryEvidenceBuilder:
         group: tuple[_Contribution, ...],
     ) -> SessionBoundaryEvidenceContext:
         concern = group[0].mapping.target_concern
-        recording_block_id = group[0].recording_block_id
-        stage_id = group[0].stage_id
-        scheduled_activity_id = group[0].scheduled_activity_id
+        recording_block_id = self._one_known_context_value(group, "recording_block_id")
+        stage_id = self._one_known_context_value(group, "stage_id")
+        scheduled_activity_id = self._one_known_context_value(
+            group,
+            "scheduled_activity_id",
+        )
         starts = tuple(
             value
             for contribution in group
@@ -819,9 +894,7 @@ class SessionBoundaryEvidenceBuilder:
             if anchor_seconds_values:
                 anchor_seconds = max(anchor_seconds_values)
             anchor_at = max(anchor_at_values)
-        source_set_ids = tuple(
-            dict.fromkeys(contribution.source_set.id for contribution in group)
-        )
+        source_set_ids = tuple(dict.fromkeys(contribution.source_set.id for contribution in group))
         context_id = _stable_entity_id(
             "context:"
             f"{concern.value}:{self._id_value(recording_block_id)}:"
@@ -849,6 +922,14 @@ class SessionBoundaryEvidenceBuilder:
                     for artifact_id in contribution.media_artifact_ids
                 )
             ),
+            correlation_ids=tuple(
+                dict.fromkeys(
+                    correlation_id
+                    for contribution in group
+                    for correlation_id in contribution.correlation_ids
+                )
+            ),
+            source_context_ids=source_set_ids,
             timeline_start_seconds=min(starts) if starts else None,
             timeline_end_seconds=max(ends) if ends else None,
             boundary_anchor_seconds=anchor_seconds,
@@ -863,6 +944,23 @@ class SessionBoundaryEvidenceBuilder:
                 "session_id": None,
             },
         )
+
+    def _one_known_context_value(
+        self,
+        group: tuple[_Contribution, ...],
+        name: str,
+    ) -> EntityId | None:
+        known = tuple(
+            dict.fromkeys(
+                value
+                for contribution in group
+                for value in (getattr(contribution, name),)
+                if isinstance(value, EntityId)
+            )
+        )
+        if len(known) > 1:
+            raise ValueError(f"Boundary group contains conflicting known {name} values.")
+        return known[0] if known else None
 
     def _context_label(self, group: tuple[_Contribution, ...]) -> str | None:
         for contribution in group:

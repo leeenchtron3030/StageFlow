@@ -297,7 +297,10 @@ Operational State families distinguish directly observable state, evidence-deriv
 
 `OperationalStateBasis` preserves ID-only traceability through Observations and
 EvidenceSets. ED-0044 compatibly adds accepted Transition Evaluation, policy, and rule
-IDs for successor-state lineage. Operational State itself still has no transition,
+IDs for successor-state lineage. ED-0045 adds an optional first-class
+`EvidenceContext` reference so an accepted successor retains validated operational
+context without placing it in the subject or relying only on metadata. Operational State
+itself still has no transition,
 repository, persistence, execution, API, queue, worker, AI, frontend, or downstream
 reasoning behavior.
 
@@ -340,6 +343,35 @@ Observation-ID independence. It does not score or rank candidates, treat ED-0039
 as proof, mutate state, create Session identity, execute transitions, persist results, or
 select a final boundary timestamp.
 
+## Authoritative Observation And Evidence Context
+
+ED-0045 closes ED0041-F004 for supported context flows. The authoritative path is:
+
+`Production Event context` -> `ObservationContext` -> `EvidenceContext` -> boundary
+`EvidenceContext` -> `TransitionEvaluation.context` -> Operational State Acceptance ->
+successor `OperationalStateBasis.evidence_context`.
+
+At each step, first-class context is authoritative, documented metadata is compatibility
+fallback, invalid fallback is ignored with diagnostics, and missing context stays absent.
+`EvidenceContextResolution` centralizes ID normalization, aliases, source descriptions,
+ignored values, and immutable conflict records. Recording and Transcript builders emit
+first-class context; Session Boundary composition retains compatible streams, artifacts,
+correlations, schedule context, anchors, boundary context, and source Evidence IDs.
+
+Known stage, recording block, and scheduled-activity conflicts remain isolated. Transcript
+streams remain separate in Transcript domain Evidence. Correlation is traceability, media
+artifact identity does not become recording identity, schedule identity does not become
+Session identity, and organizational anchors do not become verified boundaries. Context
+resolution does not inspect Evidence meaning, alter strength or roles, evaluate policy,
+create state, persist, score, or infer identity.
+
+Recording and Session policies consume the shared resolver rather than independently
+parsing Evidence metadata. Their categorical lifecycle and corroboration rules are
+unchanged. Generic `TransitionEvaluation` receives backward-compatible `context` and
+`context_conflicts` fields. Acceptance prefers that first-class evaluation context,
+allows request/current context only to supplement it compatibly, rejects known conflicts,
+and creates no successor when context is mismatched.
+
 ## Operational State Acceptance
 
 ED-0044 adds the first layer allowed to create an immutable successor
@@ -358,8 +390,10 @@ are rejected until their own policies and static acceptance mappings exist.
 An accepted result creates one new current successor record. A predecessor remains
 unchanged; intended supersession is described but not persisted. The successor state
 time comes from the evaluation, acceptance time is separate, and organizational
-boundary anchors remain unverified context. Duplicate detection is idempotent only
-relative to caller-supplied history.
+boundary anchors remain unverified context. ED-0045 makes first-class evaluation context
+authoritative during acceptance and retains the validated context on the successor basis;
+subject and context remain distinct. Duplicate detection is idempotent only relative to
+caller-supplied history.
 
 Acceptance does not invoke policies, reinterpret Evidence, persist state, query a
 repository, execute transitions, publish events, create Session aggregates, verify

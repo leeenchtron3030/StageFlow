@@ -16,7 +16,10 @@ An `OperationalStateTransitionPolicy` receives an optional current `OperationalS
 
 The generic policy contract does not mutate state, persist state, execute transitions, dispatch events, call AI, access infrastructure, create Hypotheses, create Findings, create Verification Decisions, or create Operational Products.
 
-`TransitionEvaluation` is not a command. It records the evaluated state kind, optional current state, optional proposed state value, outcome, supporting Evidence IDs, blocking Evidence IDs, rationale, timestamp, and metadata.
+`TransitionEvaluation` is not a command. It records the evaluated state kind, optional
+current state, optional proposed state value, outcome, supporting Evidence IDs, blocking
+Evidence IDs, rationale, timestamp, and metadata. ED-0045 compatibly adds accepted
+first-class `EvidenceContext` and structured context conflicts for the acceptance handoff.
 
 ## Outcomes
 
@@ -35,8 +38,8 @@ recording Evidence context at a time. It validates recording-state kind, subject
 and context compatibility before a lifecycle proposal. Multiple incompatible qualifying
 recording contexts, unresolved conflicting Signals, and unknown-context conflicts return
 conservative outcomes rather than selecting a first matching rule. This is a
-recording-policy-local safety correction; the generic `TransitionEvaluation` contract is
-unchanged and state acceptance remains deferred.
+recording-policy-local safety correction. ED-0045 retains that local projection while
+making the generic evaluation context handoff backward compatible.
 
 ## Session Transition Policy
 
@@ -63,10 +66,11 @@ policy ID, applied rule ID, current state, proposed lifecycle, subject, known co
 supporting Evidence, Observation lineage, exact source Production Event lineage, and
 caller-supplied acceptance history.
 
-The concrete Recording and Session policies expose stable policy/rule identity and
-post-ED-0043 lineage for this handoff. The generic `TransitionEvaluation` contract is
-not destructively redesigned; policy-specific result profiles populate a separate
-ID-only acceptance-lineage contract.
+The concrete Recording and Session policies expose stable policy/rule identity,
+post-ED-0043 lineage, and first-class accepted Evidence context for this handoff. The
+generic `TransitionEvaluation` contract is not destructively redesigned; compatible
+defaulted fields preserve older constructors and policy-specific result profiles still
+populate a separate ID-only acceptance-lineage contract.
 
 Policy still does not create or mutate state. Acceptance never invokes a policy or
 re-evaluates whether Evidence was persuasive. It may create one immutable successor

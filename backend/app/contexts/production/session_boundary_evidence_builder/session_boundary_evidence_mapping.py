@@ -229,9 +229,7 @@ SESSION_BOUNDARY_EVIDENCE_MAPPINGS: tuple[SessionBoundaryEvidenceMapping, ...] =
 def mappings_for_source(
     concern: EvidenceConcern,
     signal: EvidenceSignal,
-    mappings: tuple[SessionBoundaryEvidenceMapping, ...] = (
-        SESSION_BOUNDARY_EVIDENCE_MAPPINGS
-    ),
+    mappings: tuple[SessionBoundaryEvidenceMapping, ...] = (SESSION_BOUNDARY_EVIDENCE_MAPPINGS),
 ) -> tuple[SessionBoundaryEvidenceMapping, ...]:
     return tuple(
         mapping

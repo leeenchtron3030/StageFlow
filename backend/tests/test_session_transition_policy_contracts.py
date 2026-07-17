@@ -1017,7 +1017,7 @@ def test_different_known_stages_are_not_combined() -> None:
 
 @pytest.mark.parametrize(
     "incompatible_dimension",
-    ["recording_block", "scheduled_activity", "correlation"],
+    ["recording_block", "scheduled_activity"],
 )
 def test_incompatible_known_context_dimensions_are_not_combined(
     incompatible_dimension: str,
@@ -1037,8 +1037,6 @@ def test_incompatible_known_context_dimensions_are_not_combined(
         corroboration_kwargs["recording_block_id"] = EntityId.new()
     elif incompatible_dimension == "scheduled_activity":
         corroboration_kwargs["scheduled_activity_id"] = EntityId.new()
-    else:
-        corroboration_kwargs["correlation_id"] = CorrelationId.new()
 
     specific = _boundary_evidence(
         EvidenceConcern.POSSIBLE_SESSION_START,
@@ -1059,6 +1057,40 @@ def test_incompatible_known_context_dimensions_are_not_combined(
 
     assert result.outcome is TransitionPolicyResult.INSUFFICIENT_EVIDENCE
     assert result.proposed_state is None
+
+
+def test_different_correlations_remain_traceability_not_session_identity() -> None:
+    context_id = EntityId.new()
+    block_id = EntityId.new()
+    activity_id = EntityId.new()
+    correlations = (CorrelationId.new(), CorrelationId.new())
+    specific = _boundary_evidence(
+        EvidenceConcern.POSSIBLE_SESSION_START,
+        (EvidenceSignal.SPEAKER_INTRODUCTION_INDICATED,),
+        boundary_context_id=context_id,
+        correlation_id=correlations[0],
+        recording_block_id=block_id,
+        scheduled_activity_id=activity_id,
+    )
+    corroboration = _boundary_evidence(
+        EvidenceConcern.POSSIBLE_SESSION_START,
+        (EvidenceSignal.SPEECH_ACTIVITY_AVAILABLE,),
+        boundary_context_id=context_id,
+        correlation_id=correlations[1],
+        recording_block_id=block_id,
+        scheduled_activity_id=activity_id,
+    )
+
+    result = make_session_transition_policy().evaluate(
+        current_state=_state(OperationalStateValue.INACTIVE),
+        evidence_sets=(specific, corroboration),
+        evaluated_at=BASE_TIME,
+    )
+
+    assert result.outcome is TransitionPolicyResult.TRANSITION_SUPPORTED
+    assert result.evaluation.context.correlation_ids == tuple(
+        sorted(correlations, key=lambda item: item.to_json())
+    )
 
 
 def test_unknown_boundary_context_is_kept_conservative_across_evidence_sets() -> None:

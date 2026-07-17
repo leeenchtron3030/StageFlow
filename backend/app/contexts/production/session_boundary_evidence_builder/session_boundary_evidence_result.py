@@ -70,9 +70,7 @@ class SessionBoundaryEvidenceResult:
 
     @property
     def evidence_sets(self) -> tuple[EvidenceSet, ...]:
-        return tuple(self.start_boundary_evidence_sets) + tuple(
-            self.end_boundary_evidence_sets
-        )
+        return tuple(self.start_boundary_evidence_sets) + tuple(self.end_boundary_evidence_sets)
 
     @property
     def evidence_count(self) -> int:

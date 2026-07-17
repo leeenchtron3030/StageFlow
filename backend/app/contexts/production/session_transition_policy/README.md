@@ -6,6 +6,10 @@ that evaluation inside `SessionTransitionResult`, together with the Evidence pro
 rule and requirement traceability, and input classifications. `evaluate_transition()` is
 provided when a caller needs only the generic evaluation contract.
 
+ED-0045 makes first-class boundary `EvidenceSet.context` authoritative and exposes the
+selected context plus structured conflicts on the evaluation. Documented metadata is
+read only through the centralized Evidence context resolver.
+
 The policy accepts only `possible_session_start` and `possible_session_end` concerns.
 Recording, transcript, schedule, media, visual, editorial, and package Evidence must pass
 through the Session Boundary Evidence Builder first.
@@ -67,11 +71,12 @@ are the documented fallback hierarchy, although current `EvidenceItem` contracts
 provide an Observation ID. Repeated Signals tied to one Observation do not count as
 independent corroboration.
 
-Evidence is grouped by concern, correlation, recording block, stage, known scheduled
-activity, and ED-0039 boundary context. Different EvidenceSets are combined only when
-they explicitly share a boundary-context ID; otherwise each remains conservative and
-separate. The policy adds no time threshold: ED-0039's five-minute window and boundary
-anchor remain organizational metadata, not proof. Multiple incompatible qualifying
+Evidence is grouped by concern, recording block, stage, known scheduled activity, and
+ED-0039 boundary context. Different EvidenceSets are combined only when they explicitly
+share a boundary-context ID; otherwise each remains conservative and separate.
+Correlation remains traceability and is not a grouping or Session-identity dimension.
+The policy adds no time threshold: ED-0039's five-minute window and first-class
+organizational anchor are organization, not proof. Multiple incompatible qualifying
 contexts return `insufficient_evidence` unless the caller supplies a target
 `SessionBoundaryEvidenceContext`.
 

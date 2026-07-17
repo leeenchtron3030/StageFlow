@@ -41,19 +41,22 @@ contradicting. Missing Signals never create contradiction.
 
 ## Context, time, and grouping
 
-`SessionBoundaryEvidenceContext` carries optional recording block, stage, scheduled
-activity, transcript stream, media artifact, timeline, label, and anchor references.
-Metadata extraction recognizes the documented ID keys used by production Evidence:
-`recording_block_id`, `stage_id`, `scheduled_activity_id`, `transcript_stream_id`, and
-`media_artifact_id`, including plural stream and artifact forms. Invalid or absent IDs
-are not invented, and no Session ID is required.
+ED-0045 makes each source `EvidenceSet.context` authoritative and projects the generated
+`SessionBoundaryEvidenceContext` back to a first-class output `EvidenceContext`. The
+context carries optional recording block, stage, scheduled activity, transcript streams,
+media artifacts, correlations, source Evidence IDs, timeline, boundary context ID,
+label, and organizational anchors. Documented metadata aliases are read only through the
+central resolver. Invalid or absent IDs are not invented, and no Session ID is required.
 
-Start and end contributions are always separate. Compatible contributions must share
-boundary orientation, correlation, recording block, stage, and known scheduled activity.
-They are clustered within a configurable five-minute composition window. Contributions
-without recording, stage, or schedule identity remain isolated by source EvidenceSet.
-The window only prevents indefinite grouping; it is not a threshold, score, timeout, or
-transition rule.
+Start and end contributions are always separate. Compatible contributions share boundary
+orientation and cannot conflict on known recording block, stage, or scheduled activity.
+A partial schedule-only context may supplement exactly one compatible group, but cannot
+bridge multiple incompatible groups. Different correlation IDs may compose when primary
+context is compatible; all remain traceable and correlation never becomes identity.
+Contributions are clustered within a configurable five-minute composition window.
+Contributions without recording, stage, or schedule identity remain isolated by source
+EvidenceSet. The window only prevents indefinite grouping; it is not a threshold, score,
+timeout, or transition rule.
 
 The organizational anchor is the earliest contributing timeline or wall-clock anchor for
 a possible start and the latest for a possible end. It is explicitly not a verified or

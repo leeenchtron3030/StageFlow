@@ -5,7 +5,11 @@ from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, cast
 
-from app.contexts.production.evidence import EvidenceSignal
+from app.contexts.production.evidence import (
+    EvidenceContext,
+    EvidenceContextConflict,
+    EvidenceSignal,
+)
 from app.contexts.production.operational_state import (
     OperationalStateKind,
     OperationalStateValue,
@@ -92,6 +96,8 @@ class OperationalStateAcceptanceLineage:
     context: OperationalStateAcceptanceContext = field(
         default_factory=OperationalStateAcceptanceContext.unknown
     )
+    evaluation_context: EvidenceContext = field(default_factory=EvidenceContext.unknown)
+    context_conflicts: Sequence[EvidenceContextConflict] = field(default_factory=tuple)
     metadata: Mapping[str, Any] = field(default_factory=_empty_metadata)
 
     def __post_init__(self) -> None:
@@ -121,6 +127,7 @@ class OperationalStateAcceptanceLineage:
             "organizational_anchors",
             _unique_text(self.organizational_anchors),
         )
+        object.__setattr__(self, "context_conflicts", tuple(self.context_conflicts))
         object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
 
     @classmethod
@@ -135,9 +142,7 @@ class OperationalStateAcceptanceLineage:
         source_event_ids = _entity_sequence(
             evaluation.metadata.get("source_production_event_ids", ())
         )
-        interpreter_ids = _entity_sequence(
-            evaluation.metadata.get("source_interpreter_ids", ())
-        )
+        interpreter_ids = _entity_sequence(evaluation.metadata.get("source_interpreter_ids", ()))
         signals = tuple(profile.contributing_signals)
         return cls(
             evaluation_id=evaluation.id,
@@ -162,8 +167,7 @@ class OperationalStateAcceptanceLineage:
             ),
             organizational_anchors=(
                 (selected_context.organizational_at.isoformat(),)
-                if selected_context is not None
-                and selected_context.organizational_at is not None
+                if selected_context is not None and selected_context.organizational_at is not None
                 else ()
             ),
             context=OperationalStateAcceptanceContext(
@@ -177,13 +181,13 @@ class OperationalStateAcceptanceLineage:
                     and selected_context.media_artifact_id is not None
                     else ()
                 ),
-                correlation_id=(
-                    selected_context.correlation_id if selected_context else None
-                ),
+                correlation_id=(selected_context.correlation_id if selected_context else None),
                 timeline_range_seconds=(
                     selected_context.timeline_range_seconds if selected_context else None
                 ),
             ),
+            evaluation_context=evaluation.context,
+            context_conflicts=evaluation.context_conflicts,
             metadata={"source": "recording_transition_result"},
         )
 
@@ -218,23 +222,17 @@ class OperationalStateAcceptanceLineage:
             contributing_production_event_ids=_entity_sequence(
                 evaluation.metadata.get("source_production_event_ids", ())
             ),
-            contributing_signals=(
-                profile.contributing_signals if profile is not None else ()
-            ),
+            contributing_signals=(profile.contributing_signals if profile is not None else ()),
             satisfied_requirement_ids=result.satisfied_requirement_ids,
             unmet_requirement_ids=result.unmet_requirement_ids,
-            interpreter_ids=_entity_sequence(
-                evaluation.metadata.get("source_interpreter_ids", ())
-            ),
+            interpreter_ids=_entity_sequence(evaluation.metadata.get("source_interpreter_ids", ())),
             interpretation_rule_ids=_text_sequence(
                 evaluation.metadata.get("source_interpretation_rule_ids", ())
             ),
             organizational_anchors=(profile.boundary_anchors if profile else ()),
             context=OperationalStateAcceptanceContext(
                 stage_id=(
-                    profile.stage_ids[0]
-                    if profile and len(profile.stage_ids) == 1
-                    else None
+                    profile.stage_ids[0] if profile and len(profile.stage_ids) == 1 else None
                 ),
                 recording_block_id=(
                     profile.recording_block_ids[0]
@@ -252,5 +250,7 @@ class OperationalStateAcceptanceLineage:
                     else None
                 ),
             ),
+            evaluation_context=evaluation.context,
+            context_conflicts=evaluation.context_conflicts,
             metadata={"source": "session_transition_result"},
         )

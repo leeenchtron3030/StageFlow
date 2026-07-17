@@ -58,14 +58,14 @@
 - **Title:** Cross-layer semantic and context authority remains distributed through metadata
 - **Category:** metadata
 - **Severity:** medium
-- **Status:** open
+- **Status:** closed by ED-0045
 - **Affected files:** Recording/Transcript Observation Interpreters and Evidence Builders; Session Boundary Builder/Context; Session Transition Policy/Summary; Observation and Evidence contracts
 - **Observed evidence:** `recording_activity`, `recording_event_kind`, and `transcript_lifecycle` determine semantic selection. Stage and scheduled activity IDs are copied into Evidence metadata and parsed by boundary/policy code. Transcript stream identity uses three metadata aliases and is not emitted by the concrete transcript ingress path. Boundary context IDs and organizational anchors are first-class in the context object but copied to Evidence metadata for policy use. Ended-to-active freshness can depend on anchor metadata. Policy/rule/effective-current details are metadata in the generic evaluation.
 - **Architectural or operational impact:** Typos, malformed IDs, alias divergence, or missing writer behavior can change grouping and policy outcomes while remaining invisible to Pyright. State acceptance or persistence would make these conventions harder to migrate.
 - **Recommended response:** Promote only reused authoritative semantics: typed Observation semantic payload, reusable Evidence context reference, transcript stream identity, and acceptance lineage. Keep supplementary diagnostics in metadata and retain compatibility aliases until producers are inventoried.
 - **Risk of changing it:** High if attempted as one migration. Split by authority boundary and preserve readers during transition.
 - **Suggested directive:** Authoritative Observation and Evidence Context Contracts
-- **Disposition:** `defer_to_targeted_directive`
+- **Disposition:** `closed_by_ED_0045`
 
 ## ED0041-F005
 

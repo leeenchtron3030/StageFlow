@@ -2,8 +2,15 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from itertools import combinations
 from typing import cast
 
+from app.contexts.production.evidence import (
+    EvidenceContext,
+    EvidenceContextResolution,
+    EvidenceContextResolver,
+    EvidenceContextSource,
+)
 from app.contexts.production.operational_state import (
     OperationalState,
     OperationalStateBasis,
@@ -221,10 +228,7 @@ class OperationalStateAcceptance:
                 "Evaluation metadata policy ID conflicts with first-class lineage.",
             )
         metadata_policy_kind = evaluation.metadata.get("policy_kind")
-        if (
-            isinstance(metadata_policy_kind, str)
-            and metadata_policy_kind != lineage.policy_kind
-        ):
+        if isinstance(metadata_policy_kind, str) and metadata_policy_kind != lineage.policy_kind:
             return (
                 OperationalStateAcceptanceReasonCode.INVALID_POLICY_IDENTITY,
                 "Evaluation metadata policy kind conflicts with first-class lineage.",
@@ -430,30 +434,48 @@ class OperationalStateAcceptance:
         return None
 
     def _context_error(self, request: OperationalStateAcceptanceRequest) -> str | None:
-        contexts = (request.lineage.context, request.context)
+        contexts = tuple(
+            context
+            for context in (
+                OperationalStateAcceptanceContext.from_evidence_context(request.evaluation.context),
+                OperationalStateAcceptanceContext.from_evidence_context(
+                    request.lineage.evaluation_context
+                ),
+                request.lineage.context,
+                request.context,
+                (
+                    OperationalStateAcceptanceContext.from_evidence_context(
+                        request.current_state.basis.evidence_context
+                    )
+                    if request.current_state is not None
+                    and request.current_state.basis.evidence_context is not None
+                    else OperationalStateAcceptanceContext.unknown()
+                ),
+            )
+            if context != OperationalStateAcceptanceContext.unknown()
+        )
         scalar_names = (
             "stage_id",
             "recording_block_id",
             "scheduled_activity_id",
-            "correlation_id",
             "boundary_evidence_context_id",
+            "organizational_anchor",
         )
         for name in scalar_names:
-            first = getattr(contexts[0], name)
-            second = getattr(contexts[1], name)
-            if first is not None and second is not None and first != second:
+            known = {
+                value
+                for context in contexts
+                for value in (getattr(context, name),)
+                if value is not None
+            }
+            if len(known) > 1:
                 return f"Known {name} values conflict between lineage and request context."
         for name in ("transcript_stream_ids", "media_artifact_ids"):
-            first_values = set(getattr(contexts[0], name))
-            second_values = set(getattr(contexts[1], name))
-            if first_values and second_values and first_values.isdisjoint(second_values):
+            known_collections = tuple(
+                set(getattr(context, name)) for context in contexts if getattr(context, name)
+            )
+            if any(left.isdisjoint(right) for left, right in combinations(known_collections, 2)):
                 return f"Known {name} values conflict between lineage and request context."
-        if (
-            contexts[0].organizational_anchor is not None
-            and contexts[1].organizational_anchor is not None
-            and contexts[0].organizational_anchor != contexts[1].organizational_anchor
-        ):
-            return "Known organizational anchors conflict."
 
         current = request.current_state
         for context in contexts:
@@ -504,10 +526,13 @@ class OperationalStateAcceptance:
     ) -> OperationalStateAcceptanceResult:
         evaluation = request.evaluation
         lineage = request.lineage
+        accepted_context = self._accepted_evidence_context(request)
         acceptance_id = EntityId.new()
         successor_id = EntityId.new()
-        recording_block_id = self._recording_block_id(request)
-        stage_id = request.context.stage_id or lineage.context.stage_id
+        recording_block_id = accepted_context.recording_block_id or self._recording_block_id(
+            request
+        )
+        stage_id = accepted_context.stage_id or request.context.stage_id or lineage.context.stage_id
         successor = OperationalState(
             id=successor_id,
             family=family,
@@ -521,10 +546,9 @@ class OperationalStateAcceptance:
                 transition_evaluation_ids=(evaluation.id,),
                 policy_ids=(lineage.policy_id,) if lineage.policy_id is not None else (),
                 transition_rule_ids=(
-                    (lineage.applied_rule_id,)
-                    if lineage.applied_rule_id is not None
-                    else ()
+                    (lineage.applied_rule_id,) if lineage.applied_rule_id is not None else ()
                 ),
+                evidence_context=accepted_context,
                 rationale=acceptance_rule.rationale,
                 metadata={
                     "acceptance_id": acceptance_id.to_json(),
@@ -532,8 +556,7 @@ class OperationalStateAcceptance:
                         item.to_json() for item in lineage.contributing_evidence_item_ids
                     ),
                     "contributing_production_event_ids": tuple(
-                        item.to_json()
-                        for item in lineage.contributing_production_event_ids
+                        item.to_json() for item in lineage.contributing_production_event_ids
                     ),
                     "contributing_signals": tuple(
                         signal.value for signal in lineage.contributing_signals
@@ -543,6 +566,7 @@ class OperationalStateAcceptance:
             observed_or_derived_at=evaluation.evaluated_at,
             recording_block_id=recording_block_id,
             stage_id=stage_id,
+            timeline_range=accepted_context.timeline_range,
             metadata={
                 "operational_state_acceptance_id": acceptance_id.to_json(),
                 "accepted_transition_evaluation_id": evaluation.id.to_json(),
@@ -557,6 +581,18 @@ class OperationalStateAcceptance:
                     item.to_json() for item in lineage.contributing_production_event_ids
                 ),
                 "organizational_anchors": tuple(lineage.organizational_anchors),
+                "scheduled_activity_id": (
+                    accepted_context.scheduled_activity_id.to_json()
+                    if accepted_context.scheduled_activity_id is not None
+                    else None
+                ),
+                "transcript_stream_ids": accepted_context.transcript_stream_ids,
+                "media_artifact_ids": accepted_context.media_artifact_ids,
+                "boundary_context_id": (
+                    accepted_context.boundary_context_id.to_json()
+                    if accepted_context.boundary_context_id is not None
+                    else None
+                ),
                 "boundary_anchor_verified": False,
                 "accepted_at": request.accepted_at.isoformat(),
                 "persisted": False,
@@ -655,6 +691,40 @@ class OperationalStateAcceptance:
         if request.target_subject.subject_type is OperationalStateSubjectType.RECORDING_BLOCK:
             return self._entity(request.target_subject.subject_identifier)
         return None
+
+    def _accepted_evidence_context(
+        self,
+        request: OperationalStateAcceptanceRequest,
+    ) -> EvidenceContext:
+        supplemental_contexts = [
+            request.lineage.context.to_evidence_context(),
+            request.context.to_evidence_context(),
+        ]
+        if request.lineage.evaluation_context != EvidenceContext.unknown():
+            supplemental_contexts.append(request.lineage.evaluation_context)
+        if (
+            request.current_state is not None
+            and request.current_state.basis.evidence_context is not None
+        ):
+            supplemental_contexts.append(request.current_state.basis.evidence_context)
+        supplemental = EvidenceContextResolver().compose(
+            tuple(
+                EvidenceContextResolution(context=context)
+                for context in supplemental_contexts
+                if context != EvidenceContext.unknown()
+            )
+        )
+        if request.evaluation.context == EvidenceContext.unknown():
+            return supplemental.context
+        return (
+            EvidenceContextResolver()
+            .resolve(
+                first_class=request.evaluation.context,
+                first_class_source=EvidenceContextSource.EVIDENCE_FIRST_CLASS,
+                structured_legacy=supplemental.context,
+            )
+            .context
+        )
 
     def _values_for_kind(
         self,
