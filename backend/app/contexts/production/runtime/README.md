@@ -127,3 +127,13 @@ worker, call AI, or add frontend behavior. Deployment and process lifecycle belo
 future directive.
 
 In particular, the Runtime contract does not transfer or queue assets.
+
+## ED-0051 execution relationship
+
+ED-0051 adds the first executable profile as a separate `SoftwareAgentRuntime`
+lifecycle. The ED-0050 aggregate remains immutable and deployment-neutral; the Agent
+adapter validates it and then treats its embedded `RuntimeConfiguration` as
+authoritative. Construction performs no work and startup is explicit. Supplied
+production pressure controls lifecycle permission conservatively, with uncertainty
+suspending event-mode work until explicit resume. The lifecycle adds no media access,
+readiness execution, asset assembly, transfer, persistence, service, or Node adapter.

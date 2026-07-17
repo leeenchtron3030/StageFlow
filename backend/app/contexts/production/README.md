@@ -74,6 +74,21 @@ The Runtime Clock does not start StageFlow, schedule work, execute retries, exec
 
 A crossed time boundary only means that a temporal boundary is now relevant. It is not proof that production activity occurred.
 
+## Software Agent Runtime
+
+ED-0051 adds StageFlow's first executable Runtime profile as one explicit, synchronous,
+process-local Agent lifecycle. Construction performs no work. `prepare()` gates startup
+through ED-0050 validation and makes the validated aggregate's embedded
+`RuntimeConfiguration` authoritative; `start()` consumes caller-supplied pressure.
+Elevated pressure yields, and critical, recording-safety-uncertain, or unknown event
+pressure suspends until explicit resume. Stop is deterministic and terminal.
+
+The Agent lifecycle is not a Production Event and creates no semantic Observation,
+Evidence, Operational State, or Session. It performs no candidate discovery, file or
+recorder access, readiness execution, asset assembly, transfer, queue, persistence,
+networking, background service, API, worker, AI, or frontend work. Production recording
+remains externally owned and retains priority.
+
 ## Transcript Source Adapters
 
 ED-0020 adds foundational transcript source adapter contracts only.

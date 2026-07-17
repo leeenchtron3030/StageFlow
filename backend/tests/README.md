@@ -7,7 +7,7 @@ This directory contains backend tests.
 ## Current Scope
 
 The suite covers the backend foundation and implemented Production Context through
-ED-0050. Coverage includes shared and timeline contracts; Production Events, adapters,
+ED-0051. Coverage includes shared and timeline contracts; Production Events, adapters,
 dispatch, and both interpreter foundations; concrete recording, media, clock, schedule,
 transcript, and vision interpretation; Observation and Evidence semantics; generic and
 concrete Evidence Builders; Operational State and transition contracts; Recording
@@ -17,6 +17,7 @@ successor-state context propagation; and Operational State Repository contracts.
 ED-0048 adds the canonical Completed Media Asset contract boundary. ED-0049 adds
 deterministic candidate stability and safe-to-read readiness evaluation. ED-0050 adds
 the deployment-neutral declarative StageFlow Runtime and combination validation.
+ED-0051 adds the first explicit in-process Software Agent Runtime lifecycle.
 
 Tests remain under `backend/tests/` rather than inside application packages. The suite
 emphasizes contract validation, negative architectural boundaries, deterministic
@@ -85,6 +86,18 @@ identity isolation; metadata and credential safety; and the absence of services,
 monitoring, collection, file or recorder access, readiness execution, asset assembly,
 transfer, queues, Session identity, Production Events, semantic Observations, Evidence,
 Operational State, repositories, AI, APIs, workers, or frontend behavior.
+
+ED-0051 adds `software_agent_runtime_fixtures.py` plus focused contract, startup,
+lifecycle, pressure/resume, shutdown/cancellation, concurrency, failure-atomicity,
+deployment-neutrality, and architecture suites. Coverage includes explicit
+prepare/start, ED-0050 validation and configuration authority, immutable transition
+lineage, first-class execution permission, conservative event pressure, explicit
+resume, synchronous terminal stop, in-instance idempotency, stale-revision protection,
+single-winner races, deterministic notification ordering and failure reporting,
+out-of-lock slow-sink and reentrant-read behavior, instance isolation,
+borrowed-hardware safety, and the absence of media, filesystem,
+recorder, readiness, asset, transfer, queue, persistence, network, downstream state,
+service, AI, API, worker, or frontend behavior.
 
 ED-0041 reviews test quality without adding speculative future-behavior tests. Findings
 and targeted missing regression cases are documented under `docs/reviews/`.
