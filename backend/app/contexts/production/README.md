@@ -494,6 +494,29 @@ repository storage, Session inference, AI, API, worker, or frontend behavior. Th
 Runtime contract may define deployment-neutral collection capabilities without
 implementing a running service.
 
+## StageFlow Runtime
+
+ED-0050 adds one immutable deployment-neutral `StageFlowRuntime` contract. Agent, Node,
+external-compatible, development, and unknown profiles use the same identity,
+configuration, capability, collection, readiness-selection, resource, event-mode,
+asset-assembly, limitation, health, availability, summary, and validation vocabulary.
+Agent does not mean lower trust, Node does not mean higher trust, and validation
+evaluates declared capability combinations rather than profile stereotypes.
+
+Event configuration is explicitly subordinate to production recording and livestream
+workloads. Resource budgets, constrained GPU use, reducible optional activity, pressure
+responses, non-writing source observation, source ownership, and offline-capable event
+operation are declarations for a future implementation; ED-0050 measures and enforces
+none of them. Health, availability, and configuration validity remain separate.
+
+The Runtime maps source and observation capabilities onto ED-0049 resource facts,
+embeds explicit ED-0049 readiness parameters in route selection, and declares an
+ED-0048-compatible future asset-assembly mapping. It does not collect facts, run the
+readiness policy, assemble an asset, create a Production Event or semantic Observation,
+persist state, transfer or queue media, control a recorder, infer a Session, expose an
+API, run workers, use AI, or add frontend behavior. Configuration validity establishes
+internal coherence only; it is not process liveness or execution success.
+
 ## Hypothesis Primitives
 
 ED-0008 adds foundational production hypothesis contracts only.

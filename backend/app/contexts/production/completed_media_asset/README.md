@@ -89,6 +89,20 @@ keys. There are no callbacks, locks, streams, file descriptors, platform path ob
 media bytes, or mutable Runtime objects. Summaries deterministically sort warning codes
 and omit sensitive source locations.
 
+## Runtime assembly declaration
+
+ED-0050 adds a deployment-neutral Runtime asset-assembly plan that references this
+package's manifest schema, asset kinds, explicit context sources, technical-description
+sources, integrity sources, source-location handling, and summary privacy. The plan is
+configuration only. It does not construct a `CompletedMediaAsset`, create a manifest,
+read a source, calculate integrity, infer context from a filename or path, transfer or
+queue media, or change the ED-0048 validity rules.
+
+Runtime, recorder, adapter, and explicitly configured context can be declared as future
+inputs. Filename-only and path-only context remain non-authoritative hints. Agent and
+Node profiles continue to produce identical asset meaning; Runtime profile never adds
+trust, authority, or downstream eligibility.
+
 ## Future boundaries
 
 ED-0049 defines how supplied facts can justify that a candidate is finalized and safe
@@ -107,5 +121,6 @@ CompletedMediaAsset
 
 ED-0048 does not create Production Events, Observations, Evidence, Operational State,
 acceptance results, repository records, Runtime services, Agent or Node software,
-transfer, ingest, queues, AI, APIs, workers, or frontend behavior. Completed media assets
-are never stored in the Operational State Repository.
+transfer, ingest, queues, AI, APIs, workers, or frontend behavior. ED-0050 preserves the
+same boundary while adding only a declarative assembly plan. Completed media assets are
+never stored in the Operational State Repository.
