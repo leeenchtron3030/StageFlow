@@ -53,9 +53,14 @@ described in a separate immutable contract rather than applied.
 The successor state timestamp is the evaluation timestamp. Acceptance time and
 organizational boundary anchors remain separate and no boundary is thereby verified.
 
-## Still deferred
+## Repository boundary
 
-The taxonomy itself does not transition state. ED-0044 adds only static Recording and
-Session acceptance graphs outside this package. Automatic supersession, repositories,
-persistence, execution, state machines, APIs, queues, workers, AI, and frontend
-behavior remain deferred.
+ED-0046 adds a separate infrastructure-neutral repository contract outside this
+taxonomy. It may atomically store an accepted Recording or Session successor and make
+the predecessor's persisted record authoritative as `superseded`. The accepted caller
+state remains immutable and retains its original proposal status; repository status is
+represented by a separate record view.
+
+The taxonomy itself still does not transition or persist state. ED-0046 introduces no
+concrete storage implementation, state machine, execution, API, queue, worker, AI, or
+frontend behavior.

@@ -400,6 +400,33 @@ repository, execute transitions, publish events, create Session aggregates, veri
 boundaries, or introduce APIs, queues, workers, frontend behavior, or AI. These
 invariants close ED0041-F003 while leaving persistence and execution deferred.
 
+## Operational State Repository
+
+ED-0046 defines the backend-only Operational State Repository contract. It consumes one
+already accepted Recording or Session result and atomically stores StageFlow's accepted
+operational understanding. Acceptance and repository remain separate: the repository
+does not invoke policy, invoke acceptance, reinterpret Evidence, or reconstruct state.
+
+The current-state key is exactly one Operational State subject plus state kind, with at
+most one current record. An initial commit succeeds only when no current record exists.
+A successor commit requires the exact current predecessor; a stale predecessor cannot
+overwrite newer state. One Evaluation ID and one acceptance ID may each be committed at
+most once within one repository.
+
+Successful successor commit is the point where descriptive ED-0044 supersession becomes
+authoritative in persisted records. The predecessor record becomes `superseded`, the
+successor becomes the sole `current` record, and oldest-to-newest history plus complete
+acceptance/Event lineage is retained atomically. The caller's immutable predecessor is
+not mutated.
+
+Repository commit time is timezone-aware and remains distinct from Event, Observation,
+Evidence, organizational-anchor, Evaluation, state-derived, acceptance, and boundary
+times. Commit stores understanding only: it does not control a recorder or livestream,
+execute a transition, create a Session aggregate or product, verify a boundary, or
+change physical production reality. ED-0046 adds no concrete storage implementation,
+database, SQL, filesystem persistence, Redis, locks, retries, events, APIs, queues,
+workers, frontend behavior, or AI.
+
 ## Hypothesis Primitives
 
 ED-0008 adds foundational production hypothesis contracts only.
