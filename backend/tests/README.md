@@ -7,14 +7,15 @@ This directory contains backend tests.
 ## Current Scope
 
 The suite covers the backend foundation and implemented Production Context through
-ED-0048. Coverage includes shared and timeline contracts; Production Events, adapters,
+ED-0049. Coverage includes shared and timeline contracts; Production Events, adapters,
 dispatch, and both interpreter foundations; concrete recording, media, clock, schedule,
 transcript, and vision interpretation; Observation and Evidence semantics; generic and
 concrete Evidence Builders; Operational State and transition contracts; Recording
 Transition Policy context safety; Session Boundary Evidence; Session Transition Policy;
 Operational State Acceptance; authoritative Observation, Evidence, evaluation, and
 successor-state context propagation; and Operational State Repository contracts.
-ED-0048 adds the canonical Completed Media Asset contract boundary.
+ED-0048 adds the canonical Completed Media Asset contract boundary. ED-0049 adds
+deterministic candidate stability and safe-to-read readiness evaluation.
 
 Tests remain under `backend/tests/` rather than inside application packages. The suite
 emphasizes contract validation, negative architectural boundaries, deterministic
@@ -59,6 +60,17 @@ capability independence; deterministic normalization; deep metadata immutability
 privacy-safe summaries; and the absence of monitoring, readiness detection, checksum or
 probe execution, Runtime services, transfer, queues, Production Event/Observation/state
 creation, repository use, AI, APIs, workers, or frontend behavior.
+
+ED-0049 adds `asset_readiness_fixtures.py` plus focused contract, conservative-policy,
+stability, conflict, deployment-neutrality, and architecture suites. Coverage includes
+candidate/resource separation; all narrow resource observation types; deterministic
+bundle normalization; explicit parameters; strong, stable, and guarded-manual routes;
+latest-state and outcome precedence; continued growth, replacement, identity, read,
+write, presence, and timestamp conflicts; ED-0048 declaration mapping; first-class
+limitations; input-order determinism; Agent/Node peer treatment; privacy-safe summaries;
+and the absence of monitoring, file access, recorder access, probing, transfer, queues,
+Runtime services, semantic Observation/Evidence/state, AI, APIs, workers, or frontend
+behavior.
 
 ED-0041 reviews test quality without adding speculative future-behavior tests. Findings
 and targeted missing regression cases are documented under `docs/reviews/`.

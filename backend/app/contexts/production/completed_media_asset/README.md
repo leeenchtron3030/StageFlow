@@ -21,6 +21,11 @@ description are separate immutable contracts:
   facts where available;
 - technical description retains optional probe-compatible media facts.
 
+Completion and readiness both retain first-class limitations. ED-0049 uses completion
+limitations for non-blocking gaps such as unavailable independent read or write-state
+assessment; they are not hidden in metadata and do not collapse completion into
+readiness.
+
 The contract records those declarations. It does not detect file stability, assess
 readiness, calculate checksums, probe containers, open files, watch directories, mount
 storage, transfer media, queue work, or control recorders. An actively written or
@@ -86,8 +91,10 @@ and omit sensitive source locations.
 
 ## Future boundaries
 
-ED-0049 may define how a candidate becomes stable, finalized, and safe to read. It
-should stop before transfer or queueing. A later asset-availability adapter may emit a
+ED-0049 defines how supplied facts can justify that a candidate is finalized and safe
+to read, without collecting those facts or constructing a full asset. It stops before
+transfer or queueing, and future work should stop before transfer or queueing unless a
+separate directive authorizes that boundary. A later asset-availability adapter may emit a
 Production Event referencing the asset and manifest IDs:
 
 ```text
