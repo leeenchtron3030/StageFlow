@@ -73,3 +73,17 @@ These resource-state observations are not Production Events or the semantic prod
 Agent, or Node services, APIs, workers, AI, or frontend behavior. Candidates,
 observations, evaluations, and completed media assets are never stored in the
 Operational State Repository. This boundary should stop before transfer or queueing.
+
+## ED-0050 Runtime selection boundary
+
+ED-0050 declares which source, observation, and readiness capabilities a Runtime says it
+can support. Its readiness selection embeds this package's exact immutable policy
+parameters, policy identity and version, required and optional capability IDs, selected
+strong or stability route, and explicit fallback. Agent, Node, and external-compatible
+profiles use identical combination validation.
+
+The Runtime selection is not an evaluation request or result. It does not collect an
+observation bundle, derive a stability window, invoke `ConservativeAssetReadinessPolicy`,
+or assert that any candidate is complete or safe to read. ED-0049 remains the sole
+deterministic evaluation boundary over caller-supplied facts; ED-0050 remains declarative
+configuration for a future executor.

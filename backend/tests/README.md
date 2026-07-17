@@ -7,7 +7,7 @@ This directory contains backend tests.
 ## Current Scope
 
 The suite covers the backend foundation and implemented Production Context through
-ED-0049. Coverage includes shared and timeline contracts; Production Events, adapters,
+ED-0050. Coverage includes shared and timeline contracts; Production Events, adapters,
 dispatch, and both interpreter foundations; concrete recording, media, clock, schedule,
 transcript, and vision interpretation; Observation and Evidence semantics; generic and
 concrete Evidence Builders; Operational State and transition contracts; Recording
@@ -15,7 +15,8 @@ Transition Policy context safety; Session Boundary Evidence; Session Transition 
 Operational State Acceptance; authoritative Observation, Evidence, evaluation, and
 successor-state context propagation; and Operational State Repository contracts.
 ED-0048 adds the canonical Completed Media Asset contract boundary. ED-0049 adds
-deterministic candidate stability and safe-to-read readiness evaluation.
+deterministic candidate stability and safe-to-read readiness evaluation. ED-0050 adds
+the deployment-neutral declarative StageFlow Runtime and combination validation.
 
 Tests remain under `backend/tests/` rather than inside application packages. The suite
 emphasizes contract validation, negative architectural boundaries, deterministic
@@ -71,6 +72,19 @@ limitations; input-order determinism; Agent/Node peer treatment; privacy-safe su
 and the absence of monitoring, file access, recorder access, probing, transfer, queues,
 Runtime services, semantic Observation/Evidence/state, AI, APIs, workers, or frontend
 behavior.
+
+ED-0050 adds `runtime_fixtures.py` plus focused contract, capability, resource-policy,
+collection-plan, readiness-selection, health, deployment-neutrality, and architecture
+suites. Coverage includes one immutable Runtime graph; Agent/Node/external/development
+peer profiles; versioned identity and configuration; source, observation, and readiness
+capability combinations; offline-capable event constraints; production-subordinate
+budgets and pressure responses; explicit ED-0049 parameters and strong/stability
+routes; ED-0048 assembly declarations; first-class limitations; distinct health,
+availability, and validation; deterministic precedence and summaries; multiple Runtime
+identity isolation; metadata and credential safety; and the absence of services,
+monitoring, collection, file or recorder access, readiness execution, asset assembly,
+transfer, queues, Session identity, Production Events, semantic Observations, Evidence,
+Operational State, repositories, AI, APIs, workers, or frontend behavior.
 
 ED-0041 reviews test quality without adding speculative future-behavior tests. Findings
 and targeted missing regression cases are documented under `docs/reviews/`.
