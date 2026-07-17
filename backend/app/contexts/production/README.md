@@ -89,6 +89,26 @@ recorder access, readiness execution, asset assembly, transfer, queue, persisten
 networking, background service, API, worker, AI, or frontend work. Production recording
 remains externally owned and retains priority.
 
+## Media Candidate Collection
+
+ED-0052 adds the first media-facing Agent execution boundary as one explicit,
+synchronous, process-local coordinator. ED-0050 collection plans determine the bounded
+work, and a read-only ED-0051 snapshot gates the cycle at deterministic checkpoints.
+Normal permission permits configured calls; explicitly permitted reduced execution
+prioritizes required observations and defers optional work; essential-only or no
+permission invokes no media-facing port.
+
+Discovery and all ED-0049 observation collection behavior are injected ports. This
+package provides no filesystem or recorder implementation. Candidates deduplicate
+process-locally, incompatible identities become immutable conflicts, and objective
+observations may accumulate across explicit cycles without readiness evaluation or
+ED-0048 asset assembly. Partial facts survive interruption and adapter failure.
+External ports are called outside the coordinator lock, only one cycle is active, and
+there is no scheduler, watcher, polling loop, queue, persistence, transfer, network,
+service, Production Event, semantic Observation/Evidence, Operational State, Session,
+AI, API, worker, or frontend behavior. The port contracts remain reusable by a future
+Node adapter.
+
 ## Transcript Source Adapters
 
 ED-0020 adds foundational transcript source adapter contracts only.

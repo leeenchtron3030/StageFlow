@@ -225,6 +225,11 @@ Architecture Release AR-2.1
 
 Foundational backend contracts are being implemented through approved Engineering Directives. The current objective is to preserve a clear architecture in which runtime ingress remains small and explainable while reasoning stays traceable.
 
+Through ED-0052, the backend now includes a deployment-neutral Runtime, an explicit
+Software Agent lifecycle, and one bounded injected media-candidate/observation
+collection boundary. Concrete filesystem discovery, readiness execution, media asset
+assembly, transfer, queues, persistence, and background services remain future work.
+
 ⸻
 
 License

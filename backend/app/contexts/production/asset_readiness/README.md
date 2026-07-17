@@ -87,3 +87,18 @@ observation bundle, derive a stability window, invoke `ConservativeAssetReadines
 or assert that any candidate is complete or safe to read. ED-0049 remains the sole
 deterministic evaluation boundary over caller-supplied facts; ED-0050 remains declarative
 configuration for a future executor.
+
+## ED-0052 collection boundary
+
+ED-0052 is that first bounded executor for discovery and fact collection, not for
+readiness. Injected ports return `MediaAssetCandidate` values and the five objective
+ED-0049 observation types. One explicit synchronous coordinator cycle deduplicates
+candidates, retains identity conflicts, and may accumulate chronological observations
+across cycles into an immutable `AssetReadinessObservationBundle`.
+
+Collection does not interpret latest state, derive a stability window, invoke
+`ConservativeAssetReadinessPolicy`, produce completion/readiness declarations, or
+construct an ED-0048 asset. Agent permission and explicit budgets can defer or
+interrupt collection without discarding facts already supplied. No filesystem or
+recorder collector is implemented by ED-0052; future Agent and Node adapters supply the
+same ports.

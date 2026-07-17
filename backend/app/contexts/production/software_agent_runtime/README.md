@@ -106,6 +106,14 @@ execution, ED-0048 asset assembly, checksum or probe, transfer, queue, persisten
 Production Event, semantic Observation, Evidence, Operational State, repository,
 Session identity, AI, API, worker, or frontend behavior. Recording remains externally
 owned. A future Node adapter can reuse the ED-0050 Runtime and these lifecycle concepts
-without changing common media semantics. The next boundary should remain narrow: a
-candidate-discovery port and deterministic collection orchestration, without broad
-transfer or asset processing.
+without changing common media semantics.
+
+ED-0052 implements the next narrow boundary separately. A read-only execution-state
+port exposes the current immutable Agent snapshot to one explicit synchronous media
+collection coordinator. The coordinator rechecks permission between bounded external
+calls; it does not resume, stop, pressure-update, or otherwise mutate this lifecycle.
+Normal permission permits configured collection, reduced permission prioritizes
+required observations and skips optional work, and essential-only or none permits no
+media collection. Candidate discovery and objective observation behavior remain
+injected, lock-free port calls. ED-0052 adds no background loop, filesystem/recorder
+implementation, readiness execution, asset assembly, transfer, queue, or persistence.

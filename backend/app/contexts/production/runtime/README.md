@@ -137,3 +137,17 @@ authoritative. Construction performs no work and startup is explicit. Supplied
 production pressure controls lifecycle permission conservatively, with uncertainty
 suspending event-mode work until explicit resume. The lifecycle adds no media access,
 readiness execution, asset assembly, transfer, persistence, service, or Node adapter.
+
+## ED-0052 collection relationship
+
+ED-0052 consumes the validated embedded configuration rather than changing it. One
+explicit synchronous cycle resolves a configured collection plan, target, discovery
+capability, observation capabilities, readiness selection, event mode, and resource
+policy. The Runtime remains declarative: injected ports supply all candidate and
+objective observation facts, while ED-0051 permission gates each bounded call.
+
+Required capability IDs receive priority over optional IDs; reduced permission defers
+optional collection. Candidate and observation facts accumulate process-locally, but
+no readiness route is evaluated and no assembly plan is executed. ED-0052 adds no
+filesystem or recorder adapter, scheduler, persistence, transfer, queue, network, or
+service. Agent and a future Node use the same Runtime meanings and media port contracts.
