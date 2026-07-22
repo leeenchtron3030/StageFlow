@@ -5,6 +5,10 @@ An Agent on a production workstation, a dedicated Node, an external-compatible p
 and a development installation use the same immutable `StageFlowRuntime` graph. Agent
 does not mean lower trust; Node does not mean higher trust. A profile describes
 packaging and placement, never semantic authority, readiness confidence, or priority.
+Development remains first-class when Runtime provenance is mapped into ED-0049
+candidates and future ED-0048 assets. It is never converted to `unknown` or recovered
+from metadata; `unknown` is reserved for genuinely unavailable or unresolved profile
+information.
 
 The Runtime is a declarative technical boundary. It says which identity, version, host,
 configuration, capabilities, source scopes, collection plans, readiness routes,
@@ -151,3 +155,16 @@ optional collection. Candidate and observation facts accumulate process-locally,
 no readiness route is evaluated and no assembly plan is executed. ED-0052 adds no
 filesystem or recorder adapter, scheduler, persistence, transfer, queue, network, or
 service. Agent and a future Node use the same Runtime meanings and media port contracts.
+
+## ED-0053 local-filesystem adapter relationship
+
+ED-0053 consumes, but does not mutate, the Runtime graph. Its immutable binding must
+match the Runtime, configuration, plan, target, source/discovery capabilities, scheme,
+absolute target reference, host, volume, Stage, recording block, recorder, and asset-kind
+hint exactly. Agent, Node, and Development profiles use the same filtering, bounds,
+identity, and candidate semantics; profile remains provenance only.
+
+The adapter supports only explicitly configured `local_file` and `mounted_volume`
+sources. It does not mount, authenticate, discover network resources, infer context from
+paths, change resource policy, evaluate the configured readiness route, assemble an
+asset, or add Runtime lifecycle behavior.

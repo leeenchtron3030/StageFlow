@@ -623,3 +623,20 @@ The timeline contracts must be able to represent a session range even if that ra
 ## Future Relationships
 
 Future directives for ingestion, transcript generation, editorial review, rendering, packaging, and delivery should depend on these timeline contracts rather than treating raw recording files as sessions.
+
+## Bounded Local Filesystem Discovery
+
+ED-0053 adds StageFlow's first concrete media-source adapter as a separate
+implementation of the ED-0052 discovery port. One explicit request inspects one exact
+local-file or mounted-volume target as either a single file or one shallow directory.
+The adapter enforces independent directory-entry and candidate bounds, blocks oversized
+directories without arbitrary subsets, follows no symlinks, opens no media content, and
+uses no watcher, polling, recursion, retry, thread, service, network, or persistence.
+
+Explicit eligibility configuration determines filename-extension, hidden-entry, and
+excluded-suffix filtering. Candidate time is anchored to the request, stable filesystem
+identity is preferred, and location-scoped fallback is limited explicitly. Filename,
+path, extension, Runtime profile, active-looking names, and zero-byte state make no
+completion, readiness, validity, Session, or authoritative production-context claim.
+ED-0050 target Stage and recording-block facts remain authoritative; future ED-0054
+resource snapshot observation remains separate.

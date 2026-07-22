@@ -27,8 +27,9 @@ retains its objective facts, and prevents disallowed later calls.
 Discovery and the five ED-0049 observation categories are supplied by synchronous
 ports. This package contains no filesystem or recorder adapter. Candidate and
 observation-call budgets are positive and explicit; remaining candidate budget is
-passed to discovery. Candidate order is target ID, candidate ID, proposed asset ID,
-then resource ID. Required observations precede optional observations, with the stable
+passed to discovery. Canonical discovery order is target and descriptive source
+location, with candidate, proposed-asset, and resource IDs as deterministic
+tie-breakers. Required observations precede optional observations, with the stable
 per-category order presence, snapshot, finalization, write state, and read access.
 
 Adapter exceptions become typed failed results and are never retried automatically.
@@ -69,3 +70,13 @@ Agent is the first execution placement, not a different media-semantics tier. A 
 Node adapter can supply the same discovery and observation port contracts. ED-0053
 should add one bounded read-only local-filesystem candidate-discovery adapter while
 preserving explicit cycles and avoiding watchers or continuous polling.
+
+## ED-0053 concrete discovery adapter
+
+ED-0053 implements exactly the candidate-discovery port in a separate package. It maps
+one request to one immutable ED-0050 target binding, uses the request candidate budget,
+and returns canonical discovery results and ED-0049 candidates. The adapter owns no
+coordinator state, deduplication, observation calls, readiness policy, retry, or next
+cycle. Its single-file or shallow-directory metadata inspection is read-only, bounded,
+symlink-safe, request-time anchored, and deterministic. ED-0052 continues to own cycle
+permission, orchestration, process-local accumulation, identity conflicts, and replay.

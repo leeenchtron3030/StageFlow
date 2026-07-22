@@ -33,6 +33,7 @@ from app.contexts.production.completed_media_asset import (
         CompletedMediaAssetRuntimeProfile.AGENT,
         CompletedMediaAssetRuntimeProfile.NODE,
         CompletedMediaAssetRuntimeProfile.EXTERNAL_COMPATIBLE_SOURCE,
+        CompletedMediaAssetRuntimeProfile.DEVELOPMENT,
         CompletedMediaAssetRuntimeProfile.UNKNOWN,
     ),
 )
@@ -47,6 +48,8 @@ def test_every_runtime_profile_uses_the_same_strong_policy_rules(
 
     result = make_policy().evaluate(candidate, bundle, make_request())
 
+    assert candidate.runtime_profile is profile
+    assert candidate.metadata == {}
     assert result.outcome is AssetReadinessOutcome.SAFE_TO_READ
     assert result.policy_parameters == make_parameters()
 
@@ -69,13 +72,21 @@ def test_agent_and_node_equivalent_inputs_have_equivalent_semantic_results() -> 
 def test_runtime_profile_changes_only_summary_provenance() -> None:
     agent = make_candidate(runtime_profile=CompletedMediaAssetRuntimeProfile.AGENT)
     node = make_candidate(runtime_profile=CompletedMediaAssetRuntimeProfile.NODE)
+    development = make_candidate(
+        runtime_profile=CompletedMediaAssetRuntimeProfile.DEVELOPMENT
+    )
     bundle = make_stability_bundle()
     result = make_policy().evaluate(agent, bundle, make_request())
 
     agent_summary = AssetReadinessSummary.from_evaluation(result, agent)
     node_summary = AssetReadinessSummary.from_evaluation(result, node)
+    development_summary = AssetReadinessSummary.from_evaluation(result, development)
 
     assert replace(agent_summary, runtime_profile=node.runtime_profile) == node_summary
+    assert (
+        replace(agent_summary, runtime_profile=development.runtime_profile)
+        == development_summary
+    )
 
 
 def test_arbitrary_filename_has_no_effect_on_readiness() -> None:
