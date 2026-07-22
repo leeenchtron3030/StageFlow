@@ -22,6 +22,7 @@ class CompletedMediaAssetRuntimeProfile(StrEnum):
     AGENT = "agent"
     NODE = "node"
     EXTERNAL_COMPATIBLE_SOURCE = "external_compatible_source"
+    DEVELOPMENT = "development"
     UNKNOWN = "unknown"
 
 

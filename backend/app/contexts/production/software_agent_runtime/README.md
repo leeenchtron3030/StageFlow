@@ -117,3 +117,10 @@ required observations and skips optional work, and essential-only or none permit
 media collection. Candidate discovery and objective observation behavior remain
 injected, lock-free port calls. ED-0052 adds no background loop, filesystem/recorder
 implementation, readiness execution, asset assembly, transfer, queue, or persistence.
+
+ED-0053 supplies one such discovery-port implementation without changing Agent
+lifecycle. The adapter trusts only the permission value carried by ED-0052's request;
+it never queries, resumes, stops, pressure-updates, or publishes this lifecycle. Normal
+and explicitly allowed reduced cycles may invoke one bounded discovery call. None or
+essential-only permission is blocked before filesystem access, and ED-0052 still owns
+the before/after permission checkpoints and all recurrence decisions.

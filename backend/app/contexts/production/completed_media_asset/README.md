@@ -67,12 +67,15 @@ related asset IDs without media assembly or reconciliation.
 
 ## Deployment neutrality
 
-Software Agent, dedicated Node, external compatible source, and future Runtime profiles
-produce the same contract and satisfy identical validation. Runtime profile, host,
-recorder, adapter, producer, and source Event references are provenance only. Agent does
-not mean lower trust; Node does not mean higher trust. Mixed deployment is supported,
-packaging may differ, and shared Runtime semantics remain canonical. Borrowed compute is
-preferred until dedicated hardware demonstrates evidence-backed operational value.
+Software Agent, dedicated Node, external-compatible source, Development, and genuinely
+unknown Runtime profiles produce the same contract and satisfy identical validation.
+Development is first-class authoritative source provenance, not metadata and not a
+trust tier. `unknown` is reserved for provenance that is actually unavailable or
+unresolved. Runtime profile, host, recorder, adapter, producer, and source Event
+references are provenance only. Agent does not mean lower trust; Node does not mean
+higher trust. Mixed deployment is supported, packaging may differ, and shared Runtime
+semantics remain canonical. Borrowed compute is preferred until dedicated hardware
+demonstrates evidence-backed operational value.
 
 Optional capabilities may differ without creating first- and second-class assets. A
 Node may provide detailed volume information while an Agent omits recorder version;
@@ -99,9 +102,11 @@ read a source, calculate integrity, infer context from a filename or path, trans
 queue media, or change the ED-0048 validity rules.
 
 Runtime, recorder, adapter, and explicitly configured context can be declared as future
-inputs. Filename-only and path-only context remain non-authoritative hints. Agent and
-Node profiles continue to produce identical asset meaning; Runtime profile never adds
-trust, authority, or downstream eligibility.
+inputs. Filename-only and path-only context remain non-authoritative hints. Agent, Node,
+Development, external-compatible, and unknown profiles continue to produce identical
+asset meaning; Runtime profile never adds trust, authority, or downstream eligibility.
+Metadata may add descriptive deployment details but never substitutes for the
+first-class profile.
 
 ## Future boundaries
 

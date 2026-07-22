@@ -24,6 +24,7 @@ from app.shared.ids import CorrelationId, EntityId
         CompletedMediaAssetRuntimeProfile.AGENT,
         CompletedMediaAssetRuntimeProfile.NODE,
         CompletedMediaAssetRuntimeProfile.EXTERNAL_COMPATIBLE_SOURCE,
+        CompletedMediaAssetRuntimeProfile.DEVELOPMENT,
         CompletedMediaAssetRuntimeProfile.UNKNOWN,
     ),
 )
@@ -33,6 +34,7 @@ def test_every_runtime_profile_uses_the_same_canonical_contract(
     asset = make_completed_media_asset(runtime_profile=profile)
 
     assert asset.source.runtime_profile is profile
+    assert CompletedMediaAssetRuntimeProfile(profile.value) is profile
     assert asset.kind is CompletedMediaAssetKind.RECORDING_SEGMENT
     assert asset.readiness.status is CompletedMediaAssetReadinessStatus.SAFE_TO_READ
     assert asset.manifest.asset_id == asset.id
@@ -70,13 +72,39 @@ def test_deployment_profile_changes_provenance_not_asset_identity_semantics() ->
         asset_id=asset_id,
         runtime_profile=CompletedMediaAssetRuntimeProfile.NODE,
     )
+    development = make_completed_media_asset(
+        asset_id=asset_id,
+        runtime_profile=CompletedMediaAssetRuntimeProfile.DEVELOPMENT,
+    )
 
-    assert agent.id == node.id == asset_id
-    assert agent.kind is node.kind
-    assert agent.readiness.status is node.readiness.status
-    assert agent.integrity is not None and node.integrity is not None
-    assert agent.integrity.status is node.integrity.status
-    assert agent.source.runtime_profile is not node.source.runtime_profile
+    assert agent.id == node.id == development.id == asset_id
+    assert agent.kind is node.kind is development.kind
+    assert agent.readiness.status is node.readiness.status is development.readiness.status
+    assert agent.integrity is not None
+    assert node.integrity is not None
+    assert development.integrity is not None
+    assert agent.integrity.status is node.integrity.status is development.integrity.status
+    assert {
+        agent.source.runtime_profile,
+        node.source.runtime_profile,
+        development.source.runtime_profile,
+    } == {
+        CompletedMediaAssetRuntimeProfile.AGENT,
+        CompletedMediaAssetRuntimeProfile.NODE,
+        CompletedMediaAssetRuntimeProfile.DEVELOPMENT,
+    }
+
+
+def test_development_asset_provenance_is_first_class_without_metadata() -> None:
+    asset = make_completed_media_asset(
+        runtime_profile=CompletedMediaAssetRuntimeProfile.DEVELOPMENT,
+    )
+    source_without_metadata = replace(asset.source, metadata={})
+
+    rebuilt = replace(asset, source=source_without_metadata)
+
+    assert rebuilt.source.runtime_profile is CompletedMediaAssetRuntimeProfile.DEVELOPMENT
+    assert rebuilt.source.metadata == {}
 
 
 def test_optional_runtime_capabilities_do_not_create_asset_tiers() -> None:

@@ -19,6 +19,7 @@ deterministic candidate stability and safe-to-read readiness evaluation. ED-0050
 the deployment-neutral declarative StageFlow Runtime and combination validation.
 ED-0051 adds the first explicit in-process Software Agent Runtime lifecycle. ED-0052
 adds explicit bounded media-candidate discovery and objective observation orchestration.
+ED-0053 adds the first concrete bounded local-filesystem candidate-discovery adapter.
 
 Tests remain under `backend/tests/` rather than inside application packages. The suite
 emphasizes contract validation, negative architectural boundaries, deterministic
@@ -114,6 +115,25 @@ semantic/state creation, AI, APIs, workers, or frontend behavior.
 
 ED-0041 reviews test quality without adding speculative future-behavior tests. Findings
 and targeted missing regression cases are documented under `docs/reviews/`.
+
+ED-0053 adds `local_filesystem_discovery_fixtures.py` plus focused contract, adapter,
+bound/security, identity, deployment/conformance, and architecture suites. Coverage
+includes inert construction; immutable Runtime/target/policy configuration; single-file
+and shallow-directory scopes; exact entry bounds and bound-plus-one overflow detection;
+deterministic candidate truncation; explicit extension, hidden, and suffix filters;
+regular-file and symlink safety; missing, inaccessible, mismatched, raced, partial,
+unsupported, and failed outcomes; stable and location-scoped identity; request-anchored
+timestamps; active and zero-byte candidates; ED-0052 coordinator conformance; Agent,
+Node, and Development semantic parity; read-only behavior; sanitized errors; and the
+absence of content reads, recursion, watchers, polling, retries, media processing,
+readiness, asset assembly, transfer, queue, persistence, network, service, downstream
+state, AI, API, worker, or frontend behavior.
+
+The ED-0053 completion-gap correction expands the canonical ED-0048/ED-0049 media
+profile vocabulary with first-class `development`. Focused deployment-neutrality and
+identity tests prove Development needs no metadata, unknown remains valid only as an
+explicit unresolved category, and profile does not alter discovery identity, ordering,
+readiness policy results, or Completed Media Asset meaning.
 
 ## What Does Not Belong Here
 

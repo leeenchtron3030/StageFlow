@@ -64,9 +64,12 @@ readiness timestamps remain semantically distinct and timezone-aware. Limitation
 first-class on observations, derived results, and declarations rather than being hidden
 in metadata.
 
-Agent, Node, and external-compatible Runtime profiles are peers. Agent does not mean
-lower trust, Node does not mean higher trust, and profile never selects a more permissive
-rule. Unsupported capabilities are represented honestly instead of being invented.
+Agent, Node, external-compatible, Development, and genuinely unknown Runtime profiles
+are peers. Development is first-class candidate provenance, not metadata and not a
+trust tier. `unknown` is reserved for provenance that is unavailable or unresolved.
+Agent does not mean lower trust; Node does not mean higher trust. Profile never selects
+a more permissive rule or changes candidate, completion, readiness, or future asset
+meaning. Unsupported capabilities are represented honestly instead of being invented.
 
 These resource-state observations are not Production Events or the semantic production
 `Observation` domain. The package does not create Production Events, Evidence, Runtime,
@@ -79,8 +82,8 @@ Operational State Repository. This boundary should stop before transfer or queue
 ED-0050 declares which source, observation, and readiness capabilities a Runtime says it
 can support. Its readiness selection embeds this package's exact immutable policy
 parameters, policy identity and version, required and optional capability IDs, selected
-strong or stability route, and explicit fallback. Agent, Node, and external-compatible
-profiles use identical combination validation.
+strong or stability route, and explicit fallback. Agent, Node, external-compatible,
+Development, and unknown profiles use identical combination validation.
 
 The Runtime selection is not an evaluation request or result. It does not collect an
 observation bundle, derive a stability window, invoke `ConservativeAssetReadinessPolicy`,
@@ -102,3 +105,22 @@ construct an ED-0048 asset. Agent permission and explicit budgets can defer or
 interrupt collection without discarding facts already supplied. No filesystem or
 recorder collector is implemented by ED-0052; future Agent and Node adapters supply the
 same ports.
+
+## ED-0053 candidate boundary
+
+ED-0053 supplies only the first step: eligible regular filesystem entries become
+immutable `MediaAssetCandidate` values. Stable object identity is preferred; a
+location-scoped fallback carries explicit limitations. Extension-derived media,
+container, or asset-kind values remain hints, while Stage and recording-block context
+comes only from the configured ED-0050 target.
+
+The candidate's Runtime profile is canonical first-class provenance. A Development
+Runtime produces `runtime_profile = development`; downstream consumers never need
+metadata to recover it. Profile remains excluded from resource, candidate, and proposed
+asset identity seeds and does not affect eligibility, ordering, or readiness meaning.
+
+The adapter intentionally omits final size, filesystem modification time, checksums,
+duration, content probes, write/read/finalization facts, stability windows, completion,
+and readiness. Active and zero-byte files may be candidates. Future ED-0054 snapshot
+observation must remain a separate one-shot objective fact supplier; ED-0049 remains the
+only readiness evaluation boundary.

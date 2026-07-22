@@ -149,6 +149,7 @@ def test_source_and_provenance_preserve_runtime_recorder_and_event_ids() -> None
         "agent",
         "node",
         "external_compatible_source",
+        "development",
         "unknown",
     }
 

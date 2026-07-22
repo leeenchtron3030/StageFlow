@@ -117,6 +117,23 @@ class DiscoveredMediaCandidate:
         )
 
 
+def _discovered_candidate_order_key(
+    value: DiscoveredMediaCandidate,
+) -> tuple[str, ...]:
+    resource = value.candidate.primary_resource
+    location = resource.source_location.location_value
+    return (
+        value.collection_target_id.value,
+        location.casefold(),
+        location,
+        resource.original_filename.casefold(),
+        resource.original_filename,
+        value.candidate.id.value,
+        value.candidate.proposed_asset_id.value,
+        resource.id.value,
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class MediaCandidateDiscoveryResult:
     discovery_request_id: EntityId
@@ -163,12 +180,7 @@ class MediaCandidateDiscoveryResult:
             tuple(
                 sorted(
                     normalized,
-                    key=lambda value: (
-                        value.collection_target_id.value,
-                        value.candidate.id.value,
-                        value.candidate.proposed_asset_id.value,
-                        value.candidate.primary_resource.id.value,
-                    ),
+                    key=_discovered_candidate_order_key,
                 )
             ),
         )
