@@ -2,7 +2,9 @@
 
 ## Purpose
 
-This directory is reserved for implementation-facing architecture support material that complements the canonical specifications.
+This directory remains reserved for implementation-facing diagrams and support assets.
+The current architecture documentation entry point is
+[`docs/architecture/README.md`](../docs/architecture/README.md).
 
 ## What Belongs Here
 
@@ -18,6 +20,6 @@ This directory is reserved for implementation-facing architecture support materi
 
 ## Expected Future Directives
 
-- ED-0002 Backend Foundation may add backend architecture support notes.
-- ED-0003 Frontend Foundation may add frontend architecture support notes.
-- ED-0005 Production Context Foundation may add production-context implementation maps.
+Future directives may add approved implementation maps or diagrams here when those
+artifacts are clearer outside the canonical Markdown architecture set. Do not place
+unapproved decisions or duplicate architecture documents here.

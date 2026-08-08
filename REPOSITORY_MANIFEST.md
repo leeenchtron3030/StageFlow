@@ -186,7 +186,7 @@ transfer, queue, persistence, network, service, or downstream semantic/state beh
 | `.` | Repository root for StageFlow governance, specifications, and future implementation. | ED-0001 | Contains root-level project and governance documents. |
 | `.github/` | GitHub repository governance and future automation metadata. | ED-0001 | Workflows are reserved for future directives. |
 | `.github/workflows/` | Reserved location for GitHub Actions workflows. | ED-0001 | No workflows are created by ED-0001. |
-| `architecture/` | Implementation-facing architecture support material. | ED-0001 | Complements, but does not replace, canonical architecture docs. |
+| `architecture/` | Implementation-facing architecture diagrams and support material. | ED-0001 / architecture baseline disposition | Points to, but does not replace, the canonical `docs/architecture/` index. |
 | `assets/` | Versioned static assets for documentation, examples, or future product surfaces. | ED-0001 | Runtime media remains excluded by `.gitignore`. |
 | `backend/` | Python FastAPI backend workspace. | ED-0002 | Managed with `uv`; contains no StageFlow business logic in ED-0002. |
 | `backend/app/` | Backend application package root. | ED-0002 | Contains API, context, shared, core, and bootstrap packages. |
@@ -351,7 +351,10 @@ transfer, queue, persistence, network, service, or downstream semantic/state beh
 | `backend/app/shared/time/` | Shared time package. | ED-0004 | Contains clocks, timestamp alias, and time range. |
 | `backend/tests/` | Backend test suite. | ED-0002 through ED-0053 / reviewed by ED-0041 | Contains health, shared, Production Event, interpreter, Observation, Evidence, context resolution, builder, Operational State, transition, acceptance, repository, completed-media, readiness, Runtime, Agent, collection, and bounded local-filesystem discovery tests. |
 | `docs/` | Canonical and supporting architecture documentation. | Existing architecture work | Preserved by ED-0001. |
-| `docs/reviews/` | Structured architecture and codebase review reports. | ED-0041 | Contains the ED-0041 review, findings register, and directive roadmap. |
+| `docs/architecture/` | Current architecture index, accepted principles, system context, glossary, and Session/media lifecycle guidance. | Architecture baseline disposition | Separates current implementation, accepted direction, future work, and open decisions. |
+| `docs/adr/` | ADR process, index, and individual ADRs after ADR-0018. | Architecture baseline disposition | Preserves ADR-0001 through ADR-0018 in `ARCHITECTURE_DECISIONS.md`. |
+| `docs/plans/` | Implementation-plan process and reusable template. | Architecture baseline disposition | Plans require explicit approval and do not decide architecture. |
+| `docs/reviews/` | Structured architecture/codebase reviews and dispositions. | ED-0041 / architecture baseline disposition | Reviews are evidence; dispositions record accepted authority. |
 | `examples/` | Future examples that demonstrate approved implementation patterns. | ED-0001 | No application examples are created by ED-0001. |
 | `frontend/` | Next.js frontend workspace. | ED-0003 | Contains no backend communication or business logic in ED-0003. |
 | `frontend/app/` | Next.js App Router root. | ED-0003 | Contains only the root layout, root page, and global styles. |
@@ -388,15 +391,16 @@ transfer, queue, persistence, network, service, or downstream semantic/state beh
 | `.env.example` | Example environment file. | Existing repository work | Preserved by ED-0001. |
 | `.gitattributes` | Git text and binary file handling rules. | Existing repository work | Preserved by ED-0001. |
 | `.gitignore` | Ignored local, generated, runtime, and dependency files. | Existing repository work / ED-0003 | ED-0003 adds TypeScript build cache ignore coverage. |
-| `ARCHITECTURE_DECISIONS.md` | Architecture Decision Record index. | ED-0001 | Initialized with ADR-0001 through ADR-0005. |
+| `AGENTS.md` | Durable repository-specific instructions for Codex and contributors. | Architecture baseline disposition | Links architecture authority, verified commands, scope, compatibility, dependency, test, and reporting rules. |
+| `ARCHITECTURE_DECISIONS.md` | Preserved monolithic Architecture Decision Records. | ED-0001 / AR-2.1 | Contains ADR-0001 through ADR-0018; newer ADRs are indexed under `docs/adr/`. |
 | `CHANGELOG.md` | Future release and change history. | Existing repository work | Preserved by ED-0001. |
 | `CONTRIBUTING.md` | Initial contributor guide and engineering process expectations. | ED-0001 | Establishes specification-first contribution rules. |
-| `ENGINEERING_DIRECTIVES.md` | Engineering Directive index. | ED-0001 / ED-0047 | Registers approved and implemented directives through ED-0047. |
+| `ENGINEERING_DIRECTIVES.md` | Engineering Directive index. | ED-0001 through ED-0053 | Registers approved and implemented directives through ED-0053. |
 | `IMPLEMENTATION_PLAN.md` | High-level staged implementation plan. | ED-0001 | Governance only; no implementation detail. |
 | `LICENSE` | Repository license. | ED-0001 | MIT License. |
 | `PRODUCT_CONSTITUTION.md` | Canonical product constitution. | Existing architecture work | Preserved by ED-0001. |
-| `README.md` | Repository introduction. | Existing repository work | Preserved by ED-0001. |
-| `REPOSITORY_MANIFEST.md` | Repository structure and ownership manifest. | ED-0001 / ED-0047 | Created by ED-0001 and updated through the ED-0047 in-memory repository proof implementation. |
+| `README.md` | Repository introduction and current baseline summary. | Existing repository work / architecture baseline disposition | Links the current architecture index and reports implementation through ED-0053. |
+| `REPOSITORY_MANIFEST.md` | Repository structure and ownership manifest. | ED-0001 / architecture baseline disposition | Includes the development-flow architecture, ADR, review, and plan framework. |
 | `ROADMAP.md` | Future roadmap document. | Existing repository work | Preserved by ED-0001. |
 
 ## Backend Files
@@ -856,6 +860,21 @@ transfer, queue, persistence, network, service, or downstream semantic/state beh
 | `docs/04.5_Bounded_Contexts.md` | Bounded Contexts specification. | Existing architecture work / AR-2.1 | AR-2.1 notes that Perception Layer contracts remain in Production pending future bounded-context realignment. |
 | `docs/04.6_Integration_Architecture.md` | Integration Architecture specification. | Existing architecture work / AR-2.1 | AR-2.1 clarifies adapters emit Production Events and Observation Interpreters produce objective Observations before reasoning. |
 | `docs/05_Reasoning_Model.md` | Reasoning Model architecture reference. | AR-1.4 / AR-2.0 / AR-2.1 | AR-2.1 consolidates the Perception Layer between Production Events and Objective Observations. |
+| `docs/architecture/README.md` | Current architecture documentation index and authority/precedence process. | Architecture baseline disposition D-10 | Defines current, accepted, future, open, legacy, and superseded status vocabulary. |
+| `docs/architecture/principles.md` | Accepted architecture principles and current alignment. | Architecture baseline disposition | Records only accepted principles and their implications/non-goals. |
+| `docs/architecture/system-context.md` | Current runtime map and accepted future boundaries. | Architecture baseline disposition | Does not portray proposed persistence, workers, providers, or workflows as implemented. |
+| `docs/architecture/domain-glossary.md` | Qualified canonical terminology and unresolved vocabulary. | Architecture baseline disposition ABR-013 | Does not authorize a broad code rename. |
+| `docs/architecture/session-lifecycle.md` | Current Session-related contracts and accepted lifecycle direction. | Architecture baseline disposition D-01/D-06 | Leaves creation, reconciliation, and detailed late-media policy open. |
+| `docs/architecture/segment-lifecycle.md` | Current media contracts and accepted candidate-to-asset lifecycle. | Architecture baseline disposition D-05 | Preserves discovery, observation, readiness, registration, and Session association boundaries. |
+| `docs/adr/README.md` | ADR process and index. | Architecture baseline disposition | Indexes historical, new accepted, and unresolved ADR candidates. |
+| `docs/adr/ADR-0019-stable-ingress-and-interpreter-boundary.md` | Stable ingress identity and one dispatcher-facing interpreter protocol. | Architecture baseline disposition D-04 | Accepted; not implemented. |
+| `docs/adr/ADR-0020-canonical-media-to-event-path.md` | Canonical Media Asset Candidate-to-registration-Event path. | Architecture baseline disposition D-05 | Accepted; durable path not implemented. |
+| `docs/adr/ADR-0021-time-authority.md` | Domain and infrastructure timestamp authority. | Architecture baseline disposition D-07 | Accepted; legacy correction remains future work. |
 | `docs/reviews/ED-0041_ARCHITECTURE_CODEBASE_REVIEW.md` | Comprehensive architecture and codebase review through ED-0040. | ED-0041 | Covers all required review areas, four representative flow traces, repository health, state-acceptance readiness, positive findings, risks, and the explicit review decision. |
 | `docs/reviews/ED-0041_FINDINGS_REGISTER.md` | Evidence-backed ED-0041 findings register. | ED-0041 / ED-0044 / ED-0045 | Records severity, category, evidence, impact, response, change risk, directive, and disposition for every finding; ED-0044 closes ED0041-F003 and ED-0045 closes ED0041-F004. |
 | `docs/reviews/ED-0041_DIRECTIVE_ROADMAP.md` | Prioritized post-review directive roadmap. | ED-0041 | Separates pre-ED-0042 blockers, ED-0042 constraints, targeted follow-ups, deferred improvements, and intentionally unchanged patterns. |
+| `docs/reviews/architecture-baseline-review.md` | Repository-wide architecture and consistency evidence at `e75b1a4`. | Architecture baseline review | Analysis artifact; not decision authority by itself. |
+| `docs/reviews/architecture-baseline-disposition.md` | Authoritative disposition of the architecture baseline review. | Project architecture disposition | Records accepted, qualified, deferred, protected, and open outcomes. |
+| `docs/reviews/README.md` | Review/disposition process and index. | Architecture baseline disposition | Defines evidence, naming, authority, and supersession rules. |
+| `docs/plans/README.md` | Implementation-plan process and index. | Architecture baseline disposition | Defines plan triggers, statuses, approval, deviations, and completion history. |
+| `docs/plans/TEMPLATE.md` | Reusable implementation-plan template. | Architecture baseline disposition | Covers scope, migration, failure/recovery, observability, tests, rollback, and completion. |

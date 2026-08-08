@@ -91,7 +91,14 @@ Implementation follows the specifications.
 
 The specifications do not evolve to justify implementation decisions.
 
-Current specification documents include:
+Start with the current [architecture documentation index](docs/architecture/README.md),
+which distinguishes implemented behavior, accepted architecture, future direction, and
+open decisions while preserving the historical specifications below.
+
+The historical specification roadmap includes the following document categories. Not all
+categories are present or implemented at the current repository baseline; use the
+architecture index and Engineering Directive index to determine current authority and
+scope.
 
 * Product Manifesto
 * System Architecture
@@ -225,10 +232,11 @@ Architecture Release AR-2.1
 
 Foundational backend contracts are being implemented through approved Engineering Directives. The current objective is to preserve a clear architecture in which runtime ingress remains small and explainable while reasoning stays traceable.
 
-Through ED-0052, the backend now includes a deployment-neutral Runtime, an explicit
-Software Agent lifecycle, and one bounded injected media-candidate/observation
-collection boundary. Concrete filesystem discovery, readiness execution, media asset
-assembly, transfer, queues, persistence, and background services remain future work.
+Through ED-0053, the backend now includes a deployment-neutral Runtime, an explicit
+Software Agent lifecycle, one bounded injected media-candidate/observation collection
+boundary, and one synchronous bounded local-filesystem candidate-discovery adapter.
+Readiness execution, media asset assembly, transfer, queues, persistence, application
+composition, and background services remain future work.
 
 ⸻
 
