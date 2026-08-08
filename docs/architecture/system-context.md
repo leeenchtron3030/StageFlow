@@ -1,6 +1,7 @@
 # StageFlow system context
 
-**Baseline:** commit `e75b1a4`, through ED-0053
+**Baseline:** Contract Stabilization correction branch, through the durable-ingress and
+strict-aware timestamp foundations
 
 ## System purpose
 
@@ -32,8 +33,9 @@ claim a Job, run transcription, package a Session, or deliver an output.
 | FastAPI application | Resolve four service-shell settings, configure logging, enter a minimal lifespan, serve `GET /api/v1/health` | Process state only; health is liveness |
 | Next.js application | Render one static status page | No backend client or workflow state |
 | Shared contracts | IDs, errors, results, clocks, and time ranges | Pure/in-memory values |
-| Production Events/adapters | Provider-neutral source event contracts | Caller-created; no ingress store |
-| Dispatcher/interpreters | Routing contract and concrete Event-to-Observation interpreters | Caller-created; dispatcher/concrete protocol mismatch remains accepted remediation work |
+| Production Events/adapters | Provider-neutral source event contracts plus stable ingress identity | PostgreSQL ingress repository exists but is not composed into FastAPI/startup |
+| Dispatcher/interpreters | One structural routing protocol and concrete Event-to-Observation adapters | Caller-created; deterministic synchronous dispatch |
+| PostgreSQL ingress adapter | Transactional source-key/fingerprint registration and stable Production Event identity | Durable when used with PostgreSQL; real database validation remains environment-gated |
 | Evidence/reasoning/state policies | Deterministic transformation and transition contracts | Caller-invoked; no orchestrator or durable lineage store |
 | In-memory Operational State repository | Atomic accepted Recording/Session state, lineage, revision, and operation replay | Thread-safe and explicitly process-local |
 | StageFlow Runtime and Software Agent | Immutable deployment description and explicit synchronous lifecycle | Thread-safe and process-local; not started by FastAPI |
@@ -56,9 +58,10 @@ flowchart LR
     ResourceFacts -. caller-only policy .-> Readiness[Readiness evaluation]
     Readiness -. no assembler or registry .-> Asset[Completed Media Asset]
 
-    Source[Source event contract] --> ProductionEvent[Production Event]
-    ProductionEvent --> Dispatcher[Dispatcher contract]
-    ProductionEvent --> Interpreter[Concrete Observation Interpreter]
+    Source[Source fact] --> Ingress[Durable ingress repository]
+    Ingress --> ProductionEvent[Stable Production Event]
+    ProductionEvent --> Dispatcher[Dispatcher]
+    Dispatcher --> Interpreter[Concrete Observation Interpreter adapter]
     Interpreter --> Observation[Semantic Observation]
     Observation --> Evidence[Evidence]
     Evidence --> Reasoning[Hypothesis / Finding / Verification / Product]
@@ -67,13 +70,14 @@ flowchart LR
 ```
 
 Solid arrows are directly callable. Dashed arrows mark accepted or structurally intended
-boundaries that are not composed at this baseline. The dispatcher and concrete
-interpreters require the accepted compatibility correction before the depicted routing
-path can be used as one runtime boundary.
+boundaries that are not composed at this baseline. The ingress-to-dispatch route is
+directly callable but is not wired into application startup or a continuous source.
 
 ## Current persistence and side effects
 
-- No database, migration, durable queue, worker, outbox, or media registry exists.
+- One PostgreSQL ingress table, repository adapter, and forward/reversal migration exist;
+  no composed connection ownership, durable queue, worker, outbox, or media registry
+  exists.
 - Operational State, Agent history, collection history, and operation replay are in
   memory and disappear on process termination.
 - The local adapter performs `stat`/`lstat`/`scandir`-style metadata inspection only. It
@@ -91,8 +95,9 @@ path can be used as one runtime boundary.
   caller's filesystem namespace.
 - Current contracts can run without Internet access, but there is no complete offline
   event workflow to deploy.
-- PostgreSQL, Redis, workers, FFmpeg, transcription models, containers, and provider
-  services appearing in older documents are future examples, not current dependencies.
+- PostgreSQL is the accepted authoritative store and Psycopg is a current backend
+  dependency; Redis, workers, FFmpeg, transcription models, containers, and provider
+  services remain absent.
 
 ## Accepted future boundaries
 

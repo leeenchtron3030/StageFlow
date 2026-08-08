@@ -30,8 +30,8 @@ ADRs, or the authoritative architecture-baseline disposition. “Accepted” doe
   event.
 - **Current alignment:** **Aligned.** The backend is one application; no broker or remote
   internal service exists.
-- **Related decisions:** ADR-0001; disposition D-02 and D-03. Exact database and worker
-  details remain open.
+- **Related decisions:** ADR-0001; ADR-0022; disposition D-02 and D-03. Worker details
+  remain open.
 
 ## 3. Event-mode operation is locally capable
 
@@ -92,10 +92,11 @@ ADRs, or the authoritative architecture-baseline disposition. “Accepted” doe
   idempotent commits, and startup reconciliation.
 - **Non-goals:** Full event sourcing, exactly-once claims, or durable infrastructure before
   operational behavior needs it.
-- **Current alignment:** **Not implemented.** Current repository, coordinator, and Agent
-  histories are explicitly process-local.
-- **Related decisions:** Disposition D-02, D-03, and D-09. Database technology, schema,
-  migrations, backup/restore, and deployment topology remain open.
+- **Current alignment:** **Partially implemented.** PostgreSQL authority, one durable
+  ingress schema/repository, and explicit migration/reversal exist. Runtime composition,
+  other durable records, reconciliation, backup/restore, and deployment operations do
+  not.
+- **Related decisions:** ADR-0019; ADR-0022; disposition D-02, D-03, and D-09.
 
 ## 7. Processing is incremental, explainable, and human-authorized
 
@@ -125,9 +126,10 @@ ADRs, or the authoritative architecture-baseline disposition. “Accepted” doe
   distinct times remain separate; nested metadata is recursively immutable.
 - **Non-goals:** Hashing mutable metadata into identity, silently attaching UTC to naive
   time, or treating deployment profile as a trust/identity tier.
-- **Current alignment:** **Mixed.** ED-0046 through ED-0053 largely align; legacy Event,
-  Observation, Evidence, and reasoning contracts require bounded corrections.
-- **Related decisions:** ADR-0019, ADR-0021, ABR-003/005/006/016 dispositions.
+- **Current alignment:** **Aligned at implemented contract boundaries.** Stable ingress
+  identity, strict aware timestamps, and recursive metadata protection are implemented;
+  durability beyond ingress and replay-stable downstream effects remain future work.
+- **Related decisions:** ADR-0019, ADR-0021, ADR-0022, ABR-003/005/006/016 dispositions.
 
 ## 9. External systems remain behind provider-neutral adapters
 

@@ -17,7 +17,8 @@ enough to review and reverse. One plan must not silently bundle unrelated findin
 
 - **Draft:** being investigated; not implementation authority.
 - **Proposed:** ready for architecture/maintainer review.
-- **Approved:** scope and acceptance criteria are authorized for implementation.
+- **Approved:** scope and acceptance criteria are authorized for implementation through
+  recorded Green autonomous authority or explicit human/architecture approval.
 - **In progress:** approved work has started.
 - **Blocked:** an explicit dependency or decision prevents progress.
 - **Completed:** acceptance evidence and completion record are present.
@@ -31,14 +32,35 @@ enough to review and reverse. One plan must not silently bundle unrelated findin
 - Resolve architecture decisions before marking a dependent plan approved.
 - Identify compatibility, migration, failure/recovery, observability, test, and rollback
   implications before implementation begins.
-- Approval must be explicit. A generated draft is not self-approving.
+- Yellow/Red work and unresolved architecture require explicit human or architecture
+  approval. A generated draft cannot resolve or approve those decisions.
+- Green work under the root
+  [bounded autonomous execution policy](../../AGENTS.md#bounded-autonomous-execution)
+  does not require a separate human plan-approval turn. Codex may investigate, create or
+  update the plan, validate it against existing authority, record the Green
+  classification, mark it implementation-ready, and proceed.
+
+## Execution authority
+
+Every new implementation plan must record one of:
+
+- **Green autonomous:** all architecture decisions are already resolved, the scope and
+  acceptance criteria are bounded and objective, required tests are identifiable, and
+  the work satisfies every Green condition in `AGENTS.md`.
+- **Explicit approval required/granted:** a Yellow/Red condition or another project gate
+  requires a named human/architecture decision before implementation.
+
+Green classification is execution authority, not architecture authority. It cannot
+accept a review recommendation, decide an ADR, change product semantics, or expand the
+plan. Historical plans do not need retroactive classification.
 
 ## Relationship to Codex tasks
 
-A Codex task may create or execute a plan only within the user's authorized scope. Codex
-must follow the approved plan, report conflicts, preserve unrelated changes, and avoid
-implementing adjacent findings. If no plan exists for work that requires one, create a
-plan first rather than using the task conversation as hidden architecture.
+A Codex task may create or execute a plan only within the user's objective and existing
+repository authority. Codex must follow the implementation-ready plan, report Yellow/Red
+conditions, preserve unrelated changes, and avoid implementing adjacent findings. If no
+plan exists for work that requires one, create and classify the plan first rather than
+using the task conversation as hidden architecture.
 
 ## Deviations
 
@@ -61,5 +83,11 @@ or architecture document unless those documents are explicitly updated.
 
 ## Current plan index
 
-No plans have been created under this framework yet. Add new plans here with status,
-owner, related decision/finding, and a link.
+| Plan | Status | Owner | Related decision/finding |
+| --- | --- | --- | --- |
+| [Dispatcher and Observation Interpreter compatibility](dispatcher-interpreter-compatibility.md) | Completed — independent review accepted | StageFlow Architecture / Backend | ADR-0019; ABR-003; ABR-004; D-04; DIC-001–DIC-004; DIC-RR-001–DIC-RR-003 |
+| [Stable ingress identity](stable-ingress-identity.md) | In progress — implementation complete; real PostgreSQL execution pending | StageFlow Architecture / Backend | ADR-0019; ADR-0022; ABR-003; D-02; D-04 |
+| [Production timestamp invariants](production-timestamp-invariants.md) | Completed — fresh phase verification pending | StageFlow Architecture / Backend | ADR-0021; ABR-005; D-07 |
+| [Recursive metadata immutability](recursive-metadata-immutability.md) | Completed — independent review accepted | StageFlow Backend | ABR-006 |
+| [Local filesystem discovery race hardening](local-filesystem-discovery-race-hardening.md) | Completed — independent review accepted | StageFlow Backend | ABR-007; ED-0053 |
+| [CI quality-matrix enforcement](ci-quality-matrix-enforcement.md) | Completed — independent review accepted | StageFlow Engineering | ABR-015 |

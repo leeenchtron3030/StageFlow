@@ -89,9 +89,10 @@ new context and names every superseded ADR. Update this index and mark the older
 | [ADR-0016](../../ARCHITECTURE_DECISIONS.md) | ObservationLocation is location authority | Accepted | Implemented in Observation contracts |
 | [ADR-0017](../../ARCHITECTURE_DECISIONS.md) | Observation traceability should become first-class | Accepted | Future contract correction |
 | [ADR-0018](../../ARCHITECTURE_DECISIONS.md) | Observation payloads may need first-class modeling | Accepted | Future capability; not authorized yet |
-| [ADR-0019](ADR-0019-stable-ingress-and-interpreter-boundary.md) | Stable ingress identity and one dispatcher-facing interpreter protocol | Accepted | Not implemented |
+| [ADR-0019](ADR-0019-stable-ingress-and-interpreter-boundary.md) | Stable ingress identity and one dispatcher-facing interpreter protocol | Accepted | Both boundaries implemented; real PostgreSQL execution pending |
 | [ADR-0020](ADR-0020-canonical-media-to-event-path.md) | Canonical candidate-to-asset-to-Event path | Accepted | Contracts partial; durable path not implemented |
-| [ADR-0021](ADR-0021-time-authority.md) | Domain and infrastructure time authority | Accepted | Newer contracts align; legacy correction pending |
+| [ADR-0021](ADR-0021-time-authority.md) | Domain and infrastructure time authority | Accepted | Strict-aware internal transition implemented |
+| [ADR-0022](ADR-0022-postgresql-authoritative-operational-store.md) | PostgreSQL authoritative operational store | Accepted | Durable ingress foundation in progress; runtime composition remains future work |
 
 ## Unresolved ADR candidates
 

@@ -14,9 +14,16 @@ deterministically ordered, and does not watch, poll, recurse, follow known symli
 media content, transfer, or delete. It returns Media Asset Candidates and typed
 limitations/errors.
 
-The accepted filesystem race finding remains unresolved in code: validation and
-path-based enumeration are separate operations, so later hardening must bind or
-revalidate the enumerated directory object before externally writable storage is trusted.
+The accepted filesystem race finding is hardened with descriptor-bound enumeration and
+child inspection on POSIX platforms where Python exposes descriptor `scandir` and
+no-follow directory-open flags. Windows and other unsupported platforms use pre/post
+target identity revalidation around enumeration and child inspection. Persistent
+missing, inaccessible, symlinked, non-directory, or identity-changed targets fail closed
+without candidates. The fallback cannot detect a transient swap-and-restore entirely
+between checkpoints, and filesystems without meaningful device/object identifiers can
+only revalidate target type and symlink status. Deployments must not claim stronger
+replacement detection. Discovery still grants no authority to later content access,
+which must independently revalidate both identity and permission.
 
 ### Identity and candidate state
 

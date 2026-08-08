@@ -4,6 +4,13 @@
 
 Draft | Proposed | Approved | In progress | Blocked | Completed | Superseded | Abandoned
 
+## Execution authority
+
+- Classification: Green autonomous | Explicit approval required | Explicit approval granted
+- Authority evidence:
+- Implementation-ready: Yes | No
+- Required escalation or approval, if any:
+
 ## Related findings or ADRs
 
 - Finding/disposition:
@@ -88,6 +95,7 @@ step explicitly.
 - Files and migrations actually changed:
 - Commands and tests actually run:
 - Results and warnings:
+- Execution authority used:
 - Approved deviations:
 - Rollback status:
 - Remaining work:

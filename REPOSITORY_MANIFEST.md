@@ -184,8 +184,8 @@ transfer, queue, persistence, network, service, or downstream semantic/state beh
 | Path | Purpose | Owning Engineering Directive | Notes |
 | --- | --- | --- | --- |
 | `.` | Repository root for StageFlow governance, specifications, and future implementation. | ED-0001 | Contains root-level project and governance documents. |
-| `.github/` | GitHub repository governance and future automation metadata. | ED-0001 | Workflows are reserved for future directives. |
-| `.github/workflows/` | Reserved location for GitHub Actions workflows. | ED-0001 | No workflows are created by ED-0001. |
+| `.github/` | GitHub repository governance and validation automation metadata. | ED-0001 / architecture-baseline disposition | Contains validation-only CI; no deployment or release automation. |
+| `.github/workflows/` | GitHub Actions validation workflows. | Architecture-baseline disposition, ABR-015 | `ci.yml` enforces backend pytest/Ruff/Pyright and frontend build/lint/typecheck on Linux without claiming event-operational readiness. |
 | `architecture/` | Implementation-facing architecture diagrams and support material. | ED-0001 / architecture baseline disposition | Points to, but does not replace, the canonical `docs/architecture/` index. |
 | `assets/` | Versioned static assets for documentation, examples, or future product surfaces. | ED-0001 | Runtime media remains excluded by `.gitignore`. |
 | `backend/` | Python FastAPI backend workspace. | ED-0002 | Managed with `uv`; contains no StageFlow business logic in ED-0002. |
@@ -344,6 +344,7 @@ transfer, queue, persistence, network, service, or downstream semantic/state beh
 | `backend/app/core/lifecycle/` | FastAPI lifecycle hook. | ED-0002 | No external resource initialization. |
 | `backend/app/core/logging/` | Minimal logging setup. | ED-0002 | Standard logging only. |
 | `backend/app/shared/` | Domain-neutral shared primitives package root. | ED-0002 / ED-0004 | ED-0004 populates generic shared contracts. |
+| `backend/app/shared/metadata.py` | Shared recursive metadata immutability boundary. | Architecture-baseline disposition, ABR-006 | Snapshots supported nested containers, preserves evidenced immutable StageFlow values, and rejects unsupported mutable or cyclic metadata. |
 | `backend/app/shared/domain_events/` | Base domain event contract package. | ED-0004 | Contains only generic event primitives. |
 | `backend/app/shared/errors/` | Structured shared error package. | ED-0004 | Contains generic error categories only. |
 | `backend/app/shared/ids/` | Shared identifier package. | ED-0004 | Contains generic entity and correlation IDs only. |
@@ -722,6 +723,7 @@ transfer, queue, persistence, network, service, or downstream semantic/state beh
 | `backend/app/contexts/production/vision_adapter/visual_detection_status.py` | Visual detection status categories. | ED-0021 | Visual detection availability status values. |
 | `backend/app/contexts/production/vision_adapter/visual_detection_type.py` | Visual detection type categories. | ED-0021 | Generic observable visual phenomena categories without semantic meaning. |
 | `backend/app/shared/domain_events/domain_event.py` | Base domain event contract. | ED-0004 | Generic event ID, type, timestamp, correlation, actor, and metadata. |
+| `backend/app/shared/metadata.py` | Recursive metadata snapshot helper. | Architecture-baseline disposition, ABR-006 | Provides the production-neutral freezer used by legacy immutable contracts. |
 | `backend/app/shared/errors/errors.py` | Structured error contracts. | ED-0004 | Generic error categories only. |
 | `backend/app/shared/ids/correlation_id.py` | Correlation ID contract. | ED-0004 | Generic UUID-compatible workflow tracing ID. |
 | `backend/app/shared/ids/entity_id.py` | Entity ID contract. | ED-0004 | Generic UUID-compatible entity ID. |
@@ -771,6 +773,7 @@ transfer, queue, persistence, network, service, or downstream semantic/state beh
 | `backend/tests/test_local_filesystem_discovery_bounds_and_security.py` | Local-filesystem discovery bounds and security tests. | ED-0053 | Covers exact and overflow entry bounds, post-sort candidate truncation, symlinks, containment, races, permission and unknown errors, sanitized reporting, and permission gating. |
 | `backend/tests/test_local_filesystem_discovery_identity.py` | Local-filesystem discovery identity tests. | ED-0053 | Covers stable deterministic resource/candidate/asset/discovery IDs, request identity, deployment-profile neutrality, location fallback limitations, replacement tokens, privacy, and order independence. |
 | `backend/tests/test_local_filesystem_discovery_deployment_and_architecture.py` | Local-filesystem discovery conformance and architecture tests. | ED-0053 | Covers exactly one concrete port implementation, real ED-0052 coordinator use, immutable stateless shape, and absence of watchers, polling, recursion, content reads, downstream domains, infrastructure, APIs, workers, AI, or frontend code. |
+| `backend/tests/test_recursive_metadata_immutability.py` | Recursive metadata invariant tests. | Architecture-baseline disposition, ABR-006 | Covers nested caller mutation, supported immutable domain values, invalid scalars/enums/keys, and cyclic inputs across representative boundaries. |
 | `backend/tests/test_health.py` | Health endpoint test. | ED-0002 | Verifies startup through FastAPI TestClient. |
 | `backend/tests/test_media_artifact_adapter_contracts.py` | Media artifact adapter contract tests. | ED-0017 | Covers adapter identity, artifact events, types, statuses, capabilities, Production Event mapping, summaries, and excluded behaviors. |
 | `backend/tests/test_media_artifact_observation_interpreter_contracts.py` | Media artifact observation interpreter contract tests. | ED-0026 | Covers concrete interpreter creation, supported media artifact event mappings, zero-observation handling, traceability, objective wording, truthful ED-0025 locations, and excluded behaviors. |
@@ -853,6 +856,7 @@ transfer, queue, persistence, network, service, or downstream semantic/state beh
 
 | Path | Purpose | Owning Engineering Directive | Notes |
 | --- | --- | --- | --- |
+| `docs/PROJECT_BRIEF.md` | Human-readable project orientation and current high-level story. | Project-level documentation | Summary only; specific architecture documents, accepted ADRs, dispositions, directives, and approved plans retain their authority. |
 | `docs/00_Glossary.md` | Shared terminology. | Existing architecture work | Preserved by ED-0001. |
 | `docs/00.5_Domain_Model.md` | StageFlow domain model. | Existing architecture work / AR-2.1 | AR-2.1 adds concise Perception Layer, objective Observation, ObservationLocation, traceability, and payload notes. |
 | `docs/03.5_Technology_Selections.md` | Technology selections specification. | Existing architecture work | Empty at ED-0002 implementation time; preserved by ED-0002. |
