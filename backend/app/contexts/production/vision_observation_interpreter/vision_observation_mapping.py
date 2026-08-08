@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from types import MappingProxyType
 from typing import Any
 
 from app.contexts.production.production_event.production_event_type import ProductionEventType
+from app.shared.metadata import freeze_metadata
 
 
 def _empty_metadata() -> Mapping[str, Any]:
@@ -28,7 +28,7 @@ class VisionObservationMapping:
             raise ValueError("VisionObservationMapping observation_note is required.")
         if not self.vision_lifecycle.strip():
             raise ValueError("VisionObservationMapping vision_lifecycle is required.")
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        object.__setattr__(self, "metadata", freeze_metadata(self.metadata))
 
 
 VISION_OBSERVATION_MAPPINGS: tuple[VisionObservationMapping, ...] = (

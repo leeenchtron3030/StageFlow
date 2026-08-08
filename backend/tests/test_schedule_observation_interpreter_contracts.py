@@ -92,6 +92,10 @@ def _interpreter(
     )
 
 
+schedule_event_fixture = _schedule_event
+interpreter_fixture = _interpreter
+
+
 def _field_names() -> set[str]:
     return {field.name for contract in CONTRACTS for field in fields(contract)}
 

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from types import MappingProxyType
 from typing import Any
 
 from app.contexts.production.observation import (
@@ -28,6 +27,7 @@ from app.contexts.production.production_event import (
     ProductionEventType,
 )
 from app.shared.ids import EntityId
+from app.shared.metadata import freeze_metadata
 
 from .runtime_clock_interpreter_rule import RuntimeClockInterpreterRule
 from .runtime_clock_observation_mapping import (
@@ -67,7 +67,7 @@ class RuntimeClockObservationInterpreter:
             raise ValueError("RuntimeClockObservationInterpreter name must not be empty.")
         object.__setattr__(self, "mappings", tuple(self.mappings))
         object.__setattr__(self, "rules", tuple(self.rules))
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        object.__setattr__(self, "metadata", freeze_metadata(self.metadata))
 
     @property
     def supported_event_types(self) -> tuple[ProductionEventType, ...]:

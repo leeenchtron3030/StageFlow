@@ -114,6 +114,10 @@ def _interpreter(
     )
 
 
+transcript_event_fixture = _transcript_event
+interpreter_fixture = _interpreter
+
+
 def _field_names() -> set[str]:
     return {field.name for contract in CONTRACTS for field in fields(contract)}
 

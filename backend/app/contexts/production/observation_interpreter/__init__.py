@@ -1,6 +1,10 @@
 """Production Observation Interpreter contracts."""
 
 from app.contexts.production.observation_interpreter.event_observation_lineage import (
+    EventObservationLineage,
+    LineageExtraction,
+    LineageExtractionState,
+    event_observation_lineage_from_event,
     observation_context_from_event,
     observation_provenance_from_event,
 )
@@ -25,6 +29,9 @@ from app.contexts.production.observation_interpreter.observation_interpreter_sum
 )
 
 __all__ = [
+    "EventObservationLineage",
+    "LineageExtraction",
+    "LineageExtractionState",
     "ObservationInterpreter",
     "ObservationInterpreterContext",
     "ObservationInterpreterPolicy",
@@ -32,6 +39,7 @@ __all__ = [
     "ObservationInterpreterRule",
     "ObservationInterpreterStatus",
     "ObservationInterpreterSummary",
+    "event_observation_lineage_from_event",
     "observation_context_from_event",
     "observation_provenance_from_event",
 ]

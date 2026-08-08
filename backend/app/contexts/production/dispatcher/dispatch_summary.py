@@ -2,8 +2,20 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.contexts.production.dispatcher.dispatch_result import DispatchResult
+from app.contexts.production.dispatcher.dispatch_result import (
+    DispatchResult,
+    interpreter_status_semantics,
+)
+from app.contexts.production.interpreter.interpreter_status import InterpreterStatus
 from app.shared.ids import EntityId
+
+
+def _is_clean_success(
+    interpreter_status: InterpreterStatus,
+    has_warnings: bool,
+) -> bool:
+    semantics = interpreter_status_semantics(interpreter_status)
+    return semantics.successful and not semantics.warning and not has_warnings
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,7 +36,10 @@ class DispatchSummary:
             successful_interpreter_count=sum(
                 1
                 for interpreter_result in result.interpreter_results
-                if not interpreter_result.warnings
+                if _is_clean_success(
+                    interpreter_result.interpreter_status,
+                    bool(interpreter_result.warnings),
+                )
             ),
             declined_interpreter_count=result.declined_interpreter_count,
             warning_count=len(result.warnings),

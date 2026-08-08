@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from types import MappingProxyType
 from typing import Any
 
 from app.contexts.production.production_event.production_event_source import (
@@ -10,6 +9,7 @@ from app.contexts.production.production_event.production_event_source import (
 )
 from app.contexts.production.production_event.production_event_type import ProductionEventType
 from app.shared.ids import EntityId
+from app.shared.metadata import freeze_metadata
 
 
 def _empty_metadata() -> Mapping[str, Any]:
@@ -31,4 +31,4 @@ class DispatchRule:
         object.__setattr__(self, "supported_event_types", tuple(self.supported_event_types))
         object.__setattr__(self, "supported_event_sources", tuple(self.supported_event_sources))
         object.__setattr__(self, "target_interpreter_ids", tuple(self.target_interpreter_ids))
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        object.__setattr__(self, "metadata", freeze_metadata(self.metadata))

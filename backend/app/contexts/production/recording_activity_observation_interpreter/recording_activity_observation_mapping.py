@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from types import MappingProxyType
 from typing import Any
 
 from app.contexts.production.production_event.production_event_type import ProductionEventType
+from app.shared.metadata import freeze_metadata
 
 
 def _empty_metadata() -> Mapping[str, Any]:
@@ -35,7 +35,7 @@ class RecordingActivityObservationMapping:
             raise ValueError(
                 "RecordingActivityObservationMapping activity_label must not be empty."
             )
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        object.__setattr__(self, "metadata", freeze_metadata(self.metadata))
 
 
 RECORDING_ACTIVITY_OBSERVATION_MAPPINGS: tuple[

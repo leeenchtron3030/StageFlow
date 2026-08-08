@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from enum import StrEnum
-from types import MappingProxyType
 from typing import Any
 
 from app.contexts.production.observation.observation import Observation
@@ -29,6 +28,7 @@ from app.contexts.production.production_event.production_event_source import (
 )
 from app.contexts.production.production_event.production_event_type import ProductionEventType
 from app.shared.ids import EntityId
+from app.shared.metadata import freeze_metadata
 
 
 class ObservationInterpreterStatus(StrEnum):
@@ -78,7 +78,7 @@ class ObservationInterpreter:
             tuple(self.intended_observation_types),
         )
         object.__setattr__(self, "rules", tuple(self.rules))
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        object.__setattr__(self, "metadata", freeze_metadata(self.metadata))
 
     def supports_event_type(self, event_type: ProductionEventType) -> bool:
         return event_type in self.supported_event_types

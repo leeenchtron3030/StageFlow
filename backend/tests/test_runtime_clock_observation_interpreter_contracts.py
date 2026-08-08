@@ -51,10 +51,11 @@ def _clock_event(
     runtime_clock_event: bool = True,
 ) -> ProductionEvent:
     occurred_at = datetime(2026, 7, 9, 10, 0, tzinfo=UTC)
+    clock_id = EntityId.new()
     references = [
         ProductionEventReference(
             reference_type=ProductionEventReferenceType.SYSTEM,
-            referenced_id=EntityId.new(),
+            referenced_id=clock_id,
             label="runtime clock",
         ),
         ProductionEventReference(
@@ -78,7 +79,7 @@ def _clock_event(
         source=source,
         payload=ProductionEventPayload(
             {
-                "clock_id": EntityId.new().to_json(),
+                "clock_id": clock_id.to_json(),
                 "time_boundary_id": EntityId.new().to_json(),
                 "boundary_type": boundary_type,
                 "boundary_crossed_at": occurred_at.isoformat(),
@@ -100,6 +101,10 @@ def _interpreter(
         rules=rules or [],
         metadata={"scope": "runtime-clock"},
     )
+
+
+clock_event_fixture = _clock_event
+interpreter_fixture = _interpreter
 
 
 def _field_names() -> set[str]:
