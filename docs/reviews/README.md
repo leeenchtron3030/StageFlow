@@ -46,6 +46,7 @@ and baseline commit, address every material finding, and identify unresolved dec
 
 | Review | Disposition | Role |
 | --- | --- | --- |
+| [Contract Stabilization independent review](contract-stabilization-independent-review.md) | Approved PostgreSQL and timestamp decisions authorized correction; [correction status](contract-stabilization-correction-status.md) awaits fresh independent verification | Historical phase review and current correction evidence; neither self-accepts the phase |
 | [Architecture baseline and consistency review](architecture-baseline-review.md) | [Architecture baseline disposition](architecture-baseline-disposition.md) | Current repository-wide baseline; review is evidence and disposition is decision authority |
 | [ED-0041 architecture/codebase review](ED-0041_ARCHITECTURE_CODEBASE_REVIEW.md) | Findings were addressed through the related roadmap, directives, and later baseline disposition | Historical architecture review |
 | [ED-0041 findings register](ED-0041_FINDINGS_REGISTER.md) | [ED-0041 directive roadmap](ED-0041_DIRECTIVE_ROADMAP.md) | Historical findings and remediation roadmap |

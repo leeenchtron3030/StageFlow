@@ -156,3 +156,7 @@ under this plan. Never drop an operational schema automatically.
 - No application composition, watcher, Session association, durable downstream effect,
   broker, worker, media blob storage, schema outside ingress, secret, or runtime
   configuration was added.
+- Final closure validation passed 1,578 backend tests with six documented skips, Ruff,
+  Pyright, the complete frontend build/lint/typecheck matrix, and `git diff --check`.
+  Exact commands, warnings, Windows limitations, and commit evidence are recorded in the
+  [Contract Stabilization correction status](../reviews/contract-stabilization-correction-status.md).

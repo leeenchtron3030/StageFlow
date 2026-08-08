@@ -578,3 +578,7 @@ bypassing the dispatcher or duplicating it for concrete interpreters.
   checklist above is reconciled against implementation and independent-review evidence.
 - Durable ingress and timestamp changes remain owned by their separate plans; this
   follow-up did not compose a runtime or broaden dispatcher responsibility.
+- Final closure validation passed the full 1,578-test backend suite with six documented
+  skips, Ruff, Pyright, the frontend build/lint/typecheck matrix, and `git diff --check`.
+  Exact current evidence is recorded in the
+  [Contract Stabilization correction status](../reviews/contract-stabilization-correction-status.md).

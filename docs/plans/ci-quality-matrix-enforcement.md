@@ -65,12 +65,17 @@ configuration remain unchanged. Rollback is the isolated workflow/documentation 
   repositories; reviewed workflow command parity and least-privilege settings; ran the
   full available backend matrix and `git diff --check`; checked local Node/npm
   availability.
-- Results and warnings: backend pytest passed 1,543 tests with 5 expected platform
-  skips and one existing Starlette/httpx deprecation warning; Ruff and Pyright passed;
-  `git diff --check` found no whitespace errors and only LF-to-CRLF conversion warnings.
-  Node and npm are unavailable on this host, so frontend build, lint, and typecheck were
-  not run locally; the new Linux CI job enforces all three. No `actionlint` or other
-  repository workflow validator is configured.
+- Results and warnings at initial completion: backend pytest passed 1,543 tests with 5
+  expected platform skips and one existing Starlette/httpx deprecation warning; Ruff and
+  Pyright passed; `git diff --check` found no whitespace errors and only LF-to-CRLF
+  conversion warnings. Node and npm were initially unavailable and no `actionlint` or
+  other repository workflow validator is configured.
+- Contract Stabilization closure revalidation: portable official Node.js 22.23.2 and npm
+  10.9.8 were installed on the Windows reference node without changing frontend
+  dependencies. `npm ci`, `npm run build`, `npm run lint`, and `npm run typecheck` all
+  passed. npm reported 12 dependency-audit findings (3 moderate and 9 high); no unscoped
+  dependency update or automatic audit fix was performed. The exact final matrix is in
+  the [correction status report](../reviews/contract-stabilization-correction-status.md).
 - Execution authority used: Green autonomous.
 - Approved deviations: None.
 - Rollback status: Not needed.
