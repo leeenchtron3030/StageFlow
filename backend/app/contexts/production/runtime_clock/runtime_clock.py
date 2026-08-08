@@ -4,7 +4,6 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
-from types import MappingProxyType
 from typing import Any
 
 from app.contexts.production.production_event.production_event import ProductionEvent
@@ -12,6 +11,7 @@ from app.contexts.production.runtime_clock.clock_capability import ClockCapabili
 from app.contexts.production.runtime_clock.clock_event import ClockEvent
 from app.contexts.production.runtime_clock.time_boundary import TimeBoundary
 from app.shared.ids import CorrelationId, EntityId
+from app.shared.metadata import freeze_metadata
 
 
 class RuntimeClockStatus(StrEnum):
@@ -43,7 +43,7 @@ class RuntimeClock:
             raise ValueError("RuntimeClock clock_name must not be empty.")
         object.__setattr__(self, "supported_capabilities", tuple(self.supported_capabilities))
         object.__setattr__(self, "time_boundaries", tuple(self.time_boundaries))
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        object.__setattr__(self, "metadata", freeze_metadata(self.metadata))
 
     def supports_capability(self, capability: ClockCapability) -> bool:
         return capability in self.supported_capabilities
@@ -80,7 +80,7 @@ class RuntimeClock:
         self,
         clock_event: ClockEvent,
         correlation_id: CorrelationId,
-        received_at: datetime | None = None,
+        received_at: datetime,
     ) -> ProductionEvent:
         return clock_event.to_production_event(
             correlation_id=correlation_id,

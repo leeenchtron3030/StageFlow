@@ -14,6 +14,7 @@ from app.contexts.production.finding import (
 )
 from app.contexts.production.timeline import TimelinePosition, TimelineRange
 from app.shared.ids import CorrelationId, EntityId
+from tests.timestamp_fixtures import AWARE_TIMESTAMP
 
 
 def _position(recording_block_id: EntityId, seconds: int) -> TimelinePosition:
@@ -30,6 +31,8 @@ def _support() -> FindingSupport:
 def test_finding_creation() -> None:
     recording_block_id = EntityId.new()
     finding = Finding(
+                  created_at=AWARE_TIMESTAMP,
+
         id=EntityId.new(),
         recording_block_id=recording_block_id,
         finding_type=FindingType.POSSIBLE_SESSION_BOUNDARY,
@@ -144,6 +147,8 @@ def test_finding_support_references_hypothesis_ids() -> None:
 def test_finding_rejects_location_from_different_recording_block() -> None:
     with pytest.raises(ValueError, match="recording_block_id"):
         Finding(
+            created_at=AWARE_TIMESTAMP,
+
             id=EntityId.new(),
             recording_block_id=EntityId.new(),
             finding_type=FindingType.UNKNOWN,
@@ -159,6 +164,8 @@ def test_finding_requires_hypothesis_support() -> None:
     recording_block_id = EntityId.new()
     with pytest.raises(ValueError, match="Hypothesis ID reference"):
         Finding(
+            created_at=AWARE_TIMESTAMP,
+
             id=EntityId.new(),
             recording_block_id=recording_block_id,
             finding_type=FindingType.UNKNOWN,
@@ -173,6 +180,8 @@ def test_finding_requires_hypothesis_support() -> None:
 def test_finding_summary_generation() -> None:
     recording_block_id = EntityId.new()
     finding = Finding(
+                  created_at=AWARE_TIMESTAMP,
+
         id=EntityId.new(),
         recording_block_id=recording_block_id,
         finding_type=FindingType.TECHNICAL_INCIDENT,

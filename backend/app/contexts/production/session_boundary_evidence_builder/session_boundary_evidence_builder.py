@@ -2,9 +2,8 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from enum import StrEnum
-from types import MappingProxyType
 from typing import Any, cast
 from uuid import NAMESPACE_URL, uuid5
 
@@ -23,6 +22,8 @@ from app.contexts.production.evidence import (
     resolve_evidence_set_context,
 )
 from app.shared.ids import CorrelationId, EntityId
+from app.shared.metadata import freeze_metadata
+from app.shared.time import parse_aware_datetime
 
 from .session_boundary_evidence_context import SessionBoundaryEvidenceContext
 from .session_boundary_evidence_mapping import (
@@ -135,7 +136,7 @@ class SessionBoundaryEvidenceBuilder:
             raise ValueError("Boundary composition window must be greater than zero.")
         object.__setattr__(self, "rules", tuple(self.rules))
         object.__setattr__(self, "mappings", tuple(self.mappings))
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        object.__setattr__(self, "metadata", freeze_metadata(self.metadata))
 
     def can_build(self) -> bool:
         return self.status in _BUILDABLE_STATUSES
@@ -1106,18 +1107,7 @@ class SessionBoundaryEvidenceBuilder:
         return tuple(identifiers)
 
     def _datetime(self, value: object) -> datetime | None:
-        if isinstance(value, datetime):
-            parsed = value
-        elif isinstance(value, str):
-            try:
-                parsed = datetime.fromisoformat(value)
-            except ValueError:
-                return None
-        else:
-            return None
-        if parsed.tzinfo is None:
-            return parsed.replace(tzinfo=UTC)
-        return parsed
+        return parse_aware_datetime(value)
 
     def _number(self, value: object) -> float | None:
         if isinstance(value, bool):

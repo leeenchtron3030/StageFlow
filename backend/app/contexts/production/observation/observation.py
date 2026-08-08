@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
-from datetime import UTC, datetime
-from types import MappingProxyType
+from datetime import datetime
 from typing import Any
 
 from app.contexts.production.observation.observation_confidence import ObservationConfidence
@@ -13,6 +12,8 @@ from app.contexts.production.observation.observation_provenance import Observati
 from app.contexts.production.observation.observation_source import ObservationSource
 from app.contexts.production.observation.observation_type import ObservationType
 from app.shared.ids import CorrelationId, EntityId
+from app.shared.metadata import freeze_metadata
+from app.shared.time import require_aware_datetime
 
 
 def _empty_metadata() -> Mapping[str, Any]:
@@ -30,7 +31,7 @@ class Observation:
     location: ObservationLocation
     confidence: ObservationConfidence
     correlation_id: CorrelationId
-    observed_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    observed_at: datetime
     actor: str | None = None
     metadata: Mapping[str, Any] = field(default_factory=_empty_metadata)
     notes: str | None = None
@@ -38,6 +39,7 @@ class Observation:
     context: ObservationContext = field(default_factory=ObservationContext.unknown)
 
     def __post_init__(self) -> None:
+        require_aware_datetime(self.observed_at, "Observation.observed_at")
         location_recording_block_id = self.location.recording_block_id
         context_recording_block_id = self.context.recording_block_id
         authoritative_recording_block_id = (
@@ -69,4 +71,4 @@ class Observation:
                 timeline_range=self.context.timeline_range or self.location.range,
             ),
         )
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        object.__setattr__(self, "metadata", freeze_metadata(self.metadata))

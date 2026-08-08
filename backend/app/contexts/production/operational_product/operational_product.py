@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
-from types import MappingProxyType
+from datetime import datetime
 from typing import Any
 
 from app.contexts.production.operational_product.operational_product_origin import (
@@ -19,6 +18,8 @@ from app.contexts.production.operational_product.operational_product_type import
     OperationalProductType,
 )
 from app.shared.ids import CorrelationId, EntityId
+from app.shared.metadata import freeze_metadata
+from app.shared.time import require_aware_datetime
 
 
 def _empty_metadata() -> Mapping[str, Any]:
@@ -43,12 +44,13 @@ class OperationalProduct:
     originating_finding_ids: Sequence[EntityId]
     originating_verification_decision_ids: Sequence[EntityId]
     correlation_id: CorrelationId
+    created_at: datetime
     references: Sequence[OperationalProductReference] = field(default_factory=tuple)
-    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     metadata: Mapping[str, Any] = field(default_factory=_empty_metadata)
     notes: str | None = None
 
     def __post_init__(self) -> None:
+        require_aware_datetime(self.created_at, "OperationalProduct.created_at")
         object.__setattr__(self, "originating_finding_ids", tuple(self.originating_finding_ids))
         object.__setattr__(
             self,
@@ -56,7 +58,7 @@ class OperationalProduct:
             tuple(self.originating_verification_decision_ids),
         )
         object.__setattr__(self, "references", tuple(self.references))
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        object.__setattr__(self, "metadata", freeze_metadata(self.metadata))
 
         has_lineage = bool(
             self.originating_finding_ids or self.originating_verification_decision_ids

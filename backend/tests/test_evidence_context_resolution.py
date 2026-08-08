@@ -25,6 +25,7 @@ from app.contexts.production.observation import (
 )
 from app.contexts.production.timeline import TimelinePosition
 from app.shared.ids import CorrelationId, EntityId
+from tests.timestamp_fixtures import AWARE_TIMESTAMP
 
 
 def _observation(
@@ -72,6 +73,8 @@ def _legacy_evidence(metadata: dict[str, object]) -> EvidenceSet:
         role=EvidenceRole.SUPPORTS,
     )
     return EvidenceSet(
+               created_at=AWARE_TIMESTAMP,
+
         id=EntityId.new(),
         recording_block_id=None,
         purpose=EvidencePurpose.TRANSITION_SUPPORT,
@@ -156,6 +159,8 @@ def test_evidence_first_class_context_wins_over_metadata() -> None:
     stage_b = EntityId.new()
     evidence = _legacy_evidence({"stage_id": stage_b.to_json()})
     evidence = EvidenceSet(
+                   created_at=AWARE_TIMESTAMP,
+
         id=evidence.id,
         recording_block_id=evidence.recording_block_id,
         purpose=evidence.purpose,

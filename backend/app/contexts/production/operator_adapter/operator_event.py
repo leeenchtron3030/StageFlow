@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
-from types import MappingProxyType
+from datetime import datetime
 from typing import Any
 
 from app.contexts.production.operator_adapter.operator_event_status import OperatorEventStatus
@@ -21,6 +20,8 @@ from app.contexts.production.production_event.production_event_source import (
 )
 from app.contexts.production.production_event.production_event_type import ProductionEventType
 from app.shared.ids import CorrelationId, EntityId
+from app.shared.metadata import freeze_metadata
+from app.shared.time import require_aware_datetime
 
 
 def _empty_metadata() -> Mapping[str, Any]:
@@ -52,6 +53,7 @@ class OperatorEvent:
     metadata: Mapping[str, Any] = field(default_factory=_empty_metadata)
 
     def __post_init__(self) -> None:
+        require_aware_datetime(self.occurred_at, "OperatorEvent.occurred_at")
         if not self.operator_event_identifier.strip():
             raise ValueError("OperatorEvent operator_event_identifier must not be empty.")
         if self.timeline_range_reference is not None and not self.timeline_range_reference.strip():
@@ -60,12 +62,12 @@ class OperatorEvent:
             raise ValueError("OperatorEvent label must not be empty.")
         if self.note is not None and not self.note.strip():
             raise ValueError("OperatorEvent note must not be empty.")
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        object.__setattr__(self, "metadata", freeze_metadata(self.metadata))
 
     def to_production_event(
         self,
         correlation_id: CorrelationId,
-        received_at: datetime | None = None,
+        received_at: datetime,
     ) -> ProductionEvent:
         return ProductionEvent(
             id=EntityId.new(),
@@ -75,7 +77,7 @@ class OperatorEvent:
             references=self._production_event_references(),
             correlation_id=correlation_id,
             occurred_at=self.occurred_at,
-            received_at=received_at or datetime.now(UTC),
+            received_at=require_aware_datetime(received_at, "received_at"),
             metadata={"operator_adapter_event": True},
             notes=self.note,
         )

@@ -10,6 +10,7 @@ from app.contexts.production.hypothesis import (
     HypothesisType,
 )
 from app.shared.ids import CorrelationId, EntityId
+from tests.timestamp_fixtures import AWARE_TIMESTAMP
 
 
 def _support() -> HypothesisSupport:
@@ -18,6 +19,8 @@ def _support() -> HypothesisSupport:
 
 def test_hypothesis_creation() -> None:
     hypothesis = Hypothesis(
+                     created_at=AWARE_TIMESTAMP,
+
         id=EntityId.new(),
         recording_block_id=EntityId.new(),
         hypothesis_type=HypothesisType.POSSIBLE_TRANSITION,
@@ -112,6 +115,8 @@ def test_hypothesis_support_counts_contradicting_evidence() -> None:
 
 def test_hypothesis_can_represent_possible_session_start() -> None:
     hypothesis = Hypothesis(
+                     created_at=AWARE_TIMESTAMP,
+
         id=EntityId.new(),
         recording_block_id=EntityId.new(),
         hypothesis_type=HypothesisType.POSSIBLE_SESSION_START,
@@ -126,6 +131,8 @@ def test_hypothesis_can_represent_possible_session_start() -> None:
 
 def test_hypothesis_can_represent_possible_session_end() -> None:
     hypothesis = Hypothesis(
+                     created_at=AWARE_TIMESTAMP,
+
         id=EntityId.new(),
         recording_block_id=EntityId.new(),
         hypothesis_type=HypothesisType.POSSIBLE_SESSION_END,
@@ -141,6 +148,8 @@ def test_hypothesis_can_represent_possible_session_end() -> None:
 def test_non_general_hypothesis_requires_evidence_reference() -> None:
     with pytest.raises(ValueError, match="requires at least one EvidenceSet reference"):
         Hypothesis(
+            created_at=AWARE_TIMESTAMP,
+
             id=EntityId.new(),
             recording_block_id=EntityId.new(),
             hypothesis_type=HypothesisType.POSSIBLE_RECORDING_ANOMALY,
@@ -153,6 +162,8 @@ def test_non_general_hypothesis_requires_evidence_reference() -> None:
 
 def test_general_hypothesis_may_have_no_evidence_reference() -> None:
     hypothesis = Hypothesis(
+                     created_at=AWARE_TIMESTAMP,
+
         id=EntityId.new(),
         recording_block_id=EntityId.new(),
         hypothesis_type=HypothesisType.GENERAL_CONTEXT,

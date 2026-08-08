@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
-from types import MappingProxyType
 from typing import Any
 
 from app.contexts.production.media_artifact_adapter.media_artifact_capability import (
@@ -20,6 +19,7 @@ from app.contexts.production.media_artifact_adapter.media_artifact_status import
 )
 from app.contexts.production.production_event.production_event import ProductionEvent
 from app.shared.ids import CorrelationId, EntityId
+from app.shared.metadata import freeze_metadata
 
 
 def _empty_metadata() -> Mapping[str, Any]:
@@ -38,7 +38,7 @@ class MediaArtifactAdapter:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "supported_capabilities", tuple(self.supported_capabilities))
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        object.__setattr__(self, "metadata", freeze_metadata(self.metadata))
 
     def supports_capability(self, capability: MediaArtifactCapability) -> bool:
         return capability in self.supported_capabilities
@@ -47,7 +47,7 @@ class MediaArtifactAdapter:
         self,
         artifact_event: MediaArtifactEvent,
         correlation_id: CorrelationId,
-        received_at: datetime | None = None,
+        received_at: datetime,
     ) -> ProductionEvent:
         return artifact_event.to_production_event(
             correlation_id=correlation_id,

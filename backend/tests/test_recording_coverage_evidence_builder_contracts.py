@@ -31,6 +31,7 @@ from app.contexts.production.recording_transition_policy import RecordingTransit
 from app.contexts.production.timeline import TimelinePosition, TimelineRange
 from app.contexts.production.transition_policy import TransitionPolicyResult
 from app.shared.ids import CorrelationId, EntityId
+from tests.timestamp_fixtures import AWARE_TIMESTAMP
 
 
 def _observation(
@@ -384,7 +385,9 @@ def test_builder_output_compatible_with_recording_transition_policy() -> None:
     result = _build_one("began")
     policy = RecordingTransitionPolicy(id=EntityId.new())
 
-    evaluation = policy.evaluate(current_state=None, evidence_sets=result.evidence_sets)
+    evaluation = policy.evaluate(
+                     evaluated_at=AWARE_TIMESTAMP,
+                     current_state=None, evidence_sets=result.evidence_sets)
 
     assert evaluation.outcome is TransitionPolicyResult.TRANSITION_SUPPORTED
     assert evaluation.proposed_state is OperationalStateValue.ACTIVE
@@ -392,6 +395,7 @@ def test_builder_output_compatible_with_recording_transition_policy() -> None:
 
 def test_pause_signal_produces_paused_policy_proposal() -> None:
     evaluation = RecordingTransitionPolicy(id=EntityId.new()).evaluate(
+        evaluated_at=AWARE_TIMESTAMP,
         current_state=None,
         evidence_sets=_build_one("paused").evidence_sets,
     )
@@ -401,6 +405,7 @@ def test_pause_signal_produces_paused_policy_proposal() -> None:
 
 def test_resume_signal_produces_active_policy_proposal() -> None:
     evaluation = RecordingTransitionPolicy(id=EntityId.new()).evaluate(
+        evaluated_at=AWARE_TIMESTAMP,
         current_state=None,
         evidence_sets=_build_one("resumed").evidence_sets,
     )
@@ -410,6 +415,7 @@ def test_resume_signal_produces_active_policy_proposal() -> None:
 
 def test_end_signal_produces_stopped_policy_proposal() -> None:
     evaluation = RecordingTransitionPolicy(id=EntityId.new()).evaluate(
+        evaluated_at=AWARE_TIMESTAMP,
         current_state=None,
         evidence_sets=_build_one("ended").evidence_sets,
     )

@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from dataclasses import dataclass
+from datetime import datetime
 from enum import StrEnum
 
 from app.contexts.production.timeline.schedule_reference import ScheduleReference
 from app.contexts.production.timeline.timeline_range import TimelineRange
 from app.shared.ids import CorrelationId, EntityId
+from app.shared.time import require_aware_datetime
 
 
 class SessionWindowStatus(StrEnum):
@@ -34,14 +35,16 @@ class SessionWindow:
     recording_block_id: EntityId
     timeline_range: TimelineRange
     correlation_id: CorrelationId
+    created_at: datetime
+    updated_at: datetime
     window_status: SessionWindowStatus = SessionWindowStatus.PROPOSED
     confidence: float = 0.0
     verification_status: VerificationStatus = VerificationStatus.UNVERIFIED
     notes: str | None = None
-    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def __post_init__(self) -> None:
+        require_aware_datetime(self.created_at, "SessionWindow.created_at")
+        require_aware_datetime(self.updated_at, "SessionWindow.updated_at")
         if self.timeline_range.recording_block_id != self.recording_block_id:
             raise ValueError("SessionWindow timeline_range must belong to recording_block_id.")
         if not 0.0 <= self.confidence <= 1.0:

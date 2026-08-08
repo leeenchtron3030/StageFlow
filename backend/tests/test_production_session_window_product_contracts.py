@@ -14,6 +14,7 @@ from app.contexts.production.session_window_product import (
 )
 from app.contexts.production.timeline import ScheduleReference, TimelinePosition, TimelineRange
 from app.shared.ids import CorrelationId, EntityId
+from tests.timestamp_fixtures import AWARE_TIMESTAMP
 
 
 def _timeline_range(recording_block_id: EntityId) -> TimelineRange:
@@ -97,6 +98,8 @@ def test_product_rejects_timeline_range_from_different_recording_block() -> None
 
     with pytest.raises(ValueError, match="timeline_range"):
         SessionWindowProduct(
+            created_at=AWARE_TIMESTAMP,
+
             id=EntityId.new(),
             operational_product_id=operational_product_id,
             recording_block_id=EntityId.new(),
@@ -114,6 +117,8 @@ def test_product_rejects_lineage_for_different_operational_product() -> None:
 
     with pytest.raises(ValueError, match="lineage"):
         SessionWindowProduct(
+            created_at=AWARE_TIMESTAMP,
+
             id=EntityId.new(),
             operational_product_id=EntityId.new(),
             recording_block_id=recording_block_id,

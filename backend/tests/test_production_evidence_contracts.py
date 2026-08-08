@@ -15,6 +15,7 @@ from app.contexts.production.evidence import (
     EvidenceSummary,
 )
 from app.shared.ids import CorrelationId, EntityId
+from tests.timestamp_fixtures import AWARE_TIMESTAMP
 
 
 def _item(strength: EvidenceStrength = EvidenceStrength.MODERATE) -> EvidenceItem:
@@ -133,6 +134,8 @@ def test_evidence_purpose_allowed_values() -> None:
 def test_evidence_set_requires_at_least_one_evidence_item() -> None:
     with pytest.raises(ValueError, match="at least one"):
         EvidenceSet(
+            created_at=AWARE_TIMESTAMP,
+
             id=EntityId.new(),
             recording_block_id=EntityId.new(),
             purpose=EvidencePurpose.GENERAL_CONTEXT,
@@ -146,6 +149,8 @@ def test_evidence_set_uses_generic_entity_id_and_correlation_id() -> None:
     recording_block_id = EntityId.new()
     correlation_id = CorrelationId.new()
     evidence_set = EvidenceSet(
+                       created_at=AWARE_TIMESTAMP,
+
         id=evidence_set_id,
         recording_block_id=recording_block_id,
         concern=EvidenceConcern.POSSIBLE_SESSION_START,
@@ -170,6 +175,8 @@ def test_evidence_set_does_not_create_windows_or_proposals() -> None:
 
 def test_evidence_summary_counts_evidence_items() -> None:
     evidence_set = EvidenceSet(
+                       created_at=AWARE_TIMESTAMP,
+
         id=EntityId.new(),
         recording_block_id=EntityId.new(),
         purpose=EvidencePurpose.POTENTIAL_SESSION_START,
@@ -192,6 +199,8 @@ def test_evidence_summary_counts_evidence_items() -> None:
 
 def test_evidence_summary_counts_contradictory_evidence() -> None:
     evidence_set = EvidenceSet(
+                       created_at=AWARE_TIMESTAMP,
+
         id=EntityId.new(),
         recording_block_id=EntityId.new(),
         purpose=EvidencePurpose.POTENTIAL_SCHEDULE_CONFLICT,
@@ -210,6 +219,8 @@ def test_evidence_summary_counts_contradictory_evidence() -> None:
 
 def test_evidence_summary_counts_roles() -> None:
     evidence_set = EvidenceSet(
+                       created_at=AWARE_TIMESTAMP,
+
         id=EntityId.new(),
         recording_block_id=EntityId.new(),
         concern=EvidenceConcern.RECORDING_COVERAGE,
@@ -255,6 +266,8 @@ def test_evidence_summary_reports_signals() -> None:
     first_item = _item(EvidenceStrength.STRONG)
     second_item = _item(EvidenceStrength.MODERATE)
     evidence_set = EvidenceSet(
+                       created_at=AWARE_TIMESTAMP,
+
         id=EntityId.new(),
         recording_block_id=EntityId.new(),
         concern=EvidenceConcern.RECORDING_COVERAGE,

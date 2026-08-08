@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from types import MappingProxyType
+from datetime import datetime
 from typing import Any
 
 from app.contexts.production.evidence import EvidenceSet
@@ -18,6 +18,8 @@ from app.contexts.production.transition_policy.transition_policy_result import (
 )
 from app.contexts.production.transition_policy.transition_reason import TransitionReason
 from app.shared.ids import EntityId
+from app.shared.metadata import freeze_metadata
+from app.shared.time import require_aware_datetime
 
 
 def _empty_metadata() -> Mapping[str, Any]:
@@ -39,15 +41,17 @@ class OperationalStateTransitionPolicy:
             raise ValueError("OperationalStateTransitionPolicy name must not be empty.")
         if self.rule_count < 0:
             raise ValueError("Transition policy rule_count must not be negative.")
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        object.__setattr__(self, "metadata", freeze_metadata(self.metadata))
 
     def evaluate(
         self,
         *,
         current_state: OperationalState | None,
         evidence_sets: Sequence[EvidenceSet],
+        evaluated_at: datetime,
     ) -> TransitionEvaluation:
         evidence_tuple = tuple(evidence_sets)
+        evaluated_at = require_aware_datetime(evaluated_at, "evaluated_at")
         return TransitionEvaluation(
             id=EntityId.new(),
             evaluated_state_kind=self.evaluated_state_kind,
@@ -59,6 +63,7 @@ class OperationalStateTransitionPolicy:
             rationale=TransitionReason(
                 "Generic transition policy has no concrete rules for the provided Evidence."
             ),
+            evaluated_at=evaluated_at,
             metadata={
                 "examined_evidence_ids": tuple(
                     evidence_set.id.to_json() for evidence_set in evidence_tuple

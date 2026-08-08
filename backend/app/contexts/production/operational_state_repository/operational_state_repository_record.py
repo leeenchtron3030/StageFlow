@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
-from types import MappingProxyType
 from typing import Any
 
 from app.contexts.production.evidence import EvidenceContext
@@ -17,6 +16,7 @@ from app.contexts.production.operational_state import (
     OperationalStateValue,
 )
 from app.shared.ids import EntityId
+from app.shared.metadata import freeze_metadata
 
 from ..operational_state_acceptance.operational_state_acceptance_lineage import (
     OperationalStateAcceptanceLineage,
@@ -109,7 +109,7 @@ class OperationalStateRepositoryRecord:
             and self.successor_state_id is None
         ):
             raise ValueError("A superseded repository record requires a successor reference.")
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        object.__setattr__(self, "metadata", freeze_metadata(self.metadata))
 
     @property
     def state_id(self) -> EntityId:

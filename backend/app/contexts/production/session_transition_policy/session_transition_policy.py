@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
-from types import MappingProxyType
+from datetime import datetime
 from typing import Any, cast
 from uuid import NAMESPACE_URL, uuid5
 
@@ -34,6 +33,8 @@ from app.contexts.production.transition_policy import (
     TransitionReason,
 )
 from app.shared.ids import EntityId
+from app.shared.metadata import freeze_metadata
+from app.shared.time import parse_aware_datetime, require_aware_datetime
 
 from .session_transition_evidence_profile import SessionTransitionEvidenceProfile
 from .session_transition_mapping import (
@@ -127,7 +128,7 @@ class SessionTransitionPolicy:
         if not self.name.strip():
             raise ValueError("SessionTransitionPolicy name must not be empty.")
         object.__setattr__(self, "rules", tuple(self.rules))
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        object.__setattr__(self, "metadata", freeze_metadata(self.metadata))
 
     @property
     def evaluated_state_kind(self) -> OperationalStateKind:
@@ -140,9 +141,9 @@ class SessionTransitionPolicy:
         evidence_sets: Sequence[EvidenceSet],
         evaluation_context: SessionBoundaryEvidenceContext | None = None,
         metadata: Mapping[str, Any] | None = None,
-        evaluated_at: datetime | None = None,
+        evaluated_at: datetime,
     ) -> SessionTransitionResult:
-        timestamp = evaluated_at or datetime.now(UTC)
+        timestamp = require_aware_datetime(evaluated_at, "evaluated_at")
         caller_metadata = dict(metadata or {})
         current_error = self._current_state_error(current_state)
         effective_current = (
@@ -367,7 +368,7 @@ class SessionTransitionPolicy:
         evidence_sets: Sequence[EvidenceSet],
         evaluation_context: SessionBoundaryEvidenceContext | None = None,
         metadata: Mapping[str, Any] | None = None,
-        evaluated_at: datetime | None = None,
+        evaluated_at: datetime,
     ) -> TransitionEvaluation:
         """Compatibility helper returning only the generic evaluation contract."""
         return self.evaluate(
@@ -1176,16 +1177,7 @@ class SessionTransitionPolicy:
         return None
 
     def _datetime_value(self, value: object) -> datetime | None:
-        if isinstance(value, datetime):
-            parsed = value
-        elif isinstance(value, str):
-            try:
-                parsed = datetime.fromisoformat(value)
-            except ValueError:
-                return None
-        else:
-            return None
-        return parsed.replace(tzinfo=UTC) if parsed.tzinfo is None else parsed
+        return parse_aware_datetime(value)
 
 
 def make_session_transition_policy(

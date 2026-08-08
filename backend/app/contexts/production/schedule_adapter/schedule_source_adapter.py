@@ -4,7 +4,6 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
-from types import MappingProxyType
 from typing import Any
 
 from app.contexts.production.production_event.production_event import ProductionEvent
@@ -13,6 +12,7 @@ from app.contexts.production.schedule_adapter.schedule_adapter_capability import
 )
 from app.contexts.production.schedule_adapter.scheduled_activity import ScheduledActivity
 from app.shared.ids import CorrelationId, EntityId
+from app.shared.metadata import freeze_metadata
 
 
 class ScheduleAdapterStatus(StrEnum):
@@ -44,7 +44,7 @@ class ScheduleSourceAdapter:
             raise ValueError("ScheduleSourceAdapter adapter_name must not be empty.")
         object.__setattr__(self, "supported_capabilities", tuple(self.supported_capabilities))
         object.__setattr__(self, "scheduled_activities", tuple(self.scheduled_activities))
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        object.__setattr__(self, "metadata", freeze_metadata(self.metadata))
 
     def supports_capability(self, capability: ScheduleAdapterCapability) -> bool:
         return capability in self.supported_capabilities
@@ -53,9 +53,11 @@ class ScheduleSourceAdapter:
         self,
         activity: ScheduledActivity,
         correlation_id: CorrelationId,
-        received_at: datetime | None = None,
+        occurred_at: datetime,
+        received_at: datetime,
     ) -> ProductionEvent:
         return activity.to_production_event(
             correlation_id=correlation_id,
+            occurred_at=occurred_at,
             received_at=received_at,
         )

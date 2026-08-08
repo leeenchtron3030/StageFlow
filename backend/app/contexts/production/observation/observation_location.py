@@ -6,6 +6,7 @@ from enum import StrEnum
 
 from app.contexts.production.timeline import TimelinePosition, TimelineRange
 from app.shared.ids import EntityId
+from app.shared.time import require_aware_datetime
 
 
 class ObservationLocationKind(StrEnum):
@@ -30,6 +31,10 @@ class ObservationLocation:
     stage_id: EntityId | None = None
 
     def __post_init__(self) -> None:
+        if self.wall_clock_at is not None:
+            require_aware_datetime(
+                self.wall_clock_at, "ObservationLocation.wall_clock_at"
+            )
         kind = self.kind or self._infer_kind()
         object.__setattr__(self, "kind", kind)
 

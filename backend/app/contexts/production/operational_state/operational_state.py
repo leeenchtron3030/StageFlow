@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
-from types import MappingProxyType
+from datetime import datetime
 from typing import Any
 
 from app.contexts.production.operational_state.operational_state_basis import (
@@ -27,6 +26,8 @@ from app.contexts.production.operational_state.operational_state_value import (
 )
 from app.contexts.production.timeline import TimelineRange
 from app.shared.ids import EntityId
+from app.shared.metadata import freeze_metadata
+from app.shared.time import require_aware_datetime
 
 
 def _empty_metadata() -> Mapping[str, Any]:
@@ -56,13 +57,16 @@ class OperationalState:
     value: OperationalStateValue
     status: OperationalStateStatus
     basis: OperationalStateBasis
-    observed_or_derived_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    observed_or_derived_at: datetime
     recording_block_id: EntityId | None = None
     stage_id: EntityId | None = None
     timeline_range: TimelineRange | None = None
     metadata: Mapping[str, Any] = field(default_factory=_empty_metadata)
 
     def __post_init__(self) -> None:
+        require_aware_datetime(
+            self.observed_or_derived_at, "OperationalState.observed_or_derived_at"
+        )
         self._validate_family_kind_boundary()
         if self.timeline_range is not None and self.recording_block_id is None:
             object.__setattr__(
@@ -76,7 +80,7 @@ class OperationalState:
             and self.timeline_range.recording_block_id != self.recording_block_id
         ):
             raise ValueError("OperationalState timeline_range must match recording_block_id.")
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        object.__setattr__(self, "metadata", freeze_metadata(self.metadata))
 
     def _validate_family_kind_boundary(self) -> None:
         if (

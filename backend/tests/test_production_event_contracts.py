@@ -15,6 +15,7 @@ from app.contexts.production.production_event import (
     ProductionEventType,
 )
 from app.shared.ids import CorrelationId, EntityId
+from tests.timestamp_fixtures import AWARE_TIMESTAMP
 
 
 def _event(
@@ -242,6 +243,8 @@ def test_received_at_rejects_timestamps_earlier_than_occurred_at() -> None:
 
 def test_event_references_are_optional() -> None:
     event = ProductionEvent(
+                received_at=AWARE_TIMESTAMP,
+
         id=EntityId.new(),
         event_type=ProductionEventType.UNKNOWN,
         source=ProductionEventSource.UNKNOWN,
