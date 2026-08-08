@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from types import MappingProxyType
 from typing import Any
 
 from app.contexts.production.operational_state import OperationalStateValue
@@ -11,6 +10,7 @@ from app.contexts.production.transition_policy import (
     TransitionPolicyResult,
 )
 from app.shared.ids import EntityId
+from app.shared.metadata import freeze_metadata
 
 from .recording_transition_evidence_profile import RecordingTransitionEvidenceProfile
 
@@ -31,7 +31,7 @@ class RecordingTransitionResult:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "ambiguity_reasons", tuple(self.ambiguity_reasons))
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        object.__setattr__(self, "metadata", freeze_metadata(self.metadata))
 
     @property
     def outcome(self) -> TransitionPolicyResult:

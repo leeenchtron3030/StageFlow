@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from types import MappingProxyType
 from typing import Any
 
 from app.contexts.production.evidence import EvidenceSet
 from app.shared.ids import EntityId
+from app.shared.metadata import freeze_metadata
 
 from .session_boundary_evidence_context import SessionBoundaryEvidenceContext
 
@@ -66,7 +66,7 @@ class SessionBoundaryEvidenceResult:
             "generated_boundary_contexts",
             tuple(self.generated_boundary_contexts),
         )
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        object.__setattr__(self, "metadata", freeze_metadata(self.metadata))
 
     @property
     def evidence_sets(self) -> tuple[EvidenceSet, ...]:

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from types import MappingProxyType
 from typing import Any
 
 from app.contexts.production.evidence import (
@@ -13,6 +12,7 @@ from app.contexts.production.evidence import (
 )
 from app.contexts.production.observation import ObservationType
 from app.shared.ids import EntityId
+from app.shared.metadata import freeze_metadata
 
 
 def _empty_metadata() -> Mapping[str, Any]:
@@ -51,7 +51,7 @@ class RecordingCoverageEvidenceRule:
             )
         if self.target_signal is EvidenceSignal.UNKNOWN:
             raise ValueError("RecordingCoverageEvidenceRule must not target unknown Signal.")
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        object.__setattr__(self, "metadata", freeze_metadata(self.metadata))
 
     def rationale(self) -> str:
         return self.rationale_template.format(

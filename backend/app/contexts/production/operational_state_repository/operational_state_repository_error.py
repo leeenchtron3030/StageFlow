@@ -3,10 +3,10 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
-from types import MappingProxyType
 from typing import Any
 
 from app.shared.ids import EntityId
+from app.shared.metadata import freeze_metadata
 
 
 class OperationalStateRepositoryErrorCode(StrEnum):
@@ -37,4 +37,4 @@ class OperationalStateRepositoryError:
         if not self.message.strip():
             raise ValueError("OperationalStateRepositoryError message must not be empty.")
         object.__setattr__(self, "related_ids", tuple(dict.fromkeys(self.related_ids)))
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        object.__setattr__(self, "metadata", freeze_metadata(self.metadata))

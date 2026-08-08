@@ -32,6 +32,7 @@ from app.contexts.production.observation import (
     observation_traceability_metadata,
 )
 from app.shared.ids import EntityId
+from app.shared.metadata import freeze_metadata
 
 from .recording_coverage_evidence_mapping import (
     RECORDING_COVERAGE_EVIDENCE_MAPPINGS,
@@ -114,7 +115,7 @@ class RecordingCoverageEvidenceBuilder:
             raise ValueError("RecordingCoverageEvidenceBuilder name must not be empty.")
         object.__setattr__(self, "rules", tuple(self.rules))
         object.__setattr__(self, "mappings", tuple(self.mappings))
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        object.__setattr__(self, "metadata", freeze_metadata(self.metadata))
 
     def can_build(self) -> bool:
         return self.status in _BUILDABLE_STATUSES

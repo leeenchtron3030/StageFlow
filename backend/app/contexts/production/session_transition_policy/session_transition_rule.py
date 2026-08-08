@@ -3,12 +3,12 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
-from types import MappingProxyType
 from typing import Any
 
 from app.contexts.production.evidence import EvidenceConcern, EvidenceRole
 from app.contexts.production.operational_state import OperationalStateValue
 from app.shared.ids import EntityId
+from app.shared.metadata import freeze_metadata
 
 from .session_transition_requirement import SessionTransitionRequirement
 
@@ -86,7 +86,7 @@ class SessionTransitionRule:
             "allowed_evidence_roles",
             tuple(self.allowed_evidence_roles),
         )
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        object.__setattr__(self, "metadata", freeze_metadata(self.metadata))
 
     def rationale(self) -> str:
         return self.rationale_template.format(

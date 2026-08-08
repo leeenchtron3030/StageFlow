@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from types import MappingProxyType
 from typing import Any
 
 from app.contexts.production.evidence import EvidenceRole, EvidenceSignal, EvidenceStrength
 from app.shared.ids import EntityId
+from app.shared.metadata import freeze_metadata
 
 
 def _empty_metadata() -> Mapping[str, Any]:
@@ -32,7 +32,7 @@ class EvidenceBuilderSemanticRule:
             raise ValueError("EvidenceBuilderSemanticRule must not target unknown Signal.")
         if not self.rationale_template.strip():
             raise ValueError("EvidenceBuilderSemanticRule rationale template is required.")
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        object.__setattr__(self, "metadata", freeze_metadata(self.metadata))
 
     def rationale(self) -> str:
         return self.rationale_template.format(

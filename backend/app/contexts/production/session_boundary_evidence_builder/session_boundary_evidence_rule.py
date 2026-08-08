@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from types import MappingProxyType
 from typing import Any
 
 from app.contexts.production.evidence import (
@@ -12,6 +11,7 @@ from app.contexts.production.evidence import (
     EvidenceStrength,
 )
 from app.shared.ids import EntityId
+from app.shared.metadata import freeze_metadata
 
 
 def _empty_metadata() -> Mapping[str, Any]:
@@ -49,7 +49,7 @@ class SessionBoundaryEvidenceRule:
             raise ValueError("Session boundary rule rationale must not be empty.")
         object.__setattr__(self, "accepted_source_concerns", concerns)
         object.__setattr__(self, "context_requirements", tuple(self.context_requirements))
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        object.__setattr__(self, "metadata", freeze_metadata(self.metadata))
 
     def accepts(self, concern: EvidenceConcern, signal: EvidenceSignal) -> bool:
         return concern in self.accepted_source_concerns and signal is self.accepted_signal

@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from types import MappingProxyType
 from typing import Any
 
 from app.shared.ids import EntityId
+from app.shared.metadata import freeze_metadata
 
 from .observation_semantic_selection import (
     ObservationSemanticSelection,
@@ -48,7 +48,7 @@ class EvidenceBuilderInputReport:
         )
         object.__setattr__(self, "selections", tuple(self.selections))
         object.__setattr__(self, "applied_rule_ids", tuple(self.applied_rule_ids))
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        object.__setattr__(self, "metadata", freeze_metadata(self.metadata))
 
     @classmethod
     def from_selections(

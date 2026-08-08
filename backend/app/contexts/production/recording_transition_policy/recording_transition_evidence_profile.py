@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from types import MappingProxyType
 from typing import Any
 
 from app.contexts.production.evidence import EvidenceSignal
 from app.shared.ids import EntityId
+from app.shared.metadata import freeze_metadata
 
 from .recording_transition_context import RecordingTransitionContext
 
@@ -53,4 +53,4 @@ class RecordingTransitionEvidenceProfile:
             raise ValueError(
                 "RecordingTransitionEvidenceProfile current_state_validation must not be empty."
             )
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        object.__setattr__(self, "metadata", freeze_metadata(self.metadata))

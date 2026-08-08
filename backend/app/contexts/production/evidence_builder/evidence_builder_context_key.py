@@ -5,6 +5,8 @@ from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Any
 
+from app.shared.metadata import freeze_metadata
+
 
 def _empty_metadata() -> Mapping[str, Any]:
     return {}
@@ -24,7 +26,7 @@ class EvidenceBuilderContextKey:
                 raise ValueError("EvidenceBuilderContextKey labels must be non-empty.")
             normalized_components.append((label, value))
         object.__setattr__(self, "components", tuple(normalized_components))
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        object.__setattr__(self, "metadata", freeze_metadata(self.metadata))
 
     @classmethod
     def from_components(

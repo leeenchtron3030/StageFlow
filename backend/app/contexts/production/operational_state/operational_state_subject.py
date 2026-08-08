@@ -3,8 +3,9 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
-from types import MappingProxyType
 from typing import Any
+
+from app.shared.metadata import freeze_metadata
 
 
 class OperationalStateSubjectType(StrEnum):
@@ -38,4 +39,4 @@ class OperationalStateSubject:
     def __post_init__(self) -> None:
         if not self.subject_identifier.strip():
             raise ValueError("OperationalStateSubject requires a subject identifier.")
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        object.__setattr__(self, "metadata", freeze_metadata(self.metadata))

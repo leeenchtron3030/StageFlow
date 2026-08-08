@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, cast
 
 from app.contexts.production.evidence import (
@@ -15,6 +14,7 @@ from app.contexts.production.operational_state import (
     OperationalStateValue,
 )
 from app.shared.ids import EntityId
+from app.shared.metadata import freeze_metadata
 
 from .operational_state_acceptance_context import OperationalStateAcceptanceContext
 from .operational_state_acceptance_mapping import (
@@ -128,7 +128,7 @@ class OperationalStateAcceptanceLineage:
             _unique_text(self.organizational_anchors),
         )
         object.__setattr__(self, "context_conflicts", tuple(self.context_conflicts))
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        object.__setattr__(self, "metadata", freeze_metadata(self.metadata))
 
     @classmethod
     def from_recording_result(
