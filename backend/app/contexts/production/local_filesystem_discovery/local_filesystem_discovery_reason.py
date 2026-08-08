@@ -23,6 +23,7 @@ class LocalFilesystemDiscoveryReasonCode(StrEnum):
     TARGET_MISSING = "target_missing"
     TARGET_INACCESSIBLE = "target_inaccessible"
     TARGET_TYPE_MISMATCH = "target_type_mismatch"
+    TARGET_CHANGED_DURING_DISCOVERY = "target_changed_during_discovery"
     CONFIGURED_TARGET_IS_SYMLINK = "configured_target_is_symlink"
     SINGLE_FILE_INSPECTED = "single_file_inspected"
     SHALLOW_DIRECTORY_ENUMERATED = "shallow_directory_enumerated"
@@ -65,6 +66,9 @@ class LocalFilesystemDiscoveryLimitation(StrEnum):
     )
     ENTRIES_BECAME_UNAVAILABLE = "one_or_more_entries_became_unavailable"
     ENTRIES_COULD_NOT_BE_INSPECTED = "one_or_more_entries_could_not_be_inspected"
+    TARGET_IDENTITY_CHANGED_DURING_DISCOVERY = (
+        "target_identity_changed_during_discovery"
+    )
     MEDIA_TYPE_EXTENSION_DERIVED_ONLY = "media_type_is_extension_derived_only"
     CONTAINER_TYPE_EXTENSION_DERIVED_ONLY = (
         "container_type_is_extension_derived_only"

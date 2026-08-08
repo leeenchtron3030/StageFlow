@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import os
 import stat
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
+from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import MappingProxyType
+from typing import cast
 from uuid import UUID, uuid5
 
 from app.contexts.production.asset_readiness import (
@@ -68,6 +70,14 @@ _BASE_REASONS = (
     LocalFilesystemDiscoveryReasonCode.NO_COMPLETION_ASSESSMENT_PERFORMED,
     LocalFilesystemDiscoveryReasonCode.NO_READINESS_ASSESSMENT_PERFORMED,
 )
+_OS_DIRECTORY_FLAG = cast(int, vars(os).get("O_DIRECTORY", 0))
+_OS_NOFOLLOW_FLAG = cast(int, vars(os).get("O_NOFOLLOW", 0))
+_OS_CLOSE_ON_EXEC_FLAG = cast(int, vars(os).get("O_CLOEXEC", 0))
+
+type _ScandirFileDescriptor = Callable[
+    [int],
+    AbstractContextManager[Iterator[os.DirEntry[str]]],
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -382,40 +392,29 @@ class LocalFilesystemCandidateDiscoveryAdapter(MediaCandidateDiscoveryPort):
                 ),
                 binding=binding,
             )
-        names: list[str] = []
-        try:
-            with os.scandir(binding.configured_absolute_target_location) as directory_entries:
-                for entry in directory_entries:
-                    names.append(entry.name)
-                    if len(names) > binding.maximum_directory_entries_examined:
-                        break
-        except FileNotFoundError:
-            return self._result(
-                request,
-                MediaCandidateDiscoveryOutcome.BLOCKED,
-                reasons=(accepted_reason, LocalFilesystemDiscoveryReasonCode.TARGET_MISSING),
-                binding=binding,
-            )
-        except PermissionError:
-            return self._result(
-                request,
-                MediaCandidateDiscoveryOutcome.BLOCKED,
-                reasons=(
-                    accepted_reason,
-                    LocalFilesystemDiscoveryReasonCode.TARGET_INACCESSIBLE,
-                ),
-                binding=binding,
-            )
-        except OSError:
-            return self._result(
-                request,
-                MediaCandidateDiscoveryOutcome.FAILED,
-                reasons=(
-                    accepted_reason,
-                    LocalFilesystemDiscoveryReasonCode.UNKNOWN_LOCAL_FILESYSTEM_FAILURE,
-                ),
-                binding=binding,
-            )
+        (
+            names,
+            bound_entry_stats,
+            bound_disappeared_names,
+            bound_failed_names,
+            capture_failure,
+        ) = self._capture_directory_entries(
+            request,
+            binding,
+            target_stat,
+            accepted_reason,
+        )
+        if capture_failure is not None:
+            return capture_failure
+
+        replacement = self._revalidate_directory_target(
+            request,
+            binding,
+            target_stat,
+            accepted_reason,
+        )
+        if replacement is not None:
+            return replacement
 
         examined = len(names)
         if examined > binding.maximum_directory_entries_examined:
@@ -444,9 +443,7 @@ class LocalFilesystemCandidateDiscoveryAdapter(MediaCandidateDiscoveryPort):
         failed_inspection = False
         for name in sorted(names, key=lambda value: (value.casefold(), value)):
             absolute_location = os.path.join(binding.configured_absolute_target_location, name)
-            try:
-                entry_stat = os.lstat(absolute_location)
-            except FileNotFoundError:
+            if name in bound_disappeared_names:
                 reasons.append(
                     LocalFilesystemDiscoveryReasonCode.ENTRY_DISAPPEARED_DURING_DISCOVERY
                 )
@@ -456,7 +453,7 @@ class LocalFilesystemCandidateDiscoveryAdapter(MediaCandidateDiscoveryPort):
                 material_partial = True
                 unavailable = True
                 continue
-            except (PermissionError, OSError):
+            if name in bound_failed_names:
                 reasons.append(LocalFilesystemDiscoveryReasonCode.ENTRY_INSPECTION_FAILED)
                 limitations.append(
                     LocalFilesystemDiscoveryLimitation.ENTRIES_COULD_NOT_BE_INSPECTED
@@ -464,6 +461,31 @@ class LocalFilesystemCandidateDiscoveryAdapter(MediaCandidateDiscoveryPort):
                 material_partial = True
                 failed_inspection = True
                 continue
+            if bound_entry_stats is not None:
+                entry_stat = bound_entry_stats[name]
+            else:
+                try:
+                    entry_stat = os.lstat(absolute_location)
+                except FileNotFoundError:
+                    reasons.append(
+                        LocalFilesystemDiscoveryReasonCode.ENTRY_DISAPPEARED_DURING_DISCOVERY
+                    )
+                    limitations.append(
+                        LocalFilesystemDiscoveryLimitation.ENTRIES_BECAME_UNAVAILABLE
+                    )
+                    material_partial = True
+                    unavailable = True
+                    continue
+                except (PermissionError, OSError):
+                    reasons.append(
+                        LocalFilesystemDiscoveryReasonCode.ENTRY_INSPECTION_FAILED
+                    )
+                    limitations.append(
+                        LocalFilesystemDiscoveryLimitation.ENTRIES_COULD_NOT_BE_INSPECTED
+                    )
+                    material_partial = True
+                    failed_inspection = True
+                    continue
             if stat.S_ISLNK(entry_stat.st_mode):
                 reasons.append(LocalFilesystemDiscoveryReasonCode.SYMLINK_ENTRY_SKIPPED)
                 limitations.append(
@@ -492,6 +514,15 @@ class LocalFilesystemCandidateDiscoveryAdapter(MediaCandidateDiscoveryPort):
             )
             if eligible is not None:
                 entries.append(eligible)
+
+        replacement = self._revalidate_directory_target(
+            request,
+            binding,
+            target_stat,
+            accepted_reason,
+        )
+        if replacement is not None:
+            return replacement
 
         entries.sort(key=lambda value: value.order_key)
         truncated = len(entries) > request.maximum_candidate_count
@@ -535,6 +566,236 @@ class LocalFilesystemCandidateDiscoveryAdapter(MediaCandidateDiscoveryPort):
             binding=binding,
             discovered_candidates=discovered,
             entries_examined=examined,
+        )
+
+    def _capture_directory_entries(
+        self,
+        request: MediaCandidateDiscoveryRequest,
+        binding: LocalFilesystemTargetBinding,
+        target_stat: os.stat_result,
+        accepted_reason: LocalFilesystemDiscoveryReasonCode,
+    ) -> tuple[
+        list[str],
+        dict[str, os.stat_result] | None,
+        set[str],
+        set[str],
+        MediaCandidateDiscoveryResult | None,
+    ]:
+        if _descriptor_relative_directory_supported():
+            return self._capture_descriptor_bound_directory_entries(
+                request,
+                binding,
+                target_stat,
+                accepted_reason,
+            )
+        names: list[str] = []
+        try:
+            with os.scandir(binding.configured_absolute_target_location) as directory_entries:
+                for entry in directory_entries:
+                    names.append(entry.name)
+                    if len(names) > binding.maximum_directory_entries_examined:
+                        break
+        except FileNotFoundError:
+            return [], None, set(), set(), self._result(
+                request,
+                MediaCandidateDiscoveryOutcome.BLOCKED,
+                reasons=(accepted_reason, LocalFilesystemDiscoveryReasonCode.TARGET_MISSING),
+                binding=binding,
+            )
+        except PermissionError:
+            return [], None, set(), set(), self._result(
+                request,
+                MediaCandidateDiscoveryOutcome.BLOCKED,
+                reasons=(
+                    accepted_reason,
+                    LocalFilesystemDiscoveryReasonCode.TARGET_INACCESSIBLE,
+                ),
+                binding=binding,
+            )
+        except OSError:
+            return [], None, set(), set(), self._result(
+                request,
+                MediaCandidateDiscoveryOutcome.FAILED,
+                reasons=(
+                    accepted_reason,
+                    LocalFilesystemDiscoveryReasonCode.UNKNOWN_LOCAL_FILESYSTEM_FAILURE,
+                ),
+                binding=binding,
+            )
+        return names, None, set(), set(), None
+
+    def _capture_descriptor_bound_directory_entries(
+        self,
+        request: MediaCandidateDiscoveryRequest,
+        binding: LocalFilesystemTargetBinding,
+        target_stat: os.stat_result,
+        accepted_reason: LocalFilesystemDiscoveryReasonCode,
+    ) -> tuple[
+        list[str],
+        dict[str, os.stat_result] | None,
+        set[str],
+        set[str],
+        MediaCandidateDiscoveryResult | None,
+    ]:
+        flags = os.O_RDONLY
+        flags |= _OS_DIRECTORY_FLAG
+        flags |= _OS_NOFOLLOW_FLAG
+        flags |= _OS_CLOSE_ON_EXEC_FLAG
+        directory_fd: int | None = None
+        try:
+            directory_fd = os.open(binding.configured_absolute_target_location, flags)
+            opened_stat = os.fstat(directory_fd)
+            if _filesystem_object_identity(opened_stat) != _filesystem_object_identity(
+                target_stat
+            ):
+                return [], None, set(), set(), self._target_changed_result(
+                    request,
+                    binding,
+                    accepted_reason,
+                )
+            names: list[str] = []
+            entry_stats: dict[str, os.stat_result] = {}
+            disappeared_names: set[str] = set()
+            failed_names: set[str] = set()
+            scandir_fd = cast(_ScandirFileDescriptor, os.scandir)
+            with scandir_fd(directory_fd) as directory_entries:
+                captured_entries: list[os.DirEntry[str]] = []
+                for entry in directory_entries:
+                    names.append(entry.name)
+                    captured_entries.append(entry)
+                    if len(names) > binding.maximum_directory_entries_examined:
+                        break
+                replacement = self._revalidate_directory_target(
+                    request,
+                    binding,
+                    target_stat,
+                    accepted_reason,
+                )
+                if replacement is not None:
+                    return [], None, set(), set(), replacement
+                if len(names) <= binding.maximum_directory_entries_examined:
+                    for entry in captured_entries:
+                        try:
+                            entry_stats[entry.name] = entry.stat(follow_symlinks=False)
+                        except FileNotFoundError:
+                            disappeared_names.add(entry.name)
+                        except (PermissionError, OSError):
+                            failed_names.add(entry.name)
+                    replacement = self._revalidate_directory_target(
+                        request,
+                        binding,
+                        target_stat,
+                        accepted_reason,
+                    )
+                    if replacement is not None:
+                        return [], None, set(), set(), replacement
+            return names, entry_stats, disappeared_names, failed_names, None
+        except FileNotFoundError:
+            return [], None, set(), set(), self._target_changed_result(
+                request,
+                binding,
+                accepted_reason,
+            )
+        except PermissionError:
+            return [], None, set(), set(), self._result(
+                request,
+                MediaCandidateDiscoveryOutcome.BLOCKED,
+                reasons=(
+                    accepted_reason,
+                    LocalFilesystemDiscoveryReasonCode.TARGET_INACCESSIBLE,
+                ),
+                binding=binding,
+            )
+        except OSError:
+            replacement = self._revalidate_directory_target(
+                request,
+                binding,
+                target_stat,
+                accepted_reason,
+            )
+            if replacement is not None:
+                return [], None, set(), set(), replacement
+            return [], None, set(), set(), self._result(
+                request,
+                MediaCandidateDiscoveryOutcome.FAILED,
+                reasons=(
+                    accepted_reason,
+                    LocalFilesystemDiscoveryReasonCode.UNKNOWN_LOCAL_FILESYSTEM_FAILURE,
+                ),
+                binding=binding,
+            )
+        finally:
+            if directory_fd is not None:
+                os.close(directory_fd)
+
+    def _revalidate_directory_target(
+        self,
+        request: MediaCandidateDiscoveryRequest,
+        binding: LocalFilesystemTargetBinding,
+        validated_stat: os.stat_result,
+        accepted_reason: LocalFilesystemDiscoveryReasonCode,
+    ) -> MediaCandidateDiscoveryResult | None:
+        try:
+            current_stat = os.lstat(binding.configured_absolute_target_location)
+        except FileNotFoundError:
+            return self._result(
+                request,
+                MediaCandidateDiscoveryOutcome.BLOCKED,
+                reasons=(
+                    accepted_reason,
+                    LocalFilesystemDiscoveryReasonCode.TARGET_CHANGED_DURING_DISCOVERY,
+                ),
+                limitations=(
+                    LocalFilesystemDiscoveryLimitation.TARGET_IDENTITY_CHANGED_DURING_DISCOVERY,
+                ),
+                binding=binding,
+            )
+        except PermissionError:
+            return self._result(
+                request,
+                MediaCandidateDiscoveryOutcome.BLOCKED,
+                reasons=(
+                    accepted_reason,
+                    LocalFilesystemDiscoveryReasonCode.TARGET_INACCESSIBLE,
+                ),
+                binding=binding,
+            )
+        except OSError:
+            return self._result(
+                request,
+                MediaCandidateDiscoveryOutcome.FAILED,
+                reasons=(
+                    accepted_reason,
+                    LocalFilesystemDiscoveryReasonCode.UNKNOWN_LOCAL_FILESYSTEM_FAILURE,
+                ),
+                binding=binding,
+            )
+        if (
+            not stat.S_ISDIR(current_stat.st_mode)
+            or stat.S_ISLNK(current_stat.st_mode)
+            or _filesystem_object_identity(current_stat)
+            != _filesystem_object_identity(validated_stat)
+        ):
+            return self._target_changed_result(request, binding, accepted_reason)
+        return None
+
+    def _target_changed_result(
+        self,
+        request: MediaCandidateDiscoveryRequest,
+        binding: LocalFilesystemTargetBinding,
+        accepted_reason: LocalFilesystemDiscoveryReasonCode,
+    ) -> MediaCandidateDiscoveryResult:
+        return self._result(
+            request,
+            MediaCandidateDiscoveryOutcome.BLOCKED,
+            reasons=(
+                accepted_reason,
+                LocalFilesystemDiscoveryReasonCode.TARGET_CHANGED_DURING_DISCOVERY,
+            ),
+            limitations=(
+                LocalFilesystemDiscoveryLimitation.TARGET_IDENTITY_CHANGED_DURING_DISCOVERY,
+            ),
+            binding=binding,
         )
 
     def _eligible_entry(
@@ -878,6 +1139,26 @@ def _source_identity(
     return LocalFilesystemSourceIdentity(
         strength=LocalFilesystemIdentityStrength.LOCATION_SCOPED_IDENTITY,
         normalized_source_location=absolute_location,
+    )
+
+
+def _filesystem_object_identity(entry_stat: os.stat_result) -> tuple[int, int, int]:
+    return (
+        int(getattr(entry_stat, "st_dev", 0)),
+        int(getattr(entry_stat, "st_ino", 0)),
+        stat.S_IFMT(entry_stat.st_mode),
+    )
+
+
+def _descriptor_relative_directory_supported() -> bool:
+    supports_file_descriptor = cast(
+        set[Callable[..., object]],
+        vars(os).get("supports_fd", set[Callable[..., object]]()),
+    )
+    return (
+        _OS_DIRECTORY_FLAG != 0
+        and _OS_NOFOLLOW_FLAG != 0
+        and os.scandir in supports_file_descriptor
     )
 
 

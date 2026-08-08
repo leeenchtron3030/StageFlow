@@ -160,7 +160,6 @@ def test_package_has_no_watcher_polling_recursion_content_or_wall_clock_calls() 
         "glob",
         "mount",
         "now",
-        "open",
         "poll",
         "probe",
         "read",
@@ -175,6 +174,7 @@ def test_package_has_no_watcher_polling_recursion_content_or_wall_clock_calls() 
         "watch",
     }
     called_names: set[str] = set()
+    open_calls: list[ast.Call] = []
     loops: list[ast.While] = []
     for _, source in _python_sources():
         tree = ast.parse(source)
@@ -184,11 +184,25 @@ def test_package_has_no_watcher_polling_recursion_content_or_wall_clock_calls() 
                     called_names.add(node.func.id)
                 elif isinstance(node.func, ast.Attribute):
                     called_names.add(node.func.attr)
+                if (
+                    isinstance(node.func, ast.Name)
+                    and node.func.id == "open"
+                    or isinstance(node.func, ast.Attribute)
+                    and node.func.attr == "open"
+                ):
+                    open_calls.append(node)
             elif isinstance(node, ast.While):
                 loops.append(node)
 
     assert not forbidden_called_names & called_names
     assert loops == []
+    assert open_calls
+    assert all(
+        isinstance(call.func, ast.Attribute)
+        and isinstance(call.func.value, ast.Name)
+        and call.func.value.id == "os"
+        for call in open_calls
+    )
     assert "scandir" in called_names
     assert "lstat" in called_names
 
