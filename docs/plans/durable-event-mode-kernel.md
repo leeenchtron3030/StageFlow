@@ -465,8 +465,8 @@ The complete evidence/options/tradeoffs are retained in the
 
 ## Completion record
 
-- Implemented revision: working-tree implementation candidate on 2026-08-08; logical
-  local commits are recorded with the final handoff.
+- Implemented revision: local change groups `e55bf50`, `05c2641`, `4077446`, and
+  `17a1992` on 2026-08-08.
 - Files and migrations actually changed: configuration/composition/lifespan; Event/Stage
   contracts; durable Kernel contracts/service/repositories; PostgreSQL repository and
   `0002_event_mode_kernel` forward/reversal SQL; read-only status API; behavioral tests;
@@ -476,7 +476,7 @@ The complete evidence/options/tradeoffs are retained in the
   gated real-PostgreSQL test with `STAGEFLOW_TEST_POSTGRES_DSN`; explicit `0002` reverse/
   reapply; PostgreSQL stop/start; focused Windows filesystem tests; `powercfg` and
   read-only host/process observations; `git diff --check` at handoff.
-- Results and warnings: final backend matrix 1,595 passed and 5 existing capability/
+- Results and warnings: final backend matrix 1,600 passed and 5 existing capability/
   platform skips; Ruff passed; Pyright reported 0 errors. FastAPI's compatibility
   `TestClient` emitted one upstream Starlette deprecation warning. Isolated PostgreSQL
   17.10 migration/reconstruction/history/reversal/recovery passed.
