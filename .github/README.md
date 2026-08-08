@@ -9,16 +9,18 @@ This directory contains GitHub repository governance assets for StageFlow.
 - Pull request templates.
 - Issue templates.
 - Repository-level GitHub metadata.
-- Workflow definitions when a future Engineering Directive authorizes CI/CD.
+- Validation workflow definitions authorized by the accepted architecture-baseline
+  disposition.
 
 ## What Does Not Belong Here
 
 - Application code.
 - Architecture source documents.
 - Secrets or environment-specific configuration.
-- GitHub Actions workflows before they are approved by a future Engineering Directive.
+- Deployment or release workflows without specific authority.
 
-## Expected Future Directives
+## Current automation
 
-- ED-0004 Development Tooling may populate this directory with approved repository automation.
-- Future CI/CD directives may populate `.github/workflows/`.
+The quality-matrix workflow runs the repository's verified backend and frontend checks.
+It is development validation only and does not demonstrate event-operational readiness,
+deploy software, or publish artifacts.

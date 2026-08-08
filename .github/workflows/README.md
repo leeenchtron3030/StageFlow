@@ -2,12 +2,13 @@
 
 ## Purpose
 
-This directory is reserved for future GitHub Actions workflow definitions.
+This directory contains GitHub Actions workflow definitions authorized by accepted
+repository authority.
 
 ## What Belongs Here
 
-- CI workflows approved by a future Engineering Directive.
-- Repository health checks approved by a future Engineering Directive.
+- CI workflows approved by the architecture-baseline disposition or later authority.
+- Repository health checks approved by repository authority.
 - Deployment workflows only after production infrastructure is formally specified.
 
 ## What Does Not Belong Here
@@ -16,7 +17,9 @@ This directory is reserved for future GitHub Actions workflow definitions.
 - Docker, deployment, or infrastructure configuration.
 - Secrets, tokens, or local machine configuration.
 
-## Expected Future Directives
+## Current workflow
 
-- ED-0004 Development Tooling may define validation workflows.
-- Future production or release directives may define deployment workflows.
+`ci.yml` runs backend pytest/Ruff/Pyright and frontend build/lint/typecheck on Linux.
+It does not run a frontend test suite because none is configured, and it does not claim
+Windows or event-operational validation. Deployment and release automation remain future
+work requiring separate authority.
