@@ -120,8 +120,12 @@ def test_explicit_bootstrap_and_startup_reconciliation_use_observed_source_state
     assert recovered_stage.session_package_state is not None
     assert recovered_stage.session_package_state.value == "assembling"
     assert recovered_stage.session_package_revision == 1
-    with TestClient(create_app()) as client:
-        client.app.state.kernel = components
+    assert recovered.latest_reconciliation is not None
+    assert recovered.latest_reconciliation.status.value == "completed"
+    app = create_app()
+    with TestClient(app) as raw_client:
+        app.state.kernel = components
+        client = cast(SyncHttpClient, raw_client)
         response = client.get("/api/v1/kernel/status")
     assert response.status_code == 200
     assert response.json()["stages"][0]["session_package_state"] == "assembling"
@@ -147,12 +151,12 @@ def test_kernel_status_reports_database_unavailability_as_structured_503(
         raise KernelStorageUnavailableError("postgresql_unavailable")
 
     monkeypatch.setattr(KernelComponents, "status", unavailable)
-    with TestClient(create_app()) as client:
-        client.app.state.kernel = components
+    app = create_app()
+    with TestClient(app) as raw_client:
+        app.state.kernel = components
+        client = cast(SyncHttpClient, raw_client)
         response = client.get("/api/v1/kernel/status")
 
     assert response.status_code == 503
     assert response.json()["database_available"] is False
     assert response.json()["attention_codes"] == ["postgresql_unavailable"]
-    assert recovered.latest_reconciliation is not None
-    assert recovered.latest_reconciliation.status.value == "completed"
