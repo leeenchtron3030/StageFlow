@@ -17,6 +17,7 @@ from app.contexts.production.event_mode_kernel import (
 from app.contexts.production.event_mode_kernel.repository import (
     KernelStorageUnavailableError,
 )
+from app.contexts.production.runtime import RuntimeConfigurationValidity, validate_runtime
 from app.core.config.deployment import (
     EffectiveKernelConfiguration,
     load_kernel_deployment_configuration,
@@ -92,6 +93,15 @@ def test_explicit_bootstrap_and_startup_reconciliation_use_observed_source_state
         operation_id=EntityId("30000000-0000-0000-0000-000000000001"),
         actor_id=EntityId("30000000-0000-0000-0000-000000000002"),
     )
+    assert components.runtime is not None
+    assert validate_runtime(components.runtime).outcome is RuntimeConfigurationValidity.VALID
+    assert components.runtime.identity.configured_stage_ids == tuple(
+        stage.id for stage in repository.list_stages(ready.event_id)
+    )
+    assert {
+        target.metadata["source_binding_key"]
+        for target in components.runtime.collection_plans[0].targets
+    } == {"main-source"}
     stage = repository.list_stages(ready.event_id)[0]
     session = kernel.start_session(
         StartSessionRequest(

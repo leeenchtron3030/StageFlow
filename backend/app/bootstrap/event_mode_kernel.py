@@ -11,6 +11,7 @@ from app.contexts.production.event_mode_kernel import DurableEventModeKernel
 from app.contexts.production.event_mode_kernel.contracts import EventOperationalStatus
 from app.contexts.production.event_mode_kernel.repository import EventModeKernelRepository
 from app.contexts.production.event_mode_kernel.service import StableAssetIngressPublisher
+from app.contexts.production.runtime import StageFlowRuntime
 from app.core.config.deployment import (
     EffectiveKernelConfiguration,
     load_kernel_deployment_configuration,
@@ -22,12 +23,15 @@ from app.infrastructure.postgres import (
 from app.shared.ids import EntityId
 from app.shared.time import Clock, SystemClock
 
+from .runtime_factory import build_stageflow_runtime
+
 
 @dataclass(slots=True)
 class KernelComponents:
     configuration: EffectiveKernelConfiguration
     repository: EventModeKernelRepository
     kernel: DurableEventModeKernel
+    runtime: StageFlowRuntime | None = None
     source_availability: dict[str, bool] = field(
         default_factory=lambda: dict[str, bool]()
     )
@@ -65,6 +69,11 @@ class KernelComponents:
         )
         if result.event is None:
             raise RuntimeError(result.reason or "event_stage_bootstrap_failed")
+        self.runtime = build_stageflow_runtime(
+            self.configuration,
+            stages=tuple(result.stages),
+            clock=self.kernel.clock,
+        )
         self.reconcile_startup(result.event.id)
         return self.repository.operational_status(
             result.event.id,
@@ -152,6 +161,11 @@ def load_kernel_components_from_environment(
     components = build_kernel_components(configuration, clock=clock)
     event = components.repository.get_event_by_key(components.event_key)
     if event is not None:
+        components.runtime = build_stageflow_runtime(
+            configuration,
+            stages=components.repository.list_stages(event.id),
+            clock=components.kernel.clock,
+        )
         components.reconcile_startup(event.id)
     return components
 
