@@ -10,7 +10,8 @@ never redirect authoritative writes into process memory.
 
 ## Current implementation
 
-The current branch implements only the first durable boundary:
+The current branch implements stable ingress plus the bounded Durable Event-Mode Kernel
+persistence boundary:
 
 - repository-neutral stable ingress contracts under `production.ingress`;
 - a synchronous Psycopg 3 PostgreSQL adapter under `infrastructure.postgres`;
@@ -21,11 +22,19 @@ The current branch implements only the first durable boundary:
 - explicit numbered forward and reversal SQL plus a narrow migration runner; and
 - a process-local repository that is labeled and used only as a non-durable test double.
 
+`0002_event_mode_kernel` adds normalized Business Event, Stage/source binding, Program
+Expectation, realized Session, media candidate/observation/asset/association, completion,
+and reconciliation tables. Typed append-only revision/history tables preserve bootstrap,
+Program Expectation, Session boundary, association, and completion authority. Current
+state and consequential history change in the same Psycopg transaction. There is no
+generic event store, Job table, media blob, or event-sourcing projection rebuild.
+
 Registration is at least once and idempotent. It does not claim exactly-once delivery.
 Only a newly created ingress record is eligible for the included dispatcher path; an
-exact replay does not repeat that caller-visible dispatch path. Downstream durable
-effects, an outbox, operations, Sessions, media registration, retries, reconciliation,
-and runtime composition remain outside this implementation.
+exact replay does not repeat that caller-visible dispatch path. The asset-registration
+bridge is stable and replay-safe, but it is a direct synchronous boundary rather than an
+outbox. Generic asynchronous operations, workers, leases, retries, and brokers remain
+outside this implementation.
 
 ## Identity and time
 
@@ -41,21 +50,20 @@ application time remain separate fields.
 
 ## Migration and reversal
 
-`0001_ingress_forward.sql` creates the `stageflow` schema, a migration ledger, and the
-ingress table. `0001_ingress_reverse.sql` removes only the ingress table and its ledger
-entry; it deliberately does not drop the shared schema. Reversal is an explicit operator
-action for an isolated development database and is never automatic.
+`0001_ingress_forward.sql` creates the shared schema, migration ledger, and ingress
+table. `0002_event_mode_kernel_forward.sql` adds only Kernel-owned objects. Its reversal
+removes those objects and its ledger row while preserving ingress and the shared schema.
+Reversal is an explicit operator action for an isolated database and is never automatic.
 
 ## Windows reference-node validation
 
-Psycopg's binary distribution installed and the Python contract/static suite ran on the
-Windows Razer development node. This machine had no `psql`, PostgreSQL server, Docker,
-or Podman available, so a real database run was not practical in this change. The real
-integration test is gated by `STAGEFLOW_TEST_POSTGRES_DSN` and exercises migration,
-adapter reconstruction, concurrent replay, stable Event identity, and conflict behavior
-when an isolated PostgreSQL test database is supplied.
+The Windows Razer validation used an isolated PostgreSQL 17.10 cluster bound to
+`127.0.0.1`, applied both migrations, exercised Event/Stage replay, Session reconstruction,
+candidate/asset/ingress/association reconstruction, stopped and restarted PostgreSQL,
+and reversed/reapplied `0002` while confirming `0001` ingress remained. The gated test
+uses `STAGEFLOW_TEST_POSTGRES_DSN` so the same checks can run against another isolated
+database.
 
-Before operational deployment, StageFlow still needs a documented PostgreSQL service
-account/secret workflow, connection configuration, backup/restore procedure, health and
-operator visibility, and reference-node recovery exercise. None is inferred by the
-presence of the repository adapter.
+Before operational deployment, StageFlow still needs environment-specific service
+account/secret setup, backup/restore rehearsal, an event-length workload, and independent
+event-readiness review. None is inferred by the repository adapter or developer run.

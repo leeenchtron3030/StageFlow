@@ -125,17 +125,26 @@ association, restart reconciliation, or automatic downstream scheduling.
 ## 4. Session
 
 Session is an **accepted future first-class durable StageFlow concept** representing the
-logical program unit being produced. It is not a file, directory, schedule row, Session
-Candidate, Timeline Window Candidate, Session Window Product, or Operational State.
+complete logical media package for one actual on-stage substantive presentation or
+discussion, including Q&A when it is part of the presentation. Multiple files may
+contribute to one Session. It is not a file, directory, recording process, planned
+program record, Session Candidate, Timeline Window Candidate, Session Window Product, or
+Operational State.
 
 The accepted identity direction is:
 
 - StageFlow assigns one immutable Session ID.
 - Schedule-platform, recorder, and other provider IDs are versioned external references.
-- Observed or scheduled facts may propose association or creation but do not silently
-  create authority.
+- A Program Expectation preserves planned-world information separately from actual
+  observed Session activity; expectation does not silently create authority.
+- Substantive presentation/discussion activity, not introduction or schedule time,
+  determines normal observed boundaries.
+- Once activity begins, the Session belongs to one Business Event and exactly one fixed
+  Stage.
 - Operational State remains an assertion or projection about a subject, not the Session
   aggregate.
+- Media association is evidence-driven with associated, unresolved, and conflict
+  outcomes; human assignment/correction is authoritative.
 
 A future Session may connect a Business Event, Stage, scheduled activity, observed
 timing, Recording Blocks, media, speakers, transcript revisions, analysis, editorial
@@ -145,15 +154,17 @@ decisions, final assets, packages, and delivery operations.
 acceptance contracts, and a process-local Operational State repository exist. There is
 no authoritative Session entity, creation command, durable repository, schema, or API.
 
-### Session finality is multi-stage
+### Session finality is multi-dimensional
 
-The **accepted direction** distinguishes:
+The **accepted direction** distinguishes planned expectation, presentation activity,
+media assembly, and human review. Human approval of one Session package revision is
+required before the Session is complete. Apparent activity end, recording stop,
+inactivity, or grace expiration is insufficient.
 
-- Session activity ended;
-- media grace period active;
-- media set settled;
+Later concerns remain separate:
+
 - editorially final;
-- package complete;
+- publication package complete;
 - published or delivered; and
 - archived.
 
@@ -161,9 +172,9 @@ These are milestone meanings, not implemented enum names. Analysis reconciliatio
 also be tracked by future workflows, but its exact ownership and relationship to these
 accepted milestones remain to be designed.
 
-Late media must not silently rewrite published history. Reviewable revision, explicit
-reopening, or quarantine is the accepted direction; grace durations and reopening rules
-remain open.
+Late valid media preserves the earlier completion decision and returns the current
+Session package to correction/review. Post-publication behavior and grace defaults remain
+open.
 
 ## 5. Incremental intelligence and human authority
 
@@ -359,24 +370,27 @@ The Dispatcher/Observation Interpreter compatibility implementation and final ha
 are recorded as **Completed — independent review accepted**. Recursive metadata
 immutability, local-filesystem discovery race hardening, and CI quality-matrix
 enforcement are also completed and independently accepted. Durable ingress identity and
-the breaking strict-aware timestamp transition are now implemented under the approved
-PostgreSQL and time decisions; fresh phase verification remains pending. Runtime
-composition is still absent.
+the strict-aware timestamp transition are implemented under the approved PostgreSQL and
+time decisions. Final independent verification accepts phase entry with one non-blocking
+commit-reviewability limitation. Runtime composition is still absent.
 
 ### Phase 3 — Durable event-mode kernel
 
-Planned future work includes deployment configuration loading, persistence beyond the
-implemented ingress record, durable operations, a durable media registry, startup
-reconciliation,
-an application composition root, readiness/dependency health, and minimal operator
-status APIs. Required open decisions and bounded plans must precede implementation.
+Architecture/design is captured in the Durable Event-Mode Kernel architecture and plan.
+The implementation candidate includes deployment configuration, persistence beyond ingress, Event/
+Stage/Session authority, a durable media registry, startup reconciliation, an application
+composition root, readiness/dependency health, and minimal operator status APIs. A
+generic durable Operation system is deferred until a genuinely asynchronous/external
+consumer exists. ADR-0024 resolves the four former Yellow decisions. Deployment Runtime
+construction, automatic startup discovery/observation composition, and full reference-
+node qualification remain Green work before independent phase acceptance.
 
 ### Phase 4 — First operational media slice
 
 A suitable first vertical workflow is explicit shared-storage discovery through durable
 candidate registration, repeated resource observation, readiness, Completed Media Asset
 registration, stable Production Event emission, Session association or review state,
-durable operation status, restart recovery, and operator visibility.
+durable reconciliation status, restart recovery, and operator visibility.
 
 This slice does not need transcription, editorial analysis, packaging, or publishing to
 prove the architecture.

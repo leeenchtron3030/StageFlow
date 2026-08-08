@@ -93,16 +93,17 @@ new context and names every superseded ADR. Update this index and mark the older
 | [ADR-0020](ADR-0020-canonical-media-to-event-path.md) | Canonical candidate-to-asset-to-Event path | Accepted | Contracts partial; durable path not implemented |
 | [ADR-0021](ADR-0021-time-authority.md) | Domain and infrastructure time authority | Accepted | Strict-aware internal transition implemented |
 | [ADR-0022](ADR-0022-postgresql-authoritative-operational-store.md) | PostgreSQL authoritative operational store | Accepted | Durable ingress foundation in progress; runtime composition remains future work |
+| [ADR-0023](ADR-0023-session-authority-and-completion.md) | Session meaning, Stage invariants, association, boundaries, and completion authority | Accepted | Durable Session aggregate and workflow not implemented |
+| [ADR-0024](ADR-0024-durable-kernel-authority-and-persistence.md) | Explicit bootstrap, human Session realization, deterministic association, normalized state/history | Accepted | Kernel implementation approved |
 
 ## Unresolved ADR candidates
 
 | Candidate | Accepted boundary | Decision still required |
 | --- | --- | --- |
-| Session identity and lifecycle authority | StageFlow-owned immutable Session ID; distinct completion milestones | Creation/promotion, scheduled/observed reconciliation, Event/Stage ownership, split/merge/reassign, late-media policy |
-| Relational store and transaction design | One relational durable store; media by reference; append-oriented records where needed | Database technology, schema, migrations, topology, backup/restore |
+| Kernel aggregate evolution | Explicit bootstrap; human Session realization; deterministic association; normalized state plus typed history | Post-Kernel split/merge and automated realization policy |
+| Relational store evolution | PostgreSQL normalized state plus typed append-only Kernel history | Backup/restore policy and schemas for future capabilities |
 | Durable operation and worker lifecycle | Database-backed at-least-once work for real asynchronous/external tasks | Operation/attempt schema, lease rules, cancellation, worker deployment |
-| Configuration boundary | Accepted precedence and redacted effective configuration | File format, secret resolution mechanism, schema lifecycle |
-| Session completion and late media | Ended, grace, settled, editorial final, package, publication/delivery, archive remain distinct | Grace defaults, reopening authority, post-package/publication behavior |
+| Post-Kernel Session revision policy | Human completion applies to one package revision; valid late media returns the current package to correction/review | Grace defaults, split/merge, and post-publication behavior |
 | Transactional outbox | Required for future externally meaningful durable messages | First consumer, message schema, dispatch/reconciliation ownership |
 
 The documentation-authority decision D-10 is implemented by

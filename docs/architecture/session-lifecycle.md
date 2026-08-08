@@ -1,137 +1,174 @@
 # Session lifecycle
 
-This document separates verified current behavior from the accepted target lifecycle.
-It does not define unresolved promotion, reconciliation, or late-media policy.
+This document separates verified current behavior from the Session architecture accepted
+by [ADR-0023](../adr/ADR-0023-session-authority-and-completion.md). Accepted architecture
+is not a claim that the durable aggregate or workflow is implemented.
 
-## Current observed lifecycle
+## Current implementation
 
-There is no authoritative `Session` entity, creation command, repository, schema, or API.
-Current Session-related contracts are independent values:
+The Durable Kernel implementation candidate now includes an authoritative realized
+`Session` contract, human create/start and boundary commands, normalized PostgreSQL
+current state, typed boundary/completion history, and a read-only status projection.
+These remain distinct from the pre-existing independent Session-related values:
 
-- `SessionWindow` represents a proposed or verified range. Its statuses are `proposed`,
-  `review_needed`, `verified`, `rejected`, `superseded`, and `archived`.
-- `SessionWindowProduct` is a verified operational product with `created`, `active`,
-  `ready_for_package`, `completed`, `cancelled`, `superseded`, and `archived` statuses.
-- Operational State supports Session Candidate and Session Product subjects. The Session
-  transition policy evaluates `inactive`, `active`, `ending`, and `ended` values.
-- Transition evaluation, acceptance, and in-memory commit are caller-driven. The
-  repository is thread-safe but explicitly process-local and disposable.
+- `ScheduledActivity` reports the planned world through a schedule adapter.
+- `SessionWindow` represents a proposed or verified timeline range.
+- `SessionWindowProduct` is a verified operational product associated with scheduled
+  context.
+- Session boundary Evidence and the Session transition policy can propose `inactive`,
+  `active`, `ending`, or `ended` Operational State values.
+- Transition evaluation, acceptance, and the concrete in-memory Operational State
+  repository are caller-driven and process-local.
 - Completed Media Asset intentionally carries no inferred Session identity.
 
-These states belong to different contracts and must not be combined into an invented
-current Session state machine. In particular, Operational State `ended` does not mean
-media settled, editorially final, packaged, delivered, or archived.
+These values must not be combined into an invented current Session state machine.
+Operational State remains an assertion/projection about a subject; it is not the Session
+aggregate.
 
-## Accepted authority and identity
+## Accepted Session meaning
 
-- Session is a first-class durable StageFlow domain concept.
-- StageFlow assigns one immutable Session ID.
-- Schedule-platform, recorder, and other provider IDs are versioned external references,
-  not the sole Session identity.
-- An observed Session Candidate may propose association or creation, but cannot silently
-  become authoritative.
-- Operational State remains an assertion/projection about a subject and cannot become
-  the Session aggregate.
+A Session is the complete logical media package for one actual on-stage substantive
+presentation or discussion, including Q&A when it is part of the presentation. The same
+boundary principle applies to a single presenter, multiple presenters, a panel, or a
+conversational format. Multiple recording files may contribute to one Session.
 
-Who may create or promote a Session, how scheduled and observed identities reconcile,
-and whether operators may split, merge, or reassign remain open.
+A Session is not a directory, a file, a recording process, a scheduled time interval,
+an imported program record, or a reasoning/product projection.
 
-## Accepted target lifecycle
+Substantive activity defines the normal observed boundary. An introduction, schedule
+time, stage entrance, microphone activity, or presentation-computer activity can support
+an `imminent` projection, but cannot establish that the presentation has started. The
+normal end follows the substantive presentation/discussion and its included Q&A.
 
-The disposition approves distinct lifecycle dimensions and milestones rather than one
-overloaded status:
+## Identity, Business Event, and Stage
 
-```mermaid
-flowchart LR
-    Reference[Scheduled and source references] --> Decision[Explicit create / promote / reconcile decision]
-    Candidate[Observed Session Candidate] --> Decision
-    Decision --> Session[Authoritative Session ID]
-    Session --> Active[Session activity active]
-    Active --> Ended[Session activity ended]
-    Ended --> Grace[Media grace period active]
-    Grace --> Settled[Media set settled]
-    Settled --> Editorial[Editorially final]
-    Editorial --> Package[Package complete]
-    Package --> Published[Published or delivered]
-    Published --> Archived[Archived]
-```
+- StageFlow assigns one immutable Session ID. External IDs are versioned references.
+- A realized Session belongs to one Business Event.
+- Once activity begins, it belongs to exactly one Stage and cannot move to or span
+  another Stage.
+- Planned Stage and observed Stage disagreement becomes an attributable,
+  operator-visible conflict. It does not silently remap the Session, discard media, or
+  stop unrelated work.
+- Repeated delivery and restart cannot create an unrelated Session or duplicate an
+  accepted decision.
 
-This is an accepted milestone sequence, not a set of implemented enum names. A future ADR
-may allow policy-specific transitions or revisions while preserving the distinctions.
+Exact creation/realization command authority remains a Yellow decision for the Kernel.
 
-## Transition ownership
+## Program Expectation versus realized Session
 
-### Current implementation
+A **Program Expectation** is StageFlow's durable representation of planned information
+received from a schedule/program source or entered by an operator. It can carry planned
+Event/Stage, start/end, title, speakers, status, and versioned external references. It
+describes what is expected, not what occurred.
 
-The Session transition policy proposes Operational State from Evidence. A separate
-acceptance boundary decides whether to accept the proposal, and an optional in-memory
-repository commits accepted state. Callers own invocation and prior-state selection.
+A Program Expectation can contextualize a Session Candidate or realized Session. It does
+not automatically create a Session, grant Session identity, set the actual Stage, or set
+an authoritative boundary. Corrections to planned information create new expectation
+revisions and do not silently rewrite observed Session history.
 
-### Accepted direction
+The existing `ScheduledActivity` remains an adapter contract. A future persistence
+boundary may normalize one or more such external records into a Program Expectation.
 
-The durable Session aggregate owns authoritative Session lifecycle changes. Reasoning and
-Operational State may propose or explain a change; they do not silently mutate Session.
-Human or approved-system authority for creation, promotion, reopening, split/merge, and
-override must be explicit and attributable.
+## Lifecycle dimensions
 
-## Completion and finalization
+One status must not collapse program expectation, observed activity, media assembly, and
+human review. The accepted lifecycle is represented by related dimensions:
 
-- **Session activity ended:** production activity appears to have stopped.
-- **Media grace period active:** the system still expects or permits late source media.
-- **Media set settled:** the accepted media-set policy permits downstream finalization.
-- **Editorially final:** authorized review decisions for the revision are complete.
-- **Package complete:** a package revision satisfies its approved manifest/checklist.
-- **Published or delivered:** an external result/receipt has been durably recorded.
-- **Archived:** the approved retention/archive workflow has recorded the historical state.
+| Dimension | Accepted concepts | Authority |
+| --- | --- | --- |
+| Planned reality | expected/anticipated | External or declared Program Expectation |
+| Activity projection | imminent, presentation active, presentation ended | Observed, derived, or inferred evidence; authoritative boundaries can be declared |
+| Media package | assembling, ready for review, correction required | Deterministic package/association state |
+| Human review | in review, complete | Attributable human decision for a package revision |
 
-No current implementation owns these target milestones. Package, publication, delivery,
-and archive behavior is deferred until durable Session, media, editorial, and operation
-foundations exist.
+`Imminent` need not be stored as an authoritative Session state; it can be a reconstructable
+projection. A Session can have presentation activity ended while media remains assembling.
+`Ready for review` is not `complete`.
 
-## Persistence and recovery expectations
+Editorial selection, publication packaging, delivery, and archive are separate future
+lifecycles and do not change the meaning of Session completion.
 
-- Session identity, external references, lifecycle revisions, media associations, and
-  authoritative decisions must survive process and machine restart.
-- One relational durable store inside the modular monolith is the accepted direction;
-  exact technology, schema, and migrations remain open.
-- Append-oriented records are used where lineage, replay, and human decision history need
-  them; full event sourcing is not required.
-- Startup reconciliation must precede reliance on watchers/background loops.
-- Operator status must show current milestone, incomplete prerequisites, failure/retry,
-  connectivity requirements, and whether finalization is safe.
+## Boundary authority
 
-## Late-arriving work
+Machine reasoning can propose start and end boundaries with its evidence, rule/model
+identity, and evaluation time. An authorized human can declare or correct the
+authoritative start or end:
 
-Late media must not silently mutate published history. The accepted direction is a
-reviewable revision, explicit reopening action, or quarantine condition. Still open:
+- while presentation activity is ongoing;
+- during media assembly or review; or
+- after an earlier completion decision when correction is required.
 
-- default media grace duration;
-- automatic versus operator-approved reopening;
-- treatment after package completion or publication;
-- event-mode-specific policies;
-- how corrections to schedule, Event, or Stage references affect an existing Session.
+Machine proposals and successive human decisions remain append-oriented and queryable.
+A new decision supersedes the current projection but does not destructively replace its
+history. Proposal time, observed source time, evaluation time, human decision time, and
+database commit time remain distinct.
 
-## Required invariants
+## Media association
 
-1. A Session has one immutable StageFlow ID; external IDs are versioned references.
-2. Candidate or schedule facts do not create authority without an explicit decision.
-3. Operational State, timeline windows, media completeness, editorial finality, package,
-   delivery, and archive meanings remain distinct.
-4. Every authoritative change records actor/system authority, aware time, reason,
-   correlation, prior revision, and resulting revision.
-5. Semantically different source, evaluation, acceptance, commit, and organizational
-   anchor times remain separate.
-6. Human editorial/verification decisions remain append-only and attributable.
-7. Restart and repeated delivery cannot create an unrelated Session or duplicate an
-   already accepted transition.
-8. Finalization cannot infer that missing or late media is harmless.
+Completed Media Assets receive a categorical association outcome supported by explicit
+evidence:
 
-## Open questions requiring ADR or product decision
+- **Associated:** one authoritative Session association is established.
+- **Unresolved:** no safe association is established yet; the asset remains registered
+  and may continue through otherwise valid processing.
+- **Conflict:** evidence or authority is incompatible; the asset remains registered and
+  the conflict requires review.
 
-- Exact Session creation and promotion authority.
-- Scheduled/observed reconciliation, correction, split, merge, and reassignment rules.
-- Business Event and Stage ownership and reference lifecycles.
-- Operator override permissions and audit requirements.
-- Detailed late-media/reopening policy and default grace duration.
-- Initial persistence schema, migration tool, backup/restore, and deployment topology.
-- Detailed finalization, package, delivery, and archive state machines.
+Stage/source identity is a strong structural constraint. An active realized Session,
+temporal continuity, presentation activity, Program Expectation, introduction evidence,
+speaker/content evidence, recorder/file facts, and human assignment can contribute, but
+directory, filename, schedule, introduction, or AI output alone cannot grant authority.
+Human assignment/correction is authoritative and attributable.
+
+The initial automatic association rule remains a Yellow Kernel decision. The first
+Kernel must work without AI and preserve unresolved state whenever deterministic context
+is insufficient.
+
+## Completion and late media
+
+Session completion applies to a specific Session package revision and requires an
+authorized human approval. None of these independently establishes completion:
+
+- apparent presentation end;
+- recording stop;
+- absence of newly discovered files;
+- grace-period expiration; or
+- a machine-derived apparently complete package.
+
+When relevant late or previously missing media appears after completion, StageFlow:
+
+1. registers and preserves the valid media;
+2. preserves the earlier completion decision and package revision;
+3. records the new association or unresolved/conflict outcome; and
+4. projects the current package as requiring correction/review until another authorized
+   completion decision is made.
+
+This is a reviewable revision, not silent mutation of published or historical truth.
+
+## Persistence and recovery requirements
+
+The durable Session boundary must preserve:
+
+- immutable Business Event, Stage, Program Expectation, Session, asset, and decision
+  identities;
+- expectation revisions and versioned external references;
+- proposed and declared boundaries;
+- media association revisions, evidence, and conflicts;
+- package revisions and completion decisions;
+- actor/system authority, reason, correlation, and aware timestamps; and
+- restart/reconciliation status.
+
+PostgreSQL is the accepted store. Append-oriented decision/history records are required
+where lineage matters; full event sourcing is not required. Startup reconstructs from
+PostgreSQL and reconciles configured sources before event readiness is asserted.
+
+## Decisions still required before implementation
+
+- Session creation/realization authority and command boundary.
+- The initial deterministic automatic media-association rule.
+- Initial relational aggregate, history, and transaction schema.
+- Deployment configuration format, secret-reference resolution, and bootstrap behavior.
+
+Split/merge support, publication-era reopening policy, default grace durations, and
+detailed editorial/package/delivery/archive state machines remain outside the first
+Kernel.

@@ -91,3 +91,4 @@ or architecture document unless those documents are explicitly updated.
 | [Recursive metadata immutability](recursive-metadata-immutability.md) | Completed — independent review accepted | StageFlow Backend | ABR-006 |
 | [Local filesystem discovery race hardening](local-filesystem-discovery-race-hardening.md) | Completed — independent review accepted | StageFlow Backend | ABR-007; ED-0053 |
 | [CI quality-matrix enforcement](ci-quality-matrix-enforcement.md) | Completed — independent review accepted | StageFlow Engineering | ABR-015 |
+| [Durable Event-Mode Kernel](durable-event-mode-kernel.md) | Approved — Green autonomous implementation | StageFlow Architecture / Backend | ADR-0019–ADR-0024; D-01–D-08 |

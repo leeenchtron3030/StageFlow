@@ -19,6 +19,21 @@ authorized by this document.
 - **Example:** “Devcon 2026” is a Business Event; “media asset registered” is a
   Production Event.
 
+### Program Expectation
+
+- **Definition:** StageFlow's durable, revisioned representation of what an external
+  program source or authorized operator expects to occur, including planned Business
+  Event/Stage, start/end, title, speakers, status, and versioned external references.
+- **Distinction:** It describes planned reality. It is not proof that activity occurred,
+  not a realized Session, and not authority for actual Session Stage or boundaries.
+- **Current aliases/legacy names:** `ScheduledActivity` is the existing schedule-adapter
+  input contract; older documents use schedule item, scheduled session, or program item.
+- **Migration:** Preserve `ScheduledActivity` as an adapter contract. Normalize future
+  persisted planned-world records into Program Expectations without treating import as
+  Session creation.
+- **Example:** A program expects a keynote on Main Stage from 10:00 to 10:45; observation
+  later determines whether, where, and when a Session actually occurred.
+
 ### Production Event
 
 - **Definition:** The provider-neutral ingress statement that a source reports something
@@ -33,13 +48,16 @@ authorized by this document.
 
 ### Session
 
-- **Definition:** A future first-class durable StageFlow domain concept with its own
-  immutable StageFlow Session ID and versioned external references.
-- **Distinction:** Not a schedule record, directory, Session Candidate, Timeline Window
-  Candidate, Session Window Product, or Operational State assertion.
+- **Definition:** The complete logical media package representing one actual on-stage
+  substantive presentation or discussion, including Q&A when part of the presentation,
+  with one immutable StageFlow Session ID and versioned external references.
+- **Distinction:** Not a Program Expectation, schedule-adapter record, directory, file,
+  recording process, Session Candidate, Timeline Window Candidate, Session Window
+  Product, or Operational State assertion. Multiple media files may contribute to it.
 - **Current aliases/legacy names:** Older specifications describe Session as a scheduled
   presentation and primary aggregate; no authoritative Session class currently exists.
-- **Migration:** Requires an ADR and implementation plan before schema or API work.
+- **Migration:** ADR-0023 fixes the product meaning and authority invariants. Durable
+  schema/API work remains gated by the Kernel plan's Yellow decisions.
 - **Example:** One reconciled keynote workflow retains the same StageFlow Session ID when
   its schedule time changes.
 
@@ -167,12 +185,13 @@ authorized by this document.
 
 ### Stage
 
-- **Definition:** The event production location/context to which sources and future
-  Sessions may be associated.
+- **Definition:** A StageFlow-owned production location/context within one Business Event
+  to which sources, Program Expectations, and realized Sessions may be associated.
 - **Distinction:** It is not a Runtime host, Node deployment profile, or source adapter.
 - **Current aliases/legacy names:** Stage IDs/context exist; no authoritative Stage
   aggregate is implemented.
-- **Migration:** Event/Stage ownership remains an open Session architecture decision.
+- **Migration:** ADR-0023 requires one fixed Stage per realized Session after activity
+  begins. Initial Stage persistence and creation authority remain Kernel decisions.
 - **Example:** “Main Stage” contextualizes one recorder source and scheduled activities.
 
 ### Durable Operation
@@ -182,7 +201,9 @@ authorized by this document.
 - **Distinction:** Deterministic domain policy calls remain synchronous and are not Jobs
   merely because they perform work.
 - **Current aliases/legacy names:** Older documents use `Job`; no implementation exists.
-- **Migration:** Final naming and schema require an implementation ADR/plan.
+- **Migration:** The first Kernel does not require a generic Durable Operation for its
+  bounded synchronous media cycle; the first genuinely asynchronous/external consumer
+  must justify and plan the operation schema.
 - **Example:** A transcription provider request that may be deferred until online.
 
 ### Deployment profile
