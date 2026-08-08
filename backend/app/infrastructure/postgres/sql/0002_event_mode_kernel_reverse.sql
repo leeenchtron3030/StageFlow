@@ -1,0 +1,18 @@
+DROP TABLE IF EXISTS stageflow.reconciliation_run;
+DROP TABLE IF EXISTS stageflow.session_completion_history;
+DROP TABLE IF EXISTS stageflow.media_association_history;
+DROP TABLE IF EXISTS stageflow.media_association;
+DROP TABLE IF EXISTS stageflow.completed_media_asset_registry;
+DROP TABLE IF EXISTS stageflow.media_resource_observation;
+DROP TABLE IF EXISTS stageflow.media_candidate;
+DROP TABLE IF EXISTS stageflow.session_boundary_history;
+DROP TABLE IF EXISTS stageflow.session_start_operation;
+DROP INDEX IF EXISTS stageflow.one_active_session_per_stage;
+DROP TABLE IF EXISTS stageflow.session;
+DROP TABLE IF EXISTS stageflow.program_expectation_revision;
+DROP TABLE IF EXISTS stageflow.program_expectation;
+DROP TABLE IF EXISTS stageflow.event_stage_bootstrap_operation;
+DROP TABLE IF EXISTS stageflow.stage_source_binding;
+DROP TABLE IF EXISTS stageflow.stage;
+DROP TABLE IF EXISTS stageflow.business_event;
+DELETE FROM stageflow.schema_migration WHERE version = '0002_event_mode_kernel';

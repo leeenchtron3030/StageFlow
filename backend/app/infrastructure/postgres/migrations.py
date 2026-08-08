@@ -20,6 +20,13 @@ class PostgresMigrationRunner:
     def reverse_ingress_v1(self) -> None:
         self._execute("0001_ingress_reverse.sql")
 
+    def apply_event_mode_kernel_v1(self) -> None:
+        self.apply_ingress_v1()
+        self._execute("0002_event_mode_kernel_forward.sql")
+
+    def reverse_event_mode_kernel_v1(self) -> None:
+        self._execute("0002_event_mode_kernel_reverse.sql")
+
     def _execute(self, filename: str) -> None:
         statement = (
             Path(__file__).with_name("sql").joinpath(filename).read_text(encoding="utf-8")
