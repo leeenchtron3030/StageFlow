@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved - Green autonomous implementation
+Completed - implementation candidate; targeted correction verification pending
 
 ## Execution authority
 
@@ -386,7 +386,7 @@ No repository-wide formatter or frontend test runner exists and neither may be c
 ## Acceptance criteria
 
 - [x] Y-K01 through Y-K04 are accepted in ADR-0024 and this plan is Approved/Green.
-- [ ] One valid config constructs one validated Runtime and resolves secrets only at the
+- [x] One valid config constructs one validated Runtime and resolves secrets only at the
   infrastructure boundary; invalid config never declares event readiness.
 - [x] One Business Event and its Stages retain immutable StageFlow identities across
   restart and external schedule corrections.
@@ -544,3 +544,12 @@ The complete evidence/options/tradeoffs are retained in the
 - Remaining Green closure at this point is deliberate final diff/self-review, logically
   isolated commits, clean-worktree verification, and fresh independent phase-completion
   review. This plan does not self-accept the phase or claim production/event readiness.
+
+### 2026-08-09 independent-review correction follow-up
+
+- The fresh independent phase review returned **DO NOT ACCEPT** with DKR-001 through
+  DKR-007. All findings are Green under ADR-0023/ADR-0024.
+- Corrections and their new validation/evidence are governed by the separate
+  [independent-review correction plan](durable-event-mode-kernel-review-corrections.md).
+- This historical completion record does not self-accept the Kernel. Targeted fresh
+  correction verification remains required.

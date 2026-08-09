@@ -22,13 +22,20 @@ filesystem cycles, reconciliation records, startup source gating, advisory Sessi
 boundary proposals, and bounded read-only Producer detail. PostgreSQL is authoritative
 and the in-memory repository is test-only.
 
-Fresh reference-node backup/restore, process/dependency/storage recovery, bounded
-endurance/coexistence qualification, and the full validation matrix executed on
-2026-08-09. After commit and clean-worktree closure, the candidate is eligible for fresh
-independent phase-completion review. The executed workload is not conference-duration,
-the coexistence workload is a proxy, and neither establishes event readiness. The
-verified-current-state map below is retained as the pre-implementation Contract
-Stabilization baseline rather than rewritten as if those gaps never existed.
+The independent phase review found bounded correctness gaps in turnover association,
+completed-package reassignment, same-process PostgreSQL recovery, provenance, Producer
+projection, command replay, history constraints, and current-facing documentation. The
+Green correction implementation now makes interval-less same-Stage turnover unresolved,
+reopens every materially affected completed Session atomically, invalidates pre-outage
+reconciliation, records deterministic policy/input provenance, bounds recent Session
+status, and protects consequential human-command retries. It remains a candidate for
+fresh targeted independent correction verification; it is not self-accepted.
+
+Fresh reference-node backup/restore and the earlier bounded endurance/coexistence
+qualification remain evidence for unaffected behavior. The executed workload was not
+conference-duration, the coexistence workload was a proxy, and neither establishes event
+readiness. The verified-current-state map below is retained as the pre-implementation
+Contract Stabilization baseline rather than rewritten as if those gaps never existed.
 
 ## Verified current-state map
 
@@ -180,7 +187,7 @@ Association uses typed evidence, not one confidence score:
 | Category | Examples | Kernel role |
 | --- | --- | --- |
 | Structural | asset source binding resolves to Stage; Session fixed Stage; Business Event match | Hard constraint; contradictory structural facts produce conflict |
-| Deterministic temporal | unique active Session on that Stage; media occurrence/continuity overlaps declared or observed activity | Candidate for explainable automatic rule after Yellow approval |
+| Deterministic temporal | trustworthy media interval overlaps exactly one eligible Session | Explainable automatic rule; interval absence is not evidence favoring the active Session |
 | Observed production | presentation/recording activity and media arrival facts | Durable evidence; never sufficient when structural facts contradict |
 | External expectation | planned Stage/time/title/speakers from Program Expectation | Context only; never sole authority |
 | Inferred | speaker/content/model boundary output | Deferred initially; advisory evidence only |
@@ -192,9 +199,10 @@ registration or other safe asset-level processing.
 
 Before completion, a new deterministic result can enrich unresolved evidence but must
 not automatically move an already human-associated asset. Human reassignment appends a
-new association decision. After completion, any new relevant asset or reassignment
-creates a new package revision/correction-required projection; the earlier association
-and completion records remain historical.
+new association decision. After completion, any membership-changing association or
+reassignment reopens every materially affected completed source/target Session at a new
+package revision; the earlier association, completion decision, and approved membership
+snapshot remain historical.
 
 The first Kernel has no AI dependency. Model-derived association and boundary evidence
 is deferred until its model/version/provenance and review behavior are separately
@@ -392,6 +400,10 @@ deployment, or opportunistic Contract Stabilization follow-ups.
 ADR-0024 accepts Y-K01 through Y-K04. The original evidence, options, and tradeoffs are
 retained below as decision history; they are no longer blockers.
 
+The following entries preserve the decision record that ADR-0024 resolved before Kernel
+implementation. Their former blocked-work notes describe the pre-ADR baseline, not
+current blockers.
+
 ### Y-K01: Business Event and Stage bootstrap authority
 
 **Question:** How are the first StageFlow-owned Business Event and Stage records created,
@@ -412,7 +424,7 @@ database, so node-local configuration cannot silently create competing authority
 3. External schedule import creates Event/Stages. Convenient, but grants an external
    system authority rejected by ADR-0004/ADR-0023.
 
-**Blocked work:** aggregate commands/repositories, startup selection, foreign-key
+**Pre-decision blocked work (implemented):** aggregate commands/repositories, startup selection, foreign-key
 ownership, configuration validation, and multi-node bootstrap tests.
 
 **Independent Green work:** configuration parsing/precedence/redaction and Runtime
@@ -438,7 +450,7 @@ while schedule imports cannot create observed truth.
 3. Import creates anticipated Sessions that become realized at planned time. Easy, but
    collapses planned and observed reality and is not compatible with ADR-0023.
 
-**Blocked work:** Session creation command, initial lifecycle transition, one-active-
+**Pre-decision blocked work (implemented):** Session creation command, initial lifecycle transition, one-active-
 Session constraint transaction, and startup/current-Session reconstruction.
 
 **Independent Green work:** existing boundary Evidence/transition behavior and the
@@ -464,7 +476,7 @@ probability, and fixes Stage as a structural constraint.
 3. Weighted or model confidence above a threshold. Flexible, but opaque/inference-heavy
    and inappropriate for the first AI-free Kernel.
 
-**Blocked work:** association policy, current-outcome transaction, operator correction,
+**Pre-decision blocked work (implemented):** association policy, current-outcome transaction, operator correction,
 and associated/unresolved/conflict acceptance tests. Asset registration itself can
 proceed independently.
 
@@ -491,15 +503,15 @@ exists. Repository policy treats a new schema architecture as Yellow.
 3. JSON document rows per aggregate plus a small history log. Fast initial modeling, but
    weaker relational constraints, conflict queries, and migration ergonomics.
 
-**Blocked work:** migrations, repository interfaces/adapters, transaction boundaries,
+**Pre-decision blocked work (implemented):** migrations, repository interfaces/adapters, transaction boundaries,
 reconstruction, read models, and backup/restore validation.
 
 **Independent Green work:** repository-neutral aggregate contracts, failure taxonomy,
 PostgreSQL environment inventory, and migration/test design can proceed without selecting
 the physical schema.
 
-After Y-K01 through Y-K04 are decided and recorded in accepted ADR/plan authority, no
-other known architecture decision blocks the bounded first-Kernel implementation.
+ADR-0024 selected the recommended options for Y-K01 through Y-K04. The bounded first
+Kernel implements those choices; these questions are no longer open or blocked work.
 
 ## Explicitly deferred
 

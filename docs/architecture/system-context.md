@@ -1,7 +1,7 @@
 # StageFlow system context
 
-**Baseline:** Durable Event-Mode Kernel implementation candidate, prepared for
-independent review after the Contract Stabilization foundation
+**Baseline:** Durable Event-Mode Kernel implementation candidate, corrected after its
+independent phase review and awaiting targeted independent correction verification
 
 ## System purpose
 
@@ -37,8 +37,8 @@ editorial output, control a recorder, or deliver an output.
 | Production Events/adapters | Provider-neutral source event contracts plus stable ingress identity | Completed-asset ingress is composed in the bounded Kernel cycle; general dispatcher paths remain caller-created |
 | Dispatcher/interpreters | One structural routing protocol and concrete Event-to-Observation adapters | Caller-created; deterministic synchronous dispatch |
 | PostgreSQL ingress adapter | Transactional source-key/fingerprint registration and stable Production Event identity | Durable and freshly validated with isolated PostgreSQL 17.10; deployment remains unapproved |
-| Durable Kernel repository | Event/Stage, Program Expectation, Session, media registry/association, completion, reconciliation, and typed history | Normalized PostgreSQL current state plus typed append-only history |
-| Durable Kernel service | Explicit bootstrap, human Session boundaries/completion, readiness/asset adapters, stable ingress, and categorical association | Direct synchronous application boundary |
+| Durable Kernel repository | Event/Stage, Program Expectation, Session, media registry/association, completion snapshots, reconciliation, human-command replay, and typed history | Normalized PostgreSQL current state plus typed append-only history |
+| Durable Kernel service | Explicit bootstrap, idempotent human Session boundaries/assignment/completion, readiness/asset adapters, stable ingress, and provenance-bearing categorical association | Direct synchronous application boundary |
 | Evidence/reasoning/state policies | Deterministic transformation and transition contracts | Caller-invoked; no orchestrator or durable lineage store |
 | In-memory Operational State repository | Atomic accepted Recording/Session state, lineage, revision, and operation replay | Thread-safe and explicitly process-local |
 | StageFlow Runtime and Software Agent | Immutable deployment description and explicit synchronous lifecycle | Runtime graph is constructed after Event/Stage authority; lifecycle remains process-local |
@@ -90,6 +90,8 @@ There is no watcher, broker, worker, or uncontrolled loop.
 
 - PostgreSQL ingress and normalized Kernel tables, repositories, typed history, and
   explicit forward/reversal migrations exist. No queue, worker, lease, or outbox exists.
+- Loss of PostgreSQL invalidates reconciliation freshness for the live process; restored
+  reachability remains recovering/not ready until a fresh bounded reconciliation succeeds.
 - Operational State, Agent history, collection history, and operation replay are in
   memory and disappear on process termination.
 - The composed path performs `stat`/`lstat`/`scandir`-style inspection plus one bounded
@@ -138,6 +140,6 @@ automatic machine editorial publication.
 - `backend/pyproject.toml`, `frontend/package.json`, and application READMEs
 - [Reasoning model](../05_Reasoning_Model.md)
 
-Operational deployment, hardware/media behavior, multi-process recovery, provider
-failure, authentication, retention, and conference-scale performance remain unverified
-because their corresponding implementations or environments do not exist.
+Operational deployment, full hardware/media behavior, multi-process concurrency,
+provider failure, authentication, retention, and conference-scale performance remain
+unverified because their corresponding implementations or environments do not exist.

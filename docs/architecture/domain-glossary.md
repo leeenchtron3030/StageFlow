@@ -14,8 +14,8 @@ authorized by this document.
   related business context.
 - **Distinction:** Not a `ProductionEvent`, which is a technical ingress fact.
 - **Current aliases/legacy names:** Older documents use unqualified `Event`.
-- **Migration:** Use `Business Event` in architecture and qualify future schemas/APIs;
-  no implemented entity requires migration yet.
+- **Migration:** The Kernel implements the qualified `BusinessEvent` contract and
+  normalized PostgreSQL identity; continue qualifying new schemas/APIs.
 - **Example:** “Devcon 2026” is a Business Event; “media asset registered” is a
   Production Event.
 
@@ -28,9 +28,9 @@ authorized by this document.
   not a realized Session, and not authority for actual Session Stage or boundaries.
 - **Current aliases/legacy names:** `ScheduledActivity` is the existing schedule-adapter
   input contract; older documents use schedule item, scheduled session, or program item.
-- **Migration:** Preserve `ScheduledActivity` as an adapter contract. Normalize future
-  persisted planned-world records into Program Expectations without treating import as
-  Session creation.
+- **Migration:** Preserve `ScheduledActivity` as an adapter contract. The Kernel stores
+  Program Expectations as separate revisioned planned-world records without treating
+  import or linkage as Session creation.
 - **Example:** A program expects a keynote on Main Stage from 10:00 to 10:45; observation
   later determines whether, where, and when a Session actually occurred.
 
@@ -42,8 +42,8 @@ authorized by this document.
   no meaning beyond its source report.
 - **Current aliases/legacy names:** `ProductionEvent` in code; generic “event” in some
   discussions.
-- **Migration:** Qualify all future serialized and public references; stable ingress
-  identity correction is separately planned.
+- **Migration:** Qualify serialized/public references. Stable ingress identity is
+  implemented and reused by the completed-asset registration path.
 - **Example:** A recorder source reports that recording activity started.
 
 ### Session
@@ -55,9 +55,11 @@ authorized by this document.
   recording process, Session Candidate, Timeline Window Candidate, Session Window
   Product, or Operational State assertion. Multiple media files may contribute to it.
 - **Current aliases/legacy names:** Older specifications describe Session as a scheduled
-  presentation and primary aggregate; no authoritative Session class currently exists.
-- **Migration:** ADR-0023 fixes the product meaning and authority invariants. Durable
-  schema/API work remains gated by the Kernel plan's Yellow decisions.
+  presentation. The Kernel `Session` aggregate is authoritative for realized production
+  identity while schedule records remain Program Expectations.
+- **Migration:** ADR-0023 fixes the meaning and ADR-0024 fixes Kernel authority. The
+  normalized schema, human realization/correction, package history, and bounded status
+  projection are implemented; later automated realization/split/merge remains deferred.
 - **Example:** One reconciled keynote workflow retains the same StageFlow Session ID when
   its schedule time changes.
 
@@ -188,10 +190,10 @@ authorized by this document.
 - **Definition:** A StageFlow-owned production location/context within one Business Event
   to which sources, Program Expectations, and realized Sessions may be associated.
 - **Distinction:** It is not a Runtime host, Node deployment profile, or source adapter.
-- **Current aliases/legacy names:** Stage IDs/context exist; no authoritative Stage
-  aggregate is implemented.
-- **Migration:** ADR-0023 requires one fixed Stage per realized Session after activity
-  begins. Initial Stage persistence and creation authority remain Kernel decisions.
+- **Current aliases/legacy names:** Stage IDs/context remain widespread; the Kernel adds
+  the authoritative Event-owned `Stage` aggregate and source-binding records.
+- **Migration:** ADR-0023 requires one fixed Stage per realized Session and ADR-0024
+  resolves explicit idempotent bootstrap. That persistence/authority is implemented.
 - **Example:** “Main Stage” contextualizes one recorder source and scheduled activities.
 
 ### Durable Operation
@@ -225,7 +227,7 @@ authorized by this document.
 | --- | --- | --- |
 | Source Segment / durable Segment record | Disposition reserves a qualified durable media record; older documents use Media Chunk and Timeline Segment | Canonical record name, rename/alias behavior, and relationship to Completed Media Asset |
 | Job / Durable Operation / Task | Durable at-least-once work is accepted; no model exists | Public term and exact operation/attempt/worker schema |
-| Session creation/promotion action | StageFlow-owned Session ID is accepted | Command names and authority for create, promote, merge, split, and reassign |
+| Post-Kernel Session evolution | Human Session realization and reassignment are implemented | Automated realization, merge, and split policy |
 | Package and publication milestones | Distinct milestones are accepted | Aggregate names and detailed state machines remain deferred |
 
 Do not resolve these terms through incidental code naming. Record the decision first and

@@ -32,14 +32,16 @@ identity derived from authoritative Runtime/source/resource facts. Deployment pr
 provenance and does not create an identity or trust tier. Candidate has no lifecycle
 status enum; discovery only establishes that a resource is eligible for observation.
 
-The collection coordinator deduplicates candidate IDs and operation replays within one
-process. Its maps, history, conflicts, and observation bundles disappear on restart.
+The process-local collection coordinator retains its original scope. Separately, the
+composed Kernel persists candidate identity, registration state, objective observations,
+and replay authority in PostgreSQL so bounded cycles reconstruct after restart.
 
 ### Resource observation and readiness
 
-The coordinator accepts injected objective resource-observation ports, but no concrete
-snapshot observer or repeated-observation scheduler is implemented. The readiness policy
-evaluates caller-supplied facts with outcomes:
+The Kernel's configured bounded cycle performs conservative file identity/read checks,
+persists objective snapshots/presence/read-access observations, and invokes the existing
+readiness policy. No watcher or uncontrolled repeated-observation scheduler exists. The
+readiness policy outcomes remain:
 
 - `safe_to_read`
 - `not_safe_to_read`
@@ -54,16 +56,16 @@ be a valid candidate while remaining not ready.
 
 ### Completed asset
 
-`CompletedMediaAsset` is an immutable validation contract. It requires finalized
-completion and categorical `safe_to_read` readiness plus consistent manifest, resource,
-source, provenance, context, and timestamps. No current assembler, registry, repository,
-or application workflow creates and persists one from discovery results.
+`CompletedMediaAsset` is an immutable validation contract. The bounded Kernel cycle
+assembles it only after categorical `safe_to_read`, registers its durable by-reference
+projection, and then emits stable asset-registration ingress before association.
 
 ### Processing and Session relationship
 
-No current component registers a durable segment, emits an asset-registration Production
-Event, assigns a Completed Media Asset to a Session, creates a Job, transcribes, analyzes,
-renders, retries, or reconciles after restart.
+The Kernel registers Completed Media Assets, emits stable asset-registration Production
+Events, records categorical Session association/unresolved/conflict outcomes, and
+reconciles configured sources after restart. It does not create a generic Job, transcribe,
+analyze, render, transfer, publish, or deliver media.
 
 ## Accepted target flow
 
@@ -90,13 +92,13 @@ one stateful watcher-manager.
 | Milestone | Meaning | Current status |
 | --- | --- | --- |
 | Candidate discovered | An explicitly authorized source resource is eligible for observation | Implemented in one-shot local adapter |
-| Candidate persisted | Stable identity/provenance is durable and uniquely registered | Accepted future; not implemented |
-| Resource observed | One immutable objective resource snapshot/fact is recorded | Contract/port only |
-| Readiness evaluated | Explicit policy evaluates an ordered fact bundle | Policy implemented; execution/persistence absent |
-| Completed asset assembled | Finalized, safe-to-read facts satisfy the immutable asset contract | Contract only |
-| Asset registered | Completed asset and manifest are durably committed | Accepted future; not implemented |
-| Registration Event emitted | Stable Production Event records asset availability | Accepted in ADR-0020; not implemented |
-| Session associated | Explicit authority links registered asset to a Session or review queue | Accepted future; policy open |
+| Candidate persisted | Stable identity/provenance is durable and uniquely registered | Implemented in Kernel PostgreSQL repository |
+| Resource observed | One immutable objective resource snapshot/fact is recorded | Implemented in bounded Kernel cycle |
+| Readiness evaluated | Explicit policy evaluates an ordered fact bundle | Implemented/persisted in bounded Kernel cycle |
+| Completed asset assembled | Finalized, safe-to-read facts satisfy the immutable asset contract | Implemented in bounded Kernel cycle |
+| Asset registered | Completed asset and manifest are durably committed | Implemented by reference in PostgreSQL |
+| Registration Event emitted | Stable Production Event records asset availability | Implemented through stable ingress |
+| Session associated | Explicit authority records associated, unresolved, or conflict | Implemented conservatively with human correction |
 | Downstream work scheduled | Durable operation records approved processing | Accepted future; not implemented |
 
 These are milestone definitions, not approved database enum names.
@@ -123,9 +125,9 @@ These are milestone definitions, not approved database enum names.
 - Asynchronous processing or external work uses future database-backed durable operations
   with stable identity, claim/lease, attempts, bounded retry, retryability, offline
   deferral, idempotent result commit, and operator-visible status.
-- Process or machine restart must reconstruct candidate registration, observations,
-  readiness/asset records, operation attempts, and Session association from durable
-  state, then reconcile explicitly configured sources.
+- Process or machine restart reconstructs Kernel candidate registration, observations,
+  readiness/asset records, and Session association from durable state, then reconciles
+  explicitly configured sources. Future Durable Operation attempts remain separate.
 - Source files may remain after state loss, but filenames/directories alone are not a
   durable registry.
 - Provider or Internet failure must not stop the local event-critical path.
@@ -163,7 +165,6 @@ operator-approved behavior remain open in the Session lifecycle decision.
 - Canonical name and schema for the durable Source Segment/media record.
 - Rename/alias and multi-mount identity reconciliation.
 - Concrete snapshot-observation ownership and sampling policy.
-- Initial media registry transaction boundaries and uniqueness constraints.
-- Session association/review-queue authority.
+- Rename/alias continuity for durable media identity across locations.
 - Grace duration and late-media reopening/quarantine policy.
-- Database, migrations, backup/restore, and worker deployment details.
+- Production backup/restore policy and future worker deployment details.

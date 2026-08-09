@@ -72,9 +72,10 @@ The **accepted direction** is local-first event-mode operation:
 - long-running, retryable, compute-heavy, or external work becomes a Durable Operation
   only when that operational need exists.
 
-**Implemented today:** current contracts make no cloud calls and the bounded filesystem
-adapter is local and read-only. This is not a complete offline event workflow: no composed
-production runtime currently exists.
+**Implemented today:** the Durable Event-Mode Kernel composes validated local deployment
+configuration, PostgreSQL authority, bounded read-only filesystem cycles, restart/source
+reconciliation, and read-only Producer status without cloud calls. This is a bounded
+Kernel candidate, not a complete offline event workflow or event-readiness claim.
 
 ## 3. Media ingest model
 
@@ -114,17 +115,19 @@ These distinctions are protected:
 >
 > Session activity ending is not final publication.
 
-**Implemented today:** one explicit, synchronous, shallow, bounded filesystem discovery
-call can return Media Asset Candidates. Contracts and deterministic policy exist for
-supplied Media Resource Observations, readiness evaluation, and Completed Media Assets.
+**Implemented today:** one explicit bounded Kernel cycle composes shallow filesystem
+discovery, durable Media Asset Candidates and objective resource observations,
+deterministic readiness, immutable Completed Media Asset assembly/registration, stable
+asset-registration ingress, conservative Session association, and reconciliation.
+Automatic association records its deterministic policy and durable input references;
+interval-less turnover ambiguity remains unresolved rather than guessed.
 
-**Not implemented:** repeated observation ownership, readiness orchestration, asset
-assembly, a durable media registry, asset-registration Event emission, Session
-association, restart reconciliation, or automatic downstream scheduling.
+**Not implemented:** continuous watching, media decoding/transfer, generic Durable
+Operations, transcription/analysis, or automatic downstream scheduling.
 
 ## 4. Session
 
-Session is an **accepted future first-class durable StageFlow concept** representing the
+Session is a **first-class durable StageFlow concept** representing the
 complete logical media package for one actual on-stage substantive presentation or
 discussion, including Q&A when it is part of the presentation. Multiple files may
 contribute to one Session. It is not a file, directory, recording process, planned
@@ -150,9 +153,12 @@ A future Session may connect a Business Event, Stage, scheduled activity, observ
 timing, Recording Blocks, media, speakers, transcript revisions, analysis, editorial
 decisions, final assets, packages, and delivery operations.
 
-**Implemented today:** independent Session-related windows, products, transition policy,
-acceptance contracts, and a process-local Operational State repository exist. There is
-no authoritative Session entity, creation command, durable repository, schema, or API.
+**Implemented today:** the Kernel has a human-realized authoritative Session aggregate,
+fixed Business Event/Stage ownership, optional Program Expectation linkage, declared and
+proposed boundaries, deterministic/human media association, package revisions, human
+completion, typed history, PostgreSQL persistence, and bounded read-only status. The
+older independent windows/products/Operational State contracts remain projections, not
+aggregate authority.
 
 ### Session finality is multi-dimensional
 
@@ -226,8 +232,10 @@ The future Marketing experience should consume approved editorial outputs and Se
 context: clips, images, speaker details, summaries, suggested copy, campaign metadata,
 publishing status, and delivery coordination.
 
-**Implemented today:** none of these workflow interfaces or APIs exists. The Next.js
-application is a static shell and FastAPI exposes process liveness only.
+**Implemented today:** a bounded read-only Producer Kernel status API exposes Event,
+Stage, recent/current Session, media, dependency, reconciliation, provenance, completion,
+and attention context. The Next.js application remains a static shell; Editorial and
+Marketing workflow APIs/interfaces are not implemented.
 
 ## 7. Backend and deployment philosophy
 
@@ -260,10 +268,11 @@ attempts, analysis outputs, editorial candidates, human decisions, finalization,
 packages, delivery attempts, and archive/retention state. At-least-once execution,
 idempotent commits, and startup reconciliation are preferred over exactly-once claims.
 
-**Implemented today:** PostgreSQL is selected as authority and one durable ingress
-schema/repository with explicit forward/reversal migration exists. It is not composed
-into application startup. No durable media registry, operation store, outbox, or restart
-reconciliation exists; other repositories and runtime histories remain process-local.
+**Implemented today:** PostgreSQL is the composed Kernel authority for ingress,
+Business Event/Stage/Program Expectation/Session state, typed human and association
+history, media registry, approved package membership, and reconciliation. Explicit
+forward/reversal migrations exist through `0004`; there is no authoritative memory
+fallback, generic operation store, outbox, or worker system.
 
 ## 9. Workers, providers, and configuration
 
@@ -315,17 +324,19 @@ relevant implementation plan, review, CI result, or change report.
 
 ### Implemented today
 
-- Python 3.13/FastAPI health shell and a static Next.js shell.
+- Python 3.13/FastAPI shell with liveness and bounded Kernel status; static Next.js shell.
 - UI-independent modular backend contracts and deterministic policies.
 - Provider-neutral Production Event and adapter contracts.
-- Stable source-key/versioned-fingerprint ingress contracts and a PostgreSQL repository
-  foundation, not yet application-composed.
+- Stable source-key/versioned-fingerprint ingress and normalized Kernel PostgreSQL
+  repositories composed behind validated deployment configuration.
 - Six concrete Observation Interpreters and extensive reasoning/state contracts.
-- Process-local Runtime, Software Agent, collection coordinator, and in-memory
-  Operational State repository.
-- One synchronous, stateless, bounded local-filesystem candidate-discovery adapter.
-- Readiness policy and Completed Media Asset contracts without operational assembly or
-  persistence.
+- A validated StageFlow Runtime graph plus process-local Software Agent/collection and
+  Operational State foundations; PostgreSQL remains Kernel authority.
+- One synchronous, bounded, read-only local-filesystem media cycle through durable
+  candidate/observation/readiness/asset/ingress/association boundaries.
+- Human-realized Sessions, Program Expectations, package approval/revision history,
+  deterministic association provenance, narrow human-command idempotency, restart/source
+  reconciliation, and bounded Producer projections.
 - Dispatcher/Observation Interpreter compatibility implementation completed and accepted
   by fresh independent Codex review; phase-level human acceptance remains pending.
 - Recursive metadata immutability completed across the legacy shallow-freeze boundary
@@ -335,12 +346,9 @@ relevant implementation plan, review, CI result, or change report.
 
 ### Not implemented today
 
-- A composed Production runtime or application composition root.
-- Durable production persistence beyond ingress, application composition, or restart
-  recovery.
-- An authoritative Session repository.
-- Continuous ingest, filesystem watching, or repeated resource observation.
-- Operational workers, Durable Operation persistence, retries, or reconciliation.
+- Continuous ingest/filesystem watching or an uncontrolled scheduling loop.
+- Operational workers, Durable Operation persistence/retries, or generic external-work
+  reconciliation; the narrow Kernel source-reconciliation record is implemented.
 - Transcription, AI analysis, Editorial, Marketing, packaging, publishing, distribution,
   archive, or retention runtimes.
 - Producer, Editorial, or Marketing workflow APIs and interfaces.
@@ -371,26 +379,27 @@ are recorded as **Completed — independent review accepted**. Recursive metadat
 immutability, local-filesystem discovery race hardening, and CI quality-matrix
 enforcement are also completed and independently accepted. Durable ingress identity and
 the strict-aware timestamp transition are implemented under the approved PostgreSQL and
-time decisions. Final independent verification accepts phase entry with one non-blocking
-commit-reviewability limitation. Runtime composition is still absent.
+time decisions. Final independent verification accepted phase entry with one non-blocking
+commit-reviewability limitation. Runtime composition was absent at that phase boundary;
+the Phase 3 Kernel now composes its bounded media path.
 
 ### Phase 3 — Durable event-mode kernel
 
-Architecture/design is captured in the Durable Event-Mode Kernel architecture and plan.
-The implementation candidate includes deployment configuration, persistence beyond ingress, Event/
-Stage/Session authority, a durable media registry, startup reconciliation, an application
-composition root, readiness/dependency health, and minimal operator status APIs. A
-generic durable Operation system is deferred until a genuinely asynchronous/external
-consumer exists. ADR-0024 resolves the four former Yellow decisions. Deployment Runtime
-construction, automatic startup discovery/observation composition, and full reference-
-node qualification remain Green work before independent phase acceptance.
+Architecture/design and the implementation candidate are captured in the Durable
+Event-Mode Kernel architecture and plan. ADR-0024 resolved the four former Yellow
+decisions. Deployment Runtime construction, bounded startup discovery/observation,
+PostgreSQL persistence/recovery, Producer status, and bounded Razer qualification are
+implemented. The independent phase review returned **DO NOT ACCEPT** with DKR-001 through
+DKR-007; the Green correction implementation resolves those findings and now requires
+targeted fresh independent verification. A generic Durable Operation system remains
+deferred.
 
 ### Phase 4 — First operational media slice
 
-A suitable first vertical workflow is explicit shared-storage discovery through durable
-candidate registration, repeated resource observation, readiness, Completed Media Asset
-registration, stable Production Event emission, Session association or review state,
-durable reconciliation status, restart recovery, and operator visibility.
+A bounded first vertical workflow now exists from explicit shared-storage discovery
+through durable candidate registration, resource observation, readiness, Completed Media
+Asset registration, stable Production Event ingress, Session association/review state,
+reconciliation, restart recovery, and operator visibility.
 
 This slice does not need transcription, editorial analysis, packaging, or publishing to
 prove the architecture.
@@ -449,10 +458,9 @@ The working principle is:
 
 ### Session
 
-- Creation and promotion authority.
-- Scheduled/observed reconciliation, corrections, split, merge, and reassignment.
-- Business Event and Stage ownership/reference lifecycles.
-- Operator override and late-media reopening rules.
+- Post-Kernel automated realization/promotion, split, and merge policy.
+- Publication-era correction/reopening and late-media grace defaults.
+- Detailed downstream editorial/package/delivery/archive lifecycles.
 
 ### Persistence
 
@@ -470,12 +478,12 @@ The working principle is:
 - Canonical durable Source Segment/media-record terminology.
 - Rename, alias, and multi-mount identity reconciliation.
 - Snapshot-observation ownership and sampling policy.
-- Media registry uniqueness/transactions and Session association authority.
-- Grace-period defaults and late-media reopening/quarantine policy.
+- Grace-period defaults and post-publication late-media/quarantine policy.
 
 ### Configuration and distribution
 
-- Configuration format, secrets, schema lifecycle, and distribution mechanism.
+- Deployment configuration distribution/rotation and future schema evolution beyond the
+  implemented versioned TOML plus named-secret boundary.
 - Package and delivery models, first external destination, outbox ownership, and detailed
   finalization/publication/archive state machines.
 

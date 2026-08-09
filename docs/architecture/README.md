@@ -29,7 +29,7 @@ Proposed behavior must never be described as current implementation.
 | --- | --- |
 | [Principles](principles.md) | Accepted durable architectural constraints and current alignment |
 | [System context](system-context.md) | Current runtime, actors, data flows, deployment assumptions, and future boundaries |
-| [Persistence boundary](persistence.md) | Accepted PostgreSQL authority, implemented ingress schema, and remaining operational gaps |
+| [Persistence boundary](persistence.md) | Accepted PostgreSQL authority, implemented ingress/Kernel schema, migration order, and remaining operational gaps |
 | [Domain glossary](domain-glossary.md) | Approved qualified terminology, aliases, migration notes, and unresolved terms |
 | [Session lifecycle](session-lifecycle.md) | Current Session-related behavior, accepted lifecycle direction, invariants, and open decisions |
 | [Segment lifecycle](segment-lifecycle.md) | Current media lifecycle and accepted candidate-to-asset flow |

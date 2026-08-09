@@ -72,7 +72,7 @@ new context and names every superseded ADR. Update this index and mark the older
 | ADR | Decision | Status | Implementation note |
 | --- | --- | --- | --- |
 | [ADR-0001](../../ARCHITECTURE_DECISIONS.md) | Modular monolith | Accepted | Implemented/protected |
-| [ADR-0002](../../ARCHITECTURE_DECISIONS.md) | Sessions are primary Production aggregate | Accepted | Authoritative Session not implemented; D-01 details open |
+| [ADR-0002](../../ARCHITECTURE_DECISIONS.md) | Sessions are primary Production aggregate | Accepted | Authoritative Session aggregate implemented in the bounded Kernel; post-Kernel evolution remains open |
 | [ADR-0003](../../ARCHITECTURE_DECISIONS.md) | Media chunks are storage artifacts | Accepted | Preserved by candidate/readiness/asset separation |
 | [ADR-0004](../../ARCHITECTURE_DECISIONS.md) | StageFlow owns workflow, not conference data | Accepted | External systems not implemented |
 | [ADR-0005](../../ARCHITECTURE_DECISIONS.md) | External integrations use adapters | Accepted | Contracts align; provider adapters absent |
@@ -89,12 +89,12 @@ new context and names every superseded ADR. Update this index and mark the older
 | [ADR-0016](../../ARCHITECTURE_DECISIONS.md) | ObservationLocation is location authority | Accepted | Implemented in Observation contracts |
 | [ADR-0017](../../ARCHITECTURE_DECISIONS.md) | Observation traceability should become first-class | Accepted | Future contract correction |
 | [ADR-0018](../../ARCHITECTURE_DECISIONS.md) | Observation payloads may need first-class modeling | Accepted | Future capability; not authorized yet |
-| [ADR-0019](ADR-0019-stable-ingress-and-interpreter-boundary.md) | Stable ingress identity and one dispatcher-facing interpreter protocol | Accepted | Both boundaries implemented; real PostgreSQL execution pending |
-| [ADR-0020](ADR-0020-canonical-media-to-event-path.md) | Canonical candidate-to-asset-to-Event path | Accepted | Contracts partial; durable path not implemented |
+| [ADR-0019](ADR-0019-stable-ingress-and-interpreter-boundary.md) | Stable ingress identity and one dispatcher-facing interpreter protocol | Accepted | Both boundaries implemented; ingress and Kernel persistence verified on isolated real PostgreSQL |
+| [ADR-0020](ADR-0020-canonical-media-to-event-path.md) | Canonical candidate-to-asset-to-Event path | Accepted | Bounded durable filesystem candidate-to-asset-to-stable-ingress path implemented |
 | [ADR-0021](ADR-0021-time-authority.md) | Domain and infrastructure time authority | Accepted | Strict-aware internal transition implemented |
-| [ADR-0022](ADR-0022-postgresql-authoritative-operational-store.md) | PostgreSQL authoritative operational store | Accepted | Durable ingress foundation in progress; runtime composition remains future work |
-| [ADR-0023](ADR-0023-session-authority-and-completion.md) | Session meaning, Stage invariants, association, boundaries, and completion authority | Accepted | Durable Session aggregate and workflow not implemented |
-| [ADR-0024](ADR-0024-durable-kernel-authority-and-persistence.md) | Explicit bootstrap, human Session realization, deterministic association, normalized state/history | Accepted | Kernel implementation approved |
+| [ADR-0022](ADR-0022-postgresql-authoritative-operational-store.md) | PostgreSQL authoritative operational store | Accepted | Ingress and bounded Kernel authority are composed; broader durable workflows remain future work |
+| [ADR-0023](ADR-0023-session-authority-and-completion.md) | Session meaning, Stage invariants, association, boundaries, and completion authority | Accepted | Kernel Session aggregate, package approval/revision, and typed history implemented |
+| [ADR-0024](ADR-0024-durable-kernel-authority-and-persistence.md) | Explicit bootstrap, human Session realization, deterministic association, normalized state/history | Accepted | Kernel candidate implemented; DKR corrections await targeted independent verification |
 
 ## Unresolved ADR candidates
 

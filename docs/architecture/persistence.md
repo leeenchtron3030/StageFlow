@@ -34,6 +34,12 @@ including evidence, epistemic kind, proposer, policy, optional model lineage, an
 proposal/boundary times. It does not update the authoritative Session projection; human
 boundary decisions remain in `session_boundary_history` and the Session transaction.
 
+`0004_kernel_review_corrections` adds narrow human-command idempotency, deterministic
+association policy/input provenance, completion-membership snapshots, operation identity
+on consequential history, and stronger history constraints. Association membership and
+every materially affected completed Session now change in one transaction; earlier
+completion decisions and their approved asset sets remain reconstructable.
+
 Registration is at least once and idempotent. It does not claim exactly-once delivery.
 Only a newly created ingress record is eligible for the included dispatcher path; an
 exact replay does not repeat that caller-visible dispatch path. The asset-registration
@@ -56,9 +62,10 @@ application time remain separate fields.
 ## Migration and reversal
 
 `0001_ingress_forward.sql` creates the shared schema, migration ledger, and ingress
-table. `0002_event_mode_kernel_forward.sql` and `0003_kernel_projections_forward.sql`
-add only Kernel-owned objects. Reversal removes `0003` before `0002` and their ledger
-rows while preserving ingress and the shared schema.
+table. `0002_event_mode_kernel_forward.sql`, `0003_kernel_projections_forward.sql`, and
+`0004_kernel_review_corrections_forward.sql` add only Kernel-owned objects. Reversal
+removes `0004`, `0003`, then `0002` and their ledger rows while preserving ingress and
+the shared schema.
 Reversal is an explicit operator action for an isolated database and is never automatic.
 
 ## Windows reference-node validation

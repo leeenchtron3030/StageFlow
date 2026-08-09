@@ -2,7 +2,7 @@
 
 ## Status
 
-In progress
+Completed implementation candidate — targeted independent correction verification pending
 
 ## Execution authority
 
@@ -217,24 +217,24 @@ preserves `0001` through `0003`.
 
 ## Acceptance criteria
 
-- [ ] DKR-001 through DKR-007 have evidence-backed RESOLVED/PARTIALLY RESOLVED/NOT
+- [x] DKR-001 through DKR-007 have evidence-backed RESOLVED/PARTIALLY RESOLVED/NOT
   RESOLVED dispositions in a correction artifact.
-- [ ] All interval-less and timestamped turnover cases follow ADR-0024 without invented
+- [x] All interval-less and timestamped turnover cases follow ADR-0024 without invented
   evidence or timestamps.
-- [ ] Every materially affected completed source/target Session reopens atomically and
+- [x] Every materially affected completed source/target Session reopens atomically and
   the earlier approval plus approved membership remains reconstructable.
-- [ ] Same-process PostgreSQL recovery cannot report ready until a newer successful
+- [x] Same-process PostgreSQL recovery cannot report ready until a newer successful
   reconciliation completes; failure remains not ready.
-- [ ] Automatic association provenance and bounded Producer projections reconstruct
+- [x] Automatic association provenance and bounded Producer projections reconstruct
   through PostgreSQL and the API without secret/path disclosure.
-- [ ] Human boundary, assignment/reassignment, and completion retries are idempotent and
+- [x] Human boundary, assignment/reassignment, and completion retries are idempotent and
   conflicting key reuse is rejected.
-- [ ] Typed history constraints reject materially impossible direct persistence.
-- [ ] Focused, full, real-PostgreSQL, migration, and affected Razer checks pass, with
+- [x] Typed history constraints reject materially impossible direct persistence.
+- [x] Focused, full, real-PostgreSQL, migration, and affected Razer checks pass, with
   skips/warnings reported exactly.
-- [ ] Documentation reflects current truth, working tree is clean, and no Yellow/Red
+- [x] Documentation reflects current truth, working tree is clean, and no Yellow/Red
   condition remains.
-- [ ] Branch is prepared only for targeted independent correction verification; the
+- [x] Branch is prepared only for targeted independent correction verification; the
   Kernel is not self-accepted and no production/event-readiness claim is made.
 
 ## Rollback or reversal
@@ -254,12 +254,23 @@ preserves `0001` through `0003`.
 
 ## Completion record
 
-- Implemented revision: Pending.
-- Files and migrations actually changed: Pending.
-- Commands and tests actually run: Pending.
-- Results and warnings: Pending.
+- Implemented revision: `b6deafc` plus the containing documentation/evidence closure
+  commit.
+- Files and migrations actually changed: Kernel contracts/service/repositories,
+  composition recovery gate, Producer status API, migration runner, new additive/reversible
+  `0004_kernel_review_corrections` SQL, focused tests/qualification harness, and directly
+  affected project/architecture/ADR/plan/review documentation.
+- Commands and tests actually run: focused and full backend pytest with real PostgreSQL,
+  Ruff, Pyright, clean frontend install/build/lint/typecheck, read-only npm audit,
+  isolated PostgreSQL forward/reverse/reapply inspection, affected Razer recovery, and
+  `git diff --check`. Exact results are in the linked
+  [correction evidence](../reviews/durable-event-mode-kernel-correction-evidence.md).
+- Results and warnings: All correctness/quality gates passed. Backend full suite: 1,617
+  passed, 5 skipped, 1 existing deprecation warning. npm audit separately reports 12
+  findings (3 moderate, 9 high); no fix was applied.
 - Execution authority used: Green autonomous.
-- Approved deviations: None at plan start.
-- Rollback status: Pending isolated `0004` reverse/reapply evidence.
-- Remaining work: DKR-001 through DKR-007 implementation, validation, documentation,
-  correction evidence, commits, and targeted independent correction verification.
+- Approved deviations: None.
+- Rollback status: Verified on isolated real PostgreSQL; reverse preserved `0001` and
+  removed Kernel/correction objects, and reapply restored `0001` through `0004`.
+- Remaining work: Fresh targeted independent correction verification and an independent
+  phase decision. No finding remains for this implementation task.

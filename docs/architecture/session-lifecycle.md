@@ -1,14 +1,15 @@
 # Session lifecycle
 
 This document separates verified current behavior from the Session architecture accepted
-by [ADR-0023](../adr/ADR-0023-session-authority-and-completion.md). Accepted architecture
-is not a claim that the durable aggregate or workflow is implemented.
+by [ADR-0023](../adr/ADR-0023-session-authority-and-completion.md).
 
 ## Current implementation
 
-The Durable Kernel implementation candidate now includes an authoritative realized
-`Session` contract, human create/start and boundary commands, normalized PostgreSQL
-current state, typed boundary/completion history, and a read-only status projection.
+The Durable Kernel implementation candidate includes an authoritative realized `Session`
+contract, human create/start and idempotent boundary/package/assignment commands,
+normalized PostgreSQL current state, typed boundary/association/completion history,
+approved package-membership snapshots, conservative automatic association provenance,
+and bounded read-only current/recent status projections.
 These remain distinct from the pre-existing independent Session-related values:
 
 - `ScheduledActivity` reports the planned world through a schedule adapter.
@@ -52,7 +53,8 @@ normal end follows the substantive presentation/discussion and its included Q&A.
 - Repeated delivery and restart cannot create an unrelated Session or duplicate an
   accepted decision.
 
-Exact creation/realization command authority remains a Yellow decision for the Kernel.
+Kernel v1 Session realization is an explicit idempotent authorized-human command under
+ADR-0024. Later automated realization, split, and merge policy remains deferred.
 
 ## Program Expectation versus realized Session
 
@@ -66,8 +68,9 @@ not automatically create a Session, grant Session identity, set the actual Stage
 an authoritative boundary. Corrections to planned information create new expectation
 revisions and do not silently rewrite observed Session history.
 
-The existing `ScheduledActivity` remains an adapter contract. A future persistence
-boundary may normalize one or more such external records into a Program Expectation.
+The existing `ScheduledActivity` remains an adapter contract. The Kernel persistence
+boundary stores revisioned Program Expectations separately and exposes their stable link
+and bounded planned context without treating it as observed Session truth.
 
 ## Lifecycle dimensions
 
@@ -120,9 +123,12 @@ speaker/content evidence, recorder/file facts, and human assignment can contribu
 directory, filename, schedule, introduction, or AI output alone cannot grant authority.
 Human assignment/correction is authoritative and attributable.
 
-The initial automatic association rule remains a Yellow Kernel decision. The first
-Kernel must work without AI and preserve unresolved state whenever deterministic context
-is insufficient.
+ADR-0024 authorizes automatic association only when structural and available temporal
+facts make exactly one Session safe. The policy and durable input-record references are
+preserved. An interval-less asset can associate to a lone obvious active Session, but a
+same-Stage turnover with a previous assembling Session remains unresolved. Trustworthy
+intervals may select the uniquely overlapping Session; contradiction remains conflict.
+The Kernel uses no AI, invented timestamp, or grace window for this authority.
 
 ## Completion and late media
 
@@ -144,6 +150,10 @@ When relevant late or previously missing media appears after completion, StageFl
    completion decision is made.
 
 This is a reviewable revision, not silent mutation of published or historical truth.
+Reassignment changes membership for both the source and target. Every completed Session
+whose approved membership changes receives a new package revision and
+`correction_required` projection in the same transaction; the earlier completion and its
+approved asset-membership snapshot remain queryable.
 
 ## Persistence and recovery requirements
 
@@ -162,12 +172,7 @@ PostgreSQL is the accepted store. Append-oriented decision/history records are r
 where lineage matters; full event sourcing is not required. Startup reconstructs from
 PostgreSQL and reconciles configured sources before event readiness is asserted.
 
-## Decisions still required before implementation
-
-- Session creation/realization authority and command boundary.
-- The initial deterministic automatic media-association rule.
-- Initial relational aggregate, history, and transaction schema.
-- Deployment configuration format, secret-reference resolution, and bootstrap behavior.
+## Deferred post-Kernel decisions
 
 Split/merge support, publication-era reopening policy, default grace durations, and
 detailed editorial/package/delivery/archive state machines remain outside the first
