@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Protocol, cast
 
@@ -11,7 +12,9 @@ from httpx import Response
 from app.bootstrap.event_mode_kernel import KernelComponents
 from app.contexts.production.event_mode_kernel import (
     DurableEventModeKernel,
+    EpistemicKind,
     InMemoryEventModeKernelRepository,
+    RegisteredMediaAsset,
     StartSessionRequest,
 )
 from app.contexts.production.event_mode_kernel.repository import (
@@ -31,7 +34,32 @@ class SyncHttpClient(Protocol):
     def get(self, url: str) -> Response: ...
 
 
+class FileInspector(Protocol):
+    def __call__(self, path: Path, *, root: Path) -> object: ...
+
+
 NOW = datetime(2026, 8, 8, 20, 0, tzinfo=UTC)
+
+
+@dataclass(slots=True)
+class MutableClock:
+    current: datetime
+
+    def now(self) -> datetime:
+        return self.current
+
+
+@dataclass(slots=True)
+class FailOnceIngressPublisher:
+    calls: int = 0
+
+    def publish(
+        self, asset: RegisteredMediaAsset, *, received_at: datetime
+    ) -> EntityId:
+        self.calls += 1
+        if self.calls == 1:
+            raise RuntimeError("simulated_crash_after_asset_registration")
+        return EntityId("30000000-0000-0000-0000-000000000099")
 
 
 def configuration(
@@ -170,3 +198,230 @@ def test_kernel_status_reports_database_unavailability_as_structured_503(
     assert response.status_code == 503
     assert response.json()["database_available"] is False
     assert response.json()["attention_codes"] == ["postgresql_unavailable"]
+
+
+def test_bounded_media_cycle_persists_observations_registers_and_associates(
+    tmp_path: Path,
+) -> None:
+    source_path = tmp_path / "recordings"
+    source_path.mkdir()
+    media_path = source_path / "segment-001.mp4"
+    media_path.write_bytes(b"synthetic-media")
+    effective = configuration(tmp_path, source_path)
+    repository = InMemoryEventModeKernelRepository()
+    clock = MutableClock(NOW)
+    kernel = DurableEventModeKernel(repository=repository, clock=clock)
+    components = KernelComponents(
+        configuration=effective,
+        repository=repository,
+        kernel=kernel,
+    )
+
+    initial = components.explicit_bootstrap(
+        operation_id=EntityId("30000000-0000-0000-0000-000000000011"),
+        actor_id=EntityId("30000000-0000-0000-0000-000000000012"),
+    )
+    stage = repository.list_stages(initial.event_id)[0]
+    session = kernel.start_session(
+        StartSessionRequest(
+            operation_id=EntityId("30000000-0000-0000-0000-000000000013"),
+            event_id=initial.event_id,
+            stage_id=stage.id,
+            actor_id=EntityId("30000000-0000-0000-0000-000000000012"),
+            authoritative_start=NOW,
+            requested_at=NOW,
+        )
+    )
+
+    clock.current += timedelta(seconds=6)
+    cycle = components.run_media_cycle(event_id=initial.event_id)
+    replay = components.run_media_cycle(event_id=initial.event_id)
+    status = components.status()
+
+    assert cycle.candidates_seen == 1
+    assert cycle.assets_registered == 1
+    assert cycle.source_failures == ()
+    assert cycle.candidate_results[0].outcome == "registered"
+    assert replay.assets_registered == 0
+    assert replay.candidate_results[0].outcome == "registered_effects_reconciled"
+    assert status is not None
+    assert status.stages[0].registered_media == 1
+    assert status.stages[0].associated_media == 1
+    assert status.stages[0].active_or_assembling_session_id == session.id
+    observations = repository.list_observations(
+        cycle.candidate_results[0].candidate_id
+    )
+    assert sum(item.observation_kind == "asset_resource_snapshot" for item in observations) == 2
+    assert any(item.observation_kind == "asset_readiness_evaluation" for item in observations)
+
+
+def test_machine_boundary_proposal_is_queryable_and_does_not_mutate_session(
+    tmp_path: Path,
+) -> None:
+    source_path = tmp_path / "recordings"
+    source_path.mkdir()
+    effective = configuration(tmp_path, source_path)
+    repository = InMemoryEventModeKernelRepository()
+    kernel = DurableEventModeKernel(repository=repository, clock=FixedClock(NOW))
+    components = KernelComponents(effective, repository, kernel)
+    bootstrapped = components.explicit_bootstrap(
+        operation_id=EntityId("30000000-0000-0000-0000-000000000021"),
+        actor_id=EntityId("30000000-0000-0000-0000-000000000022"),
+    )
+    stage = repository.list_stages(bootstrapped.event_id)[0]
+    session = kernel.start_session(
+        StartSessionRequest(
+            operation_id=EntityId("30000000-0000-0000-0000-000000000023"),
+            event_id=bootstrapped.event_id,
+            stage_id=stage.id,
+            actor_id=EntityId("30000000-0000-0000-0000-000000000022"),
+            authoritative_start=NOW,
+            requested_at=NOW,
+        )
+    )
+
+    proposal = kernel.propose_session_boundary(
+        session_id=session.id,
+        boundary_kind="end",
+        boundary_at=NOW + timedelta(minutes=45),
+        epistemic_kind=EpistemicKind.DERIVED,
+        proposer_id=EntityId("30000000-0000-0000-0000-000000000024"),
+        evidence_ids=(EntityId("30000000-0000-0000-0000-000000000025"),),
+        policy_id="silence-window",
+        policy_version="1.0",
+        reason="advisory boundary only",
+    )
+
+    unchanged = repository.get_session(session.id)
+    status = components.status()
+    assert unchanged == session
+    assert repository.list_boundary_proposals(session.id) == (proposal,)
+    assert status is not None
+    assert status.boundary_proposals == (proposal,)
+
+
+def test_media_growth_resets_the_persisted_stability_window(tmp_path: Path) -> None:
+    source_path = tmp_path / "recordings"
+    source_path.mkdir()
+    media_path = source_path / "growing.mp4"
+    media_path.write_bytes(b"first")
+    effective = configuration(tmp_path, source_path)
+    repository = InMemoryEventModeKernelRepository()
+    clock = MutableClock(NOW)
+    components = KernelComponents(
+        effective,
+        repository,
+        DurableEventModeKernel(repository=repository, clock=clock),
+    )
+    bootstrapped = components.explicit_bootstrap(
+        operation_id=EntityId("30000000-0000-0000-0000-000000000031"),
+        actor_id=EntityId("30000000-0000-0000-0000-000000000032"),
+    )
+
+    media_path.write_bytes(b"first-and-growing")
+    clock.current += timedelta(seconds=6)
+    changed = components.run_media_cycle(event_id=bootstrapped.event_id)
+    clock.current += timedelta(seconds=6)
+    stable = components.run_media_cycle(event_id=bootstrapped.event_id)
+
+    assert changed.assets_registered == 0
+    assert changed.candidate_results[0].outcome == "insufficient_observation"
+    assert stable.assets_registered == 1
+
+
+def test_candidate_inspection_failure_is_isolated_from_other_media(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source_path = tmp_path / "recordings"
+    source_path.mkdir()
+    (source_path / "bad.mp4").write_bytes(b"bad")
+    (source_path / "good.mp4").write_bytes(b"good")
+    effective = configuration(tmp_path, source_path)
+    repository = InMemoryEventModeKernelRepository()
+    clock = MutableClock(NOW)
+    components = KernelComponents(
+        effective,
+        repository,
+        DurableEventModeKernel(repository=repository, clock=clock),
+    )
+    bootstrapped = components.explicit_bootstrap(
+        operation_id=EntityId("30000000-0000-0000-0000-000000000041"),
+        actor_id=EntityId("30000000-0000-0000-0000-000000000042"),
+    )
+    cycle = components.media_cycle
+    assert cycle is not None
+    inspect_file = cast(
+        FileInspector, object.__getattribute__(cycle, "_inspect_file")
+    )
+
+    def fail_one(path: Path, *, root: Path) -> object:
+        if path.name == "bad.mp4":
+            raise OSError("simulated_candidate_failure")
+        return inspect_file(path, root=root)
+
+    monkeypatch.setattr(cycle, "_inspect_file", fail_one)
+    clock.current += timedelta(seconds=6)
+
+    result = components.run_media_cycle(event_id=bootstrapped.event_id)
+
+    assert result.candidates_seen == 2
+    assert result.assets_registered == 1
+    assert [item.outcome for item in result.candidate_results] == ["failed", "registered"]
+    failed = result.candidate_results[0]
+    assert failed.failure_code == "OSError"
+    assert any(
+        observation.observation_kind == "candidate_inspection_failure"
+        for observation in repository.list_observations(failed.candidate_id)
+    )
+
+
+def test_registered_asset_reconciles_ingress_and_association_after_interruption(
+    tmp_path: Path,
+) -> None:
+    source_path = tmp_path / "recordings"
+    source_path.mkdir()
+    (source_path / "segment.mp4").write_bytes(b"synthetic-media")
+    effective = configuration(tmp_path, source_path)
+    repository = InMemoryEventModeKernelRepository()
+    clock = MutableClock(NOW)
+    publisher = FailOnceIngressPublisher()
+    kernel = DurableEventModeKernel(
+        repository=repository,
+        clock=clock,
+        asset_ingress_publisher=publisher,
+    )
+    components = KernelComponents(effective, repository, kernel)
+    bootstrapped = components.explicit_bootstrap(
+        operation_id=EntityId("30000000-0000-0000-0000-000000000051"),
+        actor_id=EntityId("30000000-0000-0000-0000-000000000052"),
+    )
+    stage = repository.list_stages(bootstrapped.event_id)[0]
+    session = kernel.start_session(
+        StartSessionRequest(
+            operation_id=EntityId("30000000-0000-0000-0000-000000000053"),
+            event_id=bootstrapped.event_id,
+            stage_id=stage.id,
+            actor_id=EntityId("30000000-0000-0000-0000-000000000052"),
+            authoritative_start=NOW,
+            requested_at=NOW,
+        )
+    )
+    clock.current += timedelta(seconds=6)
+
+    interrupted = components.run_media_cycle(event_id=bootstrapped.event_id)
+    candidate_id = interrupted.candidate_results[0].candidate_id
+    candidate = repository.get_candidate(candidate_id)
+    assert candidate is not None
+    assert candidate.state.value == "registered"
+    assert repository.get_asset(candidate.proposed_asset_id) is not None
+    assert repository.get_association(candidate.proposed_asset_id) is None
+
+    recovered = components.run_media_cycle(event_id=bootstrapped.event_id)
+
+    assert recovered.assets_registered == 0
+    assert recovered.candidate_results[0].outcome == "registered_effects_reconciled"
+    association = repository.get_association(candidate.proposed_asset_id)
+    assert association is not None
+    assert association.session_id == session.id
+    assert publisher.calls == 2

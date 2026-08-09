@@ -44,6 +44,7 @@ from .contracts import (
     ResourceObservation,
     Session,
     SessionActivityState,
+    SessionBoundaryProposal,
     SessionPackageState,
     StartSessionRequest,
 )
@@ -172,6 +173,39 @@ class DurableEventModeKernel:
         )
         return session
 
+    def propose_session_boundary(
+        self,
+        *,
+        session_id: EntityId,
+        boundary_kind: str,
+        boundary_at: datetime,
+        epistemic_kind: EpistemicKind,
+        proposer_id: EntityId,
+        evidence_ids: Sequence[EntityId],
+        policy_id: str,
+        policy_version: str,
+        reason: str,
+        model_id: str | None = None,
+        model_version: str | None = None,
+    ) -> SessionBoundaryProposal:
+        return self.repository.put_boundary_proposal(
+            SessionBoundaryProposal(
+                id=EntityId.new(),
+                session_id=session_id,
+                boundary_kind=boundary_kind,
+                boundary_at=boundary_at,
+                epistemic_kind=epistemic_kind,
+                proposer_id=proposer_id,
+                evidence_ids=evidence_ids,
+                policy_id=policy_id,
+                policy_version=policy_version,
+                reason=reason,
+                proposed_at=self.clock.now(),
+                model_id=model_id,
+                model_version=model_version,
+            )
+        )
+
     def register_candidate(self, candidate: MediaCandidate) -> MediaCandidate:
         return self.repository.register_candidate(candidate)
 
@@ -219,6 +253,9 @@ class DurableEventModeKernel:
         observed_at: datetime,
         facts: Mapping[str, object],
     ) -> ResourceObservation:
+        candidate = self.repository.get_candidate(candidate_id)
+        if candidate is None:
+            raise KernelNotFoundError("candidate_not_found")
         observation = ResourceObservation(
             id=EntityId.new(),
             candidate_id=candidate_id,
@@ -229,9 +266,10 @@ class DurableEventModeKernel:
             facts=facts,
         )
         self.repository.record_observation(observation)
-        self.repository.mark_candidate_state(
-            candidate_id, MediaRegistrationState.STABILIZING.value, observed_at
-        )
+        if candidate.state is not MediaRegistrationState.REGISTERED:
+            self.repository.mark_candidate_state(
+                candidate_id, MediaRegistrationState.STABILIZING.value, observed_at
+            )
         return observation
 
     def record_readiness(

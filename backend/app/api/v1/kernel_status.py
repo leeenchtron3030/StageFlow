@@ -14,6 +14,18 @@ from app.contexts.production.event_mode_kernel.repository import (
 router = APIRouter(prefix="/kernel", tags=["kernel"])
 
 
+class AssemblingSessionResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    session_id: str
+    activity_state: str
+    package_state: str
+    package_revision: int
+    revision: int
+    authoritative_start: datetime
+    authoritative_end: datetime | None
+
+
 class StageStatusResponse(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -22,6 +34,8 @@ class StageStatusResponse(BaseModel):
     name: str
     source_available: bool | None
     session_id: str | None
+    assembling_session_ids: tuple[str, ...]
+    assembling_sessions: tuple[AssemblingSessionResponse, ...]
     session_activity_state: str | None
     session_package_state: str | None
     session_package_revision: int | None
@@ -36,6 +50,45 @@ class StageStatusResponse(BaseModel):
     associated: int
     unresolved: int
     conflicting: int
+    attention_codes: tuple[str, ...]
+
+
+class MediaStatusResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    candidate_id: str
+    proposed_asset_id: str
+    asset_id: str | None
+    stage_id: str
+    source_binding_key: str
+    registration_state: str
+    discovered_at: datetime
+    last_observed_at: datetime
+    association_status: str | None
+    association_authority: str | None
+    session_id: str | None
+    epistemic_kinds: tuple[str, ...]
+    media_started_at: datetime | None
+    media_ended_at: datetime | None
+    diagnostic_codes: tuple[str, ...]
+
+
+class BoundaryProposalResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    proposal_id: str
+    session_id: str
+    boundary_kind: str
+    boundary_at: datetime
+    epistemic_kind: str
+    proposer_id: str
+    evidence_ids: tuple[str, ...]
+    policy_id: str
+    policy_version: str
+    model_id: str | None
+    model_version: str | None
+    reason: str
+    proposed_at: datetime
 
 
 class KernelStatusResponse(BaseModel):
@@ -52,6 +105,8 @@ class KernelStatusResponse(BaseModel):
     reconciliation_started_at: datetime | None
     reconciliation_completed_at: datetime | None
     stages: tuple[StageStatusResponse, ...]
+    recent_media: tuple[MediaStatusResponse, ...] = ()
+    boundary_proposals: tuple[BoundaryProposalResponse, ...] = ()
     attention_codes: tuple[str, ...]
     startup_error: str | None = None
 
@@ -86,6 +141,21 @@ def _response(status: EventOperationalStatus) -> KernelStatusResponse:
                     if stage.active_or_assembling_session_id is None
                     else stage.active_or_assembling_session_id.value
                 ),
+                assembling_session_ids=tuple(
+                    value.value for value in stage.assembling_session_ids
+                ),
+                assembling_sessions=tuple(
+                    AssemblingSessionResponse(
+                        session_id=item.session_id.value,
+                        activity_state=item.activity_state.value,
+                        package_state=item.package_state.value,
+                        package_revision=item.package_revision,
+                        revision=item.revision,
+                        authoritative_start=item.authoritative_start,
+                        authoritative_end=item.authoritative_end,
+                    )
+                    for item in stage.assembling_sessions
+                ),
                 session_activity_state=(
                     None
                     if stage.session_activity_state is None
@@ -108,8 +178,55 @@ def _response(status: EventOperationalStatus) -> KernelStatusResponse:
                 associated=stage.associated_media,
                 unresolved=stage.unresolved_media,
                 conflicting=stage.conflicting_media,
+                attention_codes=tuple(stage.attention_codes),
             )
             for stage in status.stages
+        ),
+        recent_media=tuple(
+            MediaStatusResponse(
+                candidate_id=item.candidate_id.value,
+                proposed_asset_id=item.proposed_asset_id.value,
+                asset_id=None if item.asset_id is None else item.asset_id.value,
+                stage_id=item.stage_id.value,
+                source_binding_key=item.source_binding_key,
+                registration_state=item.registration_state.value,
+                discovered_at=item.discovered_at,
+                last_observed_at=item.last_observed_at,
+                association_status=(
+                    None
+                    if item.association_status is None
+                    else item.association_status.value
+                ),
+                association_authority=(
+                    None
+                    if item.association_authority is None
+                    else item.association_authority.value
+                ),
+                session_id=None if item.session_id is None else item.session_id.value,
+                epistemic_kinds=tuple(value.value for value in item.epistemic_kinds),
+                media_started_at=item.media_started_at,
+                media_ended_at=item.media_ended_at,
+                diagnostic_codes=tuple(item.diagnostic_codes),
+            )
+            for item in status.recent_media
+        ),
+        boundary_proposals=tuple(
+            BoundaryProposalResponse(
+                proposal_id=item.id.value,
+                session_id=item.session_id.value,
+                boundary_kind=item.boundary_kind,
+                boundary_at=item.boundary_at,
+                epistemic_kind=item.epistemic_kind.value,
+                proposer_id=item.proposer_id.value,
+                evidence_ids=tuple(value.value for value in item.evidence_ids),
+                policy_id=item.policy_id,
+                policy_version=item.policy_version,
+                model_id=item.model_id,
+                model_version=item.model_version,
+                reason=item.reason,
+                proposed_at=item.proposed_at,
+            )
+            for item in status.boundary_proposals
         ),
         attention_codes=tuple(status.attention_codes),
     )
@@ -175,4 +292,11 @@ def kernel_status(request: Request, response: Response) -> KernelStatusResponse:
     return _response(status)
 
 
-__all__ = ["KernelStatusResponse", "StageStatusResponse", "router"]
+__all__ = [
+    "BoundaryProposalResponse",
+    "AssemblingSessionResponse",
+    "KernelStatusResponse",
+    "MediaStatusResponse",
+    "StageStatusResponse",
+    "router",
+]

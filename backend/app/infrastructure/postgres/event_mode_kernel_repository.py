@@ -28,6 +28,7 @@ from app.contexts.production.event_mode_kernel.contracts import (
     EventOperationalStatus,
     MediaAssociation,
     MediaCandidate,
+    MediaOperationalProjection,
     MediaRegistrationState,
     ReconciliationRun,
     ReconciliationStatus,
@@ -35,6 +36,8 @@ from app.contexts.production.event_mode_kernel.contracts import (
     ResourceObservation,
     Session,
     SessionActivityState,
+    SessionBoundaryProposal,
+    SessionOperationalProjection,
     SessionPackageState,
     StageOperationalStatus,
     StartSessionRequest,
@@ -180,6 +183,26 @@ def _reconciliation(row: Row) -> ReconciliationRun:
         candidates_seen=cast(int, row["candidates_seen"]),
         assets_registered=cast(int, row["assets_registered"]),
         failure_code=cast(str | None, row["failure_code"]),
+    )
+
+
+def _boundary_proposal(row: Row) -> SessionBoundaryProposal:
+    return SessionBoundaryProposal(
+        id=EntityId(str(row["boundary_proposal_id"])),
+        session_id=EntityId(str(row["session_id"])),
+        boundary_kind=cast(str, row["boundary_kind"]),
+        boundary_at=cast(datetime, row["boundary_at"]),
+        epistemic_kind=EpistemicKind(cast(str, row["epistemic_kind"])),
+        proposer_id=EntityId(str(row["proposer_id"])),
+        evidence_ids=tuple(
+            EntityId(value) for value in cast(list[str], row["evidence_ids"])
+        ),
+        policy_id=cast(str, row["policy_id"]),
+        policy_version=cast(str, row["policy_version"]),
+        model_id=cast(str | None, row["model_id"]),
+        model_version=cast(str | None, row["model_version"]),
+        reason=cast(str, row["reason"]),
+        proposed_at=cast(datetime, row["proposed_at"]),
     )
 
 
@@ -819,6 +842,77 @@ class PostgresEventModeKernelRepository(EventModeKernelRepository):
         except psycopg.OperationalError as exc:
             raise KernelStorageUnavailableError("postgresql_unavailable") from exc
 
+    def put_boundary_proposal(
+        self, proposal: SessionBoundaryProposal
+    ) -> SessionBoundaryProposal:
+        try:
+            with self._connect() as connection:
+                session = connection.execute(
+                    "SELECT 1 FROM stageflow.session WHERE session_id = %s",
+                    (proposal.session_id.value,),
+                ).fetchone()
+                if session is None:
+                    raise KernelNotFoundError("session_not_found")
+                row = connection.execute(
+                    """
+                    SELECT * FROM stageflow.session_boundary_proposal
+                    WHERE boundary_proposal_id = %s FOR UPDATE
+                    """,
+                    (proposal.id.value,),
+                ).fetchone()
+                if row is not None:
+                    existing = _boundary_proposal(row)
+                    if existing != proposal:
+                        raise KernelConflictError("boundary_proposal_identity_conflict")
+                    return existing
+                connection.execute(
+                    """
+                    INSERT INTO stageflow.session_boundary_proposal (
+                        boundary_proposal_id, session_id, boundary_kind, boundary_at,
+                        epistemic_kind, proposer_id, evidence_ids, policy_id,
+                        policy_version, model_id, model_version, reason, proposed_at
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """,
+                    (
+                        proposal.id.value,
+                        proposal.session_id.value,
+                        proposal.boundary_kind,
+                        proposal.boundary_at,
+                        proposal.epistemic_kind.value,
+                        proposal.proposer_id.value,
+                        Jsonb([value.value for value in proposal.evidence_ids]),
+                        proposal.policy_id,
+                        proposal.policy_version,
+                        proposal.model_id,
+                        proposal.model_version,
+                        proposal.reason,
+                        proposal.proposed_at,
+                    ),
+                )
+                return proposal
+        except psycopg.OperationalError as exc:
+            raise KernelStorageUnavailableError("postgresql_unavailable") from exc
+
+    def list_boundary_proposals(
+        self, session_id: EntityId, *, limit: int = 100
+    ) -> tuple[SessionBoundaryProposal, ...]:
+        if limit < 1 or limit > 500:
+            raise ValueError("limit must be between 1 and 500")
+        try:
+            with self._connect() as connection:
+                rows = connection.execute(
+                    """
+                    SELECT * FROM stageflow.session_boundary_proposal
+                    WHERE session_id = %s
+                    ORDER BY proposed_at DESC, boundary_proposal_id DESC
+                    LIMIT %s
+                    """,
+                    (session_id.value, limit),
+                ).fetchall()
+                return tuple(_boundary_proposal(row) for row in rows)
+        except psycopg.OperationalError as exc:
+            raise KernelStorageUnavailableError("postgresql_unavailable") from exc
+
     def register_candidate(self, candidate: MediaCandidate) -> MediaCandidate:
         try:
             with self._connect() as connection:
@@ -867,21 +961,16 @@ class PostgresEventModeKernelRepository(EventModeKernelRepository):
                         or existing.source_reference != candidate.source_reference
                     ):
                         raise KernelConflictError("candidate_identity_conflict")
-                    if (
-                        candidate.last_observed_at > existing.last_observed_at
-                        or candidate.state is not existing.state
-                    ):
+                    if candidate.last_observed_at > existing.last_observed_at:
                         connection.execute(
                             """
                             UPDATE stageflow.media_candidate
                             SET last_observed_at = GREATEST(last_observed_at, %s),
-                                registration_state = %s,
                                 revision = revision + 1
                             WHERE candidate_id = %s
                             """,
                             (
                                 candidate.last_observed_at,
-                                candidate.state.value,
                                 candidate.id.value,
                             ),
                         )
@@ -957,6 +1046,34 @@ class PostgresEventModeKernelRepository(EventModeKernelRepository):
                     (observation.observed_at, observation.candidate_id.value),
                 )
                 return observation
+        except psycopg.OperationalError as exc:
+            raise KernelStorageUnavailableError("postgresql_unavailable") from exc
+
+    def list_observations(self, candidate_id: EntityId) -> tuple[ResourceObservation, ...]:
+        try:
+            with self._connect() as connection:
+                rows = connection.execute(
+                    """
+                    SELECT observation_id, candidate_id, observation_kind,
+                           epistemic_kind, observed_at, recorded_at, facts
+                    FROM stageflow.media_resource_observation
+                    WHERE candidate_id = %s
+                    ORDER BY observed_at, observation_id
+                    """,
+                    (candidate_id.value,),
+                ).fetchall()
+                return tuple(
+                    ResourceObservation(
+                        id=EntityId(str(row["observation_id"])),
+                        candidate_id=EntityId(str(row["candidate_id"])),
+                        observation_kind=cast(str, row["observation_kind"]),
+                        epistemic_kind=EpistemicKind(cast(str, row["epistemic_kind"])),
+                        observed_at=cast(datetime, row["observed_at"]),
+                        recorded_at=cast(datetime, row["recorded_at"]),
+                        facts=cast(dict[str, object], row["facts"]),
+                    )
+                    for row in rows
+                )
         except psycopg.OperationalError as exc:
             raise KernelStorageUnavailableError("postgresql_unavailable") from exc
 
@@ -1284,6 +1401,96 @@ class PostgresEventModeKernelRepository(EventModeKernelRepository):
         except psycopg.OperationalError as exc:
             raise KernelStorageUnavailableError("postgresql_unavailable") from exc
 
+    def list_recent_media(
+        self, event_id: EntityId, *, limit: int = 100
+    ) -> tuple[MediaOperationalProjection, ...]:
+        if limit < 1 or limit > 500:
+            raise ValueError("limit must be between 1 and 500")
+        try:
+            with self._connect() as connection:
+                rows = connection.execute(
+                    """
+                    SELECT c.*, a.asset_id, a.media_started_at, a.media_ended_at,
+                           x.association_status, x.authority,
+                           x.session_id,
+                           COALESCE(
+                             (
+                               SELECT jsonb_agg(DISTINCT o.epistemic_kind)
+                               FROM stageflow.media_resource_observation o
+                               WHERE o.candidate_id = c.candidate_id
+                             ),
+                             '[]'::jsonb
+                           ) AS epistemic_kinds
+                    FROM stageflow.media_candidate c
+                    JOIN stageflow.stage s ON s.stage_id = c.stage_id
+                    LEFT JOIN stageflow.completed_media_asset_registry a
+                      ON a.candidate_id = c.candidate_id
+                    LEFT JOIN stageflow.media_association x ON x.asset_id = a.asset_id
+                    WHERE s.event_id = %s
+                    ORDER BY c.last_observed_at DESC, c.candidate_id DESC
+                    LIMIT %s
+                    """,
+                    (event_id.value, limit),
+                ).fetchall()
+                return tuple(
+                    MediaOperationalProjection(
+                        candidate_id=EntityId(str(row["candidate_id"])),
+                        proposed_asset_id=EntityId(str(row["proposed_asset_id"])),
+                        asset_id=(
+                            None
+                            if row["asset_id"] is None
+                            else EntityId(str(row["asset_id"]))
+                        ),
+                        stage_id=EntityId(str(row["stage_id"])),
+                        source_binding_key=cast(str, row["source_binding_key"]),
+                        registration_state=MediaRegistrationState(
+                            cast(str, row["registration_state"])
+                        ),
+                        discovered_at=cast(datetime, row["discovered_at"]),
+                        last_observed_at=cast(datetime, row["last_observed_at"]),
+                        association_status=(
+                            None
+                            if row["association_status"] is None
+                            else AssociationStatus(cast(str, row["association_status"]))
+                        ),
+                        association_authority=(
+                            None
+                            if row["authority"] is None
+                            else AssociationAuthority(cast(str, row["authority"]))
+                        ),
+                        session_id=(
+                            None
+                            if row["session_id"] is None
+                            else EntityId(str(row["session_id"]))
+                        ),
+                        epistemic_kinds=tuple(
+                            EpistemicKind(value)
+                            for value in cast(list[str], row["epistemic_kinds"])
+                        ),
+                        media_started_at=cast(datetime | None, row["media_started_at"]),
+                        media_ended_at=cast(datetime | None, row["media_ended_at"]),
+                        diagnostic_codes=tuple(
+                            code
+                            for code in (
+                                "not_observed"
+                                if row["registration_state"] == "discovered"
+                                else "readiness_pending"
+                                if row["registration_state"] == "stabilizing"
+                                else None,
+                                (
+                                    None
+                                    if row["association_status"] in {None, "associated"}
+                                    else f"association_{row['association_status']}"
+                                ),
+                            )
+                            if code is not None
+                        ),
+                    )
+                    for row in rows
+                )
+        except psycopg.OperationalError as exc:
+            raise KernelStorageUnavailableError("postgresql_unavailable") from exc
+
     def operational_status(
         self,
         event_id: EntityId,
@@ -1338,18 +1545,32 @@ class PostgresEventModeKernelRepository(EventModeKernelRepository):
                         """,
                         (stage.id.value,),
                     ).fetchone()
+                    assembling_rows = connection.execute(
+                        """
+                        SELECT * FROM stageflow.session
+                        WHERE stage_id = %s AND package_state IN (
+                            'assembling', 'correction_required'
+                        )
+                        ORDER BY authoritative_start, session_id
+                        """,
+                        (stage.id.value,),
+                    ).fetchall()
                     assert counts_row is not None and association_row is not None
                     source_values = [availability.get(key) for key in stage.source_bindings]
                     known = [value for value in source_values if value is not None]
                     source_available = all(known) if known else None
                     unresolved = cast(int, association_row["unresolved"])
                     conflicting = cast(int, association_row["conflicting"])
+                    stage_attention: list[str] = []
                     if unresolved:
-                        attention.append(f"stage:{stage.key}:unresolved_media")
+                        stage_attention.append("unresolved_media")
                     if conflicting:
-                        attention.append(f"stage:{stage.key}:association_conflict")
+                        stage_attention.append("association_conflict")
                     if source_available is False:
-                        attention.append(f"stage:{stage.key}:source_unavailable")
+                        stage_attention.append("source_unavailable")
+                    attention.extend(
+                        f"stage:{stage.key}:{code}" for code in stage_attention
+                    )
                     stage_statuses.append(
                         StageOperationalStatus(
                             stage_id=stage.id,
@@ -1360,6 +1581,32 @@ class PostgresEventModeKernelRepository(EventModeKernelRepository):
                                 None
                                 if session_row is None
                                 else EntityId(str(session_row["session_id"]))
+                            ),
+                            assembling_session_ids=tuple(
+                                EntityId(str(row["session_id"]))
+                                for row in assembling_rows
+                            ),
+                            assembling_sessions=tuple(
+                                SessionOperationalProjection(
+                                    session_id=EntityId(str(row["session_id"])),
+                                    activity_state=SessionActivityState(
+                                        cast(str, row["activity_state"])
+                                    ),
+                                    package_state=SessionPackageState(
+                                        cast(str, row["package_state"])
+                                    ),
+                                    package_revision=cast(
+                                        int, row["package_revision"]
+                                    ),
+                                    revision=cast(int, row["revision"]),
+                                    authoritative_start=cast(
+                                        datetime, row["authoritative_start"]
+                                    ),
+                                    authoritative_end=cast(
+                                        datetime | None, row["authoritative_end"]
+                                    ),
+                                )
+                                for row in assembling_rows
                             ),
                             session_activity_state=(
                                 None
@@ -1404,6 +1651,7 @@ class PostgresEventModeKernelRepository(EventModeKernelRepository):
                             associated_media=cast(int, association_row["associated"]),
                             unresolved_media=unresolved,
                             conflicting_media=conflicting,
+                            attention_codes=stage_attention,
                         )
                     )
                 latest_row = connection.execute(
@@ -1424,6 +1672,16 @@ class PostgresEventModeKernelRepository(EventModeKernelRepository):
                     attention.append("startup_reconciliation_running")
                 if latest is not None and latest.status is ReconciliationStatus.FAILED:
                     attention.append("startup_reconciliation_failed")
+                proposal_rows = connection.execute(
+                    """
+                    SELECT p.* FROM stageflow.session_boundary_proposal p
+                    JOIN stageflow.session s ON s.session_id = p.session_id
+                    WHERE s.event_id = %s
+                    ORDER BY p.proposed_at DESC, p.boundary_proposal_id DESC
+                    LIMIT 100
+                    """,
+                    (event_id.value,),
+                ).fetchall()
                 return EventOperationalStatus(
                     event_id=event.id,
                     event_key=event.key,
@@ -1434,6 +1692,10 @@ class PostgresEventModeKernelRepository(EventModeKernelRepository):
                     stages=stage_statuses,
                     attention_codes=attention,
                     latest_reconciliation=latest,
+                    recent_media=self.list_recent_media(event_id),
+                    boundary_proposals=tuple(
+                        _boundary_proposal(row) for row in proposal_rows
+                    ),
                 )
         except psycopg.OperationalError as exc:
             raise KernelStorageUnavailableError("postgresql_unavailable") from exc

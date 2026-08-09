@@ -23,8 +23,10 @@ class PostgresMigrationRunner:
     def apply_event_mode_kernel_v1(self) -> None:
         self.apply_ingress_v1()
         self._execute("0002_event_mode_kernel_forward.sql")
+        self._execute("0003_kernel_projections_forward.sql")
 
     def reverse_event_mode_kernel_v1(self) -> None:
+        self._execute("0003_kernel_projections_reverse.sql")
         self._execute("0002_event_mode_kernel_reverse.sql")
 
     def _execute(self, filename: str) -> None:

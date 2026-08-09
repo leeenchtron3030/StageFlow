@@ -15,17 +15,22 @@ from app.contexts.events import (
 from app.shared.ids import EntityId
 
 from .contracts import (
+    AssociationStatus,
     BoundaryDecision,
     CompletionDecision,
     EpistemicKind,
     EventOperationalStatus,
     MediaAssociation,
     MediaCandidate,
+    MediaOperationalProjection,
+    MediaRegistrationState,
     ReconciliationRun,
     ReconciliationStatus,
     RegisteredMediaAsset,
     ResourceObservation,
     Session,
+    SessionBoundaryProposal,
+    SessionOperationalProjection,
     StartSessionRequest,
 )
 
@@ -83,6 +88,16 @@ class EventModeKernelRepository(ABC):
     ) -> tuple[Session, BoundaryDecision]: ...
 
     @abstractmethod
+    def put_boundary_proposal(
+        self, proposal: SessionBoundaryProposal
+    ) -> SessionBoundaryProposal: ...
+
+    @abstractmethod
+    def list_boundary_proposals(
+        self, session_id: EntityId, *, limit: int = 100
+    ) -> tuple[SessionBoundaryProposal, ...]: ...
+
+    @abstractmethod
     def register_candidate(self, candidate: MediaCandidate) -> MediaCandidate: ...
 
     @abstractmethod
@@ -90,6 +105,9 @@ class EventModeKernelRepository(ABC):
 
     @abstractmethod
     def record_observation(self, observation: ResourceObservation) -> ResourceObservation: ...
+
+    @abstractmethod
+    def list_observations(self, candidate_id: EntityId) -> tuple[ResourceObservation, ...]: ...
 
     @abstractmethod
     def mark_candidate_state(
@@ -121,6 +139,11 @@ class EventModeKernelRepository(ABC):
     def get_latest_reconciliation(self, event_id: EntityId) -> ReconciliationRun | None: ...
 
     @abstractmethod
+    def list_recent_media(
+        self, event_id: EntityId, *, limit: int = 100
+    ) -> tuple[MediaOperationalProjection, ...]: ...
+
+    @abstractmethod
     def operational_status(
         self,
         event_id: EntityId,
@@ -145,6 +168,7 @@ class InMemoryEventModeKernelRepository(EventModeKernelRepository):
         self._start_operations: dict[EntityId, tuple[StartSessionRequest, EntityId]] = {}
         self._bootstrap_operations: dict[EntityId, EventStageBootstrapResult] = {}
         self._boundaries: list[BoundaryDecision] = []
+        self._boundary_proposals: dict[EntityId, SessionBoundaryProposal] = {}
         self._candidates: dict[EntityId, MediaCandidate] = {}
         self._observations: dict[EntityId, ResourceObservation] = {}
         self._assets: dict[EntityId, RegisteredMediaAsset] = {}
@@ -438,6 +462,36 @@ class InMemoryEventModeKernelRepository(EventModeKernelRepository):
             self._boundaries.append(decision)
             return updated, decision
 
+    def put_boundary_proposal(
+        self, proposal: SessionBoundaryProposal
+    ) -> SessionBoundaryProposal:
+        with self._lock:
+            if proposal.session_id not in self._sessions:
+                raise KernelNotFoundError("session_not_found")
+            existing = self._boundary_proposals.get(proposal.id)
+            if existing is not None and existing != proposal:
+                raise KernelConflictError("boundary_proposal_identity_conflict")
+            self._boundary_proposals[proposal.id] = proposal
+            return proposal
+
+    def list_boundary_proposals(
+        self, session_id: EntityId, *, limit: int = 100
+    ) -> tuple[SessionBoundaryProposal, ...]:
+        if limit < 1 or limit > 500:
+            raise ValueError("limit must be between 1 and 500")
+        with self._lock:
+            return tuple(
+                sorted(
+                    (
+                        item
+                        for item in self._boundary_proposals.values()
+                        if item.session_id == session_id
+                    ),
+                    key=lambda value: (value.proposed_at, value.id.value),
+                    reverse=True,
+                )[:limit]
+            )
+
     def register_candidate(self, candidate: MediaCandidate) -> MediaCandidate:
         with self._lock:
             stage = self._stages.get(candidate.stage_id)
@@ -497,6 +551,19 @@ class InMemoryEventModeKernelRepository(EventModeKernelRepository):
                 revision=candidate.revision + 1,
             )
             return observation
+
+    def list_observations(self, candidate_id: EntityId) -> tuple[ResourceObservation, ...]:
+        with self._lock:
+            return tuple(
+                sorted(
+                    (
+                        observation
+                        for observation in self._observations.values()
+                        if observation.candidate_id == candidate_id
+                    ),
+                    key=lambda value: (value.observed_at, value.id.value),
+                )
+            )
 
     def mark_candidate_state(
         self, candidate_id: EntityId, state: str, at: datetime
@@ -655,6 +722,74 @@ class InMemoryEventModeKernelRepository(EventModeKernelRepository):
                     return run
             return None
 
+    def list_recent_media(
+        self, event_id: EntityId, *, limit: int = 100
+    ) -> tuple[MediaOperationalProjection, ...]:
+        if limit < 1 or limit > 500:
+            raise ValueError("limit must be between 1 and 500")
+        with self._lock:
+            stage_ids = {stage.id for stage in self._stages.values() if stage.event_id == event_id}
+            projections: list[MediaOperationalProjection] = []
+            for candidate in self._candidates.values():
+                if candidate.stage_id not in stage_ids:
+                    continue
+                asset = next(
+                    (
+                        value
+                        for value in self._assets.values()
+                        if value.candidate_id == candidate.id
+                    ),
+                    None,
+                )
+                association = None if asset is None else self._associations.get(asset.id)
+                epistemic = {
+                    observation.epistemic_kind
+                    for observation in self._observations.values()
+                    if observation.candidate_id == candidate.id
+                }
+                diagnostic_codes: list[str] = []
+                if candidate.state is MediaRegistrationState.DISCOVERED:
+                    diagnostic_codes.append("not_observed")
+                elif candidate.state is MediaRegistrationState.STABILIZING:
+                    diagnostic_codes.append("readiness_pending")
+                if (
+                    association is not None
+                    and association.status is not AssociationStatus.ASSOCIATED
+                ):
+                    diagnostic_codes.append(f"association_{association.status.value}")
+                projections.append(
+                    MediaOperationalProjection(
+                        candidate_id=candidate.id,
+                        proposed_asset_id=candidate.proposed_asset_id,
+                        asset_id=None if asset is None else asset.id,
+                        stage_id=candidate.stage_id,
+                        source_binding_key=candidate.source_binding_key,
+                        registration_state=candidate.state,
+                        discovered_at=candidate.discovered_at,
+                        last_observed_at=candidate.last_observed_at,
+                        association_status=(
+                            None if association is None else association.status
+                        ),
+                        association_authority=(
+                            None if association is None else association.authority
+                        ),
+                        session_id=None if association is None else association.session_id,
+                        epistemic_kinds=tuple(
+                            sorted(epistemic, key=lambda value: value.value)
+                        ),
+                        media_started_at=None if asset is None else asset.media_started_at,
+                        media_ended_at=None if asset is None else asset.media_ended_at,
+                        diagnostic_codes=diagnostic_codes,
+                    )
+                )
+            return tuple(
+                sorted(
+                    projections,
+                    key=lambda value: (value.last_observed_at, value.candidate_id.value),
+                    reverse=True,
+                )[:limit]
+            )
+
     def operational_status(
         self,
         event_id: EntityId,
@@ -690,6 +825,28 @@ class InMemoryEventModeKernelRepository(EventModeKernelRepository):
                     if item.id in self._associations
                 ]
                 sessions = self.list_sessions_for_stage(stage.id)
+                assembling_session_ids = tuple(
+                    item.id
+                    for item in sessions
+                    if item.package_state
+                    in {
+                        SessionPackageState.ASSEMBLING,
+                        SessionPackageState.CORRECTION_REQUIRED,
+                    }
+                )
+                assembling_sessions = tuple(
+                    SessionOperationalProjection(
+                        session_id=item.id,
+                        activity_state=item.activity_state,
+                        package_state=item.package_state,
+                        package_revision=item.package_revision,
+                        revision=item.revision,
+                        authoritative_start=item.authoritative_start,
+                        authoritative_end=item.authoritative_end,
+                    )
+                    for item in sessions
+                    if item.id in assembling_session_ids
+                )
                 current = next(
                     (
                         item
@@ -714,12 +871,16 @@ class InMemoryEventModeKernelRepository(EventModeKernelRepository):
                 conflicts = sum(
                     item.status is AssociationStatus.CONFLICT for item in associations
                 )
+                stage_attention: list[str] = []
                 if unresolved:
-                    attention.append(f"stage:{stage.key}:unresolved_media")
+                    stage_attention.append("unresolved_media")
                 if conflicts:
-                    attention.append(f"stage:{stage.key}:association_conflict")
+                    stage_attention.append("association_conflict")
                 if source_available is False:
-                    attention.append(f"stage:{stage.key}:source_unavailable")
+                    stage_attention.append("source_unavailable")
+                attention.extend(
+                    f"stage:{stage.key}:{code}" for code in stage_attention
+                )
                 stages.append(
                     StageOperationalStatus(
                         stage_id=stage.id,
@@ -727,6 +888,8 @@ class InMemoryEventModeKernelRepository(EventModeKernelRepository):
                         stage_name=stage.name,
                         source_available=source_available,
                         active_or_assembling_session_id=None if current is None else current.id,
+                        assembling_session_ids=assembling_session_ids,
+                        assembling_sessions=assembling_sessions,
                         session_activity_state=(
                             None if current is None else current.activity_state
                         ),
@@ -761,6 +924,7 @@ class InMemoryEventModeKernelRepository(EventModeKernelRepository):
                         ),
                         unresolved_media=unresolved,
                         conflicting_media=conflicts,
+                        attention_codes=stage_attention,
                     )
                 )
             latest = self.get_latest_reconciliation(event_id)
@@ -787,6 +951,16 @@ class InMemoryEventModeKernelRepository(EventModeKernelRepository):
                 stages=stages,
                 attention_codes=attention,
                 latest_reconciliation=latest,
+                recent_media=self.list_recent_media(event_id),
+                boundary_proposals=tuple(
+                    proposal
+                    for session in (
+                        session
+                        for stage in self.list_stages(event_id)
+                        for session in self.list_sessions_for_stage(stage.id)
+                    )
+                    for proposal in self.list_boundary_proposals(session.id)
+                )[:100],
             )
 
 

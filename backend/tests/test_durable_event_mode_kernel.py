@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from uuid import uuid4
@@ -16,6 +17,7 @@ from app.contexts.events import (
 from app.contexts.production.event_mode_kernel.contracts import (
     AssociationAuthority,
     AssociationStatus,
+    EpistemicKind,
     MediaCandidate,
     MediaRegistrationState,
     ReconciliationStatus,
@@ -623,6 +625,12 @@ def test_kernel_migration_is_normalized_typed_and_reversible() -> None:
     reverse = (sql_directory / "0002_event_mode_kernel_reverse.sql").read_text(
         encoding="utf-8"
     )
+    projections_forward = (
+        sql_directory / "0003_kernel_projections_forward.sql"
+    ).read_text(encoding="utf-8")
+    projections_reverse = (
+        sql_directory / "0003_kernel_projections_reverse.sql"
+    ).read_text(encoding="utf-8")
 
     for table in (
         "business_event",
@@ -642,6 +650,9 @@ def test_kernel_migration_is_normalized_typed_and_reversible() -> None:
     assert "generic_event" not in forward
     assert "event_store" not in forward
     assert "one_active_session_per_stage" in forward
+    assert "stageflow.session_boundary_proposal" in projections_forward
+    assert "stageflow.session_boundary_proposal" in projections_reverse
+    assert "epistemic_kind IN ('observed', 'derived', 'inferred')" in projections_forward
     assert "DROP SCHEMA" not in reverse
 
 
@@ -720,6 +731,17 @@ def test_real_postgres_kernel_reconstruction_and_history() -> None:
             PostgresIngressRepository(_POSTGRES_DSN)
         ),
     )
+    proposal = durable_kernel.propose_session_boundary(
+        session_id=session.id,
+        boundary_kind="end",
+        boundary_at=NOW + timedelta(hours=1),
+        epistemic_kind=EpistemicKind.DERIVED,
+        proposer_id=EntityId.new(),
+        evidence_ids=(EntityId.new(),),
+        policy_id="integration-policy",
+        policy_version="1.0",
+        reason="durability verification",
+    )
     asset = ready_asset(
         durable_kernel,
         first.stages[0].id,
@@ -741,6 +763,19 @@ def test_real_postgres_kernel_reconstruction_and_history() -> None:
     assert restarted_repository.get_association(registered.id) == association
     assert association.session_id == session.id
     assert production_event_id is not None
+    assert restarted_repository.list_boundary_proposals(session.id) == (proposal,)
+    assert restarted_repository.get_session(session.id) == session
+    registered_candidate = restarted_repository.get_candidate(registered.candidate_id)
+    assert registered_candidate is not None
+    replayed_candidate = restarted_repository.register_candidate(
+        replace(
+            registered_candidate,
+            last_observed_at=registered_candidate.last_observed_at
+            + timedelta(seconds=1),
+            state=MediaRegistrationState.DISCOVERED,
+        )
+    )
+    assert replayed_candidate.state is MediaRegistrationState.REGISTERED
 
     with psycopg.connect(_POSTGRES_DSN) as connection:
         boundary_count = connection.execute(
@@ -788,6 +823,10 @@ def test_real_postgres_kernel_reconstruction_and_history() -> None:
         connection.execute(
             "DELETE FROM stageflow.production_event_ingress WHERE production_event_id = %s",
             (production_event_id.value,),
+        )
+        connection.execute(
+            "DELETE FROM stageflow.session_boundary_proposal WHERE session_id = %s",
+            (session.id.value,),
         )
         connection.execute(
             "DELETE FROM stageflow.session_boundary_history WHERE session_id = %s",

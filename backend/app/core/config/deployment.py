@@ -34,6 +34,13 @@ class SourceBindingConfiguration(BaseModel):
     key: str
     path: str
     maximum_candidates: int = Field(default=1000, ge=1, le=100_000)
+    allowed_extensions: tuple[str, ...] = (
+        ".mov",
+        ".mp4",
+        ".mkv",
+        ".mxf",
+        ".wav",
+    )
 
     @field_validator("key", "path")
     @classmethod
@@ -53,6 +60,14 @@ class SourceBindingConfiguration(BaseModel):
         if ".." in windows.parts or ".." in posix.parts:
             raise ValueError("source path cannot contain parent traversal")
         return value
+
+    @field_validator("allowed_extensions")
+    @classmethod
+    def normalized_extensions(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        normalized = tuple(sorted({item.strip().casefold() for item in value}))
+        if not normalized or any(not item.startswith(".") or len(item) < 2 for item in normalized):
+            raise ValueError("allowed_extensions must contain dot-prefixed extensions")
+        return normalized
 
 
 class StageDeploymentConfiguration(BaseModel):
@@ -116,6 +131,7 @@ class ResourceLimits(BaseModel):
     maximum_concurrent_assessments: int = Field(default=2, ge=1, le=64)
     maximum_cpu_percentage: int = Field(default=20, ge=1, le=100)
     maximum_memory_bytes: int = Field(default=536_870_912, ge=1)
+    minimum_stable_seconds: int = Field(default=5, ge=1, le=3600)
 
 
 class KernelDeploymentConfiguration(BaseModel):

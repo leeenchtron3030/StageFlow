@@ -138,6 +138,55 @@ class BoundaryDecision:
 
 
 @dataclass(frozen=True, slots=True)
+class SessionBoundaryProposal:
+    id: EntityId
+    session_id: EntityId
+    boundary_kind: str
+    boundary_at: datetime
+    epistemic_kind: EpistemicKind
+    proposer_id: EntityId
+    evidence_ids: Sequence[EntityId]
+    policy_id: str
+    policy_version: str
+    reason: str
+    proposed_at: datetime
+    model_id: str | None = None
+    model_version: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.boundary_kind not in {"start", "end"}:
+            raise ValueError("boundary_kind must be start or end.")
+        if self.epistemic_kind not in {
+            EpistemicKind.OBSERVED,
+            EpistemicKind.DERIVED,
+            EpistemicKind.INFERRED,
+        }:
+            raise ValueError("Machine proposal epistemic kind must be advisory.")
+        require_aware_datetime(self.boundary_at, "boundary_at")
+        require_aware_datetime(self.proposed_at, "proposed_at")
+        object.__setattr__(
+            self,
+            "evidence_ids",
+            tuple(sorted(set(self.evidence_ids), key=lambda value: value.value)),
+        )
+        if not self.evidence_ids:
+            raise ValueError("Machine boundary proposal requires evidence lineage.")
+        object.__setattr__(self, "policy_id", _text(self.policy_id, "policy_id"))
+        object.__setattr__(
+            self, "policy_version", _text(self.policy_version, "policy_version")
+        )
+        object.__setattr__(self, "reason", _text(self.reason, "reason"))
+        if (self.model_id is None) is not (self.model_version is None):
+            raise ValueError("Model identity and version must be supplied together.")
+        if self.model_id is not None:
+            object.__setattr__(self, "model_id", _text(self.model_id, "model_id"))
+            assert self.model_version is not None
+            object.__setattr__(
+                self, "model_version", _text(self.model_version, "model_version")
+            )
+
+
+@dataclass(frozen=True, slots=True)
 class MediaCandidate:
     id: EntityId
     proposed_asset_id: EntityId
@@ -285,12 +334,32 @@ class ReconciliationRun:
 
 
 @dataclass(frozen=True, slots=True)
+class SessionOperationalProjection:
+    session_id: EntityId
+    activity_state: SessionActivityState
+    package_state: SessionPackageState
+    package_revision: int
+    revision: int
+    authoritative_start: datetime
+    authoritative_end: datetime | None
+
+    def __post_init__(self) -> None:
+        if self.package_revision < 1 or self.revision < 1:
+            raise ValueError("Session projection revisions must be positive.")
+        require_aware_datetime(self.authoritative_start, "authoritative_start")
+        if self.authoritative_end is not None:
+            require_aware_datetime(self.authoritative_end, "authoritative_end")
+
+
+@dataclass(frozen=True, slots=True)
 class StageOperationalStatus:
     stage_id: EntityId
     stage_key: str
     stage_name: str
     source_available: bool | None
     active_or_assembling_session_id: EntityId | None
+    assembling_session_ids: Sequence[EntityId]
+    assembling_sessions: Sequence[SessionOperationalProjection]
     session_activity_state: SessionActivityState | None
     session_package_state: SessionPackageState | None
     session_package_revision: int | None
@@ -305,6 +374,84 @@ class StageOperationalStatus:
     associated_media: int
     unresolved_media: int
     conflicting_media: int
+    attention_codes: Sequence[str] = field(default_factory=tuple)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "assembling_session_ids",
+            tuple(sorted(set(self.assembling_session_ids), key=lambda value: value.value)),
+        )
+        object.__setattr__(
+            self, "attention_codes", tuple(sorted(set(self.attention_codes)))
+        )
+        object.__setattr__(
+            self,
+            "assembling_sessions",
+            tuple(
+                sorted(
+                    self.assembling_sessions,
+                    key=lambda value: (
+                        value.authoritative_start,
+                        value.session_id.value,
+                    ),
+                )
+            ),
+        )
+        if {value.session_id for value in self.assembling_sessions} != set(
+            self.assembling_session_ids
+        ):
+            raise ValueError("Assembling Session identities and details must match.")
+
+
+@dataclass(frozen=True, slots=True)
+class MediaOperationalProjection:
+    candidate_id: EntityId
+    proposed_asset_id: EntityId
+    asset_id: EntityId | None
+    stage_id: EntityId
+    source_binding_key: str
+    registration_state: MediaRegistrationState
+    discovered_at: datetime
+    last_observed_at: datetime
+    association_status: AssociationStatus | None
+    association_authority: AssociationAuthority | None
+    session_id: EntityId | None
+    epistemic_kinds: Sequence[EpistemicKind]
+    media_started_at: datetime | None = None
+    media_ended_at: datetime | None = None
+    diagnostic_codes: Sequence[str] = field(default_factory=tuple)
+
+    def __post_init__(self) -> None:
+        require_aware_datetime(self.discovered_at, "discovered_at")
+        require_aware_datetime(self.last_observed_at, "last_observed_at")
+        if self.media_started_at is not None:
+            require_aware_datetime(self.media_started_at, "media_started_at")
+        if self.media_ended_at is not None:
+            require_aware_datetime(self.media_ended_at, "media_ended_at")
+        if (
+            self.media_started_at is not None
+            and self.media_ended_at is not None
+            and self.media_ended_at < self.media_started_at
+        ):
+            raise ValueError("Media end cannot precede media start.")
+        object.__setattr__(
+            self,
+            "epistemic_kinds",
+            tuple(sorted(set(self.epistemic_kinds), key=lambda value: value.value)),
+        )
+        object.__setattr__(
+            self,
+            "diagnostic_codes",
+            tuple(
+                sorted(
+                    {
+                        _text(value, "diagnostic_code")
+                        for value in self.diagnostic_codes
+                    }
+                )
+            ),
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -318,10 +465,14 @@ class EventOperationalStatus:
     stages: Sequence[StageOperationalStatus]
     attention_codes: Sequence[str]
     latest_reconciliation: ReconciliationRun | None
+    recent_media: Sequence[MediaOperationalProjection] = field(default_factory=tuple)
+    boundary_proposals: Sequence[SessionBoundaryProposal] = field(default_factory=tuple)
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "stages", tuple(sorted(self.stages, key=lambda x: x.stage_key)))
         object.__setattr__(self, "attention_codes", tuple(sorted(set(self.attention_codes))))
+        object.__setattr__(self, "recent_media", tuple(self.recent_media))
+        object.__setattr__(self, "boundary_proposals", tuple(self.boundary_proposals))
 
 
 __all__ = [
@@ -333,12 +484,15 @@ __all__ = [
     "EventOperationalStatus",
     "MediaAssociation",
     "MediaCandidate",
+    "MediaOperationalProjection",
     "MediaRegistrationState",
     "ReconciliationRun",
     "ReconciliationStatus",
     "RegisteredMediaAsset",
     "ResourceObservation",
     "Session",
+    "SessionBoundaryProposal",
+    "SessionOperationalProjection",
     "SessionActivityState",
     "SessionPackageState",
     "StageOperationalStatus",

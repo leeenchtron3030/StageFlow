@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import platform
 from datetime import timedelta
 from uuid import NAMESPACE_URL, UUID, uuid5
@@ -177,7 +178,6 @@ def build_stageflow_runtime(
     capability_kinds = (
         RuntimeCapabilityKind.CANDIDATE_DISCOVERY,
         RuntimeCapabilityKind.RESOURCE_SNAPSHOT_COLLECTION,
-        RuntimeCapabilityKind.WRITE_STATE_OBSERVATION_COLLECTION,
         RuntimeCapabilityKind.READ_ACCESS_OBSERVATION_COLLECTION,
         RuntimeCapabilityKind.RESOURCE_PRESENCE_OBSERVATION_COLLECTION,
         RuntimeCapabilityKind.STABLE_RESOURCE_IDENTITY,
@@ -223,9 +223,6 @@ def build_stageflow_runtime(
         RuntimeObservationType.RESOURCE_SNAPSHOT: (
             RuntimeCapabilityKind.RESOURCE_SNAPSHOT_COLLECTION
         ),
-        RuntimeObservationType.WRITE_STATE: (
-            RuntimeCapabilityKind.WRITE_STATE_OBSERVATION_COLLECTION
-        ),
         RuntimeObservationType.READ_ACCESS: (
             RuntimeCapabilityKind.READ_ACCESS_OBSERVATION_COLLECTION
         ),
@@ -256,7 +253,7 @@ def build_stageflow_runtime(
         supporting_capability_ids=tuple(capability.id for capability in general),
         supported_finalization_methods=(),
         snapshot_support=True,
-        write_state_support=True,
+        write_state_support=False,
         read_access_support=True,
         presence_support=True,
         stable_identity_support=True,
@@ -274,18 +271,19 @@ def build_stageflow_runtime(
         declared_at=configured_at,
     )
     parameters = AssetReadinessPolicyParameters(
-        minimum_stable_interval=timedelta(seconds=5),
+        minimum_stable_interval=timedelta(
+            seconds=deployment.resources.minimum_stable_seconds
+        ),
         require_read_access_for_stability=True,
         require_post_finalization_presence=True,
         accepted_strong_finalization_methods=(
             CompletedMediaAssetCompletionMethod.ATOMIC_RENAME_OBSERVED,
         ),
-        require_inactive_write_when_available=True,
+        require_inactive_write_when_available=False,
         policy_version="1.0",
     )
     required_kinds = (
         RuntimeCapabilityKind.RESOURCE_SNAPSHOT_COLLECTION,
-        RuntimeCapabilityKind.WRITE_STATE_OBSERVATION_COLLECTION,
         RuntimeCapabilityKind.READ_ACCESS_OBSERVATION_COLLECTION,
         RuntimeCapabilityKind.RESOURCE_PRESENCE_OBSERVATION_COLLECTION,
         RuntimeCapabilityKind.STABLE_RESOURCE_IDENTITY,
@@ -309,7 +307,7 @@ def build_stageflow_runtime(
             runtime_id=runtime_id,
             source_capability_id=source_capability_id,
             source_location_scheme=RuntimeSourceLocationScheme.LOCAL_FILE,
-            opaque_location_reference=source.path,
+            opaque_location_reference=os.path.normpath(source.path),
             source_host_id=host_id,
             source_volume_id=_id(namespace, f"volume:{source.key}"),
             expected_recorder_application_id=recorder_id,

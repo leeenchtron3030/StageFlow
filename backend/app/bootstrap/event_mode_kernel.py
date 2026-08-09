@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
-from pathlib import Path
 
 import psycopg
 
@@ -23,6 +22,7 @@ from app.infrastructure.postgres import (
 from app.shared.ids import EntityId
 from app.shared.time import Clock, SystemClock
 
+from .media_cycle import BoundedMediaCycle, MediaCycleResult
 from .runtime_factory import build_stageflow_runtime
 
 
@@ -32,6 +32,7 @@ class KernelComponents:
     repository: EventModeKernelRepository
     kernel: DurableEventModeKernel
     runtime: StageFlowRuntime | None = None
+    media_cycle: BoundedMediaCycle | None = None
     source_availability: dict[str, bool] = field(
         default_factory=lambda: dict[str, bool]()
     )
@@ -74,6 +75,7 @@ class KernelComponents:
             stages=tuple(result.stages),
             clock=self.kernel.clock,
         )
+        self.compose_media_cycle()
         self.reconcile_startup(result.event.id)
         return self.repository.operational_status(
             result.event.id,
@@ -81,27 +83,27 @@ class KernelComponents:
         )
 
     def reconcile_startup(self, event_id: EntityId) -> EventOperationalStatus:
-        run = self.kernel.begin_reconciliation(event_id=event_id, scope="startup")
-        self.source_availability = {
-            key: Path(path).exists() for key, path in self.configuration.sources.items()
-        }
-        unavailable = sorted(
-            key for key, available in self.source_availability.items() if not available
-        )
-        self.kernel.finish_reconciliation(
-            run,
-            candidates_seen=0,
-            assets_registered=0,
-            failure_code=(
-                None
-                if not unavailable
-                else f"configured_sources_unavailable:{','.join(unavailable)}"
-            ),
-        )
+        self.run_media_cycle(event_id=event_id, scope="startup")
         return self.repository.operational_status(
             event_id,
             source_availability=self.source_availability,
         )
+
+    def compose_media_cycle(self) -> None:
+        if self.runtime is None:
+            raise RuntimeError("runtime_not_composed")
+        self.media_cycle = BoundedMediaCycle(
+            configuration=self.configuration,
+            runtime=self.runtime,
+            kernel=self.kernel,
+            source_availability=self.source_availability,
+        )
+
+    def run_media_cycle(self, *, event_id: EntityId, scope: str = "scheduled") -> MediaCycleResult:
+        if self.media_cycle is None:
+            self.compose_media_cycle()
+        assert self.media_cycle is not None
+        return self.media_cycle.run(event_id=event_id, scope=scope)
 
     def status(self) -> EventOperationalStatus | None:
         event = self.repository.get_event_by_key(self.event_key)
@@ -119,10 +121,13 @@ def verify_kernel_schema(dsn: str) -> None:
             row = connection.execute(
                 """
                 SELECT count(*) FROM stageflow.schema_migration
-                WHERE version IN ('0001_ingress', '0002_event_mode_kernel')
+                WHERE version IN (
+                    '0001_ingress', '0002_event_mode_kernel',
+                    '0003_kernel_projections'
+                )
                 """
             ).fetchone()
-            if row is None or row[0] != 2:
+            if row is None or row[0] != 3:
                 raise RuntimeError("kernel_schema_migration_required")
     except psycopg.OperationalError as exc:
         raise RuntimeError("postgresql_unavailable") from exc
@@ -166,6 +171,7 @@ def load_kernel_components_from_environment(
             stages=components.repository.list_stages(event.id),
             clock=components.kernel.clock,
         )
+        components.compose_media_cycle()
         components.reconcile_startup(event.id)
     return components
 
