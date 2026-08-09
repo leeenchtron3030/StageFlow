@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import os
+import subprocess
 import time
 from ctypes import POINTER, Structure, byref, c_size_t, sizeof, windll
 from ctypes.wintypes import BOOL, DWORD, HANDLE
@@ -24,7 +25,10 @@ from app.contexts.production.event_mode_kernel import (
     SessionPackageState,
     StartSessionRequest,
 )
-from app.contexts.production.event_mode_kernel.repository import KernelConflictError
+from app.contexts.production.event_mode_kernel.repository import (
+    KernelConflictError,
+    KernelStorageUnavailableError,
+)
 from app.core.config.deployment import load_kernel_deployment_configuration
 from app.shared.ids import EntityId
 
@@ -202,6 +206,7 @@ def scenario(config_path: Path, result_path: Path) -> dict[str, Any]:
     if conflict_candidate is None:
         raise AssertionError("conflict_candidate_missing")
     conflict = components.kernel.assign_asset(
+        operation_id=EntityId.new(),
         asset_id=conflict_candidate.proposed_asset_id,
         session_id=session.id,
         actor_id=actor_id,
@@ -224,6 +229,7 @@ def scenario(config_path: Path, result_path: Path) -> dict[str, Any]:
     if components.repository.get_session(session.id) != before_proposal:
         raise AssertionError("proposal_modified_authoritative_session")
     ended = components.kernel.correct_session_boundary(
+        operation_id=EntityId.new(),
         session_id=session.id,
         boundary_kind="end",
         boundary_at=datetime.now(UTC),
@@ -248,6 +254,7 @@ def scenario(config_path: Path, result_path: Path) -> dict[str, Any]:
     if trailing_candidate is None:
         raise AssertionError("trailing_candidate_missing")
     trailing_association = components.kernel.assign_asset(
+        operation_id=EntityId.new(),
         asset_id=trailing_candidate.proposed_asset_id,
         session_id=session.id,
         actor_id=actor_id,
@@ -255,6 +262,7 @@ def scenario(config_path: Path, result_path: Path) -> dict[str, Any]:
     )
     components.kernel.mark_package_ready(session.id)
     completed = components.kernel.complete_package(
+        operation_id=EntityId.new(),
         session_id=session.id,
         actor_id=actor_id,
         approved=True,
@@ -479,6 +487,126 @@ def proxy(root: Path, result_path: Path, duration_seconds: float) -> dict[str, A
     return result
 
 
+def postgresql_recovery_correction(
+    config_path: Path,
+    result_path: Path,
+    *,
+    pg_ctl: Path,
+    data_directory: Path,
+    postgres_log: Path,
+    start_options: str,
+) -> dict[str, Any]:
+    components = _components(config_path)
+    status = components.status()
+    if status is None:
+        status = components.explicit_bootstrap(
+            operation_id=EntityId.new(), actor_id=EntityId.new()
+        )
+    if not status.ready or status.latest_reconciliation is None:
+        raise AssertionError("pre_outage_kernel_not_ready")
+    pre_outage_id = status.latest_reconciliation.id
+
+    subprocess.run(
+        [str(pg_ctl), "-D", str(data_directory), "stop", "-m", "fast"],
+        check=True,
+    )
+    try:
+        try:
+            components.status()
+        except KernelStorageUnavailableError:
+            pass
+        else:
+            raise AssertionError("postgresql_loss_not_observed")
+    finally:
+        subprocess.run(
+            [
+                str(pg_ctl),
+                "-D",
+                str(data_directory),
+                "-l",
+                str(postgres_log),
+                "-o",
+                start_options,
+                "start",
+            ],
+            check=True,
+        )
+
+    before_reconciliation = components.status()
+    if before_reconciliation is None:
+        raise AssertionError("post_outage_status_missing")
+    if before_reconciliation.ready or not before_reconciliation.recovering:
+        raise AssertionError("post_outage_status_reused_stale_reconciliation")
+    if before_reconciliation.latest_reconciliation is None:
+        raise AssertionError("pre_outage_reconciliation_missing")
+    if before_reconciliation.latest_reconciliation.id != pre_outage_id:
+        raise AssertionError("reconciliation_advanced_before_recovery_run")
+
+    recovered = components.reconcile_postgresql_recovery()
+    if recovered is None or not recovered.ready or recovered.latest_reconciliation is None:
+        raise AssertionError("successful_recovery_did_not_restore_readiness")
+    if recovered.latest_reconciliation.id == pre_outage_id:
+        raise AssertionError("successful_recovery_reused_old_reconciliation")
+    successful_recovery_id = recovered.latest_reconciliation.id
+
+    subprocess.run(
+        [str(pg_ctl), "-D", str(data_directory), "stop", "-m", "fast"],
+        check=True,
+    )
+    try:
+        try:
+            components.status()
+        except KernelStorageUnavailableError:
+            pass
+        else:
+            raise AssertionError("second_postgresql_loss_not_observed")
+    finally:
+        subprocess.run(
+            [
+                str(pg_ctl),
+                "-D",
+                str(data_directory),
+                "-l",
+                str(postgres_log),
+                "-o",
+                start_options,
+                "start",
+            ],
+            check=True,
+        )
+
+    source = Path(components.configuration.deployment.event.stages[0].sources[0].path)
+    unavailable_source = source.with_name(f"{source.name}.recovery-unavailable")
+    source.rename(unavailable_source)
+    try:
+        failed = components.reconcile_postgresql_recovery()
+        if failed is None or failed.ready or not failed.recovering:
+            raise AssertionError("failed_reconciliation_restored_readiness")
+        if failed.latest_reconciliation is None:
+            raise AssertionError("failed_reconciliation_missing")
+        failed_recovery_id = failed.latest_reconciliation.id
+    finally:
+        unavailable_source.rename(source)
+
+    final = components.reconcile_postgresql_recovery()
+    if final is None or not final.ready or final.latest_reconciliation is None:
+        raise AssertionError("final_recovery_did_not_restore_readiness")
+    result: dict[str, Any] = {
+        "executed_at": datetime.now(UTC).isoformat(),
+        "pre_outage_reconciliation_id": pre_outage_id.value,
+        "successful_recovery_reconciliation_id": successful_recovery_id.value,
+        "failed_recovery_reconciliation_id": failed_recovery_id.value,
+        "final_reconciliation_id": final.latest_reconciliation.id.value,
+        "before_reconciliation_ready": before_reconciliation.ready,
+        "before_reconciliation_recovering": before_reconciliation.recovering,
+        "failed_reconciliation_ready": failed.ready,
+        "failed_reconciliation_recovering": failed.recovering,
+        "final_ready": final.ready,
+    }
+    _write_json(result_path, result)
+    return result
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -498,6 +626,13 @@ def main() -> None:
     proxy_parser.add_argument("--root", type=Path, required=True)
     proxy_parser.add_argument("--result", type=Path, required=True)
     proxy_parser.add_argument("--duration-seconds", type=float, required=True)
+    recovery_parser = subparsers.add_parser("postgresql-recovery-correction")
+    recovery_parser.add_argument("--config", type=Path, required=True)
+    recovery_parser.add_argument("--result", type=Path, required=True)
+    recovery_parser.add_argument("--pg-ctl", type=Path, required=True)
+    recovery_parser.add_argument("--data-directory", type=Path, required=True)
+    recovery_parser.add_argument("--postgres-log", type=Path, required=True)
+    recovery_parser.add_argument("--start-options", required=True)
     args = parser.parse_args()
     if args.command == "prepare":
         result = prepare(args.root)
@@ -507,6 +642,15 @@ def main() -> None:
         result = reconcile(args.config, args.result)
     elif args.command == "endurance":
         result = endurance(args.config, args.result, args.duration_seconds)
+    elif args.command == "postgresql-recovery-correction":
+        result = postgresql_recovery_correction(
+            args.config,
+            args.result,
+            pg_ctl=args.pg_ctl,
+            data_directory=args.data_directory,
+            postgres_log=args.postgres_log,
+            start_options=args.start_options,
+        )
     else:
         result = proxy(args.root, args.result, args.duration_seconds)
     print(json.dumps(result, sort_keys=True))

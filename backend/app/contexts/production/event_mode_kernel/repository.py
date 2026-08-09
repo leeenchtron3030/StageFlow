@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from dataclasses import replace
 from datetime import datetime
 from threading import RLock
+from typing import cast
 
 from app.contexts.events import (
     BusinessEvent,
@@ -20,6 +21,7 @@ from .contracts import (
     CompletionDecision,
     EpistemicKind,
     EventOperationalStatus,
+    HumanCommandKind,
     MediaAssociation,
     MediaCandidate,
     MediaOperationalProjection,
@@ -85,6 +87,8 @@ class EventModeKernelRepository(ABC):
         actor_id: EntityId,
         reason: str,
         decided_at: datetime,
+        operation_id: EntityId,
+        request_digest: str,
     ) -> tuple[Session, BoundaryDecision]: ...
 
     @abstractmethod
@@ -121,7 +125,9 @@ class EventModeKernelRepository(ABC):
     def get_asset(self, asset_id: EntityId) -> RegisteredMediaAsset | None: ...
 
     @abstractmethod
-    def put_association(self, association: MediaAssociation) -> MediaAssociation: ...
+    def put_association(
+        self, association: MediaAssociation, *, request_digest: str | None = None
+    ) -> MediaAssociation: ...
 
     @abstractmethod
     def get_association(self, asset_id: EntityId) -> MediaAssociation | None: ...
@@ -130,7 +136,14 @@ class EventModeKernelRepository(ABC):
     def set_package_state(self, session_id: EntityId, state: str, at: datetime) -> Session: ...
 
     @abstractmethod
-    def complete_session(self, decision: CompletionDecision) -> Session: ...
+    def complete_session(
+        self, decision: CompletionDecision, *, request_digest: str
+    ) -> Session: ...
+
+    @abstractmethod
+    def list_approved_package_asset_ids(
+        self, completion_decision_id: EntityId
+    ) -> tuple[EntityId, ...]: ...
 
     @abstractmethod
     def put_reconciliation(self, run: ReconciliationRun) -> ReconciliationRun: ...
@@ -149,6 +162,7 @@ class EventModeKernelRepository(ABC):
         event_id: EntityId,
         *,
         database_available: bool = True,
+        recovery_required: bool = False,
         source_availability: dict[str, bool] | None = None,
     ) -> EventOperationalStatus: ...
 
@@ -175,6 +189,10 @@ class InMemoryEventModeKernelRepository(EventModeKernelRepository):
         self._associations: dict[EntityId, MediaAssociation] = {}
         self._association_history: list[MediaAssociation] = []
         self._completion_history: list[CompletionDecision] = []
+        self._approved_package_assets: dict[EntityId, tuple[EntityId, ...]] = {}
+        self._human_commands: dict[
+            EntityId, tuple[HumanCommandKind, str, object]
+        ] = {}
         self._reconciliations: dict[EntityId, ReconciliationRun] = {}
         self._reconciliation_order: list[EntityId] = []
 
@@ -346,6 +364,9 @@ class InMemoryEventModeKernelRepository(EventModeKernelRepository):
                 if prior_request != request:
                     raise KernelConflictError("operation_id_conflict")
                 return self._sessions[session_id]
+            cross_command = self._human_commands.get(request.operation_id)
+            if cross_command is not None:
+                raise KernelConflictError("human_command_operation_id_conflict")
             stage = self._stages.get(request.stage_id)
             if stage is None or stage.event_id != request.event_id:
                 raise KernelConflictError("stage_event_mismatch")
@@ -387,9 +408,15 @@ class InMemoryEventModeKernelRepository(EventModeKernelRepository):
                     reason="human_session_start",
                     decided_at=request.requested_at,
                     resulting_session_revision=1,
+                    operation_id=request.operation_id,
                 )
             )
             self._start_operations[request.operation_id] = (request, session.id)
+            self._human_commands[request.operation_id] = (
+                HumanCommandKind.SESSION_START,
+                repr(request),
+                session,
+            )
             return session
 
     def get_session(self, session_id: EntityId) -> Session | None:
@@ -418,10 +445,22 @@ class InMemoryEventModeKernelRepository(EventModeKernelRepository):
         actor_id: EntityId,
         reason: str,
         decided_at: datetime,
+        operation_id: EntityId,
+        request_digest: str,
     ) -> tuple[Session, BoundaryDecision]:
         from .contracts import EpistemicKind, SessionActivityState, SessionPackageState
 
         with self._lock:
+            replay = self._human_commands.get(operation_id)
+            if replay is not None:
+                kind, prior_digest, result = replay
+                if (
+                    kind is not HumanCommandKind.SESSION_BOUNDARY_CORRECTION
+                    or prior_digest != request_digest
+                ):
+                    raise KernelConflictError("human_command_operation_id_conflict")
+                assert isinstance(result, tuple)
+                return cast(tuple[Session, BoundaryDecision], result)
             session = self._sessions.get(session_id)
             if session is None:
                 raise KernelNotFoundError("session_not_found")
@@ -457,10 +496,17 @@ class InMemoryEventModeKernelRepository(EventModeKernelRepository):
                 reason=reason,
                 decided_at=decided_at,
                 resulting_session_revision=updated.revision,
+                operation_id=operation_id,
             )
             self._sessions[session_id] = updated
             self._boundaries.append(decision)
-            return updated, decision
+            result = (updated, decision)
+            self._human_commands[operation_id] = (
+                HumanCommandKind.SESSION_BOUNDARY_CORRECTION,
+                request_digest,
+                result,
+            )
+            return result
 
     def put_boundary_proposal(
         self, proposal: SessionBoundaryProposal
@@ -612,34 +658,78 @@ class InMemoryEventModeKernelRepository(EventModeKernelRepository):
         with self._lock:
             return self._assets.get(asset_id)
 
-    def put_association(self, association: MediaAssociation) -> MediaAssociation:
+    def put_association(
+        self, association: MediaAssociation, *, request_digest: str | None = None
+    ) -> MediaAssociation:
         from .contracts import AssociationStatus, SessionPackageState
 
         with self._lock:
+            if association.authority.value == "human":
+                assert association.operation_id is not None
+                if request_digest is None:
+                    raise ValueError("Human association requires a request digest.")
+                replay = self._human_commands.get(association.operation_id)
+                if replay is not None:
+                    kind, prior_digest, result = replay
+                    if (
+                        kind is not HumanCommandKind.MEDIA_ASSIGNMENT
+                        or prior_digest != request_digest
+                    ):
+                        raise KernelConflictError("human_command_operation_id_conflict")
+                    assert isinstance(result, MediaAssociation)
+                    return result
+            elif request_digest is not None:
+                raise ValueError("Deterministic association cannot carry a human digest.")
             if association.asset_id not in self._assets:
                 raise KernelNotFoundError("asset_not_found")
             current = self._associations.get(association.asset_id)
             expected_revision = 1 if current is None else current.revision + 1
             if association.revision != expected_revision:
                 raise KernelConflictError("association_revision_conflict")
+            target_session: Session | None = None
             if association.status is AssociationStatus.ASSOCIATED:
                 assert association.session_id is not None
-                session = self._sessions.get(association.session_id)
+                target_session = self._sessions.get(association.session_id)
                 asset = self._assets[association.asset_id]
-                if session is None:
+                if target_session is None:
                     raise KernelNotFoundError("session_not_found")
-                if session.stage_id != asset.stage_id:
+                if target_session.stage_id != asset.stage_id:
                     raise KernelConflictError("association_stage_conflict")
-                if session.package_state is SessionPackageState.COMPLETE:
-                    self._sessions[session.id] = replace(
-                        session,
-                        package_state=SessionPackageState.CORRECTION_REQUIRED,
-                        package_revision=session.package_revision + 1,
-                        revision=session.revision + 1,
-                        updated_at=association.decided_at,
-                    )
+            old_session_id = (
+                current.session_id
+                if current is not None
+                and current.status is AssociationStatus.ASSOCIATED
+                else None
+            )
+            new_session_id = (
+                association.session_id
+                if association.status is AssociationStatus.ASSOCIATED
+                else None
+            )
+            if old_session_id != new_session_id:
+                for affected_id in {
+                    value for value in (old_session_id, new_session_id) if value is not None
+                }:
+                    affected = self._sessions.get(affected_id)
+                    if affected is None:
+                        raise KernelNotFoundError("session_not_found")
+                    if affected.package_state is SessionPackageState.COMPLETE:
+                        self._sessions[affected.id] = replace(
+                            affected,
+                            package_state=SessionPackageState.CORRECTION_REQUIRED,
+                            package_revision=affected.package_revision + 1,
+                            revision=affected.revision + 1,
+                            updated_at=association.decided_at,
+                        )
             self._associations[association.asset_id] = association
             self._association_history.append(association)
+            if association.authority.value == "human":
+                assert association.operation_id is not None and request_digest is not None
+                self._human_commands[association.operation_id] = (
+                    HumanCommandKind.MEDIA_ASSIGNMENT,
+                    request_digest,
+                    association,
+                )
             return association
 
     def get_association(self, asset_id: EntityId) -> MediaAssociation | None:
@@ -665,10 +755,22 @@ class InMemoryEventModeKernelRepository(EventModeKernelRepository):
             self._sessions[session_id] = updated
             return updated
 
-    def complete_session(self, decision: CompletionDecision) -> Session:
+    def complete_session(
+        self, decision: CompletionDecision, *, request_digest: str
+    ) -> Session:
         from .contracts import SessionPackageState
 
         with self._lock:
+            replay = self._human_commands.get(decision.operation_id)
+            if replay is not None:
+                kind, prior_digest, result = replay
+                if (
+                    kind is not HumanCommandKind.PACKAGE_COMPLETION
+                    or prior_digest != request_digest
+                ):
+                    raise KernelConflictError("human_command_operation_id_conflict")
+                assert isinstance(result, Session)
+                return result
             session = self._sessions.get(decision.session_id)
             if session is None:
                 raise KernelNotFoundError("session_not_found")
@@ -692,7 +794,30 @@ class InMemoryEventModeKernelRepository(EventModeKernelRepository):
             )
             self._sessions[session.id] = updated
             self._completion_history.append(decision)
+            if decision.approved:
+                self._approved_package_assets[decision.id] = tuple(
+                    sorted(
+                        (
+                            association.asset_id
+                            for association in self._associations.values()
+                            if association.status is AssociationStatus.ASSOCIATED
+                            and association.session_id == session.id
+                        ),
+                        key=lambda value: value.value,
+                    )
+                )
+            self._human_commands[decision.operation_id] = (
+                HumanCommandKind.PACKAGE_COMPLETION,
+                request_digest,
+                updated,
+            )
             return updated
+
+    def list_approved_package_asset_ids(
+        self, completion_decision_id: EntityId
+    ) -> tuple[EntityId, ...]:
+        with self._lock:
+            return self._approved_package_assets.get(completion_decision_id, ())
 
     def put_reconciliation(self, run: ReconciliationRun) -> ReconciliationRun:
         with self._lock:
@@ -780,6 +905,27 @@ class InMemoryEventModeKernelRepository(EventModeKernelRepository):
                         media_started_at=None if asset is None else asset.media_started_at,
                         media_ended_at=None if asset is None else asset.media_ended_at,
                         diagnostic_codes=diagnostic_codes,
+                        association_reason_codes=(
+                            () if association is None else association.reason_codes
+                        ),
+                        association_evidence_ids=(
+                            () if association is None else association.evidence_ids
+                        ),
+                        association_policy_id=(
+                            None if association is None else association.policy_id
+                        ),
+                        association_policy_version=(
+                            None if association is None else association.policy_version
+                        ),
+                        association_input_references=(
+                            () if association is None else association.input_references
+                        ),
+                        association_actor_id=(
+                            None if association is None else association.actor_id
+                        ),
+                        association_decided_at=(
+                            None if association is None else association.decided_at
+                        ),
                     )
                 )
             return tuple(
@@ -795,6 +941,7 @@ class InMemoryEventModeKernelRepository(EventModeKernelRepository):
         event_id: EntityId,
         *,
         database_available: bool = True,
+        recovery_required: bool = False,
         source_availability: dict[str, bool] | None = None,
     ) -> EventOperationalStatus:
         from .contracts import (
@@ -814,6 +961,54 @@ class InMemoryEventModeKernelRepository(EventModeKernelRepository):
             availability = source_availability or {}
             stages: list[StageOperationalStatus] = []
             attention: list[str] = []
+            session_limit = 20
+
+            def session_projection(item: Session) -> SessionOperationalProjection:
+                expectation = (
+                    None
+                    if item.program_expectation_id is None
+                    else self._expectations.get(item.program_expectation_id)
+                )
+                completion = next(
+                    (
+                        decision
+                        for decision in reversed(self._completion_history)
+                        if decision.session_id == item.id and decision.approved
+                    ),
+                    None,
+                )
+                return SessionOperationalProjection(
+                    session_id=item.id,
+                    activity_state=item.activity_state,
+                    package_state=item.package_state,
+                    package_revision=item.package_revision,
+                    revision=item.revision,
+                    authoritative_start=item.authoritative_start,
+                    authoritative_end=item.authoritative_end,
+                    program_expectation_id=item.program_expectation_id,
+                    program_expectation_title=(
+                        None if expectation is None else expectation.title
+                    ),
+                    program_expectation_revision=(
+                        None if expectation is None else expectation.revision
+                    ),
+                    program_expectation_planned_start=(
+                        None if expectation is None else expectation.planned_start
+                    ),
+                    program_expectation_planned_end=(
+                        None if expectation is None else expectation.planned_end
+                    ),
+                    completion_decision_id=(
+                        None if completion is None else completion.id
+                    ),
+                    completion_actor_id=(
+                        None if completion is None else completion.actor_id
+                    ),
+                    completion_decided_at=(
+                        None if completion is None else completion.decided_at
+                    ),
+                )
+
             for stage in self.list_stages(event_id):
                 candidates = [
                     item for item in self._candidates.values() if item.stage_id == stage.id
@@ -825,27 +1020,24 @@ class InMemoryEventModeKernelRepository(EventModeKernelRepository):
                     if item.id in self._associations
                 ]
                 sessions = self.list_sessions_for_stage(stage.id)
-                assembling_session_ids = tuple(
-                    item.id
-                    for item in sessions
+                assembling_candidates = tuple(
+                    item
+                    for item in reversed(sessions)
                     if item.package_state
                     in {
                         SessionPackageState.ASSEMBLING,
                         SessionPackageState.CORRECTION_REQUIRED,
                     }
                 )
+                bounded_assembling = assembling_candidates[:session_limit]
+                assembling_session_ids = tuple(item.id for item in bounded_assembling)
                 assembling_sessions = tuple(
-                    SessionOperationalProjection(
-                        session_id=item.id,
-                        activity_state=item.activity_state,
-                        package_state=item.package_state,
-                        package_revision=item.package_revision,
-                        revision=item.revision,
-                        authoritative_start=item.authoritative_start,
-                        authoritative_end=item.authoritative_end,
-                    )
-                    for item in sessions
-                    if item.id in assembling_session_ids
+                    session_projection(item) for item in bounded_assembling
+                )
+                recent_candidates = tuple(reversed(sessions))
+                recent_sessions = tuple(
+                    session_projection(item)
+                    for item in recent_candidates[:session_limit]
                 )
                 current = next(
                     (
@@ -925,10 +1117,20 @@ class InMemoryEventModeKernelRepository(EventModeKernelRepository):
                         unresolved_media=unresolved,
                         conflicting_media=conflicts,
                         attention_codes=stage_attention,
+                        assembling_sessions_truncated=(
+                            len(assembling_candidates) > session_limit
+                        ),
+                        recent_sessions=recent_sessions,
+                        recent_sessions_truncated=(
+                            len(recent_candidates) > session_limit
+                        ),
+                        session_limit=session_limit,
                     )
                 )
             latest = self.get_latest_reconciliation(event_id)
-            recovering = latest is not None and latest.status is ReconciliationStatus.RUNNING
+            recovering = recovery_required or (
+                latest is not None and latest.status is ReconciliationStatus.RUNNING
+            )
             ready = (
                 database_available
                 and not recovering
@@ -938,7 +1140,11 @@ class InMemoryEventModeKernelRepository(EventModeKernelRepository):
             if not database_available:
                 attention.append("postgresql_unavailable")
             if recovering:
-                attention.append("startup_reconciliation_running")
+                attention.append(
+                    "postgresql_reconciliation_required"
+                    if recovery_required
+                    else "startup_reconciliation_running"
+                )
             if latest is not None and latest.status is ReconciliationStatus.FAILED:
                 attention.append("startup_reconciliation_failed")
             return EventOperationalStatus(

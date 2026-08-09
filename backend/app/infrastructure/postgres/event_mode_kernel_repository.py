@@ -21,11 +21,13 @@ from app.contexts.events import (
 )
 from app.contexts.production.event_mode_kernel.contracts import (
     AssociationAuthority,
+    AssociationInputReference,
     AssociationStatus,
     BoundaryDecision,
     CompletionDecision,
     EpistemicKind,
     EventOperationalStatus,
+    HumanCommandKind,
     MediaAssociation,
     MediaCandidate,
     MediaOperationalProjection,
@@ -56,6 +58,28 @@ type Row = dict[str, Any]
 def _digest(value: Mapping[str, object]) -> str:
     document = json.dumps(value, sort_keys=True, separators=(",", ":"), default=str)
     return hashlib.sha256(document.encode("utf-8")).hexdigest()
+
+
+def _association_input(value: Mapping[str, object]) -> AssociationInputReference:
+    revision = value.get("revision")
+    return AssociationInputReference(
+        record_type=str(value["record_type"]),
+        record_id=str(value["record_id"]),
+        revision=None if revision is None else int(str(revision)),
+    )
+
+
+def _association_inputs(
+    values: tuple[AssociationInputReference, ...] | list[AssociationInputReference],
+) -> list[dict[str, object]]:
+    return [
+        {
+            "record_type": value.record_type,
+            "record_id": value.record_id,
+            "revision": value.revision,
+        }
+        for value in values
+    ]
 
 
 def _event(row: Row) -> BusinessEvent:
@@ -127,6 +151,44 @@ def _session(row: Row) -> Session:
     )
 
 
+def _session_operational_projection(row: Row) -> SessionOperationalProjection:
+    return SessionOperationalProjection(
+        session_id=EntityId(str(row["session_id"])),
+        activity_state=SessionActivityState(cast(str, row["activity_state"])),
+        package_state=SessionPackageState(cast(str, row["package_state"])),
+        package_revision=cast(int, row["package_revision"]),
+        revision=cast(int, row["revision"]),
+        authoritative_start=cast(datetime, row["authoritative_start"]),
+        authoritative_end=cast(datetime | None, row["authoritative_end"]),
+        program_expectation_id=(
+            None
+            if row["program_expectation_id"] is None
+            else EntityId(str(row["program_expectation_id"]))
+        ),
+        program_expectation_title=cast(str | None, row.get("expectation_title")),
+        program_expectation_revision=cast(int | None, row.get("expectation_revision")),
+        program_expectation_planned_start=cast(
+            datetime | None, row.get("expectation_planned_start")
+        ),
+        program_expectation_planned_end=cast(
+            datetime | None, row.get("expectation_planned_end")
+        ),
+        completion_decision_id=(
+            None
+            if row.get("completion_decision_id") is None
+            else EntityId(str(row["completion_decision_id"]))
+        ),
+        completion_actor_id=(
+            None
+            if row.get("completion_actor_id") is None
+            else EntityId(str(row["completion_actor_id"]))
+        ),
+        completion_decided_at=cast(
+            datetime | None, row.get("completion_decided_at")
+        ),
+    )
+
+
 def _candidate(row: Row) -> MediaCandidate:
     return MediaCandidate(
         id=EntityId(str(row["candidate_id"])),
@@ -169,6 +231,17 @@ def _association(row: Row) -> MediaAssociation:
         revision=cast(int, row["revision"]),
         decided_at=cast(datetime, row["decided_at"]),
         actor_id=None if row["actor_id"] is None else EntityId(str(row["actor_id"])),
+        operation_id=(
+            None
+            if row.get("operation_id") is None
+            else EntityId(str(row["operation_id"]))
+        ),
+        policy_id=cast(str | None, row.get("policy_id")),
+        policy_version=cast(str | None, row.get("policy_version")),
+        input_references=tuple(
+            _association_input(value)
+            for value in cast(list[dict[str, object]], row["input_references"])
+        ),
     )
 
 
@@ -212,6 +285,49 @@ class PostgresEventModeKernelRepository(EventModeKernelRepository):
 
     def _connect(self) -> psycopg.Connection[Row]:
         return psycopg.Connection[Row].connect(self._dsn, row_factory=dict_row)
+
+    @staticmethod
+    def _reserve_human_command(
+        connection: psycopg.Connection[Row],
+        *,
+        operation_id: EntityId,
+        command_kind: HumanCommandKind,
+        request_digest: str,
+        result_id: EntityId,
+        recorded_at: datetime,
+    ) -> EntityId | None:
+        inserted = connection.execute(
+            """
+            INSERT INTO stageflow.human_command_idempotency (
+                operation_id, command_kind, request_digest, result_id, recorded_at
+            ) VALUES (%s, %s, %s, %s, %s)
+            ON CONFLICT (operation_id) DO NOTHING
+            RETURNING result_id
+            """,
+            (
+                operation_id.value,
+                command_kind.value,
+                request_digest,
+                result_id.value,
+                recorded_at,
+            ),
+        ).fetchone()
+        if inserted is not None:
+            return None
+        replay = connection.execute(
+            """
+            SELECT command_kind, request_digest, result_id
+            FROM stageflow.human_command_idempotency WHERE operation_id = %s
+            """,
+            (operation_id.value,),
+        ).fetchone()
+        assert replay is not None
+        if (
+            replay["command_kind"] != command_kind.value
+            or replay["request_digest"] != request_digest
+        ):
+            raise KernelConflictError("human_command_operation_id_conflict")
+        return EntityId(str(replay["result_id"]))
 
     def bootstrap(self, request: EventStageBootstrapRequest) -> EventStageBootstrapResult:
         for attempt in range(2):
@@ -637,6 +753,22 @@ class PostgresEventModeKernelRepository(EventModeKernelRepository):
                     ).fetchone()
                     assert row is not None
                     return _session(row)
+                session_id = EntityId.new()
+                command_replay_id = self._reserve_human_command(
+                    connection,
+                    operation_id=request.operation_id,
+                    command_kind=HumanCommandKind.SESSION_START,
+                    request_digest=request_digest,
+                    result_id=session_id,
+                    recorded_at=request.requested_at,
+                )
+                if command_replay_id is not None:
+                    row = connection.execute(
+                        "SELECT * FROM stageflow.session WHERE session_id = %s",
+                        (command_replay_id.value,),
+                    ).fetchone()
+                    assert row is not None
+                    return _session(row)
                 stage = connection.execute(
                     "SELECT event_id FROM stageflow.stage WHERE stage_id = %s FOR SHARE",
                     (request.stage_id.value,),
@@ -656,7 +788,6 @@ class PostgresEventModeKernelRepository(EventModeKernelRepository):
                         or str(expectation["event_id"]) != request.event_id.value
                     ):
                         raise KernelConflictError("program_expectation_event_mismatch")
-                session_id = EntityId.new()
                 connection.execute(
                     """
                     INSERT INTO stageflow.session (
@@ -686,9 +817,9 @@ class PostgresEventModeKernelRepository(EventModeKernelRepository):
                     INSERT INTO stageflow.session_boundary_history (
                         boundary_decision_id, session_id, boundary_kind, boundary_at,
                         epistemic_kind, actor_id, reason, decided_at,
-                        resulting_session_revision
+                        resulting_session_revision, operation_id
                     ) VALUES (%s, %s, 'start', %s, 'declared', %s,
-                              'human_session_start', %s, 1)
+                              'human_session_start', %s, 1, %s)
                     """,
                     (
                         EntityId.new().value,
@@ -696,6 +827,7 @@ class PostgresEventModeKernelRepository(EventModeKernelRepository):
                         request.authoritative_start,
                         request.actor_id.value,
                         request.requested_at,
+                        request.operation_id.value,
                     ),
                 )
                 connection.execute(
@@ -756,9 +888,48 @@ class PostgresEventModeKernelRepository(EventModeKernelRepository):
         actor_id: EntityId,
         reason: str,
         decided_at: datetime,
+        operation_id: EntityId,
+        request_digest: str,
     ) -> tuple[Session, BoundaryDecision]:
         try:
             with self._connect() as connection:
+                decision_id = EntityId.new()
+                replay_id = self._reserve_human_command(
+                    connection,
+                    operation_id=operation_id,
+                    command_kind=HumanCommandKind.SESSION_BOUNDARY_CORRECTION,
+                    request_digest=request_digest,
+                    result_id=decision_id,
+                    recorded_at=decided_at,
+                )
+                if replay_id is not None:
+                    replay = connection.execute(
+                        """
+                        SELECT * FROM stageflow.session_boundary_history
+                        WHERE boundary_decision_id = %s
+                        """,
+                        (replay_id.value,),
+                    ).fetchone()
+                    assert replay is not None
+                    session_row = connection.execute(
+                        "SELECT * FROM stageflow.session WHERE session_id = %s",
+                        (str(replay["session_id"]),),
+                    ).fetchone()
+                    assert session_row is not None
+                    return _session(session_row), BoundaryDecision(
+                        id=replay_id,
+                        session_id=EntityId(str(replay["session_id"])),
+                        boundary_kind=cast(str, replay["boundary_kind"]),
+                        boundary_at=cast(datetime, replay["boundary_at"]),
+                        authority=EpistemicKind(cast(str, replay["epistemic_kind"])),
+                        actor_id=EntityId(str(replay["actor_id"])),
+                        reason=cast(str, replay["reason"]),
+                        decided_at=cast(datetime, replay["decided_at"]),
+                        resulting_session_revision=cast(
+                            int, replay["resulting_session_revision"]
+                        ),
+                        operation_id=operation_id,
+                    )
                 row = connection.execute(
                     "SELECT * FROM stageflow.session WHERE session_id = %s FOR UPDATE",
                     (session_id.value,),
@@ -803,7 +974,7 @@ class PostgresEventModeKernelRepository(EventModeKernelRepository):
                     ),
                 )
                 decision = BoundaryDecision(
-                    id=EntityId.new(),
+                    id=decision_id,
                     session_id=session_id,
                     boundary_kind=boundary_kind,
                     boundary_at=boundary_at,
@@ -812,14 +983,15 @@ class PostgresEventModeKernelRepository(EventModeKernelRepository):
                     reason=reason,
                     decided_at=decided_at,
                     resulting_session_revision=revision,
+                    operation_id=operation_id,
                 )
                 connection.execute(
                     """
                     INSERT INTO stageflow.session_boundary_history (
                         boundary_decision_id, session_id, boundary_kind, boundary_at,
                         epistemic_kind, actor_id, reason, decided_at,
-                        resulting_session_revision
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        resulting_session_revision, operation_id
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """,
                     (
                         decision.id.value,
@@ -831,6 +1003,7 @@ class PostgresEventModeKernelRepository(EventModeKernelRepository):
                         reason,
                         decided_at,
                         revision,
+                        operation_id.value,
                     ),
                 )
                 updated = connection.execute(
@@ -1166,87 +1339,185 @@ class PostgresEventModeKernelRepository(EventModeKernelRepository):
         except psycopg.OperationalError as exc:
             raise KernelStorageUnavailableError("postgresql_unavailable") from exc
 
-    def put_association(self, association: MediaAssociation) -> MediaAssociation:
+    def put_association(
+        self, association: MediaAssociation, *, request_digest: str | None = None
+    ) -> MediaAssociation:
         try:
             with self._connect() as connection:
+                history_id = EntityId.new()
+                if association.authority is AssociationAuthority.HUMAN:
+                    assert association.operation_id is not None
+                    if request_digest is None:
+                        raise ValueError("Human association requires a request digest.")
+                    replay_id = self._reserve_human_command(
+                        connection,
+                        operation_id=association.operation_id,
+                        command_kind=HumanCommandKind.MEDIA_ASSIGNMENT,
+                        request_digest=request_digest,
+                        result_id=history_id,
+                        recorded_at=association.decided_at,
+                    )
+                    if replay_id is not None:
+                        replay = connection.execute(
+                            """
+                            SELECT asset_id, association_status, session_id, authority,
+                                   reason_codes, evidence_ids, actor_id,
+                                   association_revision AS revision, decided_at,
+                                   operation_id, policy_id, policy_version,
+                                   input_references
+                            FROM stageflow.media_association_history
+                            WHERE association_history_id = %s
+                            """,
+                            (replay_id.value,),
+                        ).fetchone()
+                        assert replay is not None
+                        return _association(replay)
+                elif request_digest is not None:
+                    raise ValueError(
+                        "Deterministic association cannot carry a human digest."
+                    )
+
                 current = connection.execute(
                     "SELECT * FROM stageflow.media_association WHERE asset_id = %s FOR UPDATE",
                     (association.asset_id.value,),
                 ).fetchone()
-                expected_revision = 1 if current is None else cast(int, current["revision"]) + 1
+                expected_revision = (
+                    1 if current is None else cast(int, current["revision"]) + 1
+                )
                 if association.revision != expected_revision:
                     raise KernelConflictError("association_revision_conflict")
-                if association.status is AssociationStatus.ASSOCIATED:
-                    assert association.session_id is not None
-                    rows = connection.execute(
-                        """
-                        SELECT a.stage_id AS asset_stage_id, s.*
-                        FROM stageflow.completed_media_asset_registry a
-                        JOIN stageflow.session s ON s.session_id = %s
-                        WHERE a.asset_id = %s
-                        FOR UPDATE OF s
-                        """,
-                        (association.session_id.value, association.asset_id.value),
+                asset = connection.execute(
+                    """
+                    SELECT stage_id FROM stageflow.completed_media_asset_registry
+                    WHERE asset_id = %s
+                    """,
+                    (association.asset_id.value,),
+                ).fetchone()
+                if asset is None:
+                    raise KernelNotFoundError("asset_not_found")
+
+                old_session_id = (
+                    None
+                    if current is None
+                    or current["association_status"] != AssociationStatus.ASSOCIATED.value
+                    else EntityId(str(current["session_id"]))
+                )
+                new_session_id = (
+                    association.session_id
+                    if association.status is AssociationStatus.ASSOCIATED
+                    else None
+                )
+                affected_ids = sorted(
+                    {
+                        value
+                        for value in (old_session_id, new_session_id)
+                        if value is not None
+                    },
+                    key=lambda value: value.value,
+                )
+                affected: dict[EntityId, Row] = {}
+                for session_id in affected_ids:
+                    session_row = connection.execute(
+                        "SELECT * FROM stageflow.session WHERE session_id = %s FOR UPDATE",
+                        (session_id.value,),
                     ).fetchone()
-                    if rows is None:
-                        raise KernelNotFoundError("asset_or_session_not_found")
-                    if str(rows["asset_stage_id"]) != str(rows["stage_id"]):
-                        raise KernelConflictError("association_stage_conflict")
-                    if rows["package_state"] == SessionPackageState.COMPLETE.value:
-                        connection.execute(
-                            """
-                            UPDATE stageflow.session SET
-                                package_state = 'correction_required',
-                                package_revision = package_revision + 1,
-                                revision = revision + 1, updated_at = %s
-                            WHERE session_id = %s
-                            """,
-                            (association.decided_at, association.session_id.value),
-                        )
+                    if session_row is None:
+                        raise KernelNotFoundError("session_not_found")
+                    affected[session_id] = session_row
+                if new_session_id is not None and str(asset["stage_id"]) != str(
+                    affected[new_session_id]["stage_id"]
+                ):
+                    raise KernelConflictError("association_stage_conflict")
+
+                if old_session_id != new_session_id:
+                    for session_id, session_row in affected.items():
+                        if (
+                            session_row["package_state"]
+                            == SessionPackageState.COMPLETE.value
+                        ):
+                            connection.execute(
+                                """
+                                UPDATE stageflow.session SET
+                                    package_state = 'correction_required',
+                                    package_revision = package_revision + 1,
+                                    revision = revision + 1, updated_at = %s
+                                WHERE session_id = %s
+                                """,
+                                (association.decided_at, session_id.value),
+                            )
+
+                association_values = (
+                    association.asset_id.value,
+                    association.status.value,
+                    None
+                    if association.session_id is None
+                    else association.session_id.value,
+                    association.authority.value,
+                    Jsonb(list(association.reason_codes)),
+                    Jsonb([value.value for value in association.evidence_ids]),
+                    None
+                    if association.actor_id is None
+                    else association.actor_id.value,
+                    association.revision,
+                    association.decided_at,
+                    None
+                    if association.operation_id is None
+                    else association.operation_id.value,
+                    association.policy_id,
+                    association.policy_version,
+                    Jsonb(_association_inputs(list(association.input_references))),
+                )
                 connection.execute(
                     """
                     INSERT INTO stageflow.media_association (
                         asset_id, association_status, session_id, authority, reason_codes,
-                        evidence_ids, actor_id, revision, decided_at
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        evidence_ids, actor_id, revision, decided_at, operation_id,
+                        policy_id, policy_version, input_references
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT (asset_id) DO UPDATE SET
                         association_status = EXCLUDED.association_status,
                         session_id = EXCLUDED.session_id, authority = EXCLUDED.authority,
                         reason_codes = EXCLUDED.reason_codes,
-                        evidence_ids = EXCLUDED.evidence_ids, actor_id = EXCLUDED.actor_id,
-                        revision = EXCLUDED.revision, decided_at = EXCLUDED.decided_at
+                        evidence_ids = EXCLUDED.evidence_ids,
+                        actor_id = EXCLUDED.actor_id, revision = EXCLUDED.revision,
+                        decided_at = EXCLUDED.decided_at,
+                        operation_id = EXCLUDED.operation_id,
+                        policy_id = EXCLUDED.policy_id,
+                        policy_version = EXCLUDED.policy_version,
+                        input_references = EXCLUDED.input_references
                     """,
-                    (
-                        association.asset_id.value,
-                        association.status.value,
-                        None if association.session_id is None else association.session_id.value,
-                        association.authority.value,
-                        Jsonb(list(association.reason_codes)),
-                        Jsonb([value.value for value in association.evidence_ids]),
-                        None if association.actor_id is None else association.actor_id.value,
-                        association.revision,
-                        association.decided_at,
-                    ),
+                    association_values,
                 )
                 connection.execute(
                     """
                     INSERT INTO stageflow.media_association_history (
                         association_history_id, asset_id, association_revision,
                         association_status, session_id, authority, reason_codes,
-                        evidence_ids, actor_id, decided_at
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        evidence_ids, actor_id, decided_at, operation_id,
+                        policy_id, policy_version, input_references
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """,
                     (
-                        EntityId.new().value,
+                        history_id.value,
                         association.asset_id.value,
                         association.revision,
                         association.status.value,
-                        None if association.session_id is None else association.session_id.value,
+                        None
+                        if association.session_id is None
+                        else association.session_id.value,
                         association.authority.value,
                         Jsonb(list(association.reason_codes)),
                         Jsonb([value.value for value in association.evidence_ids]),
-                        None if association.actor_id is None else association.actor_id.value,
+                        None
+                        if association.actor_id is None
+                        else association.actor_id.value,
                         association.decided_at,
+                        None
+                        if association.operation_id is None
+                        else association.operation_id.value,
+                        association.policy_id,
+                        association.policy_version,
+                        Jsonb(_association_inputs(list(association.input_references))),
                     ),
                 )
                 return association
@@ -1283,9 +1554,34 @@ class PostgresEventModeKernelRepository(EventModeKernelRepository):
         except psycopg.OperationalError as exc:
             raise KernelStorageUnavailableError("postgresql_unavailable") from exc
 
-    def complete_session(self, decision: CompletionDecision) -> Session:
+    def complete_session(
+        self, decision: CompletionDecision, *, request_digest: str
+    ) -> Session:
         try:
             with self._connect() as connection:
+                replay_id = self._reserve_human_command(
+                    connection,
+                    operation_id=decision.operation_id,
+                    command_kind=HumanCommandKind.PACKAGE_COMPLETION,
+                    request_digest=request_digest,
+                    result_id=decision.id,
+                    recorded_at=decision.decided_at,
+                )
+                if replay_id is not None:
+                    replay = connection.execute(
+                        """
+                        SELECT session_id FROM stageflow.session_completion_history
+                        WHERE completion_decision_id = %s
+                        """,
+                        (replay_id.value,),
+                    ).fetchone()
+                    assert replay is not None
+                    replayed_session = connection.execute(
+                        "SELECT * FROM stageflow.session WHERE session_id = %s",
+                        (str(replay["session_id"]),),
+                    ).fetchone()
+                    assert replayed_session is not None
+                    return _session(replayed_session)
                 row = connection.execute(
                     "SELECT * FROM stageflow.session WHERE session_id = %s FOR UPDATE",
                     (decision.session_id.value,),
@@ -1317,8 +1613,8 @@ class PostgresEventModeKernelRepository(EventModeKernelRepository):
                     """
                     INSERT INTO stageflow.session_completion_history (
                         completion_decision_id, session_id, package_revision, actor_id,
-                        approved, reason, decided_at
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+                        approved, reason, decided_at, operation_id
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                     """,
                     (
                         decision.id.value,
@@ -1328,10 +1624,45 @@ class PostgresEventModeKernelRepository(EventModeKernelRepository):
                         decision.approved,
                         decision.reason,
                         decision.decided_at,
+                        decision.operation_id.value,
                     ),
                 )
+                if decision.approved:
+                    connection.execute(
+                        """
+                        INSERT INTO stageflow.session_completion_asset (
+                            completion_decision_id, session_id, package_revision,
+                            asset_id, association_revision
+                        )
+                        SELECT %s, %s, %s, asset_id, revision
+                        FROM stageflow.media_association
+                        WHERE association_status = 'associated' AND session_id = %s
+                        """,
+                        (
+                            decision.id.value,
+                            decision.session_id.value,
+                            decision.package_revision,
+                            decision.session_id.value,
+                        ),
+                    )
                 assert updated is not None
                 return _session(updated)
+        except psycopg.OperationalError as exc:
+            raise KernelStorageUnavailableError("postgresql_unavailable") from exc
+
+    def list_approved_package_asset_ids(
+        self, completion_decision_id: EntityId
+    ) -> tuple[EntityId, ...]:
+        try:
+            with self._connect() as connection:
+                rows = connection.execute(
+                    """
+                    SELECT asset_id FROM stageflow.session_completion_asset
+                    WHERE completion_decision_id = %s ORDER BY asset_id
+                    """,
+                    (completion_decision_id.value,),
+                ).fetchall()
+                return tuple(EntityId(str(row["asset_id"])) for row in rows)
         except psycopg.OperationalError as exc:
             raise KernelStorageUnavailableError("postgresql_unavailable") from exc
 
@@ -1411,8 +1742,10 @@ class PostgresEventModeKernelRepository(EventModeKernelRepository):
                 rows = connection.execute(
                     """
                     SELECT c.*, a.asset_id, a.media_started_at, a.media_ended_at,
-                           x.association_status, x.authority,
-                           x.session_id,
+                           x.association_status, x.authority, x.session_id,
+                           x.reason_codes, x.evidence_ids, x.policy_id,
+                           x.policy_version, x.input_references, x.actor_id,
+                           x.decided_at,
                            COALESCE(
                              (
                                SELECT jsonb_agg(DISTINCT o.epistemic_kind)
@@ -1485,6 +1818,41 @@ class PostgresEventModeKernelRepository(EventModeKernelRepository):
                             )
                             if code is not None
                         ),
+                        association_reason_codes=(
+                            ()
+                            if row["reason_codes"] is None
+                            else cast(list[str], row["reason_codes"])
+                        ),
+                        association_evidence_ids=(
+                            ()
+                            if row["evidence_ids"] is None
+                            else tuple(
+                                EntityId(value)
+                                for value in cast(list[str], row["evidence_ids"])
+                            )
+                        ),
+                        association_policy_id=cast(str | None, row["policy_id"]),
+                        association_policy_version=cast(
+                            str | None, row["policy_version"]
+                        ),
+                        association_input_references=(
+                            ()
+                            if row["input_references"] is None
+                            else tuple(
+                                _association_input(value)
+                                for value in cast(
+                                    list[dict[str, object]], row["input_references"]
+                                )
+                            )
+                        ),
+                        association_actor_id=(
+                            None
+                            if row["actor_id"] is None
+                            else EntityId(str(row["actor_id"]))
+                        ),
+                        association_decided_at=cast(
+                            datetime | None, row["decided_at"]
+                        ),
                     )
                     for row in rows
                 )
@@ -1496,6 +1864,7 @@ class PostgresEventModeKernelRepository(EventModeKernelRepository):
         event_id: EntityId,
         *,
         database_available: bool = True,
+        recovery_required: bool = False,
         source_availability: dict[str, bool] | None = None,
     ) -> EventOperationalStatus:
         try:
@@ -1506,6 +1875,7 @@ class PostgresEventModeKernelRepository(EventModeKernelRepository):
                 availability = source_availability or {}
                 stage_statuses: list[StageOperationalStatus] = []
                 attention: list[str] = []
+                session_limit = 20
                 for stage in self._list_stages(connection, event_id):
                     counts_row = connection.execute(
                         """
@@ -1547,14 +1917,58 @@ class PostgresEventModeKernelRepository(EventModeKernelRepository):
                     ).fetchone()
                     assembling_rows = connection.execute(
                         """
-                        SELECT * FROM stageflow.session
-                        WHERE stage_id = %s AND package_state IN (
+                        SELECT s.*, e.title AS expectation_title,
+                               e.revision AS expectation_revision,
+                               e.planned_start AS expectation_planned_start,
+                               e.planned_end AS expectation_planned_end,
+                               c.completion_decision_id,
+                               c.actor_id AS completion_actor_id,
+                               c.decided_at AS completion_decided_at
+                        FROM stageflow.session s
+                        LEFT JOIN stageflow.program_expectation e
+                          ON e.expectation_id = s.program_expectation_id
+                        LEFT JOIN LATERAL (
+                            SELECT completion_decision_id, actor_id, decided_at
+                            FROM stageflow.session_completion_history
+                            WHERE session_id = s.session_id AND approved
+                            ORDER BY decided_at DESC, completion_decision_id DESC
+                            LIMIT 1
+                        ) c ON TRUE
+                        WHERE s.stage_id = %s AND s.package_state IN (
                             'assembling', 'correction_required'
                         )
-                        ORDER BY authoritative_start, session_id
+                        ORDER BY s.authoritative_start DESC, s.session_id DESC
+                        LIMIT %s
                         """,
-                        (stage.id.value,),
+                        (stage.id.value, session_limit + 1),
                     ).fetchall()
+                    recent_rows = connection.execute(
+                        """
+                        SELECT s.*, e.title AS expectation_title,
+                               e.revision AS expectation_revision,
+                               e.planned_start AS expectation_planned_start,
+                               e.planned_end AS expectation_planned_end,
+                               c.completion_decision_id,
+                               c.actor_id AS completion_actor_id,
+                               c.decided_at AS completion_decided_at
+                        FROM stageflow.session s
+                        LEFT JOIN stageflow.program_expectation e
+                          ON e.expectation_id = s.program_expectation_id
+                        LEFT JOIN LATERAL (
+                            SELECT completion_decision_id, actor_id, decided_at
+                            FROM stageflow.session_completion_history
+                            WHERE session_id = s.session_id AND approved
+                            ORDER BY decided_at DESC, completion_decision_id DESC
+                            LIMIT 1
+                        ) c ON TRUE
+                        WHERE s.stage_id = %s
+                        ORDER BY s.authoritative_start DESC, s.session_id DESC
+                        LIMIT %s
+                        """,
+                        (stage.id.value, session_limit + 1),
+                    ).fetchall()
+                    bounded_assembling = assembling_rows[:session_limit]
+                    bounded_recent = recent_rows[:session_limit]
                     assert counts_row is not None and association_row is not None
                     source_values = [availability.get(key) for key in stage.source_bindings]
                     known = [value for value in source_values if value is not None]
@@ -1584,29 +1998,11 @@ class PostgresEventModeKernelRepository(EventModeKernelRepository):
                             ),
                             assembling_session_ids=tuple(
                                 EntityId(str(row["session_id"]))
-                                for row in assembling_rows
+                                for row in bounded_assembling
                             ),
                             assembling_sessions=tuple(
-                                SessionOperationalProjection(
-                                    session_id=EntityId(str(row["session_id"])),
-                                    activity_state=SessionActivityState(
-                                        cast(str, row["activity_state"])
-                                    ),
-                                    package_state=SessionPackageState(
-                                        cast(str, row["package_state"])
-                                    ),
-                                    package_revision=cast(
-                                        int, row["package_revision"]
-                                    ),
-                                    revision=cast(int, row["revision"]),
-                                    authoritative_start=cast(
-                                        datetime, row["authoritative_start"]
-                                    ),
-                                    authoritative_end=cast(
-                                        datetime | None, row["authoritative_end"]
-                                    ),
-                                )
-                                for row in assembling_rows
+                                _session_operational_projection(row)
+                                for row in bounded_assembling
                             ),
                             session_activity_state=(
                                 None
@@ -1652,6 +2048,17 @@ class PostgresEventModeKernelRepository(EventModeKernelRepository):
                             unresolved_media=unresolved,
                             conflicting_media=conflicting,
                             attention_codes=stage_attention,
+                            assembling_sessions_truncated=(
+                                len(assembling_rows) > session_limit
+                            ),
+                            recent_sessions=tuple(
+                                _session_operational_projection(row)
+                                for row in bounded_recent
+                            ),
+                            recent_sessions_truncated=(
+                                len(recent_rows) > session_limit
+                            ),
+                            session_limit=session_limit,
                         )
                     )
                 latest_row = connection.execute(
@@ -1662,14 +2069,22 @@ class PostgresEventModeKernelRepository(EventModeKernelRepository):
                     (event_id.value,),
                 ).fetchone()
                 latest = None if latest_row is None else _reconciliation(latest_row)
-                recovering = latest is not None and latest.status is ReconciliationStatus.RUNNING
+                recovering = recovery_required or (
+                    latest is not None
+                    and latest.status is ReconciliationStatus.RUNNING
+                )
                 ready = (
                     database_available
+                    and not recovering
                     and latest is not None
                     and latest.status is ReconciliationStatus.COMPLETED
                 )
                 if recovering:
-                    attention.append("startup_reconciliation_running")
+                    attention.append(
+                        "postgresql_reconciliation_required"
+                        if recovery_required
+                        else "startup_reconciliation_running"
+                    )
                 if latest is not None and latest.status is ReconciliationStatus.FAILED:
                     attention.append("startup_reconciliation_failed")
                 proposal_rows = connection.execute(

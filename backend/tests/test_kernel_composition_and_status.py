@@ -167,6 +167,11 @@ def test_explicit_bootstrap_and_startup_reconciliation_use_observed_source_state
         response = client.get("/api/v1/kernel/status")
     assert response.status_code == 200
     assert response.json()["stages"][0]["session_package_state"] == "assembling"
+    assert response.json()["stages"][0]["session_limit"] == 20
+    assert response.json()["stages"][0]["recent_sessions"][0]["session_id"] == (
+        session.id.value
+    )
+    assert response.json()["stages"][0]["recent_sessions_truncated"] is False
     assert "postgresql://not-used-by-memory-test" not in response.text
     assert str(source_path) not in response.text
 
@@ -253,6 +258,140 @@ def test_bounded_media_cycle_persists_observations_registers_and_associates(
     )
     assert sum(item.observation_kind == "asset_resource_snapshot" for item in observations) == 2
     assert any(item.observation_kind == "asset_readiness_evaluation" for item in observations)
+    app = create_app()
+    with TestClient(app) as raw_client:
+        app.state.kernel = components
+        client = cast(SyncHttpClient, raw_client)
+        response = client.get("/api/v1/kernel/status")
+    payload = cast(dict[str, object], response.json())
+    media = cast(list[dict[str, object]], payload["recent_media"])[0]
+    assert media["association_policy_id"] == "stageflow.kernel.media-association"
+    assert media["association_policy_version"] == "1.1.0"
+    assert media["association_input_references"]
+    assert media["association_evidence_ids"] == []
+    assert str(media_path) not in response.text
+
+
+def test_real_filesystem_interval_less_media_stays_unresolved_during_turnover(
+    tmp_path: Path,
+) -> None:
+    source_path = tmp_path / "recordings"
+    source_path.mkdir()
+    effective = configuration(tmp_path, source_path)
+    repository = InMemoryEventModeKernelRepository()
+    clock = MutableClock(NOW)
+    kernel = DurableEventModeKernel(repository=repository, clock=clock)
+    components = KernelComponents(effective, repository, kernel)
+    initial = components.explicit_bootstrap(
+        operation_id=EntityId.new(), actor_id=EntityId.new()
+    )
+    stage = repository.list_stages(initial.event_id)[0]
+    actor_id = EntityId.new()
+    first = kernel.start_session(
+        StartSessionRequest(
+            operation_id=EntityId.new(),
+            event_id=initial.event_id,
+            stage_id=stage.id,
+            actor_id=actor_id,
+            authoritative_start=NOW,
+            requested_at=NOW,
+        )
+    )
+    kernel.correct_session_boundary(
+        operation_id=EntityId.new(),
+        session_id=first.id,
+        boundary_kind="end",
+        boundary_at=NOW + timedelta(minutes=45),
+        actor_id=actor_id,
+        reason="ended",
+    )
+    second = kernel.start_session(
+        StartSessionRequest(
+            operation_id=EntityId.new(),
+            event_id=initial.event_id,
+            stage_id=stage.id,
+            actor_id=actor_id,
+            authoritative_start=NOW + timedelta(minutes=50),
+            requested_at=NOW + timedelta(minutes=50),
+        )
+    )
+    (source_path / "turnover-segment.mp4").write_bytes(b"synthetic-turnover-media")
+
+    components.run_media_cycle(event_id=initial.event_id, scope="turnover-observation")
+    clock.current += timedelta(seconds=6)
+    registered = components.run_media_cycle(
+        event_id=initial.event_id, scope="turnover-registration"
+    )
+    candidate = repository.get_candidate(registered.candidate_results[0].candidate_id)
+    assert candidate is not None
+    association = repository.get_association(candidate.proposed_asset_id)
+
+    assert association is not None
+    assert association.status.value == "unresolved"
+    assert "multiple_eligible_sessions" in association.reason_codes
+    assert {first.id.value, second.id.value}.issubset(
+        {
+            value.record_id
+            for value in association.input_references
+            if value.record_type == "session"
+        }
+    )
+
+
+def test_postgresql_loss_requires_fresh_same_process_reconciliation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source_path = tmp_path / "recordings"
+    source_path.mkdir()
+    repository = InMemoryEventModeKernelRepository()
+    kernel = DurableEventModeKernel(repository=repository, clock=FixedClock(NOW))
+    components = KernelComponents(
+        configuration(tmp_path, source_path), repository, kernel
+    )
+    ready = components.explicit_bootstrap(
+        operation_id=EntityId.new(), actor_id=EntityId.new()
+    )
+    assert ready.ready is True
+    assert ready.latest_reconciliation is not None
+    pre_outage_id = ready.latest_reconciliation.id
+    available_get = repository.get_event_by_key
+
+    def unavailable(event_key: str) -> object:
+        del event_key
+        raise KernelStorageUnavailableError("postgresql_unavailable")
+
+    monkeypatch.setattr(repository, "get_event_by_key", unavailable)
+    with pytest.raises(KernelStorageUnavailableError, match="postgresql_unavailable"):
+        components.status()
+    monkeypatch.setattr(repository, "get_event_by_key", available_get)
+
+    recovering = components.status()
+    assert recovering is not None
+    assert recovering.ready is False
+    assert recovering.recovering is True
+    assert "postgresql_reconciliation_required" in recovering.attention_codes
+    assert recovering.latest_reconciliation is not None
+    assert recovering.latest_reconciliation.id == pre_outage_id
+
+    recovered = components.reconcile_postgresql_recovery()
+    assert recovered is not None
+    assert recovered.ready is True
+    assert recovered.recovering is False
+    assert recovered.latest_reconciliation is not None
+    assert recovered.latest_reconciliation.id != pre_outage_id
+
+    monkeypatch.setattr(repository, "get_event_by_key", unavailable)
+    with pytest.raises(KernelStorageUnavailableError):
+        components.status()
+    monkeypatch.setattr(repository, "get_event_by_key", available_get)
+    source_path.rmdir()
+    failed = components.reconcile_postgresql_recovery()
+    assert failed is not None
+    assert failed.ready is False
+    assert failed.recovering is True
+    assert failed.latest_reconciliation is not None
+    assert failed.latest_reconciliation.status.value == "failed"
 
 
 def test_machine_boundary_proposal_is_queryable_and_does_not_mutate_session(

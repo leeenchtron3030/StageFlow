@@ -64,6 +64,13 @@ class AssociationAuthority(StrEnum):
     HUMAN = "human"
 
 
+class HumanCommandKind(StrEnum):
+    SESSION_START = "session_start"
+    SESSION_BOUNDARY_CORRECTION = "session_boundary_correction"
+    MEDIA_ASSIGNMENT = "media_assignment"
+    PACKAGE_COMPLETION = "package_completion"
+
+
 class ReconciliationStatus(StrEnum):
     RUNNING = "running"
     COMPLETED = "completed"
@@ -128,6 +135,7 @@ class BoundaryDecision:
     reason: str
     decided_at: datetime
     resulting_session_revision: int
+    operation_id: EntityId
 
     def __post_init__(self) -> None:
         if self.boundary_kind not in {"start", "end"}:
@@ -135,6 +143,19 @@ class BoundaryDecision:
         require_aware_datetime(self.boundary_at, "boundary_at")
         require_aware_datetime(self.decided_at, "decided_at")
         object.__setattr__(self, "reason", _text(self.reason, "reason"))
+
+
+@dataclass(frozen=True, slots=True)
+class AssociationInputReference:
+    record_type: str
+    record_id: str
+    revision: int | None = None
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "record_type", _text(self.record_type, "record_type"))
+        object.__setattr__(self, "record_id", _text(self.record_id, "record_id"))
+        if self.revision is not None and self.revision < 1:
+            raise ValueError("Association input revision must be positive.")
 
 
 @dataclass(frozen=True, slots=True)
@@ -277,6 +298,10 @@ class MediaAssociation:
     revision: int
     decided_at: datetime
     actor_id: EntityId | None = None
+    operation_id: EntityId | None = None
+    policy_id: str | None = None
+    policy_version: str | None = None
+    input_references: Sequence[AssociationInputReference] = field(default_factory=tuple)
 
     def __post_init__(self) -> None:
         reasons = tuple(sorted({_text(value, "reason_code") for value in self.reason_codes}))
@@ -290,6 +315,37 @@ class MediaAssociation:
             raise ValueError("Only associated media can carry a Session ID.")
         if self.authority is AssociationAuthority.HUMAN and self.actor_id is None:
             raise ValueError("Human association requires an actor.")
+        if self.authority is AssociationAuthority.HUMAN and self.operation_id is None:
+            raise ValueError("Human association requires an operation identity.")
+        if self.authority is AssociationAuthority.DETERMINISTIC:
+            if self.policy_id is None or self.policy_version is None:
+                raise ValueError("Deterministic association requires policy identity.")
+        elif self.policy_id is not None or self.policy_version is not None:
+            raise ValueError("Human association must not claim deterministic policy authority.")
+        if (self.policy_id is None) is not (self.policy_version is None):
+            raise ValueError("Association policy identity and version must be supplied together.")
+        if self.policy_id is not None:
+            object.__setattr__(self, "policy_id", _text(self.policy_id, "policy_id"))
+            assert self.policy_version is not None
+            object.__setattr__(
+                self, "policy_version", _text(self.policy_version, "policy_version")
+            )
+        object.__setattr__(
+            self,
+            "input_references",
+            tuple(
+                sorted(
+                    set(self.input_references),
+                    key=lambda value: (
+                        value.record_type,
+                        value.record_id,
+                        value.revision or 0,
+                    ),
+                )
+            ),
+        )
+        if not self.input_references:
+            raise ValueError("Association requires truthful input references.")
         if self.revision < 1:
             raise ValueError("Association revision must be positive.")
         require_aware_datetime(self.decided_at, "decided_at")
@@ -304,6 +360,7 @@ class CompletionDecision:
     approved: bool
     reason: str
     decided_at: datetime
+    operation_id: EntityId
 
     def __post_init__(self) -> None:
         if self.package_revision < 1:
@@ -342,6 +399,14 @@ class SessionOperationalProjection:
     revision: int
     authoritative_start: datetime
     authoritative_end: datetime | None
+    program_expectation_id: EntityId | None = None
+    program_expectation_title: str | None = None
+    program_expectation_revision: int | None = None
+    program_expectation_planned_start: datetime | None = None
+    program_expectation_planned_end: datetime | None = None
+    completion_decision_id: EntityId | None = None
+    completion_actor_id: EntityId | None = None
+    completion_decided_at: datetime | None = None
 
     def __post_init__(self) -> None:
         if self.package_revision < 1 or self.revision < 1:
@@ -349,6 +414,26 @@ class SessionOperationalProjection:
         require_aware_datetime(self.authoritative_start, "authoritative_start")
         if self.authoritative_end is not None:
             require_aware_datetime(self.authoritative_end, "authoritative_end")
+        if self.program_expectation_title is not None:
+            object.__setattr__(
+                self,
+                "program_expectation_title",
+                _text(self.program_expectation_title, "program_expectation_title"),
+            )
+        if self.program_expectation_revision is not None:
+            if self.program_expectation_id is None or self.program_expectation_revision < 1:
+                raise ValueError("Program Expectation projection requires identity and revision.")
+        for value, name in (
+            (self.program_expectation_planned_start, "program_expectation_planned_start"),
+            (self.program_expectation_planned_end, "program_expectation_planned_end"),
+            (self.completion_decided_at, "completion_decided_at"),
+        ):
+            if value is not None:
+                require_aware_datetime(value, name)
+        if (self.completion_decision_id is None) is not (
+            self.completion_actor_id is None
+        ):
+            raise ValueError("Completion projection identity and actor must be supplied together.")
 
 
 @dataclass(frozen=True, slots=True)
@@ -375,6 +460,10 @@ class StageOperationalStatus:
     unresolved_media: int
     conflicting_media: int
     attention_codes: Sequence[str] = field(default_factory=tuple)
+    assembling_sessions_truncated: bool = False
+    recent_sessions: Sequence[SessionOperationalProjection] = field(default_factory=tuple)
+    recent_sessions_truncated: bool = False
+    session_limit: int = 20
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -398,6 +487,26 @@ class StageOperationalStatus:
                 )
             ),
         )
+        object.__setattr__(
+            self,
+            "recent_sessions",
+            tuple(
+                sorted(
+                    self.recent_sessions,
+                    key=lambda value: (
+                        value.authoritative_start,
+                        value.session_id.value,
+                    ),
+                    reverse=True,
+                )
+            ),
+        )
+        if self.session_limit < 1 or self.session_limit > 100:
+            raise ValueError("Session projection limit must be between 1 and 100.")
+        if len(self.assembling_sessions) > self.session_limit:
+            raise ValueError("Assembling Session projection exceeds its declared bound.")
+        if len(self.recent_sessions) > self.session_limit:
+            raise ValueError("Recent Session projection exceeds its declared bound.")
         if {value.session_id for value in self.assembling_sessions} != set(
             self.assembling_session_ids
         ):
@@ -421,6 +530,15 @@ class MediaOperationalProjection:
     media_started_at: datetime | None = None
     media_ended_at: datetime | None = None
     diagnostic_codes: Sequence[str] = field(default_factory=tuple)
+    association_reason_codes: Sequence[str] = field(default_factory=tuple)
+    association_evidence_ids: Sequence[EntityId] = field(default_factory=tuple)
+    association_policy_id: str | None = None
+    association_policy_version: str | None = None
+    association_input_references: Sequence[AssociationInputReference] = field(
+        default_factory=tuple
+    )
+    association_actor_id: EntityId | None = None
+    association_decided_at: datetime | None = None
 
     def __post_init__(self) -> None:
         require_aware_datetime(self.discovered_at, "discovered_at")
@@ -452,6 +570,30 @@ class MediaOperationalProjection:
                 )
             ),
         )
+        object.__setattr__(
+            self,
+            "association_reason_codes",
+            tuple(
+                sorted(
+                    {
+                        _text(value, "association_reason_code")
+                        for value in self.association_reason_codes
+                    }
+                )
+            ),
+        )
+        object.__setattr__(
+            self,
+            "association_evidence_ids",
+            tuple(sorted(set(self.association_evidence_ids), key=lambda value: value.value)),
+        )
+        object.__setattr__(
+            self,
+            "association_input_references",
+            tuple(self.association_input_references),
+        )
+        if self.association_decided_at is not None:
+            require_aware_datetime(self.association_decided_at, "association_decided_at")
 
 
 @dataclass(frozen=True, slots=True)
@@ -476,12 +618,14 @@ class EventOperationalStatus:
 
 
 __all__ = [
+    "AssociationInputReference",
     "AssociationAuthority",
     "AssociationStatus",
     "BoundaryDecision",
     "CompletionDecision",
     "EpistemicKind",
     "EventOperationalStatus",
+    "HumanCommandKind",
     "MediaAssociation",
     "MediaCandidate",
     "MediaOperationalProjection",

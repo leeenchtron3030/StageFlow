@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Mapping, Sequence
 from dataclasses import replace
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Protocol
 
 from app.contexts.events import (
@@ -32,6 +34,7 @@ from app.shared.time import Clock
 
 from .contracts import (
     AssociationAuthority,
+    AssociationInputReference,
     AssociationStatus,
     CompletionDecision,
     EpistemicKind,
@@ -58,6 +61,27 @@ from .repository import (
 
 class AssetIngressPublisher(Protocol):
     def publish(self, asset: RegisteredMediaAsset, *, received_at: datetime) -> EntityId: ...
+
+
+_ASSOCIATION_POLICY_ID = "stageflow.kernel.media-association"
+_ASSOCIATION_POLICY_VERSION = "1.1.0"
+
+
+def _command_digest(kind: str, values: Mapping[str, object]) -> str:
+    normalized = {
+        key: (
+            value.astimezone(UTC).isoformat()
+            if isinstance(value, datetime)
+            else value.value
+            if isinstance(value, EntityId)
+            else value
+        )
+        for key, value in values.items()
+    }
+    document = json.dumps(
+        {"kind": kind, **normalized}, sort_keys=True, separators=(",", ":")
+    )
+    return hashlib.sha256(document.encode("utf-8")).hexdigest()
 
 
 class StableAssetIngressPublisher:
@@ -157,12 +181,23 @@ class DurableEventModeKernel:
     def correct_session_boundary(
         self,
         *,
+        operation_id: EntityId,
         session_id: EntityId,
         boundary_kind: str,
         boundary_at: datetime,
         actor_id: EntityId,
         reason: str,
     ) -> Session:
+        request_digest = _command_digest(
+            "session_boundary_correction",
+            {
+                "session_id": session_id,
+                "boundary_kind": boundary_kind,
+                "boundary_at": boundary_at,
+                "actor_id": actor_id,
+                "reason": reason.strip(),
+            },
+        )
         session, _ = self.repository.correct_boundary(
             session_id=session_id,
             boundary_kind=boundary_kind,
@@ -170,6 +205,8 @@ class DurableEventModeKernel:
             actor_id=actor_id,
             reason=reason,
             decided_at=self.clock.now(),
+            operation_id=operation_id,
+            request_digest=request_digest,
         )
         return session
 
@@ -397,6 +434,26 @@ class DurableEventModeKernel:
                 else "no_safely_eligible_session",
             )
         current = self.repository.get_association(asset.id)
+        candidate = self.repository.get_candidate(asset.candidate_id)
+        if candidate is None:
+            raise KernelNotFoundError("candidate_not_found")
+        input_references = [
+            AssociationInputReference("registered_media_asset", asset.id.value),
+            AssociationInputReference(
+                "media_candidate", candidate.id.value, candidate.revision
+            ),
+            AssociationInputReference(
+                "stage_source_binding", asset.source_binding_key
+            ),
+        ]
+        input_references.extend(
+            AssociationInputReference("session", session.id.value, session.revision)
+            for session in sessions
+        )
+        input_references.extend(
+            AssociationInputReference("contradictory_session", value.value)
+            for value in contradictory_session_ids
+        )
         association = MediaAssociation(
             asset_id=asset.id,
             status=status,
@@ -406,16 +463,26 @@ class DurableEventModeKernel:
             evidence_ids=(),
             revision=1 if current is None else current.revision + 1,
             decided_at=self.clock.now(),
+            policy_id=_ASSOCIATION_POLICY_ID,
+            policy_version=_ASSOCIATION_POLICY_VERSION,
+            input_references=input_references,
         )
         return self.repository.put_association(association)
 
     def _temporally_eligible(self, asset: RegisteredMediaAsset, session: Session) -> bool:
+        if asset.media_started_at is None and asset.media_ended_at is None:
+            return (
+                session.activity_state is SessionActivityState.PRESENTATION_ACTIVE
+                or (
+                    session.activity_state is SessionActivityState.PRESENTATION_ENDED
+                    and session.package_state is SessionPackageState.ASSEMBLING
+                )
+            )
         if session.activity_state is SessionActivityState.PRESENTATION_ACTIVE:
             if asset.media_ended_at is None:
-                return True
+                assert asset.media_started_at is not None
+                return asset.media_started_at >= session.authoritative_start
             return asset.media_ended_at >= session.authoritative_start
-        if asset.media_started_at is None and asset.media_ended_at is None:
-            return False
         session_end = session.authoritative_end
         if session_end is None:
             return False
@@ -430,6 +497,7 @@ class DurableEventModeKernel:
     def assign_asset(
         self,
         *,
+        operation_id: EntityId,
         asset_id: EntityId,
         session_id: EntityId,
         actor_id: EntityId,
@@ -442,6 +510,11 @@ class DurableEventModeKernel:
         if session is None:
             raise KernelNotFoundError("session_not_found")
         current = self.repository.get_association(asset_id)
+        input_references = (
+            AssociationInputReference("registered_media_asset", asset.id.value),
+            AssociationInputReference("session", session.id.value, session.revision),
+            AssociationInputReference("stage_source_binding", asset.source_binding_key),
+        )
         if asset.stage_id != session.stage_id:
             association = MediaAssociation(
                 asset_id=asset_id,
@@ -453,6 +526,8 @@ class DurableEventModeKernel:
                 revision=1 if current is None else current.revision + 1,
                 decided_at=self.clock.now(),
                 actor_id=actor_id,
+                operation_id=operation_id,
+                input_references=input_references,
             )
         else:
             association = MediaAssociation(
@@ -465,8 +540,21 @@ class DurableEventModeKernel:
                 revision=1 if current is None else current.revision + 1,
                 decided_at=self.clock.now(),
                 actor_id=actor_id,
+                operation_id=operation_id,
+                input_references=input_references,
             )
-        return self.repository.put_association(association)
+        return self.repository.put_association(
+            association,
+            request_digest=_command_digest(
+                "media_assignment",
+                {
+                    "asset_id": asset_id,
+                    "session_id": session_id,
+                    "actor_id": actor_id,
+                    "reason": reason.strip(),
+                },
+            ),
+        )
 
     def mark_package_ready(self, session_id: EntityId) -> Session:
         return self.repository.set_package_state(
@@ -476,6 +564,7 @@ class DurableEventModeKernel:
     def complete_package(
         self,
         *,
+        operation_id: EntityId,
         session_id: EntityId,
         actor_id: EntityId,
         approved: bool,
@@ -493,7 +582,17 @@ class DurableEventModeKernel:
                 approved=approved,
                 reason=reason,
                 decided_at=self.clock.now(),
-            )
+                operation_id=operation_id,
+            ),
+            request_digest=_command_digest(
+                "package_completion",
+                {
+                    "session_id": session_id,
+                    "actor_id": actor_id,
+                    "approved": approved,
+                    "reason": reason.strip(),
+                },
+            ),
         )
 
     def begin_reconciliation(self, *, event_id: EntityId, scope: str) -> ReconciliationRun:

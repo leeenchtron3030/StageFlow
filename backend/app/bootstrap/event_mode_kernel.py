@@ -8,7 +8,10 @@ import psycopg
 from app.contexts.events import EventStageBootstrapRequest, StageBootstrapDefinition
 from app.contexts.production.event_mode_kernel import DurableEventModeKernel
 from app.contexts.production.event_mode_kernel.contracts import EventOperationalStatus
-from app.contexts.production.event_mode_kernel.repository import EventModeKernelRepository
+from app.contexts.production.event_mode_kernel.repository import (
+    EventModeKernelRepository,
+    KernelStorageUnavailableError,
+)
 from app.contexts.production.event_mode_kernel.service import StableAssetIngressPublisher
 from app.contexts.production.runtime import StageFlowRuntime
 from app.core.config.deployment import (
@@ -37,6 +40,7 @@ class KernelComponents:
         default_factory=lambda: dict[str, bool]()
     )
     startup_error: str | None = None
+    postgresql_recovery_required: bool = False
 
     @property
     def event_key(self) -> str:
@@ -103,16 +107,35 @@ class KernelComponents:
         if self.media_cycle is None:
             self.compose_media_cycle()
         assert self.media_cycle is not None
-        return self.media_cycle.run(event_id=event_id, scope=scope)
+        try:
+            result = self.media_cycle.run(event_id=event_id, scope=scope)
+        except KernelStorageUnavailableError:
+            self.postgresql_recovery_required = True
+            raise
+        if not result.source_failures:
+            self.postgresql_recovery_required = False
+        return result
 
-    def status(self) -> EventOperationalStatus | None:
+    def reconcile_postgresql_recovery(self) -> EventOperationalStatus | None:
         event = self.repository.get_event_by_key(self.event_key)
         if event is None:
             return None
-        return self.repository.operational_status(
-            event.id,
-            source_availability=self.source_availability,
-        )
+        self.run_media_cycle(event_id=event.id, scope="postgresql_recovery")
+        return self.status()
+
+    def status(self) -> EventOperationalStatus | None:
+        try:
+            event = self.repository.get_event_by_key(self.event_key)
+            if event is None:
+                return None
+            return self.repository.operational_status(
+                event.id,
+                recovery_required=self.postgresql_recovery_required,
+                source_availability=self.source_availability,
+            )
+        except KernelStorageUnavailableError:
+            self.postgresql_recovery_required = True
+            raise
 
 
 def verify_kernel_schema(dsn: str) -> None:
@@ -123,11 +146,12 @@ def verify_kernel_schema(dsn: str) -> None:
                 SELECT count(*) FROM stageflow.schema_migration
                 WHERE version IN (
                     '0001_ingress', '0002_event_mode_kernel',
-                    '0003_kernel_projections'
+                    '0003_kernel_projections',
+                    '0004_kernel_review_corrections'
                 )
                 """
             ).fetchone()
-            if row is None or row[0] != 3:
+            if row is None or row[0] != 4:
                 raise RuntimeError("kernel_schema_migration_required")
     except psycopg.OperationalError as exc:
         raise RuntimeError("postgresql_unavailable") from exc

@@ -24,6 +24,14 @@ class AssemblingSessionResponse(BaseModel):
     revision: int
     authoritative_start: datetime
     authoritative_end: datetime | None
+    program_expectation_id: str | None
+    program_expectation_title: str | None
+    program_expectation_revision: int | None
+    program_expectation_planned_start: datetime | None
+    program_expectation_planned_end: datetime | None
+    completion_decision_id: str | None
+    completion_actor_id: str | None
+    completion_decided_at: datetime | None
 
 
 class StageStatusResponse(BaseModel):
@@ -36,6 +44,10 @@ class StageStatusResponse(BaseModel):
     session_id: str | None
     assembling_session_ids: tuple[str, ...]
     assembling_sessions: tuple[AssemblingSessionResponse, ...]
+    assembling_sessions_truncated: bool
+    recent_sessions: tuple[AssemblingSessionResponse, ...]
+    recent_sessions_truncated: bool
+    session_limit: int
     session_activity_state: str | None
     session_package_state: str | None
     session_package_revision: int | None
@@ -71,6 +83,13 @@ class MediaStatusResponse(BaseModel):
     media_started_at: datetime | None
     media_ended_at: datetime | None
     diagnostic_codes: tuple[str, ...]
+    association_reason_codes: tuple[str, ...]
+    association_evidence_ids: tuple[str, ...]
+    association_policy_id: str | None
+    association_policy_version: str | None
+    association_input_references: tuple[dict[str, object], ...]
+    association_actor_id: str | None
+    association_decided_at: datetime | None
 
 
 class BoundaryProposalResponse(BaseModel):
@@ -113,6 +132,45 @@ class KernelStatusResponse(BaseModel):
 
 def _response(status: EventOperationalStatus) -> KernelStatusResponse:
     reconciliation = status.latest_reconciliation
+
+    def session_response(item: object) -> AssemblingSessionResponse:
+        from app.contexts.production.event_mode_kernel.contracts import (
+            SessionOperationalProjection,
+        )
+
+        assert isinstance(item, SessionOperationalProjection)
+        return AssemblingSessionResponse(
+            session_id=item.session_id.value,
+            activity_state=item.activity_state.value,
+            package_state=item.package_state.value,
+            package_revision=item.package_revision,
+            revision=item.revision,
+            authoritative_start=item.authoritative_start,
+            authoritative_end=item.authoritative_end,
+            program_expectation_id=(
+                None
+                if item.program_expectation_id is None
+                else item.program_expectation_id.value
+            ),
+            program_expectation_title=item.program_expectation_title,
+            program_expectation_revision=item.program_expectation_revision,
+            program_expectation_planned_start=(
+                item.program_expectation_planned_start
+            ),
+            program_expectation_planned_end=item.program_expectation_planned_end,
+            completion_decision_id=(
+                None
+                if item.completion_decision_id is None
+                else item.completion_decision_id.value
+            ),
+            completion_actor_id=(
+                None
+                if item.completion_actor_id is None
+                else item.completion_actor_id.value
+            ),
+            completion_decided_at=item.completion_decided_at,
+        )
+
     return KernelStatusResponse(
         configured=True,
         event_id=status.event_id.value,
@@ -145,17 +203,15 @@ def _response(status: EventOperationalStatus) -> KernelStatusResponse:
                     value.value for value in stage.assembling_session_ids
                 ),
                 assembling_sessions=tuple(
-                    AssemblingSessionResponse(
-                        session_id=item.session_id.value,
-                        activity_state=item.activity_state.value,
-                        package_state=item.package_state.value,
-                        package_revision=item.package_revision,
-                        revision=item.revision,
-                        authoritative_start=item.authoritative_start,
-                        authoritative_end=item.authoritative_end,
-                    )
+                    session_response(item)
                     for item in stage.assembling_sessions
                 ),
+                assembling_sessions_truncated=stage.assembling_sessions_truncated,
+                recent_sessions=tuple(
+                    session_response(item) for item in stage.recent_sessions
+                ),
+                recent_sessions_truncated=stage.recent_sessions_truncated,
+                session_limit=stage.session_limit,
                 session_activity_state=(
                     None
                     if stage.session_activity_state is None
@@ -207,6 +263,26 @@ def _response(status: EventOperationalStatus) -> KernelStatusResponse:
                 media_started_at=item.media_started_at,
                 media_ended_at=item.media_ended_at,
                 diagnostic_codes=tuple(item.diagnostic_codes),
+                association_reason_codes=tuple(item.association_reason_codes),
+                association_evidence_ids=tuple(
+                    value.value for value in item.association_evidence_ids
+                ),
+                association_policy_id=item.association_policy_id,
+                association_policy_version=item.association_policy_version,
+                association_input_references=tuple(
+                    {
+                        "record_type": value.record_type,
+                        "record_id": value.record_id,
+                        "revision": value.revision,
+                    }
+                    for value in item.association_input_references
+                ),
+                association_actor_id=(
+                    None
+                    if item.association_actor_id is None
+                    else item.association_actor_id.value
+                ),
+                association_decided_at=item.association_decided_at,
             )
             for item in status.recent_media
         ),
