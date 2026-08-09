@@ -34,16 +34,17 @@ editorial output, control a recorder, or deliver an output.
 | FastAPI application | Preserve liveness; optionally load Kernel configuration, verify schema, reconcile, and serve read-only status | PostgreSQL authority; process state is composition only |
 | Next.js application | Render one static status page | No backend client or workflow state |
 | Shared contracts | IDs, errors, results, clocks, and time ranges | Pure/in-memory values |
-| Production Events/adapters | Provider-neutral source event contracts plus stable ingress identity | PostgreSQL ingress repository exists but is not composed into FastAPI/startup |
+| Production Events/adapters | Provider-neutral source event contracts plus stable ingress identity | Completed-asset ingress is composed in the bounded Kernel cycle; general dispatcher paths remain caller-created |
 | Dispatcher/interpreters | One structural routing protocol and concrete Event-to-Observation adapters | Caller-created; deterministic synchronous dispatch |
-| PostgreSQL ingress adapter | Transactional source-key/fingerprint registration and stable Production Event identity | Durable when used with PostgreSQL; real database validation remains environment-gated |
+| PostgreSQL ingress adapter | Transactional source-key/fingerprint registration and stable Production Event identity | Durable and freshly validated with isolated PostgreSQL 17.10; deployment remains unapproved |
 | Durable Kernel repository | Event/Stage, Program Expectation, Session, media registry/association, completion, reconciliation, and typed history | Normalized PostgreSQL current state plus typed append-only history |
 | Durable Kernel service | Explicit bootstrap, human Session boundaries/completion, readiness/asset adapters, stable ingress, and categorical association | Direct synchronous application boundary |
 | Evidence/reasoning/state policies | Deterministic transformation and transition contracts | Caller-invoked; no orchestrator or durable lineage store |
 | In-memory Operational State repository | Atomic accepted Recording/Session state, lineage, revision, and operation replay | Thread-safe and explicitly process-local |
-| StageFlow Runtime and Software Agent | Immutable deployment description and explicit synchronous lifecycle | Thread-safe and process-local; not started by FastAPI |
+| StageFlow Runtime and Software Agent | Immutable deployment description and explicit synchronous lifecycle | Runtime graph is constructed after Event/Stage authority; lifecycle remains process-local |
 | Media collection coordinator | One bounded caller-driven cycle over injected discovery/observation ports | Thread-safe and process-local |
-| Local filesystem discovery adapter | Read-only, shallow, bounded candidate discovery for one explicit binding | Stateless; filesystem metadata side effects only |
+| Bounded Kernel media cycle | Configured discovery, durable resource observations, readiness, asset registration, stable ingress, and association/reconciliation | Explicit synchronous startup or caller-triggered cycle; PostgreSQL is authority |
+| Local filesystem discovery adapter | Read-only, shallow, bounded candidate discovery for one explicit binding | Stateless and composed into the Kernel media cycle |
 | Readiness and Completed Media Asset contracts | Evaluate supplied objective facts and validate immutable assets; Kernel adapters persist decisions/assets | Callable policy plus durable Kernel registry |
 
 ## Current data flow
@@ -52,18 +53,27 @@ editorial output, control a recorder, or deliver an output.
 flowchart LR
     HTTP[FastAPI process] --> Health[GET /api/v1/health]
 
-    Caller[Explicit caller or test] --> Runtime[StageFlow Runtime]
-    Runtime --> Agent[Software Agent\nprocess-local]
-    Agent --> Coordinator[Media collection coordinator\nprocess-local]
-    Coordinator --> Discovery[Bounded local filesystem discovery]
+    HTTP --> Status[GET /api/v1/kernel/status]
+    Config[Validated TOML + secret reference] --> Bootstrap[Explicit Event/Stage bootstrap]
+    Bootstrap --> DB[(PostgreSQL authority)]
+    Config --> Runtime[StageFlow Runtime]
+    Caller[Startup or explicit bounded caller] --> Cycle[Bounded Kernel media cycle]
+    Runtime --> Cycle
+    Cycle --> Discovery[Bounded local filesystem discovery]
     Discovery --> Candidate[Media Asset Candidate]
-    Candidate -. no composed observer .-> ResourceFacts[Media Resource Observations]
-    ResourceFacts -. caller-only policy .-> Readiness[Readiness evaluation]
-    Readiness -. no assembler or registry .-> Asset[Completed Media Asset]
+    Candidate --> ResourceFacts[Durable Resource Observations]
+    ResourceFacts --> Readiness[Readiness evaluation]
+    Readiness --> Asset[Completed Media Asset]
+    Asset --> Registry[Durable media registry]
+    Registry --> AssetIngress[Stable asset ingress]
+    Registry --> Association[Session association / unresolved / conflict]
+    Association --> DB
+    AssetIngress --> DB
+    Status --> DB
 
-    Source[Source fact] --> Ingress[Durable ingress repository]
-    Ingress --> ProductionEvent[Stable Production Event]
-    ProductionEvent --> Dispatcher[Dispatcher]
+    Source[Other source fact] --> GeneralIngress[Durable ingress repository]
+    GeneralIngress --> ProductionEvent[Stable Production Event]
+    ProductionEvent -. other caller-created paths .-> Dispatcher[Dispatcher]
     Dispatcher --> Interpreter[Concrete Observation Interpreter adapter]
     Interpreter --> Observation[Semantic Observation]
     Observation --> Evidence[Evidence]
@@ -72,9 +82,9 @@ flowchart LR
     State --> MemoryRepo[In-memory repository]
 ```
 
-Solid arrows are directly callable. Dashed arrows mark accepted or structurally intended
-boundaries that are not composed at this baseline. The ingress-to-dispatch route is
-directly callable but is not wired into application startup or a continuous source.
+Solid arrows are directly callable or composed in the bounded Kernel. Dashed arrows mark
+other accepted or caller-created reasoning paths that are not composed into the Kernel.
+There is no watcher, broker, worker, or uncontrolled loop.
 
 ## Current persistence and side effects
 
@@ -82,8 +92,9 @@ directly callable but is not wired into application startup or a continuous sour
   explicit forward/reversal migrations exist. No queue, worker, lease, or outbox exists.
 - Operational State, Agent history, collection history, and operation replay are in
   memory and disappear on process termination.
-- The local adapter performs `stat`/`lstat`/`scandir`-style metadata inspection only. It
-  does not open media content, watch, poll, recurse, transfer, or delete.
+- The composed path performs `stat`/`lstat`/`scandir`-style inspection plus one bounded
+  open/read access check. It does not decode media, watch, poll, recurse, transfer, alter,
+  or delete source media.
 - No provider SDK, outbound HTTP client, FFmpeg, model execution, or delivery side effect
   exists in production code.
 - HTTP exposes process liveness and read-only Kernel operational status; authoritative

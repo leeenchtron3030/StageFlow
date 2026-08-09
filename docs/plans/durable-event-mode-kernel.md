@@ -394,7 +394,7 @@ No repository-wide formatter or frontend test runner exists and neither may be c
   create or rewrite a realized Session.
 - [x] A realized Session belongs to one Business Event/Stage; the database transaction
   prevents two active realized Sessions on one Stage under the approved rule.
-- [ ] Any persisted Operational State remains an explainable projection with durable
+- [x] Any persisted Operational State remains an explainable projection with durable
   acceptance lineage and cannot mutate or replace Session aggregate authority.
 - [x] Candidate discovery, objective observations, readiness, Completed Media Asset
   registration, stable Event ingress, and association remain distinct durable boundaries.
@@ -402,17 +402,17 @@ No repository-wide formatter or frontend test runner exists and neither may be c
   association effect or a typed conflict.
 - [x] Unresolved/conflicting assets remain registered and processable; structural or
   schedule conflict is operator-visible and does not halt unrelated Stages.
-- [ ] Machine boundary proposals and successive human authoritative decisions remain
+- [x] Machine boundary proposals and successive human authoritative decisions remain
   queryable and attributable.
 - [x] Session completion requires human approval for one package revision; late valid
   media preserves history and returns the current package to correction/review.
 - [x] PostgreSQL/source failure and return follow the documented no-interference,
   no-memory-fallback, reconstruction, reconciliation, and readiness behavior.
-- [ ] Read-only queries answer the Kernel Producer status questions and preserve
+- [x] Read-only queries answer the Kernel Producer status questions and preserve
   Observed/Derived/Inferred/Declared/External provenance.
 - [x] No generic operation system, broker, AI, editorial/publication workflow, media
   blob storage, cloud requirement, or recorder control is introduced.
-- [ ] Required backend, real PostgreSQL, whitespace, restart/fault, and Razer milestone
+- [x] Required backend, real PostgreSQL, whitespace, restart/fault, and Razer milestone
   validation passes or any environmental limitation is explicitly reported.
 - [ ] A deliberate diff/self-review and fresh independent review find no unresolved
   in-scope defect or Yellow/Red expansion.
@@ -494,3 +494,53 @@ The complete evidence/options/tradeoffs are retained in the
   event-length/coexistence qualification, and a fresh independent Codex phase review.
 - Phase status: implementation candidate; not self-accepted and not an event-readiness
   claim.
+
+### 2026-08-08 continuation
+
+- Commit `8671251` constructs the validated existing `StageFlowRuntime` graph after
+  explicit Event/Stage authority resolution.
+- The current working tree adds the bounded configured discovery/observation/readiness/
+  asset/ingress/association cycle, registered-effect replay reconciliation, bounded
+  identifiable Producer projections, and non-authoritative boundary-proposal migration.
+- New behavioral tests cover stable registration/association, replay, growth resetting
+  the current stability window, proposal non-authority, query visibility, and real
+  PostgreSQL proposal reconstruction. These tests were not executable in this
+  continuation because the sandbox denied the backend virtual-environment executables
+  and the escalation reviewer reported an exhausted tool-usage limit.
+- Fresh Razer PostgreSQL/process/backup/endurance qualification could not proceed because
+  PostgreSQL tooling was absent and the official portable download required the same
+  unavailable escalation. The evidence-graded result is recorded in
+  [the Razer qualification report](../reviews/durable-kernel-razer-qualification.md).
+- `npm ci` was attempted with portable Node 22.23.2 and failed after 108.3 seconds with
+  npm's `Exit handler never called` error. Downstream frontend checks were not claimed.
+- A local implementation commit was attempted, but writing `.git/index.lock` required
+  the unavailable escalation; the continuation remains an unstaged working-tree change.
+- Current status: implementation drafted and deliberately self-reviewed, but not ready
+  for independent phase-completion review until the required executable matrix and fresh
+  qualification run complete. No production/event-readiness claim is made.
+
+### 2026-08-09 validation and qualification closure
+
+- Fresh execution corrected Windows path normalization, registered-candidate state
+  preservation across post-registration diagnostics and PostgreSQL discovery replay,
+  static typing/style defects, and missing failure-isolation/interrupted-effect tests.
+- The full backend matrix ran with real PostgreSQL: 1,610 collected, 1,605 passed, five
+  existing platform/capability skips; Ruff passed; Pyright reported zero errors.
+- Portable Node 22.23.2/npm 10.9.8 completed clean `npm ci`, build, lint, and typecheck.
+  The audit reported nine high and three moderate findings; dependencies were unchanged.
+- Official PostgreSQL 17.10 on loopback applied `0001` through `0003`, reversed Kernel-
+  owned migrations while preserving `0001`, reapplied, and passed the gated tests.
+- A real two-Stage scenario, force-kill/restart, PostgreSQL stop/return, one-source
+  disappearance/return, custom backup/clean restore, and fresh restored app graph passed.
+- The accepted bounded workload ran 197.626 seconds and created 26 new segments while a
+  separate 180.089-second rotating-write/hash proxy wrote 13,841,203,200 cumulative
+  bytes. These are short/proxy results, not conference-duration or vMix certification.
+- The Razer power posture remains unsafe for unattended Event Mode: Balanced plan, AC
+  sleep 60 minutes, DC sleep 3 minutes, S0 Low Power Idle/Hibernate/Fast Startup
+  available, AC wake timers enabled, and Fast Startup enabled. No policy was changed.
+- Execution authority remained Green. No architecture deviation, public compatibility
+  break, dependency, schema redesign, destructive migration, or Yellow/Red condition
+  occurred. `0003_kernel_projections` is the approved additive migration.
+- Remaining Green closure at this point is deliberate final diff/self-review, logically
+  isolated commits, clean-worktree verification, and fresh independent phase-completion
+  review. This plan does not self-accept the phase or claim production/event readiness.

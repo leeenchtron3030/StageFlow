@@ -32,6 +32,13 @@ name = "Main Stage"
 key = "main-recorder"
 path = "D:/recordings/main"
 maximum_candidates = 1000
+allowed_extensions = [".mov", ".mp4", ".mxf"]
+
+[resources]
+maximum_concurrent_assessments = 2
+maximum_cpu_percentage = 20
+maximum_memory_bytes = 536870912
+minimum_stable_seconds = 5
 ```
 
 Set `STAGEFLOW_KERNEL_CONFIG_PATH` to the TOML path and set the named secret environment
@@ -43,15 +50,16 @@ does not create a Business Event, Stage, Session, or migration.
 
 1. Provision a local or local-network PostgreSQL database independently of StageFlow.
 2. Back it up before schema change when it contains operational data.
-3. Run the explicit `0001_ingress` and `0002_event_mode_kernel` forward migrations with
+3. Run the explicit `0001_ingress`, `0002_event_mode_kernel`, and
+   `0003_kernel_projections` forward migrations with
    `PostgresMigrationRunner.apply_event_mode_kernel_v1()` in an isolated maintenance
    step.
 4. Start the shell and confirm `/api/v1/health` remains live.
 5. Invoke `KernelComponents.explicit_bootstrap(...)` from an authorized setup boundary.
    Equivalent repeats resolve the same StageFlow IDs; structural removal/conflict is
    rejected.
-6. Restart StageFlow. Startup reconstructs PostgreSQL state and records a typed startup
-   reconciliation before Kernel readiness.
+6. Restart StageFlow. Startup reconstructs PostgreSQL state and runs one bounded
+   configured discovery/observation/reconciliation cycle before Kernel readiness.
 
 The application never auto-migrates or auto-bootstraps on configuration parsing or
 ordinary startup. PostgreSQL failure makes Kernel status unavailable; there is no
@@ -60,9 +68,17 @@ in-memory authority fallback.
 ## Operational status and recovery
 
 `GET /api/v1/kernel/status` reports the selected Event, each Stage's source availability,
-active/assembling Session and package revision/state, media-state counts, latest media
-arrival, reconciliation state, and attention codes. A database outage returns HTTP 503
-with `postgresql_unavailable`. Source paths and the PostgreSQL DSN are not returned.
+active and still-assembling Sessions, package revision/state, bounded recent media
+identities and epistemic/diagnostic detail, advisory boundary proposals, media-state
+counts, latest media arrival, reconciliation state, dependency state, and attention
+codes. A database outage returns HTTP 503 with `postgresql_unavailable`. Source paths
+and the PostgreSQL DSN are not returned.
+
+`KernelComponents.run_media_cycle(...)` performs one bounded synchronous pass. Each pass
+reuses the configured Runtime graph and local-filesystem discovery adapter, persists
+objective snapshots/read checks before readiness, and safely replays candidate, asset,
+ingress, and association identity. The Kernel does not create a watcher, broker, or
+uncontrolled scan loop.
 
 For source loss, preserve the durable records, restore the same configured binding, and
 run startup reconciliation again. Absence never implies deletion, Session end, package
@@ -72,11 +88,13 @@ reconcile sources before treating the Kernel as ready.
 
 ## Reversal and backup limitations
 
-`reverse_event_mode_kernel_v1()` removes only `0002_event_mode_kernel` objects and its
-ledger row; it preserves `0001_ingress` and the shared `stageflow` schema. It is suitable
+`reverse_event_mode_kernel_v1()` removes `0003_kernel_projections` followed by
+`0002_event_mode_kernel` objects and their ledger rows; it preserves `0001_ingress` and
+the shared `stageflow` schema. It is suitable
 only for an isolated database or an operator-approved rollback after operational lineage
 has been exported/preserved. It is not an automatic recovery action.
 
-Reference-node qualification must separately cover backup/restore, a representative
-event-length workload, recording/livestream coexistence, and deliberate sleep/power-plan
-configuration. Developer tests and short synthetic runs do not establish those facts.
+The 2026-08-09 reference-node qualification exercised a custom-format backup/clean
+restore and short bounded endurance/coexistence proxy. It did not establish
+conference-duration endurance, real recording/livestream coexistence, or safe Event-Mode
+power policy. Developer tests and short synthetic runs do not establish those facts.

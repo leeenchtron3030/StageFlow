@@ -29,6 +29,11 @@ Program Expectation, Session boundary, association, and completion authority. Cu
 state and consequential history change in the same Psycopg transaction. There is no
 generic event store, Job table, media blob, or event-sourcing projection rebuild.
 
+`0003_kernel_projections` adds only append-only advisory Session-boundary proposals,
+including evidence, epistemic kind, proposer, policy, optional model lineage, and aware
+proposal/boundary times. It does not update the authoritative Session projection; human
+boundary decisions remain in `session_boundary_history` and the Session transaction.
+
 Registration is at least once and idempotent. It does not claim exactly-once delivery.
 Only a newly created ingress record is eligible for the included dispatcher path; an
 exact replay does not repeat that caller-visible dispatch path. The asset-registration
@@ -51,8 +56,9 @@ application time remain separate fields.
 ## Migration and reversal
 
 `0001_ingress_forward.sql` creates the shared schema, migration ledger, and ingress
-table. `0002_event_mode_kernel_forward.sql` adds only Kernel-owned objects. Its reversal
-removes those objects and its ledger row while preserving ingress and the shared schema.
+table. `0002_event_mode_kernel_forward.sql` and `0003_kernel_projections_forward.sql`
+add only Kernel-owned objects. Reversal removes `0003` before `0002` and their ledger
+rows while preserving ingress and the shared schema.
 Reversal is an explicit operator action for an isolated database and is never automatic.
 
 ## Windows reference-node validation
@@ -64,6 +70,10 @@ and reversed/reapplied `0002` while confirming `0001` ingress remained. The gate
 uses `STAGEFLOW_TEST_POSTGRES_DSN` so the same checks can run against another isolated
 database.
 
+A fresh 2026-08-09 Razer qualification also exercised `0003` reversal/reapply, a
+custom-format backup and clean restore, a fresh application graph against the restore,
+PostgreSQL stop/return, process-kill recovery, and a 197.626-second bounded workload.
 Before operational deployment, StageFlow still needs environment-specific service
-account/secret setup, backup/restore rehearsal, an event-length workload, and independent
-event-readiness review. None is inferred by the repository adapter or developer run.
+account/secret setup, conference-duration endurance, real recorder/livestream
+coexistence, event-specific power policy, and independent event-readiness review. None
+is inferred by the repository adapter or short developer qualification.

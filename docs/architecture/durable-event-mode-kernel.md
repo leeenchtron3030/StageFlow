@@ -17,16 +17,18 @@ The current working implementation adds the versioned TOML/secret boundary, expl
 Event/Stage bootstrap, Program Expectations, human-authorized realized Sessions,
 normalized PostgreSQL current state and typed history, durable candidate/observation/
 readiness/asset/association records, stable asset ingress, conservative Session
-association, reconciliation records, startup source gating, and read-only Producer
-status. PostgreSQL is authoritative and the in-memory repository is test-only.
+association, a fully validated existing `StageFlowRuntime` graph, bounded configured
+filesystem cycles, reconciliation records, startup source gating, advisory Session
+boundary proposals, and bounded read-only Producer detail. PostgreSQL is authoritative
+and the in-memory repository is test-only.
 
-Before the candidate is eligible for independent phase acceptance, remaining Green work
-must construct the existing full `StageFlowRuntime` graph from deployment configuration,
-compose the existing bounded local discovery adapter and concrete resource observation
-execution into startup/periodic reconciliation, expose epistemic detail needed by the
-read side, and complete backup/restore plus representative event-length/coexistence
-qualification. The verified-current-state map below is retained as the pre-implementation
-Contract Stabilization baseline rather than rewritten as if those gaps never existed.
+Fresh reference-node backup/restore, process/dependency/storage recovery, bounded
+endurance/coexistence qualification, and the full validation matrix executed on
+2026-08-09. After commit and clean-worktree closure, the candidate is eligible for fresh
+independent phase-completion review. The executed workload is not conference-duration,
+the coexistence workload is a proxy, and neither establishes event readiness. The
+verified-current-state map below is retained as the pre-implementation Contract
+Stabilization baseline rather than rewritten as if those gaps never existed.
 
 ## Verified current-state map
 
