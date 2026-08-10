@@ -85,12 +85,12 @@ or architecture document unless those documents are explicitly updated.
 
 | Plan | Status | Owner | Related decision/finding |
 | --- | --- | --- | --- |
-| [Durable Event-Mode Kernel Green follow-up closure](durable-event-mode-kernel-green-follow-up-closure.md) | Approved — Green autonomous, implementation-ready | StageFlow Architecture / Backend | ADR-0022-ADR-0024; DKV-001-DKV-004 |
-| [Durable Event-Mode Kernel independent-review corrections](durable-event-mode-kernel-review-corrections.md) | Completed candidate — targeted independent verification pending | StageFlow Architecture / Backend | ADR-0022-ADR-0024; DKR-001-DKR-007 |
+| [Durable Event-Mode Kernel Green follow-up closure](durable-event-mode-kernel-green-follow-up-closure.md) | Completed — closure validation passed | StageFlow Architecture / Backend | ADR-0022-ADR-0024; DKV-001-DKV-004 |
+| [Durable Event-Mode Kernel independent-review corrections](durable-event-mode-kernel-review-corrections.md) | Completed — targeted verification accepted with completed Green follow-up | StageFlow Architecture / Backend | ADR-0022-ADR-0024; DKR-001-DKR-007 |
 | [Dispatcher and Observation Interpreter compatibility](dispatcher-interpreter-compatibility.md) | Completed — independent review accepted | StageFlow Architecture / Backend | ADR-0019; ABR-003; ABR-004; D-04; DIC-001–DIC-004; DIC-RR-001–DIC-RR-003 |
 | [Stable ingress identity](stable-ingress-identity.md) | In progress — implementation complete; real PostgreSQL execution pending | StageFlow Architecture / Backend | ADR-0019; ADR-0022; ABR-003; D-02; D-04 |
 | [Production timestamp invariants](production-timestamp-invariants.md) | Completed — fresh phase verification pending | StageFlow Architecture / Backend | ADR-0021; ABR-005; D-07 |
 | [Recursive metadata immutability](recursive-metadata-immutability.md) | Completed — independent review accepted | StageFlow Backend | ABR-006 |
 | [Local filesystem discovery race hardening](local-filesystem-discovery-race-hardening.md) | Completed — independent review accepted | StageFlow Backend | ABR-007; ED-0053 |
 | [CI quality-matrix enforcement](ci-quality-matrix-enforcement.md) | Completed — independent review accepted | StageFlow Engineering | ABR-015 |
-| [Durable Event-Mode Kernel](durable-event-mode-kernel.md) | Completed candidate - targeted correction verification pending | StageFlow Architecture / Backend | ADR-0019-ADR-0024; D-01-D-08 |
+| [Durable Event-Mode Kernel](durable-event-mode-kernel.md) | Completed operational foundation — not a readiness claim | StageFlow Architecture / Backend | ADR-0019-ADR-0024; D-01-D-08 |

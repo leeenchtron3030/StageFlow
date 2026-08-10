@@ -2,7 +2,7 @@
 
 ## Status
 
-Completed implementation candidate — targeted independent correction verification pending
+Completed — targeted independent correction verification accepted and Green follow-up closed
 
 ## Execution authority
 
@@ -274,3 +274,14 @@ preserves `0001` through `0003`.
   removed Kernel/correction objects, and reapply restored `0001` through `0004`.
 - Remaining work: Fresh targeted independent correction verification and an independent
   phase decision. No finding remains for this implementation task.
+
+### 2026-08-09 targeted verification and Green closure
+
+- The [targeted independent correction verification](../reviews/durable-event-mode-kernel-correction-verification.md)
+  returned **ACCEPT WITH GREEN FOLLOW-UP** and identified DKV-001 through DKV-004.
+- The separate [Green follow-up plan](durable-event-mode-kernel-green-follow-up-closure.md)
+  implemented and validated all four findings. Its
+  [closure evidence](../reviews/durable-event-mode-kernel-green-follow-up-closure.md)
+  recommends **ACCEPT** for the bounded operational foundation.
+- This closes the pending correction-verification work. It does not establish production
+  or event readiness.

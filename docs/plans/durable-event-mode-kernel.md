@@ -2,7 +2,7 @@
 
 ## Status
 
-Completed - implementation candidate; targeted correction verification pending
+Completed — targeted correction verification accepted and Green follow-up closed
 
 ## Execution authority
 
@@ -553,3 +553,12 @@ The complete evidence/options/tradeoffs are retained in the
   [independent-review correction plan](durable-event-mode-kernel-review-corrections.md).
 - This historical completion record does not self-accept the Kernel. Targeted fresh
   correction verification remains required.
+
+### 2026-08-09 targeted verification and Green closure
+
+- Targeted independent correction verification returned **ACCEPT WITH GREEN FOLLOW-UP**.
+- DKV-001 through DKV-004 were implemented under the separate
+  [Green follow-up plan](durable-event-mode-kernel-green-follow-up-closure.md) and passed
+  focused/full real-PostgreSQL plus frontend closure validation.
+- The bounded Kernel is now recorded as the completed operational foundation. Production
+  deployment and event readiness remain separate gates.

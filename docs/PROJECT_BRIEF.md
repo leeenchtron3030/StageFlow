@@ -271,7 +271,7 @@ idempotent commits, and startup reconciliation are preferred over exactly-once c
 **Implemented today:** PostgreSQL is the composed Kernel authority for ingress,
 Business Event/Stage/Program Expectation/Session state, typed human and association
 history, media registry, approved package membership, and reconciliation. Explicit
-forward/reversal migrations exist through `0004`; there is no authoritative memory
+forward/reversal migrations exist through `0005`; there is no authoritative memory
 fallback, generic operation store, outbox, or worker system.
 
 ## 9. Workers, providers, and configuration
@@ -307,9 +307,13 @@ The accepted configuration precedence is:
 Runtime-observed facts cannot be overwritten by configuration preference. Operators
 should be able to inspect the effective non-sensitive configuration.
 
-**Open decisions:** file format, secret resolution, schema lifecycle, and deployment
-distribution. No authoritative production configuration loader currently composes a
-Runtime graph.
+**Implemented today:** the Kernel loads versioned TOML, resolves a named PostgreSQL DSN
+at the infrastructure boundary, verifies explicit schema migrations through `0005`, and
+composes the validated existing Runtime graph after durable Event/Stage resolution.
+Effective status distinguishes supplied and valid configuration, PostgreSQL availability,
+Runtime composition, source availability, and operational readiness without returning
+the DSN or source paths. Production secret-management integration and deployment
+distribution remain environment-specific operational work.
 
 ## 10. Current repository maturity
 
@@ -390,9 +394,11 @@ Event-Mode Kernel architecture and plan. ADR-0024 resolved the four former Yello
 decisions. Deployment Runtime construction, bounded startup discovery/observation,
 PostgreSQL persistence/recovery, Producer status, and bounded Razer qualification are
 implemented. The independent phase review returned **DO NOT ACCEPT** with DKR-001 through
-DKR-007; the Green correction implementation resolves those findings and now requires
-targeted fresh independent verification. A generic Durable Operation system remains
-deferred.
+DKR-007. The correction implementation resolved the original High findings; targeted
+independent verification then returned **ACCEPT WITH GREEN FOLLOW-UP**. DKV-001 through
+DKV-004 are now implemented and closure-validated. This completes the bounded
+operational-foundation phase without establishing production or event readiness. A
+generic Durable Operation system remains deferred.
 
 ### Phase 4 — First operational media slice
 

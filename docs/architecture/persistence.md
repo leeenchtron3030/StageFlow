@@ -40,6 +40,13 @@ on consequential history, and stronger history constraints. Association membersh
 every materially affected completed Session now change in one transaction; earlier
 completion decisions and their approved asset sets remain reconstructable.
 
+`0005_kernel_follow_up_closure` classifies completion membership as recorded,
+deterministically reconstructed, or unresolved. It reconstructs legacy reopened
+completion membership only from strictly prior association history and records equal-time
+ambiguity without fabricating membership. It also stores versioned original Session
+result snapshots for new consequential human commands so delayed PostgreSQL replay
+matches the original operation after later state changes.
+
 Registration is at least once and idempotent. It does not claim exactly-once delivery.
 Only a newly created ingress record is eligible for the included dispatcher path; an
 exact replay does not repeat that caller-visible dispatch path. The asset-registration
@@ -63,15 +70,18 @@ application time remain separate fields.
 
 `0001_ingress_forward.sql` creates the shared schema, migration ledger, and ingress
 table. `0002_event_mode_kernel_forward.sql`, `0003_kernel_projections_forward.sql`, and
-`0004_kernel_review_corrections_forward.sql` add only Kernel-owned objects. Reversal
-removes `0004`, `0003`, then `0002` and their ledger rows while preserving ingress and
-the shared schema.
+`0004_kernel_review_corrections_forward.sql` and
+`0005_kernel_follow_up_closure_forward.sql` add only Kernel-owned objects. Reversal
+removes `0005`, `0004`, `0003`, then `0002` and their ledger rows while preserving
+ingress and the shared schema. The `0005` reverse removes only membership tagged as its
+legacy reconstruction before dropping its additive columns.
 Reversal is an explicit operator action for an isolated database and is never automatic.
 
 ## Windows reference-node validation
 
-The Windows Razer validation used an isolated PostgreSQL 17.10 cluster bound to
-`127.0.0.1`, applied both migrations, exercised Event/Stage replay, Session reconstruction,
+The initial Windows Razer validation used an isolated PostgreSQL 17.10 cluster bound to
+`127.0.0.1`, applied the then-current migrations, exercised Event/Stage replay, Session
+reconstruction,
 candidate/asset/ingress/association reconstruction, stopped and restarted PostgreSQL,
 and reversed/reapplied `0002` while confirming `0001` ingress remained. The gated test
 uses `STAGEFLOW_TEST_POSTGRES_DSN` so the same checks can run against another isolated
@@ -79,7 +89,10 @@ database.
 
 A fresh 2026-08-09 Razer qualification also exercised `0003` reversal/reapply, a
 custom-format backup and clean restore, a fresh application graph against the restore,
-PostgreSQL stop/return, process-kill recovery, and a 197.626-second bounded workload.
+PostgreSQL stop/return, process-kill recovery, and a 197.626-second bounded workload. The
+later Green closure applied and exercised migrations through `0005` on a new empty
+loopback PostgreSQL 17.10 database.
+
 Before operational deployment, StageFlow still needs environment-specific service
 account/secret setup, conference-duration endurance, real recorder/livestream
 coexistence, event-specific power policy, and independent event-readiness review. None

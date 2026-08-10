@@ -51,9 +51,9 @@ does not create a Business Event, Stage, Session, or migration.
 1. Provision a local or local-network PostgreSQL database independently of StageFlow.
 2. Back it up before schema change when it contains operational data.
 3. Run the explicit `0001_ingress`, `0002_event_mode_kernel`,
-   `0003_kernel_projections`, and `0004_kernel_review_corrections` forward migrations with
-   `PostgresMigrationRunner.apply_event_mode_kernel_v1()` in an isolated maintenance
-   step.
+   `0003_kernel_projections`, `0004_kernel_review_corrections`, and
+   `0005_kernel_follow_up_closure` forward migrations with
+   `PostgresMigrationRunner.apply_event_mode_kernel_v1()` in an isolated maintenance step.
 4. Start the shell and confirm `/api/v1/health` remains live.
 5. Invoke `KernelComponents.explicit_bootstrap(...)` from an authorized setup boundary.
    Equivalent repeats resolve the same StageFlow IDs; structural removal/conflict is
@@ -67,7 +67,8 @@ in-memory authority fallback.
 
 ## Operational status and recovery
 
-`GET /api/v1/kernel/status` reports the selected Event, each Stage's source availability,
+`GET /api/v1/kernel/status` reports configuration supplied/valid, Runtime composition,
+PostgreSQL availability, the selected Event, each Stage's source availability,
 active and still-assembling Sessions, a bounded recent Session projection with explicit
 truncation, expectation linkage and completion authority, package revision/state,
 bounded recent media identities and association provenance, advisory boundary proposals,
@@ -84,16 +85,17 @@ uncontrolled scan loop.
 For source loss, preserve the durable records, restore the same configured binding, and
 run reconciliation again. Absence never implies deletion, Session end, package
 completion, or reassociation. For database loss in a live process, stop authoritative
-writes, restore connectivity, verify all four migrations, and call
+writes, restore connectivity, verify all five migrations, and call
 `KernelComponents.reconcile_postgresql_recovery()`. Status remains recovering and not
 ready until that fresh bounded reconciliation succeeds; failure remains not ready. A
 restart reconstructs the same durable authority and must satisfy the same source gate.
 
 ## Reversal and backup limitations
 
-`reverse_event_mode_kernel_v1()` removes `0004_kernel_review_corrections`,
-`0003_kernel_projections`, then `0002_event_mode_kernel` objects and their ledger rows;
-it preserves `0001_ingress` and the shared `stageflow` schema. It is suitable
+`reverse_event_mode_kernel_v1()` removes `0005_kernel_follow_up_closure`,
+`0004_kernel_review_corrections`, `0003_kernel_projections`, then
+`0002_event_mode_kernel` objects and their ledger rows; it preserves `0001_ingress` and
+the shared `stageflow` schema. It is suitable
 only for an isolated database or an operator-approved rollback after operational lineage
 has been exported/preserved. It is not an automatic recovery action.
 

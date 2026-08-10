@@ -33,7 +33,7 @@ Proposed behavior must never be described as current implementation.
 | [Domain glossary](domain-glossary.md) | Approved qualified terminology, aliases, migration notes, and unresolved terms |
 | [Session lifecycle](session-lifecycle.md) | Current Session-related behavior, accepted lifecycle direction, invariants, and open decisions |
 | [Segment lifecycle](segment-lifecycle.md) | Current media lifecycle and accepted candidate-to-asset flow |
-| [Durable Event-Mode Kernel](durable-event-mode-kernel.md) | Accepted operational slice, current implementation map, and resolved decisions |
+| [Durable Event-Mode Kernel](durable-event-mode-kernel.md) | Accepted and closure-validated bounded operational foundation, current implementation map, and resolved decisions |
 | [Durable Kernel operations](durable-kernel-operations.md) | Reference-node configuration, bootstrap, status, recovery, and reversal procedure |
 | [ADR index](../adr/README.md) | Accepted decisions, historical ADRs, and unresolved ADR candidates |
 | [Review index](../reviews/README.md) | Evidence reviews and authoritative dispositions |

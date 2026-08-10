@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved — Green autonomous, implementation-ready
+Completed — closure validation passed
 
 ## Execution authority
 
@@ -145,14 +145,14 @@ reconstructed, and unresolved membership without exposing secrets.
 
 ## Acceptance criteria
 
-- [ ] Unambiguous legacy reopened completion membership is reconstructed with provenance.
-- [ ] Ambiguous legacy membership is explicitly unresolved and not fabricated.
-- [ ] Reverse and reapply behavior is tested and migration ledger state is correct.
-- [ ] Delayed replay returns the original Session result from a fresh repository instance.
-- [ ] Idempotency conflicts remain fail-closed.
-- [ ] Startup status preserves configuration and composition truth across all failure modes.
-- [ ] Current-facing documentation reflects implemented behavior without readiness inflation.
-- [ ] Required validation passes and closure evidence records only commands actually run.
+- [x] Unambiguous legacy reopened completion membership is reconstructed with provenance.
+- [x] Ambiguous legacy membership is explicitly unresolved and not fabricated.
+- [x] Reverse and reapply behavior is tested and migration ledger state is correct.
+- [x] Delayed replay returns the original Session result from a fresh repository instance.
+- [x] Idempotency conflicts remain fail-closed.
+- [x] Startup status preserves configuration and composition truth across all failure modes.
+- [x] Current-facing documentation reflects implemented behavior without readiness inflation.
+- [x] Required validation passes and closure evidence records only commands actually run.
 
 ## Rollback or reversal
 
@@ -167,11 +167,24 @@ all pre-existing identities and 0001-0004 data remain. No irreversible step is p
 
 ## Completion record
 
-- Implemented revision: Pending
-- Files and migrations actually changed: Pending
-- Commands and tests actually run: Pending
-- Results and warnings: Pending
+- Implemented revision: `a31edee` and `2576b5f`, plus the containing documentation/
+  evidence closure commit.
+- Files and migrations actually changed: PostgreSQL migration runner/repository and new
+  `0005_kernel_follow_up_closure` forward/reverse SQL; Kernel bootstrap/lifespan/status;
+  focused backend tests; and directly affected project, architecture, plan, and review
+  documentation.
+- Commands and tests actually run: focused pytest/Ruff/Pyright; full backend pytest with
+  fresh real PostgreSQL, Ruff, and Pyright; clean frontend `npm ci`, build, lint, and
+  typecheck; migration forward/reverse/repeated-reverse/reapply inspection; and
+  `git diff --check`. Exact commands and evidence are in the linked
+  [closure artifact](../reviews/durable-event-mode-kernel-green-follow-up-closure.md).
+- Results and warnings: Full backend 1,622 passed, 5 existing platform/capability skips,
+  and 1 existing deprecation warning; Ruff and Pyright clean; all frontend gates passed.
+  Clean npm install reported 12 audit findings (3 moderate, 9 high); no fix was applied.
 - Execution authority used: Green autonomous plus explicit user request
 - Approved deviations: None
-- Rollback status: Not exercised yet
-- Remaining work: Implementation, validation, independent verification, and closure record
+- Rollback status: `0005` reversal and repeated reversal were exercised on disposable
+  real PostgreSQL, preserved migration ledger versions `0001` through `0004`, removed
+  only reconstructed membership/additive state, and reapplied successfully.
+- Remaining work: Production deployment, event qualification/readiness, and deferred
+  downstream workflow phases remain separate; no DKV-001-DKV-004 closure work remains.

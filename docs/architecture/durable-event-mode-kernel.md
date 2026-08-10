@@ -28,8 +28,12 @@ projection, command replay, history constraints, and current-facing documentatio
 Green correction implementation now makes interval-less same-Stage turnover unresolved,
 reopens every materially affected completed Session atomically, invalidates pre-outage
 reconciliation, records deterministic policy/input provenance, bounds recent Session
-status, and protects consequential human-command retries. It remains a candidate for
-fresh targeted independent correction verification; it is not self-accepted.
+status, and protects consequential human-command retries. Targeted independent
+verification accepted that correction with four Green follow-ups. Migration `0005` now
+closes legacy reopened membership reconstruction without invented equal-time facts and
+preserves original Session command results; startup status retains configuration and
+composition truth; and the remaining current-facing documentation is aligned. This is
+closure of the bounded operational foundation, not a production or event-readiness claim.
 
 Fresh reference-node backup/restore and the earlier bounded endurance/coexistence
 qualification remain evidence for unaffected behavior. The executed workload was not
@@ -68,8 +72,10 @@ readiness.
 | Operation/job/work | process-local operation IDs in Agent/coordinator only | Absent as a durable abstraction | Do not add a generic operation table in the first Kernel; use explicit synchronous cycles and reconciliation runs |
 | Node implementation | Runtime profile/host contracts, no Node service | Future placeholder | Treat the current Windows Razer as a reference environment, not a Windows-specific domain tier |
 
-No current component owns a composed, durable candidate-to-Session workflow. Process-local
-Agent, coordinator, or Operational State history is not restart authority.
+At that pre-implementation baseline, no component owned a composed, durable
+candidate-to-Session workflow. The current bounded Kernel now owns that PostgreSQL-backed
+slice; process-local Agent, coordinator, or Operational State history is still not
+restart authority.
 
 ## First coherent operational slice
 
