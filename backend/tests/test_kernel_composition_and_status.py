@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -9,7 +10,14 @@ import pytest
 from fastapi.testclient import TestClient
 from httpx import Response
 
-from app.bootstrap.event_mode_kernel import KernelComponents
+from app.bootstrap import event_mode_kernel as kernel_bootstrap
+from app.bootstrap.event_mode_kernel import (
+    KernelComponents,
+    KernelDatabaseUnavailableError,
+    KernelStartupProgress,
+    build_kernel_components,
+    load_kernel_components_from_environment,
+)
 from app.contexts.production.event_mode_kernel import (
     DurableEventModeKernel,
     EpistemicKind,
@@ -25,6 +33,7 @@ from app.core.config.deployment import (
     EffectiveKernelConfiguration,
     load_kernel_deployment_configuration,
 )
+from app.infrastructure.postgres import PostgresMigrationRunner
 from app.main import create_app
 from app.shared.ids import EntityId
 from app.shared.time import FixedClock
@@ -39,6 +48,7 @@ class FileInspector(Protocol):
 
 
 NOW = datetime(2026, 8, 8, 20, 0, tzinfo=UTC)
+_POSTGRES_DSN = os.getenv("STAGEFLOW_TEST_POSTGRES_DSN")
 
 
 @dataclass(slots=True)
@@ -99,8 +109,130 @@ def test_kernel_status_route_is_read_only_and_reports_unconfigured() -> None:
 
     assert response.status_code == 200
     assert response.json()["configured"] is False
+    assert response.json()["configuration_supplied"] is False
+    assert response.json()["configuration_valid"] is None
+    assert response.json()["runtime_composed"] is False
+    assert response.json()["database_available"] is False
     assert response.json()["ready"] is False
     assert response.json()["attention_codes"] == ["kernel_not_configured"]
+
+
+def test_kernel_status_retains_invalid_supplied_configuration(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    path = tmp_path / "invalid-kernel.toml"
+    path.write_text('schema_version = "unsupported"', encoding="utf-8")
+    monkeypatch.setenv("STAGEFLOW_KERNEL_CONFIG_PATH", str(path))
+
+    with TestClient(create_app()) as raw_client:
+        client = cast(SyncHttpClient, raw_client)
+        response = client.get("/api/v1/kernel/status")
+
+    payload = response.json()
+    assert payload["configured"] is False
+    assert payload["configuration_supplied"] is True
+    assert payload["configuration_valid"] is False
+    assert payload["runtime_composed"] is False
+    assert payload["database_available"] is False
+    assert payload["ready"] is False
+    assert payload["attention_codes"] == ["kernel_startup_failed"]
+    assert payload["startup_error"]
+
+
+def test_kernel_status_retains_valid_configuration_when_postgresql_is_unavailable(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source_path = tmp_path / "recordings"
+    source_path.mkdir()
+    configuration(tmp_path, source_path)
+    monkeypatch.setenv(
+        "STAGEFLOW_KERNEL_CONFIG_PATH", str(tmp_path / "kernel.toml")
+    )
+    monkeypatch.setenv("KERNEL_DSN", "postgresql://synthetic-unavailable")
+
+    def unavailable(dsn: str) -> None:
+        del dsn
+        raise KernelDatabaseUnavailableError("postgresql_unavailable")
+
+    monkeypatch.setattr(kernel_bootstrap, "verify_kernel_schema", unavailable)
+
+    with TestClient(create_app()) as raw_client:
+        client = cast(SyncHttpClient, raw_client)
+        response = client.get("/api/v1/kernel/status")
+
+    payload = response.json()
+    assert payload["configured"] is True
+    assert payload["configuration_supplied"] is True
+    assert payload["configuration_valid"] is True
+    assert payload["runtime_composed"] is False
+    assert payload["database_available"] is False
+    assert payload["ready"] is False
+    assert payload["attention_codes"] == ["kernel_startup_failed"]
+    assert payload["startup_error"] == "postgresql_unavailable"
+
+
+@pytest.mark.skipif(
+    not _POSTGRES_DSN,
+    reason="STAGEFLOW_TEST_POSTGRES_DSN is required for successful startup checks.",
+)
+def test_real_postgres_successful_environment_startup_reports_complete_progress(
+    tmp_path: Path,
+) -> None:
+    assert _POSTGRES_DSN is not None
+    PostgresMigrationRunner(_POSTGRES_DSN).apply_event_mode_kernel_v1()
+    suffix = EntityId.new().value.replace("-", "")
+    source_path = tmp_path / "recordings"
+    source_path.mkdir()
+    config_path = tmp_path / "successful-kernel.toml"
+    config_path.write_text(
+        f"""
+schema_version = "1.0"
+deployment_id = "startup-{suffix}"
+node_id = "node-{suffix}"
+node_role = "node"
+network_policy = "local_only"
+postgres_dsn_secret_ref = "KERNEL_DSN"
+[event]
+key = "startup-event-{suffix}"
+name = "Successful Startup Event"
+[[event.stages]]
+key = "main"
+name = "Main Stage"
+[[event.stages.sources]]
+key = "source-{suffix}"
+path = "{source_path.as_posix()}"
+""".strip(),
+        encoding="utf-8",
+    )
+    environment = {
+        "STAGEFLOW_KERNEL_CONFIG_PATH": str(config_path),
+        "KERNEL_DSN": _POSTGRES_DSN,
+    }
+    effective = load_kernel_deployment_configuration(
+        config_path, environment=environment
+    )
+    initial = build_kernel_components(effective, clock=FixedClock(NOW))
+    bootstrapped = initial.explicit_bootstrap(
+        operation_id=EntityId.new(), actor_id=EntityId.new()
+    )
+    assert bootstrapped.ready is True
+
+    progress = KernelStartupProgress()
+    loaded = load_kernel_components_from_environment(
+        environment=environment,
+        clock=FixedClock(NOW),
+        progress=progress,
+    )
+
+    assert loaded is not None
+    status = loaded.status()
+    assert progress.configuration_supplied is True
+    assert progress.configuration_valid is True
+    assert progress.database_available is True
+    assert progress.runtime_composed is True
+    assert status is not None and status.ready is True
 
 
 def test_explicit_bootstrap_and_startup_reconciliation_use_observed_source_state(
@@ -143,13 +275,26 @@ def test_explicit_bootstrap_and_startup_reconciliation_use_observed_source_state
     )
     source_path.rmdir()
     unavailable = components.reconcile_startup(ready.event_id)
-    source_path.mkdir()
-    recovered = components.reconcile_startup(ready.event_id)
+    app = create_app()
+    with TestClient(app) as raw_client:
+        app.state.kernel = components
+        client = cast(SyncHttpClient, raw_client)
+        unavailable_response = client.get("/api/v1/kernel/status")
+        source_path.mkdir()
+        recovered = components.reconcile_startup(ready.event_id)
+        recovered_response = client.get("/api/v1/kernel/status")
 
     assert ready.ready is True
     assert unavailable.ready is False
     assert "startup_reconciliation_failed" in unavailable.attention_codes
     assert any("source_unavailable" in code for code in unavailable.attention_codes)
+    assert unavailable_response.json()["configured"] is True
+    assert unavailable_response.json()["configuration_supplied"] is True
+    assert unavailable_response.json()["configuration_valid"] is True
+    assert unavailable_response.json()["runtime_composed"] is True
+    assert unavailable_response.json()["database_available"] is True
+    assert unavailable_response.json()["ready"] is False
+    assert unavailable_response.json()["stages"][0]["source_available"] is False
     assert recovered.ready is True
     recovered_stage = recovered.stages[0]
     assert recovered_stage.active_or_assembling_session_id == session.id
@@ -160,20 +305,19 @@ def test_explicit_bootstrap_and_startup_reconciliation_use_observed_source_state
     assert recovered_stage.session_package_revision == 1
     assert recovered.latest_reconciliation is not None
     assert recovered.latest_reconciliation.status.value == "completed"
-    app = create_app()
-    with TestClient(app) as raw_client:
-        app.state.kernel = components
-        client = cast(SyncHttpClient, raw_client)
-        response = client.get("/api/v1/kernel/status")
-    assert response.status_code == 200
-    assert response.json()["stages"][0]["session_package_state"] == "assembling"
-    assert response.json()["stages"][0]["session_limit"] == 20
-    assert response.json()["stages"][0]["recent_sessions"][0]["session_id"] == (
+    assert recovered_response.status_code == 200
+    assert recovered_response.json()["runtime_composed"] is True
+    assert recovered_response.json()["database_available"] is True
+    assert recovered_response.json()["ready"] is True
+    assert recovered_response.json()["stages"][0]["source_available"] is True
+    assert recovered_response.json()["stages"][0]["session_package_state"] == "assembling"
+    assert recovered_response.json()["stages"][0]["session_limit"] == 20
+    assert recovered_response.json()["stages"][0]["recent_sessions"][0]["session_id"] == (
         session.id.value
     )
-    assert response.json()["stages"][0]["recent_sessions_truncated"] is False
-    assert "postgresql://not-used-by-memory-test" not in response.text
-    assert str(source_path) not in response.text
+    assert recovered_response.json()["stages"][0]["recent_sessions_truncated"] is False
+    assert "postgresql://not-used-by-memory-test" not in recovered_response.text
+    assert str(source_path) not in recovered_response.text
 
 
 def test_kernel_status_reports_database_unavailability_as_structured_503(

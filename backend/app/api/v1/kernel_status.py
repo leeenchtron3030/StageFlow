@@ -5,7 +5,7 @@ from datetime import datetime
 from fastapi import APIRouter, Request, Response
 from pydantic import BaseModel, ConfigDict
 
-from app.bootstrap.event_mode_kernel import KernelComponents
+from app.bootstrap.event_mode_kernel import KernelComponents, KernelStartupProgress
 from app.contexts.production.event_mode_kernel.contracts import EventOperationalStatus
 from app.contexts.production.event_mode_kernel.repository import (
     KernelStorageUnavailableError,
@@ -114,6 +114,9 @@ class KernelStatusResponse(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     configured: bool
+    configuration_supplied: bool
+    configuration_valid: bool | None
+    runtime_composed: bool
     event_id: str | None
     event_key: str | None
     event_name: str | None
@@ -130,7 +133,13 @@ class KernelStatusResponse(BaseModel):
     startup_error: str | None = None
 
 
-def _response(status: EventOperationalStatus) -> KernelStatusResponse:
+def _response(
+    status: EventOperationalStatus,
+    *,
+    configuration_supplied: bool,
+    configuration_valid: bool | None,
+    runtime_composed: bool,
+) -> KernelStatusResponse:
     reconciliation = status.latest_reconciliation
 
     def session_response(item: object) -> AssemblingSessionResponse:
@@ -173,6 +182,9 @@ def _response(status: EventOperationalStatus) -> KernelStatusResponse:
 
     return KernelStatusResponse(
         configured=True,
+        configuration_supplied=configuration_supplied,
+        configuration_valid=configuration_valid,
+        runtime_composed=runtime_composed,
         event_id=status.event_id.value,
         event_key=status.event_key,
         event_name=status.event_name,
@@ -312,13 +324,28 @@ def _response(status: EventOperationalStatus) -> KernelStatusResponse:
 def kernel_status(request: Request, response: Response) -> KernelStatusResponse:
     components = getattr(request.app.state, "kernel", None)
     startup_error = getattr(request.app.state, "kernel_startup_error", None)
+    startup_progress = getattr(request.app.state, "kernel_startup_progress", None)
+    if not isinstance(startup_progress, KernelStartupProgress):
+        startup_progress = KernelStartupProgress()
+    configuration_supplied = startup_progress.configuration_supplied
+    configuration_valid = startup_progress.configuration_valid
+    database_available = startup_progress.database_available is True
+    runtime_composed = startup_progress.runtime_composed
+    if isinstance(components, KernelComponents):
+        configuration_supplied = True
+        configuration_valid = True
+        database_available = True
+        runtime_composed = components.runtime is not None
     if components is None:
         return KernelStatusResponse(
-            configured=False,
+            configured=configuration_valid is True,
+            configuration_supplied=configuration_supplied,
+            configuration_valid=configuration_valid,
+            runtime_composed=runtime_composed,
             event_id=None,
             event_key=None,
             event_name=None,
-            database_available=False,
+            database_available=database_available,
             ready=False,
             recovering=False,
             reconciliation_status=None,
@@ -337,6 +364,9 @@ def kernel_status(request: Request, response: Response) -> KernelStatusResponse:
         response.status_code = 503
         return KernelStatusResponse(
             configured=True,
+            configuration_supplied=configuration_supplied,
+            configuration_valid=configuration_valid,
+            runtime_composed=runtime_composed,
             event_id=None,
             event_key=components.event_key,
             event_name=components.configuration.deployment.event.name,
@@ -353,6 +383,9 @@ def kernel_status(request: Request, response: Response) -> KernelStatusResponse:
     if status is None:
         return KernelStatusResponse(
             configured=True,
+            configuration_supplied=configuration_supplied,
+            configuration_valid=configuration_valid,
+            runtime_composed=runtime_composed,
             event_id=None,
             event_key=components.event_key,
             event_name=components.configuration.deployment.event.name,
@@ -365,7 +398,12 @@ def kernel_status(request: Request, response: Response) -> KernelStatusResponse:
             stages=(),
             attention_codes=("explicit_event_stage_bootstrap_required",),
         )
-    return _response(status)
+    return _response(
+        status,
+        configuration_supplied=configuration_supplied,
+        configuration_valid=configuration_valid,
+        runtime_composed=runtime_composed,
+    )
 
 
 __all__ = [

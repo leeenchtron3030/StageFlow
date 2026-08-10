@@ -29,6 +29,22 @@ from .media_cycle import BoundedMediaCycle, MediaCycleResult
 from .runtime_factory import build_stageflow_runtime
 
 
+class KernelDatabaseUnavailableError(RuntimeError):
+    """The configured PostgreSQL dependency could not be reached."""
+
+
+class KernelSchemaMigrationRequiredError(RuntimeError):
+    """PostgreSQL is reachable but does not have the required Kernel schema."""
+
+
+@dataclass(slots=True)
+class KernelStartupProgress:
+    configuration_supplied: bool = False
+    configuration_valid: bool | None = None
+    database_available: bool | None = None
+    runtime_composed: bool = False
+
+
 @dataclass(slots=True)
 class KernelComponents:
     configuration: EffectiveKernelConfiguration
@@ -153,9 +169,11 @@ def verify_kernel_schema(dsn: str) -> None:
                 """
             ).fetchone()
             if row is None or row[0] != 5:
-                raise RuntimeError("kernel_schema_migration_required")
+                raise KernelSchemaMigrationRequiredError(
+                    "kernel_schema_migration_required"
+                )
     except psycopg.OperationalError as exc:
-        raise RuntimeError("postgresql_unavailable") from exc
+        raise KernelDatabaseUnavailableError("postgresql_unavailable") from exc
 
 
 def build_kernel_components(
@@ -181,27 +199,51 @@ def load_kernel_components_from_environment(
     *,
     environment: dict[str, str] | None = None,
     clock: Clock | None = None,
+    progress: KernelStartupProgress | None = None,
 ) -> KernelComponents | None:
+    startup = progress if progress is not None else KernelStartupProgress()
     env = dict(os.environ) if environment is None else environment
     path = env.get("STAGEFLOW_KERNEL_CONFIG_PATH")
     if path is None:
         return None
-    configuration = load_kernel_deployment_configuration(path, environment=env)
-    verify_kernel_schema(configuration.postgres_dsn)
+    startup.configuration_supplied = True
+    try:
+        configuration = load_kernel_deployment_configuration(path, environment=env)
+    except (OSError, ValueError):
+        startup.configuration_valid = False
+        raise
+    startup.configuration_valid = True
+    try:
+        verify_kernel_schema(configuration.postgres_dsn)
+    except KernelDatabaseUnavailableError:
+        startup.database_available = False
+        raise
+    except KernelSchemaMigrationRequiredError:
+        startup.database_available = True
+        raise
+    startup.database_available = True
     components = build_kernel_components(configuration, clock=clock)
-    event = components.repository.get_event_by_key(components.event_key)
-    if event is not None:
-        components.runtime = build_stageflow_runtime(
-            configuration,
-            stages=components.repository.list_stages(event.id),
-            clock=components.kernel.clock,
-        )
-        components.compose_media_cycle()
-        components.reconcile_startup(event.id)
+    try:
+        event = components.repository.get_event_by_key(components.event_key)
+        if event is not None:
+            components.runtime = build_stageflow_runtime(
+                configuration,
+                stages=components.repository.list_stages(event.id),
+                clock=components.kernel.clock,
+            )
+            components.compose_media_cycle()
+            startup.runtime_composed = True
+            components.reconcile_startup(event.id)
+    except KernelStorageUnavailableError:
+        startup.database_available = False
+        raise
     return components
 
 
 __all__ = [
+    "KernelDatabaseUnavailableError",
+    "KernelSchemaMigrationRequiredError",
+    "KernelStartupProgress",
     "KernelComponents",
     "build_kernel_components",
     "load_kernel_components_from_environment",
