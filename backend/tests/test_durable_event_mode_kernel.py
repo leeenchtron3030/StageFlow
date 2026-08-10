@@ -8,6 +8,7 @@ from uuid import uuid4
 
 import psycopg
 import pytest
+from psycopg.types.json import Jsonb
 
 from app.contexts.events import (
     BootstrapStatus,
@@ -989,6 +990,12 @@ def test_kernel_migration_is_normalized_typed_and_reversible() -> None:
     corrections_reverse = (
         sql_directory / "0004_kernel_review_corrections_reverse.sql"
     ).read_text(encoding="utf-8")
+    follow_up_forward = (
+        sql_directory / "0005_kernel_follow_up_closure_forward.sql"
+    ).read_text(encoding="utf-8")
+    follow_up_reverse = (
+        sql_directory / "0005_kernel_follow_up_closure_reverse.sql"
+    ).read_text(encoding="utf-8")
 
     for table in (
         "business_event",
@@ -1016,8 +1023,14 @@ def test_kernel_migration_is_normalized_typed_and_reversible() -> None:
         assert f"stageflow.{table}" in corrections_reverse
     assert "media_association_history_status_ck" in corrections_forward
     assert "media_association_policy_authority_ck" in corrections_forward
+    assert "membership_snapshot_status" in follow_up_forward
+    assert "legacy_equal_time_association_ambiguity" in follow_up_forward
+    assert "h.decided_at < c.decided_at" in follow_up_forward
+    assert "result_snapshot" in follow_up_forward
+    assert "legacy_reconstructed_0005" in follow_up_reverse
     assert "DROP SCHEMA" not in reverse
     assert "DROP SCHEMA" not in corrections_reverse
+    assert "DROP SCHEMA" not in follow_up_reverse
 
 
 def test_postgres_unavailability_is_typed_without_memory_fallback(
@@ -1035,6 +1048,231 @@ def test_postgres_unavailability_is_typed_without_memory_fallback(
 
 
 _POSTGRES_DSN = os.getenv("STAGEFLOW_TEST_POSTGRES_DSN")
+
+
+@pytest.mark.skipif(
+    not _POSTGRES_DSN,
+    reason="STAGEFLOW_TEST_POSTGRES_DSN is required for real migration checks.",
+)
+def test_real_postgres_legacy_completion_membership_migration_and_reversal() -> None:
+    assert _POSTGRES_DSN is not None
+    runner = PostgresMigrationRunner(_POSTGRES_DSN)
+    runner.apply_event_mode_kernel_v1()
+    runner.reverse_kernel_follow_up_closure()
+
+    suffix = uuid4().hex
+    completion_ids: list[str] = []
+    asset_ids: list[str] = []
+    try:
+        with psycopg.connect(_POSTGRES_DSN) as connection:
+            for index, ambiguous in enumerate((False, True)):
+                event_id = str(uuid4())
+                stage_id = str(uuid4())
+                session_id = str(uuid4())
+                candidate_id = str(uuid4())
+                asset_id = str(uuid4())
+                completion_id = str(uuid4())
+                completion_ids.append(completion_id)
+                asset_ids.append(asset_id)
+                source_key = f"legacy-source-{index}-{suffix}"
+                completion_at = NOW + timedelta(hours=index + 2)
+                association_at = (
+                    completion_at if ambiguous else completion_at - timedelta(seconds=1)
+                )
+                connection.execute(
+                    """
+                    INSERT INTO stageflow.business_event (
+                        event_id, event_key, name, revision, created_at, updated_at
+                    ) VALUES (%s, %s, 'Legacy migration event', 1, %s, %s)
+                    """,
+                    (event_id, f"legacy-event-{index}-{suffix}", NOW, NOW),
+                )
+                connection.execute(
+                    """
+                    INSERT INTO stageflow.stage (
+                        stage_id, event_id, stage_key, name, revision, created_at, updated_at
+                    ) VALUES (%s, %s, 'main', 'Main', 1, %s, %s)
+                    """,
+                    (stage_id, event_id, NOW, NOW),
+                )
+                connection.execute(
+                    """
+                    INSERT INTO stageflow.stage_source_binding (
+                        source_binding_key, stage_id, source_reference, revision, updated_at
+                    ) VALUES (%s, %s, %s, 1, %s)
+                    """,
+                    (source_key, stage_id, f"C:/legacy/{suffix}/{index}", NOW),
+                )
+                connection.execute(
+                    """
+                    INSERT INTO stageflow.session (
+                        session_id, event_id, stage_id, activity_state, package_state,
+                        authoritative_start, authoritative_end, package_revision,
+                        revision, created_by, created_at, updated_at
+                    ) VALUES (%s, %s, %s, 'presentation_ended', 'correction_required',
+                              %s, %s, 2, 5, %s, %s, %s)
+                    """,
+                    (
+                        session_id,
+                        event_id,
+                        stage_id,
+                        NOW,
+                        NOW + timedelta(hours=1),
+                        ACTOR_ID.value,
+                        NOW,
+                        completion_at + timedelta(minutes=1),
+                    ),
+                )
+                connection.execute(
+                    """
+                    INSERT INTO stageflow.media_candidate (
+                        candidate_id, proposed_asset_id, stage_id, source_binding_key,
+                        source_reference, discovered_at, last_observed_at,
+                        registration_state, revision
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, 'registered', 1)
+                    """,
+                    (
+                        candidate_id,
+                        asset_id,
+                        stage_id,
+                        source_key,
+                        f"C:/legacy/{suffix}/{index}.mkv",
+                        NOW,
+                        NOW,
+                    ),
+                )
+                connection.execute(
+                    """
+                    INSERT INTO stageflow.completed_media_asset_registry (
+                        asset_id, candidate_id, manifest_id, stage_id,
+                        source_binding_key, registered_at
+                    ) VALUES (%s, %s, %s, %s, %s, %s)
+                    """,
+                    (asset_id, candidate_id, str(uuid4()), stage_id, source_key, NOW),
+                )
+                connection.execute(
+                    """
+                    INSERT INTO stageflow.media_association_history (
+                        association_history_id, asset_id, association_revision,
+                        association_status, session_id, authority, reason_codes,
+                        evidence_ids, actor_id, decided_at, policy_id, policy_version,
+                        input_references, operation_id
+                    ) VALUES (%s, %s, 1, 'associated', %s, 'deterministic',
+                              '["legacy"]'::jsonb, '[]'::jsonb, NULL, %s,
+                              'stageflow.kernel.media-association', '1.0.0',
+                              %s, NULL)
+                    """,
+                    (
+                        str(uuid4()),
+                        asset_id,
+                        session_id,
+                        association_at,
+                        Jsonb(
+                            [
+                                {
+                                    "record_type": "registered_media_asset",
+                                    "record_id": asset_id,
+                                    "revision": None,
+                                }
+                            ]
+                        ),
+                    ),
+                )
+                connection.execute(
+                    """
+                    INSERT INTO stageflow.human_command_idempotency (
+                        operation_id, command_kind, request_digest, result_id, recorded_at
+                    ) VALUES (%s, 'legacy_package_completion', %s, %s, %s)
+                    """,
+                    (completion_id, "0" * 64, completion_id, completion_at),
+                )
+                connection.execute(
+                    """
+                    INSERT INTO stageflow.session_completion_history (
+                        completion_decision_id, session_id, package_revision, actor_id,
+                        approved, reason, decided_at, operation_id
+                    ) VALUES (%s, %s, 1, %s, true, 'legacy approval', %s, %s)
+                    """,
+                    (
+                        completion_id,
+                        session_id,
+                        ACTOR_ID.value,
+                        completion_at,
+                        completion_id,
+                    ),
+                )
+
+        runner.apply_kernel_follow_up_closure()
+        with psycopg.connect(_POSTGRES_DSN) as connection:
+            rows = connection.execute(
+                """
+                SELECT completion_decision_id::text, membership_snapshot_status,
+                       membership_snapshot_reason
+                FROM stageflow.session_completion_history
+                WHERE completion_decision_id = ANY(%s::uuid[])
+                ORDER BY completion_decision_id
+                """,
+                (completion_ids,),
+            ).fetchall()
+            statuses = {row[0]: (row[1], row[2]) for row in rows}
+            assert statuses[completion_ids[0]] == (
+                "reconstructed",
+                "legacy_strictly_prior_association_history",
+            )
+            assert statuses[completion_ids[1]] == (
+                "unresolved",
+                "legacy_equal_time_association_ambiguity",
+            )
+            memberships = connection.execute(
+                """
+                SELECT completion_decision_id::text, asset_id::text, snapshot_origin
+                FROM stageflow.session_completion_asset
+                WHERE completion_decision_id = ANY(%s::uuid[])
+                """,
+                (completion_ids,),
+            ).fetchall()
+            assert memberships == [
+                (completion_ids[0], asset_ids[0], "legacy_reconstructed_0005")
+            ]
+
+        runner.reverse_kernel_follow_up_closure()
+        runner.reverse_kernel_follow_up_closure()
+        with psycopg.connect(_POSTGRES_DSN) as connection:
+            migration_count = connection.execute(
+                "SELECT count(*) FROM stageflow.schema_migration"
+            ).fetchone()
+            reconstructed_count = connection.execute(
+                """
+                SELECT count(*) FROM stageflow.session_completion_asset
+                WHERE completion_decision_id = ANY(%s::uuid[])
+                """,
+                (completion_ids,),
+            ).fetchone()
+            snapshot_column = connection.execute(
+                """
+                SELECT count(*) FROM information_schema.columns
+                WHERE table_schema = 'stageflow'
+                  AND table_name = 'human_command_idempotency'
+                  AND column_name = 'result_snapshot'
+                """
+            ).fetchone()
+            assert migration_count == (4,)
+            assert reconstructed_count == (0,)
+            assert snapshot_column == (0,)
+
+        runner.apply_kernel_follow_up_closure()
+        with psycopg.connect(_POSTGRES_DSN) as connection:
+            reapplied = connection.execute(
+                """
+                SELECT count(*) FROM stageflow.session_completion_asset
+                WHERE completion_decision_id = %s
+                  AND snapshot_origin = 'legacy_reconstructed_0005'
+                """,
+                (completion_ids[0],),
+            ).fetchone()
+            assert reapplied == (1,)
+    finally:
+        runner.apply_kernel_follow_up_closure()
 
 
 @pytest.mark.skipif(
@@ -1128,6 +1366,8 @@ def test_real_postgres_kernel_reconstruction_and_history() -> None:
     assert association.session_id == session.id
     assert production_event_id is not None
     assert restarted_repository.list_boundary_proposals(session.id) == (proposal,)
+
+
     assert restarted_repository.get_session(session.id) == session
     registered_candidate = restarted_repository.get_candidate(registered.candidate_id)
     assert registered_candidate is not None
@@ -1219,6 +1459,109 @@ def test_real_postgres_kernel_reconstruction_and_history() -> None:
         connection.execute(
             "DELETE FROM stageflow.business_event WHERE event_id = %s",
             (first.event.id.value,),
+        )
+
+
+@pytest.mark.skipif(
+    not _POSTGRES_DSN,
+    reason="STAGEFLOW_TEST_POSTGRES_DSN is required for delayed replay checks.",
+)
+def test_real_postgres_delayed_human_command_replay_returns_original_session() -> None:
+    assert _POSTGRES_DSN is not None
+    PostgresMigrationRunner(_POSTGRES_DSN).apply_event_mode_kernel_v1()
+    suffix = uuid4().hex
+    repository = PostgresEventModeKernelRepository(_POSTGRES_DSN)
+    bootstrapped = repository.bootstrap(
+        EventStageBootstrapRequest(
+            operation_id=EntityId.new(),
+            event_key=f"replay-event-{suffix}",
+            event_name="Delayed Replay Event",
+            stages=(
+                StageBootstrapDefinition(
+                    key="main",
+                    name="Main",
+                    source_bindings={
+                        f"replay-source-{suffix}": f"C:/replay/{suffix}"
+                    },
+                ),
+            ),
+            actor_id=ACTOR_ID,
+            requested_at=NOW,
+        )
+    )
+    assert bootstrapped.event is not None
+    kernel = DurableEventModeKernel(repository=repository, clock=FixedClock(NOW))
+    start_operation_id = EntityId.new()
+    start_request = StartSessionRequest(
+        operation_id=start_operation_id,
+        event_id=bootstrapped.event.id,
+        stage_id=bootstrapped.stages[0].id,
+        actor_id=ACTOR_ID,
+        authoritative_start=NOW,
+        requested_at=NOW,
+    )
+    started = kernel.start_session(start_request)
+    boundary_operation_id = EntityId.new()
+    ended = kernel.correct_session_boundary(
+        operation_id=boundary_operation_id,
+        session_id=started.id,
+        boundary_kind="end",
+        boundary_at=NOW + timedelta(hours=1),
+        actor_id=ACTOR_ID,
+        reason="presentation_ended",
+    )
+    kernel.mark_package_ready(started.id)
+    completion_operation_id = EntityId.new()
+    completed = kernel.complete_package(
+        operation_id=completion_operation_id,
+        session_id=started.id,
+        actor_id=ACTOR_ID,
+        approved=True,
+        reason="package_approved",
+    )
+    current = kernel.correct_session_boundary(
+        operation_id=EntityId.new(),
+        session_id=started.id,
+        boundary_kind="start",
+        boundary_at=NOW + timedelta(minutes=5),
+        actor_id=ACTOR_ID,
+        reason="later_boundary_correction",
+    )
+    assert current not in {started, ended, completed}
+
+    restarted = DurableEventModeKernel(
+        repository=PostgresEventModeKernelRepository(_POSTGRES_DSN),
+        clock=FixedClock(NOW),
+    )
+    assert restarted.start_session(start_request) == started
+    assert (
+        restarted.correct_session_boundary(
+            operation_id=boundary_operation_id,
+            session_id=started.id,
+            boundary_kind="end",
+            boundary_at=NOW + timedelta(hours=1),
+            actor_id=ACTOR_ID,
+            reason="presentation_ended",
+        )
+        == ended
+    )
+    assert (
+        restarted.complete_package(
+            operation_id=completion_operation_id,
+            session_id=started.id,
+            actor_id=ACTOR_ID,
+            approved=True,
+            reason="package_approved",
+        )
+        == completed
+    )
+    with pytest.raises(KernelConflictError, match="human_command_operation_id_conflict"):
+        restarted.complete_package(
+            operation_id=completion_operation_id,
+            session_id=started.id,
+            actor_id=ACTOR_ID,
+            approved=False,
+            reason="different_request",
         )
 
 

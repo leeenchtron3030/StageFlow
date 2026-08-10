@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Mapping
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, cast
 
@@ -53,6 +54,12 @@ from app.contexts.production.event_mode_kernel.repository import (
 from app.shared.ids import EntityId
 
 type Row = dict[str, Any]
+
+
+@dataclass(frozen=True, slots=True)
+class _HumanCommandReplay:
+    result_id: EntityId
+    result_snapshot: Mapping[str, object] | None
 
 
 def _digest(value: Mapping[str, object]) -> str:
@@ -148,6 +155,74 @@ def _session(row: Row) -> Session:
         created_by=EntityId(str(row["created_by"])),
         created_at=cast(datetime, row["created_at"]),
         updated_at=cast(datetime, row["updated_at"]),
+    )
+
+
+def _session_result_snapshot(session: Session) -> dict[str, object]:
+    return {
+        "schema_version": "session-result-v1",
+        "session": {
+            "session_id": session.id.value,
+            "event_id": session.event_id.value,
+            "stage_id": session.stage_id.value,
+            "program_expectation_id": (
+                None
+                if session.program_expectation_id is None
+                else session.program_expectation_id.value
+            ),
+            "title": session.title,
+            "activity_state": session.activity_state.value,
+            "package_state": session.package_state.value,
+            "authoritative_start": session.authoritative_start.isoformat(),
+            "authoritative_end": (
+                None
+                if session.authoritative_end is None
+                else session.authoritative_end.isoformat()
+            ),
+            "package_revision": session.package_revision,
+            "revision": session.revision,
+            "created_by": session.created_by.value,
+            "created_at": session.created_at.isoformat(),
+            "updated_at": session.updated_at.isoformat(),
+        },
+    }
+
+
+def _session_from_result_snapshot(snapshot: Mapping[str, object]) -> Session:
+    untyped_payload = snapshot.get("session")
+    if snapshot.get("schema_version") != "session-result-v1" or not isinstance(
+        untyped_payload, Mapping
+    ):
+        raise KernelConflictError("human_command_result_snapshot_invalid")
+    payload = cast(Mapping[str, object], untyped_payload)
+
+    def timestamp(name: str) -> datetime:
+        value = payload[name]
+        if not isinstance(value, str):
+            raise KernelConflictError("human_command_result_snapshot_invalid")
+        return datetime.fromisoformat(value)
+
+    end = payload["authoritative_end"]
+    expectation_id = payload["program_expectation_id"]
+    return Session(
+        id=EntityId(str(payload["session_id"])),
+        event_id=EntityId(str(payload["event_id"])),
+        stage_id=EntityId(str(payload["stage_id"])),
+        program_expectation_id=(
+            None if expectation_id is None else EntityId(str(expectation_id))
+        ),
+        title=None if payload["title"] is None else str(payload["title"]),
+        activity_state=SessionActivityState(str(payload["activity_state"])),
+        package_state=SessionPackageState(str(payload["package_state"])),
+        authoritative_start=timestamp("authoritative_start"),
+        authoritative_end=(
+            None if end is None else datetime.fromisoformat(str(end))
+        ),
+        package_revision=int(str(payload["package_revision"])),
+        revision=int(str(payload["revision"])),
+        created_by=EntityId(str(payload["created_by"])),
+        created_at=timestamp("created_at"),
+        updated_at=timestamp("updated_at"),
     )
 
 
@@ -295,7 +370,7 @@ class PostgresEventModeKernelRepository(EventModeKernelRepository):
         request_digest: str,
         result_id: EntityId,
         recorded_at: datetime,
-    ) -> EntityId | None:
+    ) -> _HumanCommandReplay | None:
         inserted = connection.execute(
             """
             INSERT INTO stageflow.human_command_idempotency (
@@ -316,7 +391,7 @@ class PostgresEventModeKernelRepository(EventModeKernelRepository):
             return None
         replay = connection.execute(
             """
-            SELECT command_kind, request_digest, result_id
+            SELECT command_kind, request_digest, result_id, result_snapshot
             FROM stageflow.human_command_idempotency WHERE operation_id = %s
             """,
             (operation_id.value,),
@@ -327,7 +402,29 @@ class PostgresEventModeKernelRepository(EventModeKernelRepository):
             or replay["request_digest"] != request_digest
         ):
             raise KernelConflictError("human_command_operation_id_conflict")
-        return EntityId(str(replay["result_id"]))
+        snapshot = cast(Mapping[str, object] | None, replay["result_snapshot"])
+        return _HumanCommandReplay(
+            result_id=EntityId(str(replay["result_id"])),
+            result_snapshot=snapshot,
+        )
+
+    @staticmethod
+    def _record_session_result(
+        connection: psycopg.Connection[Row],
+        *,
+        operation_id: EntityId,
+        session: Session,
+    ) -> None:
+        updated = connection.execute(
+            """
+            UPDATE stageflow.human_command_idempotency
+            SET result_snapshot = %s
+            WHERE operation_id = %s
+            """,
+            (Jsonb(_session_result_snapshot(session)), operation_id.value),
+        )
+        if updated.rowcount != 1:
+            raise KernelConflictError("human_command_result_snapshot_missing")
 
     def bootstrap(self, request: EventStageBootstrapRequest) -> EventStageBootstrapResult:
         for attempt in range(2):
@@ -739,14 +836,23 @@ class PostgresEventModeKernelRepository(EventModeKernelRepository):
             with self._connect() as connection:
                 replay = connection.execute(
                     """
-                    SELECT session_id, request_digest
-                    FROM stageflow.session_start_operation WHERE operation_id = %s
+                    SELECT operation.session_id, operation.request_digest,
+                           command.result_snapshot
+                    FROM stageflow.session_start_operation operation
+                    LEFT JOIN stageflow.human_command_idempotency command
+                      ON command.operation_id = operation.operation_id
+                    WHERE operation.operation_id = %s
                     """,
                     (request.operation_id.value,),
                 ).fetchone()
                 if replay is not None:
                     if replay["request_digest"] != request_digest:
                         raise KernelConflictError("session_start_operation_id_conflict")
+                    snapshot = cast(
+                        Mapping[str, object] | None, replay["result_snapshot"]
+                    )
+                    if snapshot is not None:
+                        return _session_from_result_snapshot(snapshot)
                     row = connection.execute(
                         "SELECT * FROM stageflow.session WHERE session_id = %s",
                         (str(replay["session_id"]),),
@@ -763,9 +869,13 @@ class PostgresEventModeKernelRepository(EventModeKernelRepository):
                     recorded_at=request.requested_at,
                 )
                 if command_replay_id is not None:
+                    if command_replay_id.result_snapshot is not None:
+                        return _session_from_result_snapshot(
+                            command_replay_id.result_snapshot
+                        )
                     row = connection.execute(
                         "SELECT * FROM stageflow.session WHERE session_id = %s",
-                        (command_replay_id.value,),
+                        (command_replay_id.result_id.value,),
                     ).fetchone()
                     assert row is not None
                     return _session(row)
@@ -848,7 +958,13 @@ class PostgresEventModeKernelRepository(EventModeKernelRepository):
                     (session_id.value,),
                 ).fetchone()
                 assert row is not None
-                return _session(row)
+                saved = _session(row)
+                self._record_session_result(
+                    connection,
+                    operation_id=request.operation_id,
+                    session=saved,
+                )
+                return saved
         except UniqueViolation as exc:
             raise KernelConflictError("stage_already_has_active_session") from exc
         except psycopg.OperationalError as exc:
@@ -908,16 +1024,22 @@ class PostgresEventModeKernelRepository(EventModeKernelRepository):
                         SELECT * FROM stageflow.session_boundary_history
                         WHERE boundary_decision_id = %s
                         """,
-                        (replay_id.value,),
+                        (replay_id.result_id.value,),
                     ).fetchone()
                     assert replay is not None
-                    session_row = connection.execute(
-                        "SELECT * FROM stageflow.session WHERE session_id = %s",
-                        (str(replay["session_id"]),),
-                    ).fetchone()
-                    assert session_row is not None
-                    return _session(session_row), BoundaryDecision(
-                        id=replay_id,
+                    if replay_id.result_snapshot is not None:
+                        replayed_session = _session_from_result_snapshot(
+                            replay_id.result_snapshot
+                        )
+                    else:
+                        session_row = connection.execute(
+                            "SELECT * FROM stageflow.session WHERE session_id = %s",
+                            (str(replay["session_id"]),),
+                        ).fetchone()
+                        assert session_row is not None
+                        replayed_session = _session(session_row)
+                    return replayed_session, BoundaryDecision(
+                        id=replay_id.result_id,
                         session_id=EntityId(str(replay["session_id"])),
                         boundary_kind=cast(str, replay["boundary_kind"]),
                         boundary_at=cast(datetime, replay["boundary_at"]),
@@ -1011,7 +1133,13 @@ class PostgresEventModeKernelRepository(EventModeKernelRepository):
                     (session_id.value,),
                 ).fetchone()
                 assert updated is not None
-                return _session(updated), decision
+                saved = _session(updated)
+                self._record_session_result(
+                    connection,
+                    operation_id=operation_id,
+                    session=saved,
+                )
+                return saved, decision
         except psycopg.OperationalError as exc:
             raise KernelStorageUnavailableError("postgresql_unavailable") from exc
 
@@ -1368,7 +1496,7 @@ class PostgresEventModeKernelRepository(EventModeKernelRepository):
                             FROM stageflow.media_association_history
                             WHERE association_history_id = %s
                             """,
-                            (replay_id.value,),
+                            (replay_id.result_id.value,),
                         ).fetchone()
                         assert replay is not None
                         return _association(replay)
@@ -1573,9 +1701,11 @@ class PostgresEventModeKernelRepository(EventModeKernelRepository):
                         SELECT session_id FROM stageflow.session_completion_history
                         WHERE completion_decision_id = %s
                         """,
-                        (replay_id.value,),
+                        (replay_id.result_id.value,),
                     ).fetchone()
                     assert replay is not None
+                    if replay_id.result_snapshot is not None:
+                        return _session_from_result_snapshot(replay_id.result_snapshot)
                     replayed_session = connection.execute(
                         "SELECT * FROM stageflow.session WHERE session_id = %s",
                         (str(replay["session_id"]),),
@@ -1646,7 +1776,13 @@ class PostgresEventModeKernelRepository(EventModeKernelRepository):
                         ),
                     )
                 assert updated is not None
-                return _session(updated)
+                saved = _session(updated)
+                self._record_session_result(
+                    connection,
+                    operation_id=decision.operation_id,
+                    session=saved,
+                )
+                return saved
         except psycopg.OperationalError as exc:
             raise KernelStorageUnavailableError("postgresql_unavailable") from exc
 

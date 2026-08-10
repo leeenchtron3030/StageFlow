@@ -147,11 +147,12 @@ def verify_kernel_schema(dsn: str) -> None:
                 WHERE version IN (
                     '0001_ingress', '0002_event_mode_kernel',
                     '0003_kernel_projections',
-                    '0004_kernel_review_corrections'
+                    '0004_kernel_review_corrections',
+                    '0005_kernel_follow_up_closure'
                 )
                 """
             ).fetchone()
-            if row is None or row[0] != 4:
+            if row is None or row[0] != 5:
                 raise RuntimeError("kernel_schema_migration_required")
     except psycopg.OperationalError as exc:
         raise RuntimeError("postgresql_unavailable") from exc
