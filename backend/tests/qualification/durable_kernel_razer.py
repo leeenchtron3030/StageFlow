@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import argparse
+import ctypes
 import hashlib
 import json
 import os
 import subprocess
 import time
-from ctypes import POINTER, Structure, byref, c_size_t, sizeof, windll
+from ctypes import POINTER, Structure, byref, c_size_t, sizeof
 from ctypes.wintypes import BOOL, DWORD, HANDLE
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -50,11 +51,14 @@ class _ProcessMemoryCounters(Structure):
 
 
 def _working_set_bytes() -> int:
+    native_windll = getattr(ctypes, "windll", None)
+    if native_windll is None:
+        raise OSError("Windows process memory APIs are unavailable")
     counters = _ProcessMemoryCounters()
     counters.cb = sizeof(counters)
-    get_current_process = windll.kernel32.GetCurrentProcess
+    get_current_process = native_windll.kernel32.GetCurrentProcess
     get_current_process.restype = HANDLE
-    get_process_memory_info = windll.psapi.GetProcessMemoryInfo
+    get_process_memory_info = native_windll.psapi.GetProcessMemoryInfo
     get_process_memory_info.argtypes = [
         HANDLE,
         POINTER(_ProcessMemoryCounters),
