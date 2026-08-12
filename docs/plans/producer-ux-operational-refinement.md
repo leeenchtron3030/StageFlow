@@ -2,7 +2,7 @@
 
 ## Status
 
-In progress
+Complete
 
 ## Execution authority
 
@@ -187,24 +187,24 @@ preview failure without leaking paths or credentials into UI projections.
 
 ## Acceptance criteria
 
-- [ ] Mission Control keeps one through seven-plus Stages simultaneously scannable and
+- [x] Mission Control keeps one through seven-plus Stages simultaneously scannable and
   handles long Stage/Session identities and no active Session without layout loss.
-- [ ] Normal stabilization and trailing assembly remain quiet; Runs 003/004 communicate
+- [x] Normal stabilization and trailing assembly remain quiet; Runs 003/004 communicate
   preservation and review without production-failure language.
-- [ ] `LIVE - connected`, `LIVE - unavailable`, `LIVE - unconfigured`, and
+- [x] `LIVE - connected`, `LIVE - unavailable`, `LIVE - unconfigured`, and
   `DEVELOPMENT FIXTURE` are unmistakable and behavior-tested.
-- [ ] Stage/Session drill-down exposes bounded affected media, association reasoning,
+- [x] Stage/Session drill-down exposes bounded affected media, association reasoning,
   eligible Session context only where the projection proves it, otherwise Sessions
   considered by policy, plus a comprehensible non-selection reason.
-- [ ] MTE labels Observed and Derived facts, qualification, provenance, precision,
+- [x] MTE labels Observed and Derived facts, qualification, provenance, precision,
   limitations, candidate interval, and advisory-only use; unqualified evidence cannot
   visually appear authoritative or enter Producer Attention.
-- [ ] Infrastructure separates health, consequence, and Attention; Internet degradation
+- [x] Infrastructure separates health, consequence, and Attention; Internet degradation
   explicitly preserves local Event Mode.
-- [ ] Editorial frames Session, media/timeline, transcript, Candidate, Hot Moment,
+- [x] Editorial frames Session, media/timeline, transcript, Candidate, Hot Moment,
   approved Clip, and human-review states without implying a connected AI subsystem.
-- [ ] Disabled authority controls explain their backend/authority prerequisite.
-- [ ] Preview, feedback, security-triage, responsive, keyboard, and validation evidence
+- [x] Disabled authority controls explain their backend/authority prerequisite.
+- [x] Preview, feedback, security-triage, responsive, keyboard, and validation evidence
   are documented; all required checks pass or an exact blocker is recorded.
 
 ## Rollback or reversal
@@ -221,11 +221,35 @@ requires reversal.
 
 ## Completion record
 
-- **Implemented revision:** Pending
-- **Files and migrations actually changed:** Pending
-- **Commands and tests actually run:** Pending
-- **Results and warnings:** Pending
+- **Implemented revision:** `53695fe` (`Refine producer operational UX`); this
+  completion record follows in the same milestone branch.
+- **Files and migrations actually changed:** Frontend presentation model, Kernel/MTE
+  adapter, fixtures, operational components, responsive styles, behavior tests, package
+  manifest/lock, frontend and script guidance, UX plan/index, operator-feedback and
+  dependency-security documents, and one dev-only PowerShell preview helper. No backend
+  production code, schema, migration, durable state, deployment, or runtime configuration
+  changed.
+- **Commands and tests actually run:** `npm ci --ignore-scripts`; npm 11 audit/registry
+  diagnostics; `npm test`; `npm run lint`; `npm run typecheck`; `npm run build`;
+  PowerShell parser validation; Markdown relative-link, strict UTF-8, secret-pattern,
+  `git diff --check`, and staged-diff checks; in-app browser checks at 1512, 1440, 1280,
+  768, and 90/100/110/125-percent-equivalent CSS widths across quiet, scale, Runs 003/004,
+  source/cloud degradation, Stage, Session, Infrastructure, Editorial, development
+  fixture, live-unavailable, and live-unconfigured states.
+- **Results and warnings:** 14/14 behavior tests passed; lint completed with no warnings;
+  typecheck passed; the optimized Next.js 16.2.11 build passed all application routes;
+  PowerShell parsing, links, UTF-8, secret scan, and whitespace checks passed. Browser
+  checks found and corrected one constrained Session media-counter overflow and verified
+  linked MTE evidence, visible focus styling, explained disabled controls, and no remaining
+  horizontal overflow. npm still reports 12 package-level findings (3 moderate, 9 high)
+  in framework/tooling transitive paths; exact reachability and disposition are recorded
+  in `docs/ux/producer-ui-dependency-security.md`. Install scripts remained unapproved.
+  The preview helper was parser-validated and its equivalent child lifecycle was exercised
+  manually; direct helper invocation was skipped because `npm.cmd` is not on this Codex
+  process PATH. Backend checks were not rerun because no backend code changed.
 - **Execution authority used:** Green autonomous
 - **Approved deviations:** None
-- **Rollback status:** Reversible; not yet exercised
-- **Remaining work:** Pending
+- **Rollback status:** Reversible; not exercised
+- **Remaining work:** None within this milestone. Authority-command implementation, MTE
+  qualification, real Editorial/transcription execution, and deployment remain separately
+  governed work.
