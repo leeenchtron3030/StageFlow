@@ -499,6 +499,22 @@ directory watching, polling, stability or readiness detection, checksum calculat
 container probing, transfer, ingest, queue, Production Event, Observation, Evidence,
 Operational State, repository storage, AI, API, worker, or frontend behavior.
 
+## Media Timing Evidence
+
+ED-0054 and ADR-0027 add a separate immutable, revisioned Media Timing Evidence
+aggregate linked to one registered Completed Media Asset and its manifest version. Raw
+`Observed` timing facts remain structurally separate from `Derived` candidate intervals.
+Each revision retains sanitized inspection provenance, explicit recorder-profile
+qualification, limitations, predecessor lineage, and exact application idempotency.
+
+The application boundary accepts an already-inspected provider-neutral result and
+persists it synchronously. PostgreSQL is the durable authority; the in-memory repository
+is a test double. A sanitized projection and bounded read API support relevant Producer
+drill-down. Evidence is advisory only: it cannot mutate Session boundaries, media
+association, package state, or Producer Attention. No production inspector, provider
+adapter, watcher, queue, worker, transcript execution, recorder qualification, or
+automatic authority is introduced.
+
 ## Asset Stability and Readiness Detection
 
 ED-0049 defines deterministic evaluation of supplied objective resource facts. A

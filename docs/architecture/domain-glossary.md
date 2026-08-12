@@ -120,6 +120,20 @@ authorized by this document.
 - **Example:** A finalized recording segment registered after sufficient resource
   observations support `safe_to_read`.
 
+### Media Timing Evidence
+
+- **Definition:** An immutable, durable, asset-linked revision containing sanitized
+  Observed recorder/media timing facts, Derived candidate intervals, inspection
+  provenance, recorder-profile qualification state, and explicit limitations.
+- **Distinction:** It is not a mutable Completed Media Asset field, authoritative content
+  time, Semantic Evidence specialization, Session boundary, or association decision.
+- **Current aliases/legacy names:** `MediaTimingEvidence` under ADR-0027; the earlier
+  candidate architecture is accepted and renamed to the canonical architecture document.
+- **Migration:** Additive `0006_media_timing_evidence`; pre-existing assets require no
+  evidence/backfill and remain valid.
+- **Example:** Unqualified vMix `creation_time` and measured duration support a Derived
+  candidate interval shown as advisory evidence during media-uncertainty drill-down.
+
 ### Editorial Candidate Moment
 
 - **Definition:** A proposed editorial highlight awaiting human review.
@@ -140,6 +154,35 @@ authorized by this document.
   exists.
 - **Migration:** Use the qualified term at cross-context boundaries when implemented.
 - **Example:** A reviewer approves a 45-second range from an Editorial Candidate Moment.
+
+### Hot Moment
+
+- **Definition:** An urgency designation indicating that an Editorial Candidate Moment
+  or approved editorial output may require prompt reviewer attention.
+- **Distinction:** It is not a separate aggregate, editorial tier, approval action, or
+  grant of automatic authority.
+- **Current aliases/legacy names:** Foundational documents use `Hot Moment` and sometimes
+  describe a hot flag on Candidate Moment.
+- **Migration:** Keep urgency first-class where behavior-driving, but do not introduce a
+  `HotMoment` authority object in the first post-Kernel slice.
+- **Example:** A time-sensitive announcement candidate is prioritized in Editorial review
+  while remaining unapproved.
+
+### Session Assembly
+
+- **Definition:** A versioned downstream presentation plan that combines one fixed
+  Session package revision with template, approved packaging-asset, placement, and
+  resolved metadata references.
+- **Distinction:** It describes how a package should be presented; it does not change
+  Session boundaries, media membership, package revision, or package completeness.
+- **Current aliases/legacy names:** Foundational documents describe package/export
+  branding settings but do not define this separate aggregate. The existing Runtime
+  asset assembly plan is a Completed Media Asset manifest mapping and is not Session
+  Assembly.
+- **Migration:** No implementation exists. Assembly revision must remain independent of
+  Session package revision when introduced.
+- **Example:** Replacing a sponsor outro creates Assembly revision 4 while Session
+  package revision 2 remains unchanged.
 
 ### Operational State
 
@@ -204,8 +247,9 @@ authorized by this document.
   merely because they perform work.
 - **Current aliases/legacy names:** Older documents use `Job`; no implementation exists.
 - **Migration:** The first Kernel does not require a generic Durable Operation for its
-  bounded synchronous media cycle; the first genuinely asynchronous/external consumer
-  must justify and plan the operation schema.
+  bounded synchronous media cycle. Proposed ADR-0025 now evaluates the first concrete
+  asynchronous consumer, transcription; no operation schema exists until that decision
+  is accepted and implemented.
 - **Example:** A transcription provider request that may be deferred until online.
 
 ### Deployment profile
@@ -226,9 +270,11 @@ authorized by this document.
 | Concept | Current evidence | Unresolved decision |
 | --- | --- | --- |
 | Source Segment / durable Segment record | Disposition reserves a qualified durable media record; older documents use Media Chunk and Timeline Segment | Canonical record name, rename/alias behavior, and relationship to Completed Media Asset |
-| Job / Durable Operation / Task | Durable at-least-once work is accepted; no model exists | Public term and exact operation/attempt/worker schema |
+| Job / Durable Operation / Task | Durable at-least-once work is accepted; proposed ADR-0025 defines a minimal model | ADR-0025 acceptance plus public term and exact operation/attempt/worker schema |
 | Post-Kernel Session evolution | Human Session realization and reassignment are implemented | Automated realization, merge, and split policy |
 | Package and publication milestones | Distinct milestones are accepted | Aggregate names and detailed state machines remain deferred |
+| Packaging Asset / Event Asset | Session Assembly needs reusable approved presentation media distinct from package correctness | Aggregate name/owner and whether content composes a Completed Media Asset or a separate manifest |
+| Automation Policy / Approval Policy | Evidence -> Policy -> Authority and per-decision activation are proposed in ADR-0026 | Acceptance, public term, scope storage, and activation authority |
 
 Do not resolve these terms through incidental code naming. Record the decision first and
 then plan compatibility for documentation, contracts, storage, and APIs.

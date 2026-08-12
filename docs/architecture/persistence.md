@@ -47,6 +47,13 @@ ambiguity without fabricating membership. It also stores versioned original Sess
 result snapshots for new consequential human commands so delayed PostgreSQL replay
 matches the original operation after later state changes.
 
+`0006_media_timing_evidence` adds a dedicated append-only advisory evidence parent,
+typed Observed timing rows, typed Derived candidate-interval rows with explicit input
+lineage, and exact application-idempotency records linked to Completed Media Asset.
+Asset-scoped revisions preserve earlier interpretations. The schema stores sanitized
+normalized facts/provenance/limitations rather than private paths or provider dumps and
+does not update Session, association, or package tables.
+
 Registration is at least once and idempotent. It does not claim exactly-once delivery.
 Only a newly created ingress record is eligible for the included dispatcher path; an
 exact replay does not repeat that caller-visible dispatch path. The asset-registration
@@ -69,10 +76,11 @@ application time remain separate fields.
 ## Migration and reversal
 
 `0001_ingress_forward.sql` creates the shared schema, migration ledger, and ingress
-table. `0002_event_mode_kernel_forward.sql`, `0003_kernel_projections_forward.sql`, and
-`0004_kernel_review_corrections_forward.sql` and
-`0005_kernel_follow_up_closure_forward.sql` add only Kernel-owned objects. Reversal
-removes `0005`, `0004`, `0003`, then `0002` and their ledger rows while preserving
+table. `0002_event_mode_kernel_forward.sql`, `0003_kernel_projections_forward.sql`,
+`0004_kernel_review_corrections_forward.sql`, and
+`0005_kernel_follow_up_closure_forward.sql` and
+`0006_media_timing_evidence_forward.sql` add only bounded Production-owned objects.
+Reversal removes `0006`, `0005`, `0004`, `0003`, then `0002` and their ledger rows while preserving
 ingress and the shared schema. The `0005` reverse removes only membership tagged as its
 legacy reconstruction before dropping its additive columns.
 Reversal is an explicit operator action for an isolated database and is never automatic.

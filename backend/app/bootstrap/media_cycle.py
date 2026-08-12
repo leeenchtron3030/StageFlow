@@ -91,6 +91,14 @@ class _FileFacts:
     identity_token: str
 
 
+class _CandidateInspectionError(OSError):
+    """Privacy-safe typed failure raised by bounded candidate inspection."""
+
+    def __init__(self, code: str) -> None:
+        self.code = code
+        super().__init__(code)
+
+
 class BoundedMediaCycle:
     """One bounded, synchronous pass through accepted durable media contracts."""
 
@@ -261,6 +269,11 @@ class BoundedMediaCycle:
                 except KernelStorageUnavailableError:
                     raise
                 except (OSError, ValueError, RuntimeError) as exc:
+                    cycle_failure_code = (
+                        exc.code
+                        if isinstance(exc, _CandidateInspectionError)
+                        else type(exc).__name__
+                    )
                     failure_at = self.kernel.clock.now()
                     self.kernel.record_resource_observation(
                         candidate_id=durable.id,
@@ -276,7 +289,7 @@ class BoundedMediaCycle:
                             source_binding_key=key,
                             state=current.state,
                             outcome="failed",
-                            failure_code=type(exc).__name__,
+                            failure_code=cycle_failure_code,
                         )
                     )
         self.kernel.finish_reconciliation(
@@ -357,10 +370,10 @@ class BoundedMediaCycle:
         root_resolved = root.resolve(strict=True)
         pre = path.lstat()
         if stat.S_ISLNK(pre.st_mode) or not stat.S_ISREG(pre.st_mode):
-            raise OSError("candidate_not_regular_file")
+            raise _CandidateInspectionError("candidate_not_regular_file")
         resolved = path.resolve(strict=True)
         if not resolved.is_relative_to(root_resolved):
-            raise OSError("candidate_outside_configured_source")
+            raise _CandidateInspectionError("candidate_outside_configured_source")
         flags = os.O_RDONLY | int(getattr(os, "O_BINARY", 0))
         descriptor = os.open(resolved, flags)
         try:
@@ -372,7 +385,7 @@ class BoundedMediaCycle:
         if _stat_identity(pre) != _stat_identity(opened) or _stat_identity(
             opened
         ) != _stat_identity(post):
-            raise OSError("candidate_replaced_during_observation")
+            raise _CandidateInspectionError("candidate_replaced_during_observation")
         return _FileFacts(
             size_bytes=opened.st_size,
             modified_at=datetime.fromtimestamp(opened.st_mtime_ns / 1_000_000_000, UTC),

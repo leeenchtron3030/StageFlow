@@ -1,13 +1,13 @@
 export const designTokens = {
   typography: {
     fontFamily: {
-      sans: "Arial, Helvetica, sans-serif",
+      sans: "Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
       mono: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
     },
     fontSize: {
       body: "1rem",
       label: "0.875rem",
-      display: "3rem",
+      display: "2.375rem",
     },
   },
   spacing: {
@@ -48,6 +48,10 @@ export const designTokens = {
     border: "var(--border)",
     accent: "var(--accent)",
     accentForeground: "var(--accent-foreground)",
+    information: "var(--information)",
+    review: "var(--review)",
+    intervention: "var(--intervention)",
+    complete: "var(--complete)",
   },
 } as const;
 

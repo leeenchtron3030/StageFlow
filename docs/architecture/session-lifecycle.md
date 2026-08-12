@@ -88,8 +88,22 @@ human review. The accepted lifecycle is represented by related dimensions:
 projection. A Session can have presentation activity ended while media remains assembling.
 `Ready for review` is not `complete`.
 
+The authoritative Kernel application boundary requires `presentation_ended` and a
+non-null authoritative end before the Session package can enter `ready_for_review` or be
+completed. This cross-dimension guard preserves the distinct activity and package
+meanings while preventing an open-ended presentation from being treated as a reviewable
+complete Session package. Kernel v1 does not otherwise require non-empty membership or
+make every unresolved, conflicting, or stabilizing asset a package-readiness blocker;
+changing those rules requires separate accepted policy.
+
 Editorial selection, publication packaging, delivery, and archive are separate future
 lifecycles and do not change the meaning of Session completion.
+
+Media Timing Evidence under ADR-0027 is separate revisioned advisory evidence linked to
+a Completed Media Asset. Observed recorder facts and Derived candidate intervals may
+support future boundary proposals or association suggestions, but MTE v1 cannot directly
+change authoritative Session Start, Presentation End, membership, package readiness, or
+completion. The current unqualified vMix profile grants no Session authority.
 
 ## Boundary authority
 

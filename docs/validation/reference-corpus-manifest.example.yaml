@@ -1,0 +1,93 @@
+# Example annotation contract only. This file is not parsed by StageFlow runtime code.
+# Copy it to a future sanitized corpus manifest and replace every example value.
+# Never place event footage, credentials, or an absolute local media path in Git.
+
+schema_version: "1.0"
+corpus_id: "example-reference-corpus"
+corpus_revision: 1
+description: "Small representative event-media corpus for repeatable validation"
+maintainer: "StageFlow validation owner"
+rights_and_handling:
+  use_authorized: false
+  authorization_reference: "supply-outside-git-before-use"
+  sensitivity: "restricted"
+  redistribution_allowed: false
+  notes: "Record handling restrictions without embedding private agreements."
+
+items:
+  - item_id: "example-main-talk-001"
+    title: "Example Main Stage Talk"
+    categories:
+      - "straightforward_talk"
+      - "editorially_rich_session"
+    source:
+      path_alias: "CORPUS_EXAMPLE_MAIN_TALK_001"
+      local_path_required: true
+      stable_external_id: "external-library:example-main-talk-001"
+      sha256: null
+      byte_size: null
+      duration_ms: 2700000
+      container: "mp4"
+      video_codec: "record-exact-value"
+      audio_codec: "record-exact-value"
+      resolution: "record-exact-value"
+      frame_rate: "record-exact-value"
+      audio_layout: "record-exact-value"
+      source_notes: "No media is stored with this manifest."
+    expected_context:
+      business_event_label: "Reference Event"
+      stage_label: "Main Stage"
+      external_program_expectation_id: "schedule:example-talk-001"
+      session_title: "Example Main Stage Talk"
+      participants:
+        - display_name: "Example Speaker"
+          role: "speaker"
+          organization: null
+          authority: "external_or_human_annotation"
+      q_and_a_included: true
+    expected_boundaries:
+      origin: "source_recording_start"
+      substantive_start_source_offset_ms: 90000
+      substantive_end_source_offset_ms: 2580000
+      start_uncertainty_ms: 1000
+      end_uncertainty_ms: 2000
+      rationale: "Introduction excluded; audience Q&A remains part of the Session."
+    turnover_conditions:
+      preceding_session_item_id: null
+      following_session_item_id: null
+      known_overlap: false
+      notes: null
+    media_irregularities:
+      - kind: "none_known"
+        source_offset_ms: null
+        end_source_offset_ms: null
+        notes: null
+    reference_moments:
+      - reference_moment_id: "example-main-talk-001-moment-001"
+        anchor_source_offset_ms: 720000
+        anchor_session_offset_ms: 630000
+        preferred_start_source_offset_ms: 710000
+        preferred_end_source_offset_ms: 748000
+        preferred_start_session_offset_ms: 620000
+        preferred_end_session_offset_ms: 658000
+        rationale: "Concise statement that captures the Session's central argument."
+        importance: "high"
+        kinds:
+          - "verbal"
+        uncertainty_ms: 1000
+        notes: null
+      - reference_moment_id: "example-main-talk-001-moment-002"
+        anchor_source_offset_ms: 2460000
+        anchor_session_offset_ms: 2370000
+        preferred_start_source_offset_ms: 2445000
+        preferred_end_source_offset_ms: 2490000
+        preferred_start_session_offset_ms: 2355000
+        preferred_end_session_offset_ms: 2400000
+        rationale: "Useful answer during included Q&A."
+        importance: "medium"
+        kinds:
+          - "q_and_a"
+          - "verbal"
+        uncertainty_ms: 1500
+        notes: null
+    notes: "Reference Moments are evaluation annotations, not runtime Candidate records."

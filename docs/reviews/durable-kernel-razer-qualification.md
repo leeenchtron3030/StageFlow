@@ -1,11 +1,11 @@
 # Durable Kernel Razer reference-node qualification
 
-**Qualification date:** 2026-08-09  
+**Qualification date:** 2026-08-09
 **Reference host:** `WENCESLAS` (Windows build `10.0.26200.8973`, display version
-`25H2`)  
-**Scope:** fresh qualification of the first Durable Event-Mode Kernel candidate  
+`25H2`)
+**Scope:** fresh qualification of the first Durable Event-Mode Kernel candidate
 **Outcome:** Executed reference-node evidence supports fresh independent phase-completion
-review; it does not establish production or event readiness  
+review; it does not establish production or event readiness
 **Execution classification:** Green validation/correction under the approved Durable
 Event-Mode Kernel plan and ADR-0019 through ADR-0024
 

@@ -1,21 +1,14 @@
-# Frontend Tests
+# Frontend tests
 
-## Purpose
+Focused behavior tests currently live beside the pure presentation boundary in
+`src/experience/presentation.test.ts` and run through Node's native test runner.
 
-This directory is reserved for frontend tests.
+They verify quiet healthy operation, turnover Review, transient stabilization, separate
+Presentation/Package states, completed Session prominence, consequence-first degradation,
+fixture labeling, no invented authority, and Kernel projection adaptation.
+Media Timing Evidence coverage verifies the advisory drill-down projection, explicit
+Observed/Derived and qualification labels, and exclusion from ordinary Attention.
 
-## Current Scope
-
-ED-0003 does not add a frontend test runner.
-
-## What Belongs Here
-
-- Future component tests.
-- Future route or interaction tests.
-- Frontend accessibility checks after approved by future directives.
-
-## What Does Not Belong Here
-
-- Backend tests.
-- End-to-end tests requiring backend communication before that dependency is approved.
-- Tests for unimplemented workflows.
+Component rendering is validated proportionately through lint, strict TypeScript,
+production build, and local browser qualification. No visual-regression dependency is
+configured.

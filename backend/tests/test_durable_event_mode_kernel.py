@@ -23,6 +23,7 @@ from app.contexts.production.event_mode_kernel.contracts import (
     MediaRegistrationState,
     ReconciliationStatus,
     RegisteredMediaAsset,
+    SessionActivityState,
     SessionPackageState,
     StartSessionRequest,
 )
@@ -616,6 +617,88 @@ def test_candidate_source_binding_must_belong_to_its_stage() -> None:
         )
 
 
+def test_active_presentation_cannot_enter_or_complete_package_review() -> None:
+    kernel, repository, event_id, main_id, _ = kernel_with_bootstrap()
+    session = kernel.start_session(
+        StartSessionRequest(
+            operation_id=EntityId.new(),
+            event_id=event_id,
+            stage_id=main_id,
+            actor_id=ACTOR_ID,
+            authoritative_start=NOW,
+            requested_at=NOW,
+        )
+    )
+
+    with pytest.raises(KernelConflictError, match="session_presentation_not_ended"):
+        kernel.mark_package_ready(session.id)
+
+    assert repository.get_session(session.id) == session
+
+    repository.set_package_state(
+        session.id, SessionPackageState.READY_FOR_REVIEW.value, NOW
+    )
+    with pytest.raises(KernelConflictError, match="session_presentation_not_ended"):
+        kernel.complete_package(
+            operation_id=EntityId.new(),
+            session_id=session.id,
+            actor_id=ACTOR_ID,
+            approved=True,
+            reason="legacy_active_ready_state_must_not_complete",
+        )
+
+    still_active = repository.get_session(session.id)
+    assert still_active is not None
+    assert still_active.activity_state is SessionActivityState.PRESENTATION_ACTIVE
+    assert still_active.package_state is SessionPackageState.READY_FOR_REVIEW
+
+
+def test_ended_session_may_complete_an_empty_package() -> None:
+    kernel, repository, event_id, main_id, _ = kernel_with_bootstrap()
+    session = kernel.start_session(
+        StartSessionRequest(
+            operation_id=EntityId.new(),
+            event_id=event_id,
+            stage_id=main_id,
+            actor_id=ACTOR_ID,
+            authoritative_start=NOW,
+            requested_at=NOW,
+        )
+    )
+    ended = kernel.correct_session_boundary(
+        operation_id=EntityId.new(),
+        session_id=session.id,
+        boundary_kind="end",
+        boundary_at=NOW + timedelta(minutes=30),
+        actor_id=ACTOR_ID,
+        reason="presentation_ended",
+    )
+
+    ready = kernel.mark_package_ready(session.id)
+    completed = kernel.complete_package(
+        operation_id=EntityId.new(),
+        session_id=session.id,
+        actor_id=ACTOR_ID,
+        approved=True,
+        reason="producer_confirmed_empty_validation_package",
+    )
+
+    assert ended.activity_state is SessionActivityState.PRESENTATION_ENDED
+    assert ended.authoritative_end == NOW + timedelta(minutes=30)
+    assert ready.package_state is SessionPackageState.READY_FOR_REVIEW
+    assert completed.package_state is SessionPackageState.COMPLETE
+    assert repository.list_recent_media(event_id) == ()
+    projection = next(
+        item
+        for item in repository.operational_status(event_id).stages[0].recent_sessions
+        if item.session_id == session.id
+    )
+    assert projection.completion_decision_id is not None
+    assert repository.list_approved_package_asset_ids(
+        projection.completion_decision_id
+    ) == ()
+
+
 def test_completion_requires_human_approval_and_late_media_reopens_revision() -> None:
     kernel, repository, event_id, main_id, _ = kernel_with_bootstrap()
     session = kernel.start_session(
@@ -732,6 +815,14 @@ def test_reassignment_reopens_every_materially_changed_completed_package(
         )
     )
     if target_complete:
+        kernel.correct_session_boundary(
+            operation_id=EntityId.new(),
+            session_id=target.id,
+            boundary_kind="end",
+            boundary_at=NOW + timedelta(minutes=65),
+            actor_id=ACTOR_ID,
+            reason="target_ended",
+        )
         kernel.mark_package_ready(target.id)
         kernel.complete_package(
             operation_id=EntityId.new(),
@@ -1256,7 +1347,7 @@ def test_real_postgres_legacy_completion_membership_migration_and_reversal() -> 
                   AND column_name = 'result_snapshot'
                 """
             ).fetchone()
-            assert migration_count == (4,)
+            assert migration_count == (5,)
             assert reconstructed_count == (0,)
             assert snapshot_column == (0,)
 
@@ -1641,6 +1732,14 @@ def test_real_postgres_reassignment_idempotency_provenance_and_history_constrain
             authoritative_start=NOW + timedelta(minutes=35),
             requested_at=NOW + timedelta(minutes=35),
         )
+    )
+    kernel.correct_session_boundary(
+        operation_id=EntityId.new(),
+        session_id=target.id,
+        boundary_kind="end",
+        boundary_at=NOW + timedelta(minutes=65),
+        actor_id=ACTOR_ID,
+        reason="target_ended",
     )
     kernel.mark_package_ready(target.id)
     kernel.complete_package(

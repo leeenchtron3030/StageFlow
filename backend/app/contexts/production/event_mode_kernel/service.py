@@ -84,6 +84,14 @@ def _command_digest(kind: str, values: Mapping[str, object]) -> str:
     return hashlib.sha256(document.encode("utf-8")).hexdigest()
 
 
+def _require_presentation_ended(session: Session) -> None:
+    if (
+        session.activity_state is not SessionActivityState.PRESENTATION_ENDED
+        or session.authoritative_end is None
+    ):
+        raise KernelConflictError("session_presentation_not_ended")
+
+
 class StableAssetIngressPublisher:
     def __init__(self, repository: IngressRepository) -> None:
         self._repository = repository
@@ -557,6 +565,10 @@ class DurableEventModeKernel:
         )
 
     def mark_package_ready(self, session_id: EntityId) -> Session:
+        session = self.repository.get_session(session_id)
+        if session is None:
+            raise KernelNotFoundError("session_not_found")
+        _require_presentation_ended(session)
         return self.repository.set_package_state(
             session_id, SessionPackageState.READY_FOR_REVIEW.value, self.clock.now()
         )
@@ -573,6 +585,7 @@ class DurableEventModeKernel:
         session = self.repository.get_session(session_id)
         if session is None:
             raise KernelNotFoundError("session_not_found")
+        _require_presentation_ended(session)
         return self.repository.complete_session(
             CompletionDecision(
                 id=EntityId.new(),

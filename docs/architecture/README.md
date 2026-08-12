@@ -35,6 +35,10 @@ Proposed behavior must never be described as current implementation.
 | [Segment lifecycle](segment-lifecycle.md) | Current media lifecycle and accepted candidate-to-asset flow |
 | [Durable Event-Mode Kernel](durable-event-mode-kernel.md) | Accepted and closure-validated bounded operational foundation, current implementation map, and resolved decisions |
 | [Durable Kernel operations](durable-kernel-operations.md) | Reference-node configuration, bootstrap, status, recovery, and reversal procedure |
+| [Post-Kernel capability layer](post-kernel-capability-layer.md) | Proposed live intelligence, worker execution, Session Assembly, progressive-automation boundaries, sequencing, and Yellow decisions |
+| [Media Timing Evidence](media-timing-evidence.md) | Accepted provider-neutral durable observation, derivation, qualification, advisory-consumption, and disclosure boundary |
+| [UX specification index](../ux/README.md) | Role-specific interaction specifications and their implementation status |
+| [Validation artifact index](../validation/README.md) | Non-media validation plans, corpus annotations, run templates, and sanitized evidence |
 | [ADR index](../adr/README.md) | Accepted decisions, historical ADRs, and unresolved ADR candidates |
 | [Review index](../reviews/README.md) | Evidence reviews and authoritative dispositions |
 | [Plan index](../plans/README.md) | Implementation planning process and template |

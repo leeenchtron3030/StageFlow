@@ -1,7 +1,7 @@
 # StageFlow system context
 
-**Baseline:** Durable Event-Mode Kernel implementation candidate, corrected after its
-independent phase review and awaiting targeted independent correction verification
+**Baseline:** Accepted Durable Event-Mode Kernel operational foundation after targeted
+verification and Green follow-up closure
 
 ## System purpose
 
@@ -9,15 +9,17 @@ StageFlow is intended to observe live-event recorded media and supporting produc
 signals, preserve explainable reasoning and human authority, and eventually coordinate
 durable production, editorial, packaging, and delivery workflows. At the current
 baseline, it includes a bounded durable Event/Stage/Session/media Kernel behind the
-existing shell; it remains an implementation candidate rather than event-ready software.
+existing shell. That foundation is closure-validated but is not event-ready software.
 
 ## External actors and systems
 
-| Actor or system | Current interaction | Accepted future boundary |
+| Actor or system | Current interaction | Accepted or proposed future boundary |
 | --- | --- | --- |
 | Developer/operator | Loads validated Kernel configuration, explicitly bootstraps Event/Stages, and invokes application commands | Uses a future authenticated setup/control surface |
-| Technical producer/event operations | Reads Kernel Event/Stage/Session/media/recovery status through an API; no UI | Uses future Mission Control workflows |
-| Editorial/marketing reviewer | No implemented workflow | Reviews explainable Findings/Candidate Moments; humans retain approval authority |
+| Technical producer/event operations | Reads Kernel Event/Stage/Session/media/recovery status through an API; no UI | Uses future Mission Control and bounded Work Queue workflows from a worker-independent client |
+| Editorial reviewer | No implemented workflow | Reviews explainable Editorial Candidate Moments and creates human-approved Editorial Clips |
+| Marketing user | No implemented workflow | Consumes approved clips, assembled outputs, metadata, and delivery state rather than raw candidate intelligence |
+| AI/media Event Worker | No implementation | Claims approved PostgreSQL-backed work for transcription, analysis, vision, proxy, or rendering without owning Session/media authority |
 | Recording/shared-storage system | Files may be inspected only by an explicit one-shot local discovery call | Remains source of media; StageFlow registers completed assets by reference |
 | Schedule/conference system | Adapter contracts only | Remains source of planned conference data and external identifiers |
 | Transcript/vision providers | Adapter/interpreter contracts only | Optional providers behind adapters; unavailable service must not stop local event work |
@@ -31,13 +33,14 @@ editorial output, control a recorder, or deliver an output.
 
 | Component | Current responsibility | State/durability |
 | --- | --- | --- |
-| FastAPI application | Preserve liveness; optionally load Kernel configuration, verify schema, reconcile, and serve read-only status | PostgreSQL authority; process state is composition only |
-| Next.js application | Render one static status page | No backend client or workflow state |
+| FastAPI application | Preserve liveness; optionally load Kernel configuration, verify schema, reconcile, and serve bounded read-only Kernel/MTE projections | PostgreSQL authority; process state is composition only |
+| Next.js application | Render the read-only Producer operational UI and minimum Editorial shell from explicit fixtures or Kernel/MTE projections | No frontend authority or durable workflow state |
 | Shared contracts | IDs, errors, results, clocks, and time ranges | Pure/in-memory values |
 | Production Events/adapters | Provider-neutral source event contracts plus stable ingress identity | Completed-asset ingress is composed in the bounded Kernel cycle; general dispatcher paths remain caller-created |
 | Dispatcher/interpreters | One structural routing protocol and concrete Event-to-Observation adapters | Caller-created; deterministic synchronous dispatch |
 | PostgreSQL ingress adapter | Transactional source-key/fingerprint registration and stable Production Event identity | Durable and freshly validated with isolated PostgreSQL 17.10; deployment remains unapproved |
 | Durable Kernel repository | Event/Stage, Program Expectation, Session, media registry/association, completion snapshots, reconciliation, human-command replay, and typed history | Normalized PostgreSQL current state plus typed append-only history |
+| Media Timing Evidence repository | Append/retrieve immutable asset-linked Observed facts, Derived intervals, qualification state, and exact application replay | Additive PostgreSQL revision/history authority; advisory only |
 | Durable Kernel service | Explicit bootstrap, idempotent human Session boundaries/assignment/completion, readiness/asset adapters, stable ingress, and provenance-bearing categorical association | Direct synchronous application boundary |
 | Evidence/reasoning/state policies | Deterministic transformation and transition contracts | Caller-invoked; no orchestrator or durable lineage store |
 | In-memory Operational State repository | Atomic accepted Recording/Session state, lineage, revision, and operation replay | Thread-safe and explicitly process-local |
@@ -67,6 +70,7 @@ flowchart LR
     Asset --> Registry[Durable media registry]
     Registry --> AssetIngress[Stable asset ingress]
     Registry --> Association[Session association / unresolved / conflict]
+    Registry --> Timing[Optional advisory Media Timing Evidence]
     Association --> DB
     AssetIngress --> DB
     Status --> DB
@@ -99,7 +103,8 @@ There is no watcher, broker, worker, or uncontrolled loop.
   or delete source media.
 - No provider SDK, outbound HTTP client, FFmpeg, model execution, or delivery side effect
   exists in production code.
-- HTTP exposes process liveness and read-only Kernel operational status; authoritative
+- HTTP exposes process liveness, read-only Kernel operational status, and bounded
+  asset-specific MTE history; authoritative
   mutation remains an application boundary rather than a public control API.
 
 ## Known deployment assumptions
@@ -125,6 +130,10 @@ external work needs them. The accepted media path is documented in
 [session-lifecycle.md](session-lifecycle.md). The accepted first operational slice,
 component reuse map, and resolved decisions are documented in the
 [Durable Event-Mode Kernel architecture](durable-event-mode-kernel.md).
+The proposed layer above that foundation, including live intelligence, worker execution,
+Session Assembly, scoped approval policy, sequencing, and remaining Yellow decisions, is
+documented in the
+[Post-Kernel capability architecture](post-kernel-capability-layer.md).
 
 The following are explicitly not approved: microservices, a first-phase broker,
 cloud-required event operation, direct live NDI/SDI capture, directories as Sessions,

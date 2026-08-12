@@ -659,6 +659,50 @@ def test_candidate_inspection_failure_is_isolated_from_other_media(
     )
 
 
+def test_candidate_replacement_has_typed_transient_cycle_outcome(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source_path = tmp_path / "recordings"
+    source_path.mkdir()
+    (source_path / "growing.mp4").write_bytes(b"still-growing")
+    effective = configuration(tmp_path, source_path)
+    repository = InMemoryEventModeKernelRepository()
+    clock = MutableClock(NOW)
+    components = KernelComponents(
+        effective,
+        repository,
+        DurableEventModeKernel(repository=repository, clock=clock),
+    )
+    bootstrapped = components.explicit_bootstrap(
+        operation_id=EntityId("30000000-0000-0000-0000-000000000043"),
+        actor_id=EntityId("30000000-0000-0000-0000-000000000044"),
+    )
+    fstat = os.fstat
+
+    def changed_fstat(descriptor: int) -> os.stat_result:
+        values = list(fstat(descriptor))
+        values[6] += 1
+        return os.stat_result(values)
+
+    monkeypatch.setattr(os, "fstat", changed_fstat)
+
+    result = components.run_media_cycle(event_id=bootstrapped.event_id)
+
+    assert result.assets_registered == 0
+    assert len(result.candidate_results) == 1
+    candidate_result = result.candidate_results[0]
+    assert candidate_result.outcome == "failed"
+    assert candidate_result.failure_code == "candidate_replaced_during_observation"
+    observations = repository.list_observations(candidate_result.candidate_id)
+    failure = next(
+        item
+        for item in observations
+        if item.observation_kind == "candidate_inspection_failure"
+    )
+    assert failure.facts["failure_code"] == "candidate_replaced_during_observation"
+
+
 def test_registered_asset_reconciles_ingress_and_association_after_interruption(
     tmp_path: Path,
 ) -> None:

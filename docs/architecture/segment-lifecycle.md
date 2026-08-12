@@ -67,6 +67,12 @@ Events, records categorical Session association/unresolved/conflict outcomes, an
 reconciles configured sources after restart. It does not create a generic Job, transcribe,
 analyze, render, transfer, publish, or deliver media.
 
+ADR-0027 adds a separate optional Media Timing Evidence path after asset registration.
+Already-inspected Observed timing facts and Derived candidate intervals may be applied as
+durable asset-linked revisions and read as advisory evidence. Missing MTE does not block
+registration, ingress, association, or package behavior, and MTE never mutates those
+authorities.
+
 ## Accepted target flow
 
 ADR-0020 records the accepted order:
@@ -79,6 +85,7 @@ flowchart LR
     Ready --> Assemble[Assemble immutable Completed Media Asset]
     Assemble --> Register[Register in durable media registry]
     Register --> Event[Emit stable asset-registration Production Event]
+    Register --> Timing[Apply optional advisory Media Timing Evidence]
     Event --> Associate[Associate with authoritative Session]
     Associate --> Work[Schedule approved durable operations]
 ```
@@ -97,6 +104,7 @@ one stateful watcher-manager.
 | Readiness evaluated | Explicit policy evaluates an ordered fact bundle | Implemented/persisted in bounded Kernel cycle |
 | Completed asset assembled | Finalized, safe-to-read facts satisfy the immutable asset contract | Implemented in bounded Kernel cycle |
 | Asset registered | Completed asset and manifest are durably committed | Implemented by reference in PostgreSQL |
+| Timing evidence applied | Sanitized Observed facts and Derived advisory interval are revisioned beside the asset | MTE v1 implemented; no production inspector |
 | Registration Event emitted | Stable Production Event records asset availability | Implemented through stable ingress |
 | Session associated | Explicit authority records associated, unresolved, or conflict | Implemented conservatively with human correction |
 | Downstream work scheduled | Durable operation records approved processing | Accepted future; not implemented |

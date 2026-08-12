@@ -122,6 +122,11 @@ asset-registration ingress, conservative Session association, and reconciliation
 Automatic association records its deterministic policy and durable input references;
 interval-less turnover ambiguity remains unresolved rather than guessed.
 
+ADR-0027 adds a separate append-only Media Timing Evidence path beside registered assets:
+sanitized Observed recorder/media timing facts and Derived candidate intervals are
+revisioned with provider/profile/qualification lineage and exposed only as advisory
+evidence. MTE does not change association or Session/package authority.
+
 **Not implemented:** continuous watching, media decoding/transfer, generic Durable
 Operations, transcription/analysis, or automatic downstream scheduling.
 
@@ -218,6 +223,10 @@ The future Producer experience is mission control rather than a media editor. It
 show source and recording status, active Sessions, segment arrival, readiness, storage,
 processing, worker/GPU utilization, network-dependent work, retries, failures,
 finalization safety, and delivery state. It should make required intervention obvious.
+The Producer owns Event operation, Session authority, media completeness, exceptions,
+and package correctness. Its control surface must remain usable independently of an
+individual GPU/AI worker; consequential lag and deferred work matter more than raw
+hardware telemetry.
 
 ### Editorial
 
@@ -231,11 +240,15 @@ rather than replacing an editor.
 The future Marketing experience should consume approved editorial outputs and Session
 context: clips, images, speaker details, summaries, suggested copy, campaign metadata,
 publishing status, and delivery coordination.
+Marketing consumes approved editorial or assembled outputs rather than raw Candidate
+Moment intelligence.
 
 **Implemented today:** a bounded read-only Producer Kernel status API exposes Event,
 Stage, recent/current Session, media, dependency, reconciliation, provenance, completion,
-and attention context. The Next.js application remains a static shell; Editorial and
-Marketing workflow APIs/interfaces are not implemented.
+and attention context. The Next.js application provides an initial locally runnable
+Producer operational UI over a presentation adapter plus clearly labeled development
+fixtures, with a minimum non-executing Editorial shell. Authority-changing Producer,
+Editorial runtime, and Marketing workflow APIs remain unimplemented.
 
 ## 7. Backend and deployment philosophy
 
@@ -284,6 +297,12 @@ remain database-backed inside the modular monolith with stable operation identit
 claims or leases, attempt history, bounded retry, offline deferral, idempotent result
 commit, and operator-visible state.
 
+Dedicated Event Nodes may supply these capabilities while the Producer client runs on a
+separate workstation. Node/worker identity is execution placement, not semantic
+authority. Worker failure defers eligible intelligence or rendering and must not
+invalidate Event, Session, media, association, or package authority. Machine brand and
+provider remain deployment/adapter details.
+
 **Not implemented:** workers, claims, leases, attempts, retry scheduling, GPU scheduling,
 transcription, model inference, rendering, and delivery execution.
 
@@ -328,7 +347,8 @@ relevant implementation plan, review, CI result, or change report.
 
 ### Implemented today
 
-- Python 3.13/FastAPI shell with liveness and bounded Kernel status; static Next.js shell.
+- Python 3.13/FastAPI shell with liveness and bounded Kernel status; locally runnable
+  Next.js Producer operational UI with fixture and read-only Kernel modes.
 - UI-independent modular backend contracts and deterministic policies.
 - Provider-neutral Production Event and adapter contracts.
 - Stable source-key/versioned-fingerprint ingress and normalized Kernel PostgreSQL
@@ -341,12 +361,27 @@ relevant implementation plan, review, CI result, or change report.
 - Human-realized Sessions, Program Expectations, package approval/revision history,
   deterministic association provenance, narrow human-command idempotency, restart/source
   reconciliation, and bounded Producer projections.
+- Dedicated immutable revisioned Media Timing Evidence contracts, additive PostgreSQL
+  persistence/application idempotency, sanitized asset-specific read projection, and
+  advisory Producer drill-down; no recorder profile is qualified and no inspector runs.
 - Dispatcher/Observation Interpreter compatibility implementation completed and accepted
   by fresh independent Codex review; phase-level human acceptance remains pending.
 - Recursive metadata immutability completed across the legacy shallow-freeze boundary
   and accepted by fresh independent review.
 - Local-filesystem discovery race hardening completed with descriptor-relative binding
   where supported, bounded fallback revalidation, and fresh independent acceptance.
+- Real-event validation Run 002 passed as the first real-media Durable Event-Mode Kernel
+  baseline: 20 vMix MP4 blocks became 20 durable Candidates, registered assets, and
+  deterministic Session associations; authoritative boundaries, package completion, and
+  fresh reconstruction were preserved without media loss. This is a bounded Kernel
+  validation result, not visual UX, post-Kernel capability, production, or Event
+  readiness. See the [sanitized result](validation/results/real-event-playback-run-002.md).
+- Run 004 partially qualified same-Stage turnover: Session lifecycle execution,
+  real-media preservation/conservative ambiguity, and accepted interval-less association
+  policy conformance passed; content-correct automatic turnover association remains
+  inconclusive because the substantive B boundary was not durably captured and assets
+  lacked trustworthy content intervals. See the
+  [sanitized result](validation/results/real-event-playback-run-004.md).
 
 ### Not implemented today
 
@@ -355,7 +390,9 @@ relevant implementation plan, review, CI result, or change report.
   reconciliation; the narrow Kernel source-reconciliation record is implemented.
 - Transcription, AI analysis, Editorial, Marketing, packaging, publishing, distribution,
   archive, or retention runtimes.
-- Producer, Editorial, or Marketing workflow APIs and interfaces.
+- Authority-changing Producer workflow APIs, executable Editorial workflow/runtime, and
+  Marketing APIs/interfaces. The read-only Producer UI and minimum Editorial shell are
+  implemented as an operator-review milestone.
 
 ## 11. Current engineering phases
 
@@ -409,6 +446,28 @@ reconciliation, restart recovery, and operator visibility.
 
 This slice does not need transcription, editorial analysis, packaging, or publishing to
 prove the architecture.
+
+Run 002 supplies the first successful one-Session real-media baseline for this slice.
+Run 004 supplies a partial same-Stage turnover qualification: lifecycle, preservation,
+and accepted-policy conformance passed, while content-correct automatic association was
+not qualified. Changing predecessor/successor automatic eligibility remains a separate
+Yellow Session/media-association decision. Interrupted reconciliation remaining durably
+`running` until a later explicit reconciliation supersedes it remains a bounded
+recovery/status investigation, not a changed lifecycle semantic.
+
+### Phase 5 — Post-Kernel capability layer
+
+The proposed next layer separates Editorial Candidate Moments, durable AI/media work,
+Session Assembly, and policy-scoped approval authority from the accepted Kernel. The
+recommended first product slice is human-declared `Mark Moment` persistence and bounded
+Moment projections, followed by Editorial review and then one concrete transcription
+worker after its operation/lease ADR is accepted. Assembly and automatic authority remain
+later decision-gated slices. See the
+[Post-Kernel capability architecture](architecture/post-kernel-capability-layer.md) and
+[plan](plans/post-kernel-capability-layer.md). The
+[UX specification set](ux/README.md) records Producer, Editorial, and shared interaction
+models, including source-fidelity distinctions between exact Draft v0.1 material and
+recovered accepted-design summaries. No part of this phase is implemented yet.
 
 ## 12. Development workflow
 
@@ -475,9 +534,16 @@ The working principle is:
 
 ### Work execution
 
-- Durable Operation and attempt schema.
-- Claim/lease, cancellation, retry, and worker deployment semantics.
+- Proposed ADR-0025: Durable Operation/attempt identity, claim/lease, cancellation,
+  retry, and worker deployment semantics.
 - GPU resource ownership and scheduling.
+
+### Post-Kernel authority and presentation
+
+- Proposed ADR-0026: policy-scoped automatic authority, activation, and provenance.
+- Packaging Asset identity/ownership and composition with Completed Media Assets.
+- Authoritative participant identity, ordering, role, and affiliation beyond current
+  Program Expectation display strings.
 
 ### Media
 
