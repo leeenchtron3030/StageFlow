@@ -57,7 +57,7 @@ export function OperationalShell({
     (item) => item.level === "intervention",
   ).length;
   const attentionLevel = workspaceAttentionLevel(workspace);
-  const modeClass = workspace.dataSource.kind === "fixture" ? "mode-fixture" : "mode-kernel";
+  const modeClass = `mode-${workspace.dataSource.state.replaceAll("_", "-")}`;
   return (
     <div className="app-shell">
       <aside className="navigation-rail">
@@ -117,7 +117,8 @@ export function OperationalShell({
 
         <div className={`data-source-block ${modeClass}`}>
           <span className="eyebrow">Data source</span>
-          <strong>{workspace.dataSource.label}</strong>
+          <strong className="mode-status">{workspace.dataSource.statusLabel}</strong>
+          <span>{workspace.dataSource.label}</span>
           {workspace.dataSource.scenarioLabel ? (
             <span>{workspace.dataSource.scenarioLabel}</span>
           ) : null}
@@ -141,6 +142,9 @@ export function OperationalShell({
             <span className="header-separator">·</span>
             <span>{workspace.event.modeLabel}</span>
           </div>
+          <div className={`header-mode-indicator ${modeClass}`} role="status">
+            {workspace.dataSource.statusLabel}
+          </div>
           <div className="event-clock">
             <span className="eyebrow">Status observed</span>
             <time dateTime={workspace.dataSource.updatedAt}>
@@ -157,6 +161,14 @@ export function OperationalShell({
         {workspace.dataSource.kind === "fixture" ? (
           <div className="fixture-ribbon" role="note">
             Development fixture · interaction review only · no commands change durable state
+          </div>
+        ) : workspace.dataSource.state === "live_unavailable" ? (
+          <div className="live-unavailable-ribbon" role="alert">
+            LIVE unavailable · no cached authority is being shown
+          </div>
+        ) : workspace.dataSource.state === "live_unconfigured" ? (
+          <div className="live-unconfigured-ribbon" role="status">
+            LIVE backend connected · Kernel configuration is not supplied
           </div>
         ) : null}
         {attentionLevel === "intervention" ? (

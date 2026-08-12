@@ -47,5 +47,15 @@ This directory is reserved for repository maintenance and developer utility scri
 
 ## Local application preview
 
-- [Frontend launch guide](../frontend/README.md) documents locked npm setup, fixture-mode
-  operator review, read-only Kernel mode, routes, validation, and current limitations.
+- [`Start-StageFlowPreview.ps1`](preview/Start-StageFlowPreview.ps1) is a dev-only
+  convenience entry point for fixture or live read-only preview. It keeps subprocess
+  output visible, fails if a child exits, and stops only child processes it created.
+
+  ```powershell
+  .\scripts\preview\Start-StageFlowPreview.ps1 -Mode Fixture -Scenario quiet
+  .\scripts\preview\Start-StageFlowPreview.ps1 -Mode Live
+  ```
+
+- [Frontend launch guide](../frontend/README.md) documents locked npm setup, fixture/live
+  distinction, shutdown, common failures, routes, validation, security triage, and current
+  limitations.

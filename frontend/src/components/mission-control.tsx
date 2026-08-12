@@ -46,6 +46,7 @@ function StageRow({ stage, workspace }: { stage: StageView; workspace: Operation
     <Link
       className={`stage-row attention-${stage.attentionLevel ?? "none"}`}
       href={scenarioHref(`/stages/${encodeURIComponent(stage.key)}`, workspace)}
+      aria-label={`${stage.name}: ${state}. ${stage.currentSession?.title ?? "No active Session"}`}
     >
       <div className="stage-identity-cell">
         <strong>{stage.name}</strong>
@@ -58,6 +59,7 @@ function StageRow({ stage, workspace }: { stage: StageView; workspace: Operation
       <div className="package-cell">
         <span className="cell-label">Package</span>
         <strong>{formatPackageState(stage.currentSession)}</strong>
+        <span>{stage.currentSession ? `Revision ${stage.currentSession.packageRevision}` : "No revision"}</span>
       </div>
       <div className="media-cell">
         <span className="cell-label">Media</span>
@@ -67,6 +69,7 @@ function StageRow({ stage, workspace }: { stage: StageView; workspace: Operation
       <div className="source-cell">
         <span className="cell-label">Source</span>
         <strong>{stage.sourceLabel}</strong>
+        <span>{relativeTimeLabel(stage.media.lastActivityAt)} last media</span>
       </div>
       <div className="state-cell">
         <span className={`state-marker state-${stage.attentionLevel ?? "normal"}`} />
@@ -103,6 +106,47 @@ export function StageMatrix({ workspace }: { workspace: OperationalWorkspace }) 
             <span>Configure and bootstrap the Kernel or select a development fixture.</span>
           </div>
         )}
+      </div>
+    </section>
+  );
+}
+
+function EventPulse({ workspace }: { workspace: OperationalWorkspace }) {
+  const stageAttention = workspace.stages.filter((stage) => stage.attentionLevel).length;
+  const active = workspace.sessions.filter(
+    (session) => session.activityState === "presentation_active",
+  ).length;
+  const assembling = workspace.sessions.filter(
+    (session) => session.activityState === "presentation_ended" && session.packageState !== "complete",
+  ).length;
+  const media = workspace.stages.reduce(
+    (totals, stage) => ({
+      registered: totals.registered + stage.media.registered,
+      associated: totals.associated + stage.media.associated,
+      unresolved: totals.unresolved + stage.media.unresolved,
+      conflicting: totals.conflicting + stage.media.conflicting,
+      stabilizing: totals.stabilizing + stage.media.stabilizing,
+    }),
+    { registered: 0, associated: 0, unresolved: 0, conflicting: 0, stabilizing: 0 },
+  );
+  return (
+    <section className="event-pulse" aria-label="Event operational summary">
+      <div>
+        <span className="eyebrow">Event operation</span>
+        <strong>{workspace.event.ready ? "Operating normally" : workspace.event.recovering ? "Recovering" : "Not ready"}</strong>
+      </div>
+      <div>
+        <span className="eyebrow">Stages</span>
+        <strong>{workspace.stages.length - stageAttention} clear · {stageAttention} need attention</strong>
+      </div>
+      <div>
+        <span className="eyebrow">Sessions</span>
+        <strong>{active} active · {assembling} assembling</strong>
+      </div>
+      <div>
+        <span className="eyebrow">Media preserved</span>
+        <strong>{media.registered} registered · {media.associated} associated</strong>
+        <span>{media.unresolved} unresolved · {media.conflicting} conflicts · {media.stabilizing} stabilizing</span>
       </div>
     </section>
   );
@@ -159,6 +203,9 @@ function InfrastructureCell({ item }: { item: InfrastructureItemView }) {
       <span className="eyebrow">{item.label}</span>
       <strong>{item.state}</strong>
       <span>{item.impact}</span>
+      <span className={`attention-tag attention-tag-${item.attentionLevel ?? "none"}`}>
+        {item.attentionLevel ?? "No action"}
+      </span>
     </div>
   );
 }
@@ -188,6 +235,7 @@ export function MissionControl({ workspace }: { workspace: OperationalWorkspace 
   return (
     <>
       <WorkspaceTitle eyebrow="Producer" title="Mission Control" summary={summary} />
+      <EventPulse workspace={workspace} />
       <StageMatrix workspace={workspace} />
       <div className="mission-lower-grid">
         <AttentionPanel attention={workspace.attention} />

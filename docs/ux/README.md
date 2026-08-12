@@ -19,6 +19,11 @@ Editorial shell. Draft specifications remain calibration inputs rather than evid
 that their full workflows, authority actions, playback, transcription, or automation
 are implemented.
 
+Hands-on review findings use the lightweight
+[Producer and Editorial operator feedback](operator-feedback.md) log. Current frontend
+advisory reachability and accepted residual findings are recorded in
+[Producer UI dependency-security triage](producer-ui-dependency-security.md).
+
 ## Status vocabulary
 
 - **Draft:** product/UX direction under refinement; not implementation authority.

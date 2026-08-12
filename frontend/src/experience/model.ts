@@ -1,10 +1,17 @@
 export type AttentionLevel = "information" | "review" | "intervention";
 export type HealthState = "ready" | "degraded" | "unavailable" | "unknown";
 export type DataSourceKind = "fixture" | "kernel";
+export type DataSourceState =
+  | "development_fixture"
+  | "live_connected"
+  | "live_unavailable"
+  | "live_unconfigured";
 
 export interface DataSourceView {
   kind: DataSourceKind;
   label: string;
+  state: DataSourceState;
+  statusLabel: string;
   scenarioId?: string;
   scenarioLabel?: string;
   updatedAt: string;
@@ -30,6 +37,30 @@ export interface MediaSummaryView {
   unresolved: number;
   conflicting: number;
   lastActivityAt?: string;
+}
+
+export interface MediaAssetView {
+  candidateId: string;
+  assetId?: string;
+  stageId: string;
+  stageKey: string;
+  stageName: string;
+  sourceBindingKey: string;
+  registrationState: "discovered" | "stabilizing" | "ready" | "registered" | "unknown";
+  associationStatus: "associated" | "unresolved" | "conflict" | "not_evaluated";
+  associationAuthority?: "deterministic" | "human";
+  sessionId?: string;
+  consideredSessionIds: string[];
+  discoveredAt: string;
+  lastObservedAt: string;
+  candidateStartedAt?: string;
+  candidateEndedAt?: string;
+  epistemicKinds: string[];
+  diagnosticCodes: string[];
+  associationReasonCodes: string[];
+  associationPolicy?: string;
+  explanation: string;
+  boundedProjection: true;
 }
 
 export interface SessionView {
@@ -99,6 +130,15 @@ export interface MediaTimingEvidenceView {
   stageKey: string;
   sessionId?: string;
   revision: number;
+  providerLabel: string;
+  toolLabel: string;
+  inspectedAt?: string;
+  observations: Array<{
+    kind: string;
+    precision?: string;
+    limitations: string[];
+  }>;
+  derivationIdentity?: string;
   candidateStartedAt?: string;
   candidateEndedAt?: string;
   evidenceLabel: string;
@@ -127,9 +167,23 @@ export interface OperationalWorkspace {
   event: EventView;
   stages: StageView[];
   sessions: SessionView[];
+  mediaAssets: MediaAssetView[];
   attention: AttentionItemView[];
   infrastructure: InfrastructureItemView[];
   editorialCandidates: EditorialCandidateView[];
+  editorialClips: Array<{
+    id: string;
+    sessionId: string;
+    sessionTitle: string;
+    rangeLabel: string;
+    reviewLabel: string;
+    simulated: true;
+  }>;
+  transcriptState: {
+    state: "not_connected" | "fixture_available" | "deferred";
+    label: string;
+    detail: string;
+  };
   mediaTimingEvidence: MediaTimingEvidenceView[];
   mediaTimingEvidenceStatus: "not_requested" | "available" | "unavailable";
 }
