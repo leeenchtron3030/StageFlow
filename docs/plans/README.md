@@ -85,6 +85,7 @@ or architecture document unless those documents are explicitly updated.
 
 | Plan | Status | Owner | Related decision/finding |
 | --- | --- | --- | --- |
+| [Producer UX operational refinement and real-data integration](producer-ux-operational-refinement.md) | In progress - Green autonomous operational-refinement milestone | StageFlow UX / Frontend | Producer UX workstream; Runs 002-004; ADR-0023, ADR-0024, ADR-0027 |
 | [Producer operational UI MVP](producer-ui-mvp.md) | Completed - Green autonomous runnable Producer milestone | StageFlow UX / Frontend | Producer UX specifications; Run 002-004; read-only Kernel status |
 | [Media Timing Evidence v1 production slice](media-timing-evidence-v1.md) | Completed - Green autonomous durable advisory evidence slice | StageFlow Production / Backend / UX | Accepted ADR-0027 and MTE-001 through MTE-005 |
 | [Media timing reconnaissance and qualification tooling](media-timing-qualification.md) | Completed - Green qualification-only probe and evidence documentation validated | StageFlow Validation / Architecture | Run 004 partial qualification; ADR-0021, ADR-0023, ADR-0024 |

@@ -2,6 +2,7 @@ import type {
   AttentionItemView,
   EditorialCandidateView,
   InfrastructureItemView,
+  MediaAssetView,
   OperationalWorkspace,
   ScenarioOption,
   SessionView,
@@ -21,6 +22,7 @@ export const scenarioOptions: ScenarioOption[] = [
   { id: "run-002", label: "Run 002 · Baseline", group: "evidence" },
   { id: "run-003", label: "Run 003 · No Session authority", group: "evidence" },
   { id: "run-004", label: "Run 004 · Same-Stage turnover", group: "evidence" },
+  { id: "scale", label: "Scale · Seven Stages", group: "evidence" },
 ];
 
 const baseInfrastructure: InfrastructureItemView[] = [
@@ -177,6 +179,8 @@ function quietWorkspace(): OperationalWorkspace {
     dataSource: {
       kind: "fixture",
       label: "Development fixture",
+      state: "development_fixture",
+      statusLabel: "DEVELOPMENT FIXTURE",
       scenarioId: "quiet",
       scenarioLabel: "Quiet healthy Event",
       updatedAt: OBSERVED_AT,
@@ -195,9 +199,25 @@ function quietWorkspace(): OperationalWorkspace {
     },
     stages,
     sessions: [main, studio, workshop],
+    mediaAssets: [],
     attention: [],
     infrastructure: structuredClone(baseInfrastructure),
     editorialCandidates: structuredClone(editorialCandidates),
+    editorialClips: [
+      {
+        id: "clip-fixture-1",
+        sessionId: main.id,
+        sessionTitle: main.title,
+        rangeLabel: "18:42–19:21",
+        reviewLabel: "Approved by Editorial · simulated fixture",
+        simulated: true,
+      },
+    ],
+    transcriptState: {
+      state: "fixture_available",
+      label: "Simulated transcript surface",
+      detail: "Synthetic fixture copy for workflow evaluation; no transcription ran.",
+    },
     mediaTimingEvidence: [],
     mediaTimingEvidenceStatus: "available",
   };
@@ -213,6 +233,34 @@ function attention(
   action: string,
 ): AttentionItemView {
   return { id, level, title, scope, since: "01:24", impact, safeContinuation, action };
+}
+
+function uncertainMediaAssets(
+  stageName: string,
+  consideredSessionIds: string[],
+  count = 3,
+): MediaAssetView[] {
+  return Array.from({ length: count }, (_, index) => ({
+    candidateId: `candidate-turnover-${index + 1}`,
+    assetId: `asset-turnover-${index + 1}`,
+    stageId: "stage-main",
+    stageKey: "main",
+    stageName,
+    sourceBindingKey: "main-recorder",
+    registrationState: "registered",
+    associationStatus: "unresolved",
+    associationAuthority: "deterministic",
+    consideredSessionIds,
+    discoveredAt: `2026-08-12T01:2${5 + index}:01-07:00`,
+    lastObservedAt: `2026-08-12T01:3${index}:01-07:00`,
+    epistemicKinds: ["observed", "derived"],
+    diagnosticCodes: ["association_unresolved"],
+    associationReasonCodes: ["multiple_eligible_sessions"],
+    associationPolicy: "stageflow.kernel.media-association 1.1.0",
+    explanation:
+      "StageFlow preserved this media but cannot safely determine whether it belongs to Session A or Session B.",
+    boundedProjection: true,
+  }));
 }
 
 function assemblingWorkspace(): OperationalWorkspace {
@@ -250,7 +298,7 @@ function turnoverWorkspace(): OperationalWorkspace {
   const item = attention(
     "turnover-review",
     "review",
-    "Media association requires review",
+    "Media association needs review",
     "Main Stage · Account Abstraction / Future of Ethereum",
     "17 registered media items have multiple eligible Sessions.",
     "Media is preserved. Session control and local processing continue.",
@@ -266,6 +314,7 @@ function turnoverWorkspace(): OperationalWorkspace {
     nextExpectation: "Protocol Economics",
   });
   workspace.sessions = [current, previous, workspace.sessions[1], workspace.sessions[2]];
+  workspace.mediaAssets = uncertainMediaAssets("Main Stage", [previous.id, current.id]);
   workspace.attention = [item];
   return workspace;
 }
@@ -391,6 +440,13 @@ function run003Workspace(): OperationalWorkspace {
     }),
   ];
   workspace.sessions = [];
+  workspace.mediaAssets = uncertainMediaAssets("Main Stage", [], 3).map((item) => ({
+    ...item,
+    consideredSessionIds: [],
+    associationReasonCodes: ["no_safely_eligible_session"],
+    explanation:
+      "StageFlow preserved this media because no realized Session is safely eligible.",
+  }));
   workspace.attention = [item];
   workspace.event.stageCount = 1;
   workspace.editorialCandidates = [];
@@ -412,9 +468,25 @@ function run004Workspace(): OperationalWorkspace {
   workspace.mediaTimingEvidence = [
     {
       evidenceId: "mte-run-004-001",
-      assetId: "asset-run-004-001",
+      assetId: workspace.mediaAssets[0].assetId ?? "asset-turnover-1",
       stageKey: "main",
       revision: 1,
+      providerLabel: "StageFlow qualification probe 1.0",
+      toolLabel: "ffprobe 8.0",
+      inspectedAt: "2026-08-12T01:40:10-07:00",
+      observations: [
+        {
+          kind: "embedded_creation_time",
+          precision: "microsecond representation",
+          limitations: ["Captured-content-start semantics are not qualified."],
+        },
+        {
+          kind: "measured_duration",
+          precision: "microsecond representation",
+          limitations: [],
+        },
+      ],
+      derivationIdentity: "mte-derivation-001 · creation-time-plus-duration 1.0",
       candidateStartedAt: "2026-08-12T01:24:01-07:00",
       candidateEndedAt: "2026-08-12T01:25:01.030-07:00",
       evidenceLabel: "Observed vMix recorder/container metadata",
@@ -432,6 +504,74 @@ function run004Workspace(): OperationalWorkspace {
   return workspace;
 }
 
+function scaleWorkspace(): OperationalWorkspace {
+  const workspace = quietWorkspace();
+  const names = [
+    "Main Auditorium and Global Livestream",
+    "Protocol Research Forum",
+    "Community Governance Workshop",
+    "Applied Cryptography Studio",
+    "Developer Experience and Tooling Lab",
+    "Ecosystem Coordination Room",
+    "Independent Media Briefing Stage",
+  ];
+  workspace.dataSource.scenarioId = "scale";
+  workspace.dataSource.scenarioLabel = "Seven-Stage density and high Attention";
+  workspace.stages = names.map((name, index) => {
+    const key = `stage-${index + 1}`;
+    const current = index === 6
+      ? undefined
+      : session(
+          `session-scale-${index + 1}`,
+          index === 0
+            ? "A Very Long Session Title About Coordinating Production Across Multiple Independent Event Systems"
+            : `Operational Session ${index + 1}`,
+          key,
+          name,
+          { media: media(12 + index, index % 3 === 0 ? 1 : 0, index > 3 ? index - 3 : 0) },
+        );
+    return stage(key, name, current, {
+      media: current?.media ?? media(0),
+      attentionLevel: index === 4 ? "intervention" : index > 3 ? "review" : undefined,
+      attentionText:
+        index === 4
+          ? "Source unavailable"
+          : index > 3
+            ? `${index - 3} unresolved · media preserved`
+            : undefined,
+      sourceState: index === 4 ? "unavailable" : "ready",
+      sourceLabel: index === 4 ? "Unavailable" : "Available",
+    });
+  });
+  workspace.sessions = workspace.stages.flatMap((item) =>
+    item.currentSession ? [item.currentSession] : [],
+  );
+  workspace.event.stageCount = workspace.stages.length;
+  workspace.attention = [
+    attention(
+      "scale-source",
+      "intervention",
+      "Configured source unavailable",
+      names[4],
+      "New media cannot be observed from this Stage source.",
+      "Other Stages and already registered media continue.",
+      "Restore the configured source.",
+    ),
+    ...workspace.stages.slice(5).map((item, index) =>
+      attention(
+        `scale-review-${index}`,
+        "review",
+        "Media association needs review",
+        item.name,
+        item.attentionText ?? "Association uncertainty is present.",
+        "Media is preserved and Stage operation continues.",
+        "Review bounded evidence when production permits.",
+      ),
+    ),
+  ];
+  return workspace;
+}
+
 const builders: Record<string, () => OperationalWorkspace> = {
   quiet: quietWorkspace,
   assembling: assemblingWorkspace,
@@ -443,6 +583,7 @@ const builders: Record<string, () => OperationalWorkspace> = {
   "run-002": run002Workspace,
   "run-003": run003Workspace,
   "run-004": run004Workspace,
+  scale: scaleWorkspace,
 };
 
 export function getFixtureWorkspace(scenarioId = "quiet"): OperationalWorkspace {

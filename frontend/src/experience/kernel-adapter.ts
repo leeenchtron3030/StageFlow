@@ -2,6 +2,7 @@ import type {
   AttentionItemView,
   AttentionLevel,
   InfrastructureItemView,
+  MediaAssetView,
   MediaSummaryView,
   MediaTimingEvidenceView,
   OperationalWorkspace,
@@ -67,8 +68,28 @@ export interface KernelStatusPayload {
 
 export interface KernelMediaStatus {
   asset_id: string | null;
+  candidate_id: string;
+  proposed_asset_id: string;
   stage_id: string;
+  source_binding_key: string;
+  registration_state: string;
+  discovered_at: string;
+  last_observed_at: string;
+  association_status: string | null;
+  association_authority: string | null;
   session_id: string | null;
+  epistemic_kinds: string[];
+  media_started_at: string | null;
+  media_ended_at: string | null;
+  diagnostic_codes: string[];
+  association_reason_codes: string[];
+  association_policy_id: string | null;
+  association_policy_version: string | null;
+  association_input_references: Array<{
+    record_type: string;
+    record_id: string;
+    revision?: number | null;
+  }>;
 }
 
 export interface KernelMediaTimingEvidenceHistory {
@@ -81,6 +102,7 @@ export interface KernelMediaTimingEvidenceHistory {
     provider_version: string;
     tool_id: string;
     tool_version: string;
+    inspected_at: string;
     recorder_profile_id: string;
     recorder_profile_revision: number;
     qualification_status: "unqualified" | "qualified" | "rejected" | "expired";
@@ -92,6 +114,7 @@ export interface KernelMediaTimingEvidenceHistory {
       limitations: string[];
     }>;
     derivations: Array<{
+      derivation_id: string;
       epistemic_kind: string;
       rule_id: string;
       rule_version: string;
@@ -123,6 +146,17 @@ export function adaptKernelMediaTimingEvidence(
       stageKey,
       sessionId: media.session_id ?? undefined,
       revision: evidence.revision,
+      providerLabel: `${evidence.provider_id} ${evidence.provider_version}`,
+      toolLabel: `${evidence.tool_id} ${evidence.tool_version}`,
+      inspectedAt: evidence.inspected_at,
+      observations: evidence.observations.map((observation) => ({
+        kind: observation.kind,
+        precision: observation.precision ?? undefined,
+        limitations: observation.limitations,
+      })),
+      derivationIdentity: derivation
+        ? `${derivation.derivation_id} · ${derivation.rule_id} ${derivation.rule_version}`
+        : undefined,
       candidateStartedAt: derivation?.candidate_started_at,
       candidateEndedAt: derivation?.candidate_ended_at,
       evidenceLabel: `${evidence.provider_id} ${evidence.provider_version} · ${evidence.tool_id} ${evidence.tool_version}`,
@@ -140,6 +174,89 @@ export function adaptKernelMediaTimingEvidence(
       authorizedUse: evidence.authorized_use,
     };
   });
+}
+
+function registrationState(value: string): MediaAssetView["registrationState"] {
+  if (
+    value === "discovered" ||
+    value === "stabilizing" ||
+    value === "ready" ||
+    value === "registered"
+  ) {
+    return value;
+  }
+  return "unknown";
+}
+
+function associationStatus(value: string | null): MediaAssetView["associationStatus"] {
+  if (value === "associated" || value === "unresolved" || value === "conflict") {
+    return value;
+  }
+  return "not_evaluated";
+}
+
+function associationExplanation(
+  status: MediaAssetView["associationStatus"],
+  reasons: string[],
+): string {
+  if (status === "associated") {
+    return "StageFlow found one safe Session match under the recorded association policy.";
+  }
+  if (status === "conflict") {
+    return "StageFlow preserved this media because available evidence conflicts with Session authority.";
+  }
+  if (reasons.includes("multiple_eligible_sessions")) {
+    return "StageFlow preserved this media but cannot safely determine which eligible Session owns it.";
+  }
+  if (reasons.includes("no_safely_eligible_session")) {
+    return "StageFlow preserved this media because no realized Session is safely eligible.";
+  }
+  if (status === "unresolved") {
+    return "StageFlow preserved this media without guessing Session ownership.";
+  }
+  return "Registration evidence is still being evaluated; no Session authority has been asserted.";
+}
+
+function mediaAssetView(
+  item: KernelMediaStatus,
+  stages: KernelStageStatus[],
+): MediaAssetView | undefined {
+  const stage = stages.find((candidate) => candidate.stage_id === item.stage_id);
+  if (!stage) return undefined;
+  const consideredSessionIds = item.association_input_references
+    .filter((reference) => reference.record_type === "session")
+    .map((reference) => reference.record_id);
+  const status = associationStatus(item.association_status);
+  return {
+    candidateId: item.candidate_id,
+    assetId: item.asset_id ?? undefined,
+    stageId: item.stage_id,
+    stageKey: stage.key,
+    stageName: stage.name,
+    sourceBindingKey: item.source_binding_key,
+    registrationState: registrationState(item.registration_state),
+    associationStatus: status,
+    associationAuthority:
+      item.association_authority === "deterministic" ||
+      item.association_authority === "human"
+        ? item.association_authority
+        : undefined,
+    sessionId: item.session_id ?? undefined,
+    consideredSessionIds,
+    discoveredAt: item.discovered_at,
+    lastObservedAt: item.last_observed_at,
+    candidateStartedAt: item.media_started_at ?? undefined,
+    candidateEndedAt: item.media_ended_at ?? undefined,
+    epistemicKinds: item.epistemic_kinds,
+    diagnosticCodes: item.diagnostic_codes,
+    associationReasonCodes: item.association_reason_codes,
+    associationPolicy:
+      item.association_policy_id && item.association_policy_version
+        ? `${item.association_policy_id} ${item.association_policy_version}`
+        : undefined,
+    explanation: associationExplanation(status, item.association_reason_codes),
+    boundedProjection: true,
+  };
 }
 
 function mediaFromStage(stage: KernelStageStatus): MediaSummaryView {
@@ -292,7 +409,7 @@ function stageAttentionItem(stage: StageView): AttentionItemView | undefined {
   return {
     id: `${stage.id}-media-review`,
     level: "review",
-    title: "Media association requires review",
+    title: "Media association needs review",
     scope: stage.name,
     since: "Current status",
     impact: stage.attentionText ?? "Media ownership is uncertain.",
@@ -437,6 +554,10 @@ export function adaptKernelStatus(
   observedAt: string,
 ): OperationalWorkspace {
   const stages = payload.stages.map(stageView);
+  const mediaAssets = (payload.recent_media ?? []).flatMap((item) => {
+    const projected = mediaAssetView(item, payload.stages);
+    return projected ? [projected] : [];
+  });
   const sessionMap = new Map<string, SessionView>();
   for (const rawStage of payload.stages) {
     for (const projection of [...rawStage.assembling_sessions, ...rawStage.recent_sessions]) {
@@ -455,9 +576,13 @@ export function adaptKernelStatus(
   return {
     dataSource: {
       kind: "kernel",
-      label: "Live Kernel status · read only",
+      label: payload.configuration_supplied
+        ? "Live Kernel status · read only"
+        : "Live Kernel · setup required",
+      state: payload.configuration_supplied ? "live_connected" : "live_unconfigured",
+      statusLabel: payload.configuration_supplied ? "LIVE — connected" : "LIVE — unconfigured",
       updatedAt: observedAt,
-      authoritative: true,
+      authoritative: payload.configuration_supplied,
     },
     event: {
       id: payload.event_id ?? undefined,
@@ -472,9 +597,16 @@ export function adaptKernelStatus(
     },
     stages,
     sessions: [...sessionMap.values()],
+    mediaAssets,
     attention,
     infrastructure: infrastructure(payload),
     editorialCandidates: [],
+    editorialClips: [],
+    transcriptState: {
+      state: "not_connected",
+      label: "Not connected",
+      detail: "No transcription runtime is implemented in the current Kernel.",
+    },
     mediaTimingEvidence: [],
     mediaTimingEvidenceStatus: "not_requested",
   };
@@ -510,6 +642,8 @@ export function kernelUnavailableWorkspace(
     dataSource: {
       kind: "kernel",
       label: "Kernel connection unavailable · read only",
+      state: "live_unavailable",
+      statusLabel: "LIVE — unavailable",
       updatedAt: observedAt,
       authoritative: false,
     },

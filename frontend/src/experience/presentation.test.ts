@@ -78,6 +78,8 @@ test("fixture mode is explicit and never enables authority actions", () => {
   const workspace = getFixtureWorkspace("run-004");
 
   assert.equal(workspace.dataSource.kind, "fixture");
+  assert.equal(workspace.dataSource.state, "development_fixture");
+  assert.equal(workspace.dataSource.statusLabel, "DEVELOPMENT FIXTURE");
   assert.equal(workspace.dataSource.authoritative, false);
   assert.match(workspace.dataSource.label, /Development fixture/);
   assert.equal(authorityActionsEnabled(workspace), false);
@@ -139,6 +141,7 @@ test("Kernel adapter keeps stabilizing quiet and maps unresolved media to Review
   const workspace = adaptKernelStatus(payload, "2026-08-12T01:02:00Z");
 
   assert.equal(workspace.dataSource.kind, "kernel");
+  assert.equal(workspace.dataSource.state, "live_connected");
   assert.equal(workspace.dataSource.authoritative, true);
   assert.equal(workspace.stages[0].media.stabilizing, 1);
   assert.equal(workspace.attention.length, 1);
@@ -170,6 +173,9 @@ test("an intentionally unconfigured backend is setup Information, not database I
 
   assert.equal(workspace.attention[0].level, "information");
   assert.equal(workspace.attention[0].title, "Kernel not configured");
+  assert.equal(workspace.dataSource.state, "live_unconfigured");
+  assert.equal(workspace.dataSource.statusLabel, "LIVE — unconfigured");
+  assert.equal(workspace.dataSource.authoritative, false);
   assert.equal(workspaceAttentionLevel(workspace), "information");
 });
 
@@ -180,6 +186,8 @@ test("a failed Kernel request reports client connection loss without inventing d
   );
 
   assert.equal(workspace.dataSource.authoritative, false);
+  assert.equal(workspace.dataSource.state, "live_unavailable");
+  assert.equal(workspace.dataSource.statusLabel, "LIVE — unavailable");
   assert.equal(workspace.attention[0].level, "intervention");
   assert.equal(workspace.attention[0].title, "Kernel connection unavailable");
   assert.equal(workspace.infrastructure[0].label, "Kernel status API");
@@ -214,6 +222,7 @@ test("MTE remains advisory drill-down evidence and does not enter Producer Atten
           provider_version: "1.0",
           tool_id: "ffprobe",
           tool_version: "8.0",
+          inspected_at: "2026-08-12T18:26:00Z",
           recorder_profile_id: "vmix-reference-profile",
           recorder_profile_revision: 1,
           qualification_status: "unqualified",
@@ -228,6 +237,7 @@ test("MTE remains advisory drill-down evidence and does not enter Producer Atten
           ],
           derivations: [
             {
+              derivation_id: "derivation-1",
               epistemic_kind: "derived",
               rule_id: "creation-time-plus-duration",
               rule_version: "1.0",
@@ -241,7 +251,27 @@ test("MTE remains advisory drill-down evidence and does not enter Producer Atten
         },
       ],
     },
-    { asset_id: "asset-1", stage_id: "stage-1", session_id: null },
+    {
+      asset_id: "asset-1",
+      candidate_id: "candidate-1",
+      proposed_asset_id: "asset-1",
+      stage_id: "stage-1",
+      source_binding_key: "main-recorder",
+      registration_state: "registered",
+      discovered_at: "2026-08-12T18:23:00Z",
+      last_observed_at: "2026-08-12T18:26:00Z",
+      association_status: "unresolved",
+      association_authority: "deterministic",
+      session_id: null,
+      epistemic_kinds: ["observed", "derived"],
+      media_started_at: null,
+      media_ended_at: null,
+      diagnostic_codes: ["association_unresolved"],
+      association_reason_codes: ["multiple_eligible_sessions"],
+      association_policy_id: "stageflow.kernel.media-association",
+      association_policy_version: "1.1.0",
+      association_input_references: [],
+    },
     [
       {
         stage_id: "stage-1",
@@ -273,4 +303,37 @@ test("MTE remains advisory drill-down evidence and does not enter Producer Atten
   assert.equal(adapted[0].stageKey, "main");
   assert.equal(adapted[0].qualificationStatus, "unqualified");
   assert.equal(adapted[0].authorizedUse, "advisory_only");
+  assert.match(adapted[0].derivationIdentity ?? "", /derivation-1/);
+  assert.equal(adapted[0].observations[0].kind, "embedded_creation_time");
+});
+
+test("Run 004 reads as association review with preserved media, not system failure", () => {
+  const workspace = getFixtureWorkspace("run-004");
+  const stage = workspace.stages[0];
+
+  assert.equal(workspace.event.ready, true);
+  assert.equal(stage.media.registered, 49);
+  assert.equal(stage.media.associated, 32);
+  assert.equal(stage.media.unresolved, 17);
+  assert.equal(stage.media.conflicting, 0);
+  assert.equal(workspace.attention[0].title, "Media association needs review");
+  assert.doesNotMatch(
+    `${workspace.attention[0].title} ${workspace.attention[0].impact}`,
+    /system failure|media loss/i,
+  );
+  assert.ok(workspace.mediaAssets.every((item) => item.boundedProjection));
+  assert.match(workspace.mediaAssets[0].explanation, /preserved/i);
+  assert.equal(workspace.mediaTimingEvidence[0].assetId, workspace.mediaAssets[0].assetId);
+  assert.equal(workspace.mediaTimingEvidence[0].authorizedUse, "advisory_only");
+});
+
+test("scale fixture covers seven Stages, long identities, no Session, and high Attention", () => {
+  const workspace = getFixtureWorkspace("scale");
+
+  assert.equal(workspace.stages.length, 7);
+  assert.ok(workspace.stages.some((stage) => stage.name.length > 30));
+  assert.ok(workspace.sessions.some((session) => session.title.length > 70));
+  assert.ok(workspace.stages.some((stage) => !stage.currentSession));
+  assert.ok(workspace.attention.length >= 3);
+  assert.equal(workspaceAttentionLevel(workspace), "intervention");
 });

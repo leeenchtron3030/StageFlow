@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import type {
   EditorialCandidateView,
+  MediaAssetView,
   MediaTimingEvidenceView,
   OperationalWorkspace,
   SessionView,
@@ -28,8 +29,91 @@ function Definition({ label, value }: { label: string; value: string }) {
   return <div className="definition"><dt>{label}</dt><dd>{value}</dd></div>;
 }
 
+function readableCode(value: string): string {
+  return value.replaceAll("_", " ");
+}
+
+function MediaUncertaintyPanel({
+  assets,
+  workspace,
+}: {
+  assets: MediaAssetView[];
+  workspace: OperationalWorkspace;
+}) {
+  const uncertain = assets.filter(
+    (asset) => asset.associationStatus === "unresolved" || asset.associationStatus === "conflict",
+  );
+  if (!uncertain.length) return null;
+  return (
+    <section className="media-uncertainty-panel" aria-labelledby="media-uncertainty-title">
+      <div className="section-heading">
+        <div>
+          <span className="eyebrow">Membership uncertainty · bounded recent evidence</span>
+          <h2 id="media-uncertainty-title">Affected media</h2>
+        </div>
+        <span>{uncertain.length} shown · media preserved</span>
+      </div>
+      <div className="uncertainty-list">
+        {uncertain.map((asset) => {
+          const considered = asset.consideredSessionIds
+            .map((id) => workspace.sessions.find((session) => session.id === id)?.title ?? `Session ${id.slice(0, 8)}`)
+            .join(" · ");
+          const timing = workspace.mediaTimingEvidence.find((item) => item.assetId === asset.assetId);
+          return (
+            <article className={`uncertainty-card uncertainty-${asset.associationStatus}`} key={asset.candidateId}>
+              <div className="uncertainty-identity">
+                <div>
+                  <span className="eyebrow">{asset.stageName} · {asset.registrationState}</span>
+                  <strong>{asset.assetId ? `Asset ${asset.assetId.slice(0, 12)}` : `Candidate ${asset.candidateId.slice(0, 12)}`}</strong>
+                </div>
+                <span className={`association-badge association-${asset.associationStatus}`}>
+                  {asset.associationStatus === "conflict" ? "Conflict · Review" : "Unresolved · Review"}
+                </span>
+              </div>
+              <p className="operator-explanation">{asset.explanation}</p>
+              <dl className="definition-grid uncertainty-definitions">
+                <Definition
+                  label="Sessions considered by policy"
+                  value={considered || "None recorded in bounded evidence"}
+                />
+                <Definition
+                  label="Association reason"
+                  value={asset.associationReasonCodes.map(readableCode).join(" · ") || "No reason reported"}
+                />
+                <Definition
+                  label="Timing evidence"
+                  value={
+                    timing
+                      ? `${timing.qualificationStatus} · candidate interval is Derived and advisory`
+                      : "No timing evidence in this bounded read"
+                  }
+                />
+                <Definition label="Last observed" value={asset.lastObservedAt} />
+              </dl>
+              <details className="diagnostic-details">
+                <summary>Evidence and provenance</summary>
+                <p>Source binding: {asset.sourceBindingKey}</p>
+                <p>Policy: {asset.associationPolicy ?? "Not reported"}</p>
+                <p>Epistemic kinds: {asset.epistemicKinds.join(" · ") || "Not reported"}</p>
+                <p>Diagnostic codes: {asset.diagnosticCodes.map(readableCode).join(" · ") || "None"}</p>
+              </details>
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 function AuthorityControls({ workspace }: { workspace: OperationalWorkspace }) {
   const enabled = authorityActionsEnabled(workspace);
+  const actions = [
+    ["Arm Event", "Would assert that the configured Event may enter operational mode."],
+    ["Start Session", "Would declare a realized Session and authoritative occurrence time."],
+    ["End Presentation", "Would declare an authoritative Presentation End occurrence time."],
+    ["Package Ready", "Would assert the current package revision is ready for human review."],
+    ["Approve Package", "Would record an attributable human decision for one package revision."],
+  ] as const;
   return (
     <section className="authority-panel" aria-labelledby="authority-title">
       <div className="section-heading">
@@ -45,13 +129,17 @@ function AuthorityControls({ workspace }: { workspace: OperationalWorkspace }) {
         </p>
       </div>
       <div className="authority-actions" aria-label="Unavailable authority actions">
-        {[
-          "Arm Event",
-          "Start Session",
-          "End Presentation",
-          "Package Ready",
-          "Approve Package",
-        ].map((label) => <button disabled={!enabled} key={label} type="button">{label}</button>)}
+        {actions.map(([label, description]) => (
+          <button
+            aria-label={`${label}. ${description} Disabled because no reviewed command API is connected.`}
+            disabled={!enabled}
+            key={label}
+            title={`${description} Disabled: no reviewed command API is connected.`}
+            type="button"
+          >
+            {label}
+          </button>
+        ))}
       </div>
       <p className="disabled-explanation">
         Unavailable: no reviewed command API is connected. Status remains useful and read-only.
@@ -171,9 +259,9 @@ function TimingEvidencePanel({
       <div className="section-heading">
         <div>
           <span className="eyebrow">Media evidence · drill-down</span>
-          <h2 id="timing-evidence-title">Recorder timing</h2>
+          <h2 id="timing-evidence-title">Media Timing Evidence</h2>
         </div>
-        <span>Advisory only</span>
+        <span className="advisory-badge">Advisory only · never authority</span>
       </div>
       {status === "unavailable" ? (
         <div className="operational-empty compact-empty">
@@ -186,25 +274,32 @@ function TimingEvidencePanel({
             <article className="timing-evidence-card" key={item.evidenceId}>
               <div className="timing-evidence-identity">
                 <strong>Asset {item.assetId.slice(0, 8)} · evidence r{item.revision}</strong>
-                <span>{item.recorderProfileLabel}</span>
+                <span>{item.qualificationStatus.toUpperCase()} · {item.recorderProfileLabel}</span>
+              </div>
+              <div className="epistemic-split">
+                <section>
+                  <span className="epistemic-label observed-label">Observed</span>
+                  <strong>{item.providerLabel} · {item.toolLabel}</strong>
+                  <span>{item.observations.length ? `${item.observations.length} recorder/media facts` : "No normalized observations"}</span>
+                </section>
+                <section>
+                  <span className="epistemic-label derived-label">Derived</span>
+                  <strong>Candidate media interval</strong>
+                  <span>
+                    {item.candidateStartedAt && item.candidateEndedAt
+                      ? `${item.candidateStartedAt} → ${item.candidateEndedAt}`
+                      : "No candidate interval derived"}
+                  </span>
+                </section>
               </div>
               <dl className="definition-grid">
-                <Definition
-                  label="Candidate interval · Derived"
-                  value={
-                    item.candidateStartedAt && item.candidateEndedAt
-                      ? `${item.candidateStartedAt} → ${item.candidateEndedAt}`
-                      : "No candidate interval derived"
-                  }
-                />
-                <Definition label="Evidence · Observed" value={item.evidenceLabel} />
-                <Definition
-                  label="Derivation"
-                  value={item.derivationLabel ?? "No derivation"}
-                />
+                <Definition label="Provider / tool" value={`${item.providerLabel} · ${item.toolLabel}`} />
+                <Definition label="Source / recorder profile" value={item.recorderProfileLabel} />
+                <Definition label="Evidence revision" value={String(item.revision)} />
+                <Definition label="Derivation identity" value={item.derivationIdentity ?? item.derivationLabel ?? "No derivation"} />
                 <Definition
                   label="Qualification"
-                  value={`${item.qualificationStatus} recorder profile`}
+                  value={`${item.qualificationStatus} recorder profile · does not grant authority`}
                 />
                 <Definition
                   label="Precision / limitations"
@@ -215,6 +310,19 @@ function TimingEvidencePanel({
                 />
                 <Definition label="Use" value="Advisory only · never Session authority" />
               </dl>
+              {item.observations.length ? (
+                <details className="diagnostic-details">
+                  <summary>Observed facts and limitations</summary>
+                  <ul>
+                    {item.observations.map((observation, index) => (
+                      <li key={`${observation.kind}-${index}`}>
+                        <strong>{readableCode(observation.kind)}</strong>
+                        <span>{[observation.precision, ...observation.limitations].filter(Boolean).join(" · ") || "No additional limitation reported"}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              ) : null}
             </article>
           ))}
         </div>
@@ -248,10 +356,21 @@ export function StageOperationalView({ stage, workspace }: { stage?: StageView; 
         <section className="detail-panel">
           <div className="section-heading"><h2>Authority</h2><span>Read only</span></div>
           <p>Declared boundaries are shown in Session detail. No command API is connected.</p>
-          <button disabled type="button">Mark Moment</button>
+          <button
+            aria-label="Mark Moment. Would record an attributable human Editorial mark. Disabled because durable operator-mark execution is not implemented."
+            disabled
+            title="Would record an attributable human Editorial mark. Disabled: durable operator-mark execution is not implemented."
+            type="button"
+          >
+            Mark Moment
+          </button>
           <p className="disabled-explanation">Unavailable: durable operator-mark execution is not implemented.</p>
         </section>
       </div>
+      <MediaUncertaintyPanel
+        assets={workspace.mediaAssets.filter((item) => item.stageKey === stage.key)}
+        workspace={workspace}
+      />
       <TimingEvidencePanel
         evidence={workspace.mediaTimingEvidence.filter((item) => item.stageKey === stage.key)}
         status={workspace.mediaTimingEvidenceStatus}
@@ -280,13 +399,32 @@ export function SessionOperationalView({ session, workspace }: { session?: Sessi
         </section>
         <section className="detail-panel">
           <div className="section-heading"><h2>Media membership</h2><span>Aggregate</span></div>
-          <strong className="summary-value compact-value">{formatMediaSummary(session.media)}</strong>
-          <p>Physical recording boundaries remain secondary. Filesystem timestamps are not presented as content truth.</p>
+          <div className="media-metric-grid" aria-label="Stage media context for this Session">
+            <div><span>Registered</span><strong>{session.media.registered}</strong></div>
+            <div><span>Associated</span><strong>{session.media.associated}</strong></div>
+            <div><span>Stabilizing</span><strong>{session.media.stabilizing}</strong></div>
+            <div><span>Unresolved</span><strong>{session.media.unresolved}</strong></div>
+            <div><span>Conflicting</span><strong>{session.media.conflicting}</strong></div>
+          </div>
+          <p>Stage aggregate context · bounded Session evidence appears below. Physical recording boundaries and filesystem timestamps are not content truth.</p>
           {session.media.unresolved ? <div className="review-callout"><strong>{session.media.unresolved} unplaced / time unknown</strong><span>Media preserved. Ownership remains unresolved.</span></div> : null}
         </section>
       </div>
+      <MediaUncertaintyPanel
+        assets={workspace.mediaAssets.filter(
+          (item) => item.sessionId === session.id || item.consideredSessionIds.includes(session.id),
+        )}
+        workspace={workspace}
+      />
       <TimingEvidencePanel
-        evidence={workspace.mediaTimingEvidence.filter((item) => item.sessionId === session.id)}
+        evidence={workspace.mediaTimingEvidence.filter(
+          (item) =>
+            item.sessionId === session.id ||
+            workspace.mediaAssets.some(
+              (asset) =>
+                asset.assetId === item.assetId && asset.consideredSessionIds.includes(session.id),
+            ),
+        )}
         status={workspace.mediaTimingEvidenceStatus}
       />
       <AuthorityControls workspace={workspace} />
@@ -300,26 +438,62 @@ function CandidateRow({ candidate }: { candidate: EditorialCandidateView }) {
       <div className="candidate-marker" aria-hidden="true">{candidate.origin === "producer" ? "◆" : "✦"}</div>
       <div className="candidate-time"><strong>{candidate.at}</strong><span>{candidate.stageName}</span></div>
       <div className="candidate-copy"><span className="eyebrow">{candidate.origin} · {candidate.state}</span><strong>{candidate.sessionTitle}</strong><p>{candidate.excerpt}</p><span>{candidate.reason}</span></div>
-      <button disabled type="button">Review</button>
+      <button
+        aria-label={`Review ${candidate.sessionTitle} Candidate Moment. Disabled because Editorial review execution is not implemented.`}
+        disabled
+        title="Fixture-only Candidate Moment. Disabled: Editorial review execution is not implemented."
+        type="button"
+      >
+        Review
+      </button>
     </article>
   );
 }
 
 export function EditorialShellView({ workspace }: { workspace: OperationalWorkspace }) {
   const current = workspace.sessions.find((session) => session.activityState === "presentation_active") ?? workspace.sessions[0];
+  const hotMoments = workspace.editorialCandidates.filter((item) => item.state === "priority");
+  const pendingReview = workspace.editorialCandidates.filter(
+    (item) => item.state === "candidate" || item.state === "priority" || item.state === "deferred",
+  );
   return (
     <>
-      <WorkspaceTitle eyebrow={`Editorial · ${workspace.event.name}`} title="Live Triage" summary={workspace.editorialCandidates.length ? `${workspace.editorialCandidates.length} development Candidates available` : "No Candidate runtime connected"} />
-      <div className="editorial-notice" role="note"><strong>Development Editorial shell</strong><span>No transcript, model, or Editorial decision runtime is connected. Synthetic Candidates are labeled fixture data.</span></div>
+      <WorkspaceTitle eyebrow={`Editorial · ${workspace.event.name}`} title="Editorial workspace" summary={workspace.editorialCandidates.length ? `${pendingReview.length} simulated review items · ${hotMoments.length} Hot Moments` : "No Editorial runtime connected"} />
+      <div className="editorial-notice" role="note"><strong>{workspace.dataSource.kind === "fixture" ? "Development Editorial fixture" : "Editorial workflow frame"}</strong><span>No transcript, model, or Editorial decision runtime is connected. Fixture Candidates, Hot Moments, and Clips are simulated and never Producer Attention.</span></div>
+      <div className="editorial-summary-grid">
+        <section><span className="eyebrow">Session context</span><strong>{current?.title ?? "No Session selected"}</strong><span>{current ? `${current.stageName} · ${formatActivityState(current)}` : "Unavailable"}</span></section>
+        <section><span className="eyebrow">Transcript</span><strong>{workspace.transcriptState.label}</strong><span>{workspace.transcriptState.detail}</span></section>
+        <section><span className="eyebrow">Candidate Moments</span><strong>{workspace.editorialCandidates.length}</strong><span>{pendingReview.length} awaiting human judgment</span></section>
+        <section><span className="eyebrow">Hot Moments</span><strong>{hotMoments.length}</strong><span>Editorial urgency · not Producer Attention</span></section>
+        <section><span className="eyebrow">Approved Editorial Clips</span><strong>{workspace.editorialClips.length}</strong><span>Fixture-only approved surface</span></section>
+        <section><span className="eyebrow">Human review</span><strong>{pendingReview.length ? "Judgment pending" : "Caught up"}</strong><span>No automatic approval authority</span></section>
+      </div>
       <div className="editorial-layout">
         <section className="media-workspace">
           <div className="section-heading"><div><span className="eyebrow">Session context</span><h2>{current?.title ?? "No Session selected"}</h2></div><span>{current ? formatActivityState(current) : "Unavailable"}</span></div>
           <div className="media-placeholder"><span>Media / timeline workspace</span><strong>Playback not implemented</strong><p>Future media remains anchored to one Session timeline. No synthetic media is shown.</p></div>
           <div className="timeline-placeholder"><span className="timeline-line" /><span className="timeline-playhead" /><div><span>00:00</span><span>Session timeline placeholder</span><span>LIVE</span></div></div>
-          <section className="transcript-placeholder"><span className="eyebrow">Transcript</span><strong>Not available</strong><p>Transcription execution is not implemented. This space preserves the accepted temporal workspace structure.</p></section>
+          <section className="transcript-placeholder"><span className="eyebrow">Transcript surface</span><strong>{workspace.transcriptState.label}</strong><p>{workspace.transcriptState.detail}</p><p>Transcript text remains intentionally absent because no transcription execution is implemented.</p></section>
         </section>
-        <aside className="candidate-panel"><div className="section-heading"><h2>Candidates</h2><span>Fixture only</span></div>{workspace.editorialCandidates.length ? workspace.editorialCandidates.map((item) => <CandidateRow candidate={item} key={item.id} />) : <div className="operational-empty"><strong>Caught up</strong><span>No Candidate evidence is available.</span></div>}</aside>
+        <aside className="candidate-panel"><div className="section-heading"><h2>Candidate Moments</h2><span>{workspace.dataSource.kind === "fixture" ? "Simulated fixture" : "Not connected"}</span></div>{workspace.editorialCandidates.length ? workspace.editorialCandidates.map((item) => <CandidateRow candidate={item} key={item.id} />) : <div className="operational-empty"><strong>Caught up</strong><span>No Candidate evidence is available.</span></div>}</aside>
       </div>
+      <section className="approved-clips-panel" aria-labelledby="approved-clips-title">
+        <div className="section-heading"><div><span className="eyebrow">Human-approved surface</span><h2 id="approved-clips-title">Approved Editorial Clips</h2></div><span>Fixture only · no rendering</span></div>
+        {workspace.editorialClips.length ? workspace.editorialClips.map((clip) => (
+          <article className="approved-clip-row" key={clip.id}>
+            <div><strong>{clip.sessionTitle}</strong><span>{clip.rangeLabel}</span></div>
+            <span>{clip.reviewLabel}</span>
+            <button
+              aria-label={`Open approved Editorial Clip for ${clip.sessionTitle}. Disabled because Clip playback and persistence are not implemented.`}
+              disabled
+              title="Fixture-only approved Clip. Disabled: Clip playback and persistence are not implemented."
+              type="button"
+            >
+              Open Clip
+            </button>
+          </article>
+        )) : <div className="operational-empty compact-empty"><strong>No approved Editorial Clips</strong><span>Approval and Clip persistence are not implemented.</span></div>}
+      </section>
     </>
   );
 }

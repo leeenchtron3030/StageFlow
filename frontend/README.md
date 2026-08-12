@@ -41,6 +41,16 @@ npm ci
 
 ## Fixture-mode operator preview
 
+From the repository root, the dev-only preview helper keeps child output attached to the
+current terminal and stops only processes it started:
+
+```powershell
+.\scripts\preview\Start-StageFlowPreview.ps1 -Mode Fixture -Scenario quiet
+```
+
+Press `Ctrl+C` in that terminal to stop the preview. The helper requires `npm.cmd` on
+`PATH`; it does not install packages or create production orchestration.
+
 Development defaults to fixture mode. The explicit environment value makes the source
 choice obvious:
 
@@ -62,9 +72,17 @@ http://127.0.0.1:3000/?scenario=quiet
 http://127.0.0.1:3000/?scenario=turnover
 http://127.0.0.1:3000/?scenario=source-unavailable
 http://127.0.0.1:3000/?scenario=run-004
+http://127.0.0.1:3000/?scenario=scale
 ```
 
 ## Read-only Kernel mode
+
+After setting `STAGEFLOW_KERNEL_CONFIG_PATH` and its referenced DSN secret, the same
+helper can start the backend and frontend together:
+
+```powershell
+.\scripts\preview\Start-StageFlowPreview.ps1 -Mode Live
+```
 
 Terminal 1:
 
@@ -89,6 +107,17 @@ it into a presentation model. It does not duplicate association policy or expose
 authority. If the endpoint is unavailable, it identifies the local client connection
 loss without inventing database state; it never silently falls back to fixture state.
 
+The persistent source indicator uses exactly four operator states:
+
+- `LIVE — connected`
+- `LIVE — unavailable`
+- `LIVE — unconfigured`
+- `DEVELOPMENT FIXTURE`
+
+An unavailable frontend-to-Kernel connection never fabricates PostgreSQL or source
+health. An unconfigured backend remains a connected setup state rather than a database
+failure.
+
 Production builds default to Kernel mode unless `STAGEFLOW_UI_DATA_MODE=fixture` is set
 explicitly. An explicitly enabled production-build fixture remains visibly labeled and is
 still not production authority.
@@ -109,6 +138,15 @@ dependency.
 Focused behavior coverage includes MTE fixture/projection labeling and verifies that
 unqualified timing evidence remains advisory drill-down rather than Producer Attention.
 
+## Dependency-security status
+
+Next.js is pinned through the compatible 16.2.11 patch. Current npm advisory paths,
+runtime reachability, install-script notices, and accepted residual development-tooling
+findings are documented in
+[Producer UI dependency-security triage](../docs/ux/producer-ui-dependency-security.md).
+Do not run `npm audit fix --force` or approve install scripts as part of routine preview
+setup.
+
 ## Known limitations
 
 - Status is server-rendered on navigation/refresh; continuous polling is not implemented.
@@ -121,3 +159,5 @@ unqualified timing evidence remains advisory drill-down rather than Producer Att
 - Worker/GPU, Internet, cloud, and transfer status render only when modeled by fixtures;
   the current Kernel projection does not report those capabilities.
 - The interface is an operator-review milestone, not Event-readiness evidence.
+- The Kernel media list is deliberately bounded. Asset drill-down labels it as bounded
+  recent evidence and does not claim it is a complete Session membership export.
