@@ -111,10 +111,11 @@ implementation is contract-validation infrastructure rather than production stor
 ## Immutability note
 
 Acceptance contracts are frozen, normalize duplicate references, convert collections
-to tuples, and defensively copy metadata into read-only mapping wrappers. As with the
-existing repository contracts, nested objects placed inside metadata are not
-recursively frozen. Acceptance-critical meaning therefore remains in first-class
-fields and does not rely on nested metadata mutability.
+to tuples, and recursively snapshot supplementary metadata into immutable containers.
+The shared metadata boundary accepts serialization-friendly values plus evidenced
+immutable StageFlow value contracts and fails closed for mutable/active objects or
+reference cycles. Acceptance-critical meaning remains in first-class fields rather than
+depending on metadata.
 
 ## Architectural boundary
 

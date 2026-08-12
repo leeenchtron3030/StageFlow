@@ -20,6 +20,7 @@ from app.contexts.production.transition_policy import (
     TransitionReason,
 )
 from app.shared.ids import EntityId
+from tests.timestamp_fixtures import AWARE_TIMESTAMP
 
 
 def _state(value: OperationalStateValue) -> OperationalState:
@@ -100,7 +101,9 @@ def test_generic_policy_evaluation_is_explainable_and_non_executing() -> None:
     )
     current_state = _state(OperationalStateValue.INACTIVE)
 
-    evaluation = policy.evaluate(current_state=current_state, evidence_sets=())
+    evaluation = policy.evaluate(
+                     evaluated_at=AWARE_TIMESTAMP,
+                     current_state=current_state, evidence_sets=())
 
     assert evaluation.outcome is TransitionPolicyResult.INSUFFICIENT_EVIDENCE
     assert evaluation.current_state == current_state

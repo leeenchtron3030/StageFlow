@@ -3,12 +3,13 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from types import MappingProxyType
 from typing import Any
 
 from app.contexts.production.evidence import EvidenceContext
 from app.contexts.production.timeline import TimelinePosition, TimelineRange
 from app.shared.ids import CorrelationId, EntityId
+from app.shared.metadata import freeze_metadata
+from app.shared.time import parse_aware_datetime
 
 
 def _empty_metadata() -> Mapping[str, Any]:
@@ -47,7 +48,7 @@ class OperationalStateAcceptanceContext:
                     "OperationalStateAcceptanceContext timeline range must be ordered."
                 )
             object.__setattr__(self, "timeline_range_seconds", (float(start), float(end)))
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        object.__setattr__(self, "metadata", freeze_metadata(self.metadata))
 
     @classmethod
     def unknown(cls) -> OperationalStateAcceptanceContext:
@@ -101,9 +102,8 @@ class OperationalStateAcceptanceContext:
         organizational_anchor: datetime | None = None
         organizational_anchor_seconds: float | None = None
         if self.organizational_anchor is not None:
-            try:
-                organizational_anchor = datetime.fromisoformat(self.organizational_anchor)
-            except ValueError:
+            organizational_anchor = parse_aware_datetime(self.organizational_anchor)
+            if organizational_anchor is None:
                 try:
                     organizational_anchor_seconds = float(self.organizational_anchor)
                 except ValueError:

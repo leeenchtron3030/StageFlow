@@ -44,8 +44,10 @@ The architecture-baseline disposition accepts ABR-005 and fully approves D-07.
 
 ## Consequences
 
-- Legacy contracts require incremental compatibility-aware hardening before durable
-  serialization or external ingress.
+- A deliberate breaking internal transition to explicit aware timestamps is approved
+  before operational runtime, durable schemas, or external consumers depend on legacy
+  optional/defaulted Python timestamp behavior. No prolonged compatibility wrapper is
+  required solely to preserve ambiguity.
 - Source adapters may need explicit normalization policy and preservation of original
   representations.
 - Tests use injected/fixed clocks and deliberately different semantic timestamps.

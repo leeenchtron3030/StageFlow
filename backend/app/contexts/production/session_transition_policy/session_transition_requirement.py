@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from types import MappingProxyType
 from typing import Any
 
 from app.contexts.production.evidence import EvidenceRole, EvidenceSignal
 from app.contexts.production.operational_state import OperationalStateValue
 from app.shared.ids import EntityId
+from app.shared.metadata import freeze_metadata
 
 
 def _empty_metadata() -> Mapping[str, Any]:
@@ -58,4 +58,4 @@ class SessionTransitionRequirement:
         object.__setattr__(self, "allowed_signals", tuple(self.allowed_signals))
         object.__setattr__(self, "disallowed_signals", tuple(self.disallowed_signals))
         object.__setattr__(self, "allowed_roles", tuple(self.allowed_roles))
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        object.__setattr__(self, "metadata", freeze_metadata(self.metadata))

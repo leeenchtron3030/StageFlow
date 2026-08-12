@@ -4,10 +4,11 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 from math import isfinite
-from types import MappingProxyType
 from typing import Any
 
 from app.shared.ids import CorrelationId, EntityId
+from app.shared.metadata import freeze_metadata
+from app.shared.time import require_aware_datetime
 
 
 def _empty_metadata() -> Mapping[str, Any]:
@@ -50,6 +51,11 @@ class RecordingTransitionContext:
     )
 
     def __post_init__(self) -> None:
+        if self.organizational_at is not None:
+            require_aware_datetime(
+                self.organizational_at,
+                "RecordingTransitionContext.organizational_at",
+            )
         if self.media_artifact_id is not None and not self.media_artifact_id.strip():
             raise ValueError("RecordingTransitionContext media_artifact_id must not be blank.")
         if self.timeline_range_seconds is not None:
@@ -63,7 +69,7 @@ class RecordingTransitionContext:
                 "timeline_range_seconds",
                 (float(start), float(end)),
             )
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        object.__setattr__(self, "metadata", freeze_metadata(self.metadata))
 
     @property
     def has_recording_identity(self) -> bool:

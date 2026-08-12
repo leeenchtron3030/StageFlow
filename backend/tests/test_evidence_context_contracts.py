@@ -19,6 +19,7 @@ from app.contexts.production.evidence import (
 from app.contexts.production.timeline import TimelinePosition, TimelineRange
 from app.contexts.production.transition_policy import TransitionEvaluation
 from app.shared.ids import CorrelationId, EntityId
+from tests.timestamp_fixtures import AWARE_TIMESTAMP
 
 
 def _item() -> EvidenceItem:
@@ -206,6 +207,8 @@ def test_resolution_contract_normalizes_diagnostics_immutably() -> None:
 
 def test_evidence_set_and_transition_evaluation_context_defaults_are_compatible() -> None:
     evidence = EvidenceSet(
+                   created_at=AWARE_TIMESTAMP,
+
         id=EntityId.new(),
         recording_block_id=None,
         purpose=EvidencePurpose.TRANSITION_SUPPORT,

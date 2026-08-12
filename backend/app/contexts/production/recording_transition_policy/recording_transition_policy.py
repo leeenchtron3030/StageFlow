@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
-from types import MappingProxyType
+from datetime import datetime
 from typing import Any, cast
 from uuid import NAMESPACE_URL, uuid5
 
@@ -36,6 +35,8 @@ from app.contexts.production.transition_policy import (
     TransitionReason,
 )
 from app.shared.ids import EntityId
+from app.shared.metadata import freeze_metadata
+from app.shared.time import require_aware_datetime
 
 from .recording_transition_context import RecordingTransitionContext
 from .recording_transition_evidence_profile import RecordingTransitionEvidenceProfile
@@ -149,7 +150,7 @@ class RecordingTransitionPolicy:
         if len({rule.evidence_signal for rule in rules}) != len(rules):
             raise ValueError("RecordingTransitionPolicy rules must not repeat an Evidence Signal.")
         object.__setattr__(self, "rules", rules)
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        object.__setattr__(self, "metadata", freeze_metadata(self.metadata))
 
     @property
     def evaluated_state_kind(self) -> OperationalStateKind:
@@ -160,11 +161,13 @@ class RecordingTransitionPolicy:
         *,
         current_state: OperationalState | None,
         evidence_sets: Sequence[EvidenceSet],
+        evaluated_at: datetime,
     ) -> TransitionEvaluation:
         """Compatibility entry point returning the generic evaluation contract."""
         return self.evaluate_result(
             current_state=current_state,
             evidence_sets=evidence_sets,
+            evaluated_at=evaluated_at,
         ).evaluation
 
     def evaluate_result(
@@ -172,10 +175,10 @@ class RecordingTransitionPolicy:
         *,
         current_state: OperationalState | None,
         evidence_sets: Sequence[EvidenceSet],
-        evaluated_at: datetime | None = None,
+        evaluated_at: datetime,
     ) -> RecordingTransitionResult:
         """Evaluate recording Evidence with policy-local context diagnostics."""
-        timestamp = evaluated_at or datetime.now(UTC)
+        timestamp = require_aware_datetime(evaluated_at, "evaluated_at")
         prepared, ignored_ids, unsupported_ids, duplicate_ids = self._prepare_evidence(
             tuple(evidence_sets)
         )

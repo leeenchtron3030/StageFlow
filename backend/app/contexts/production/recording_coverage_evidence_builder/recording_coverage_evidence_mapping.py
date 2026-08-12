@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from types import MappingProxyType
 from typing import Any
 
 from app.contexts.production.evidence import EvidenceSignal
 from app.contexts.production.observation import Observation
+from app.shared.metadata import freeze_metadata
 
 
 def _empty_metadata() -> Mapping[str, Any]:
@@ -38,7 +38,7 @@ class RecordingCoverageEvidenceMapping:
             )
         if not self.rationale.strip():
             raise ValueError("RecordingCoverageEvidenceMapping rationale must not be empty.")
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        object.__setattr__(self, "metadata", freeze_metadata(self.metadata))
 
 
 RECORDING_COVERAGE_EVIDENCE_MAPPINGS: tuple[

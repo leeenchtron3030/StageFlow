@@ -3,11 +3,12 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
-from types import MappingProxyType
 from typing import Any
 
 from app.contexts.production.operational_state import OperationalState, OperationalStateSubject
 from app.shared.ids import EntityId
+from app.shared.metadata import freeze_metadata
+from app.shared.time import require_aware_datetime
 
 from .operational_state_acceptance_lineage import OperationalStateAcceptanceLineage
 from .operational_state_acceptance_outcome import OperationalStateAcceptanceOutcome
@@ -37,6 +38,7 @@ class OperationalStateAcceptanceResult:
     metadata: Mapping[str, Any] = field(default_factory=_empty_metadata)
 
     def __post_init__(self) -> None:
+        require_aware_datetime(self.accepted_at, "OperationalStateAcceptanceResult.accepted_at")
         reasons = tuple(self.reasons)
         if not reasons:
             raise ValueError("OperationalStateAcceptanceResult requires at least one reason.")
@@ -53,7 +55,7 @@ class OperationalStateAcceptanceResult:
         elif self.successor_state is not None or self.supersession is not None:
             raise ValueError("Non-accepted result must not contain successor or supersession.")
 
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        object.__setattr__(self, "metadata", freeze_metadata(self.metadata))
 
     @property
     def is_accepted(self) -> bool:

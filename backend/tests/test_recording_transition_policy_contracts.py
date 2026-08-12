@@ -34,6 +34,7 @@ from app.contexts.production.recording_transition_policy import (
 )
 from app.contexts.production.transition_policy import TransitionPolicyResult
 from app.shared.ids import CorrelationId, EntityId
+from tests.timestamp_fixtures import AWARE_TIMESTAMP
 
 
 def _state(
@@ -168,7 +169,9 @@ def test_recording_transition_context_is_immutable_id_only_and_hashable() -> Non
 
 def test_recording_transition_policy_creation_and_result_contract() -> None:
     policy = RecordingTransitionPolicy(id=EntityId.new())
-    result = policy.evaluate_result(current_state=None, evidence_sets=())
+    result = policy.evaluate_result(
+                 evaluated_at=AWARE_TIMESTAMP,
+                 current_state=None, evidence_sets=())
 
     assert policy.name == "Recording Transition Policy"
     assert policy.evaluated_state_kind is OperationalStateKind.RECORDING_STATE
@@ -210,6 +213,8 @@ def test_existing_valid_recording_lifecycle_transitions_are_preserved() -> None:
     for current_value, signal, proposed_value in cases:
         current_state, evidence = _evaluation(current_value, signal)
         evaluation = policy.evaluate(
+                         evaluated_at=AWARE_TIMESTAMP,
+
             current_state=current_state,
             evidence_sets=(evidence,),
         )
@@ -224,7 +229,9 @@ def test_missing_current_state_is_explicitly_assumed_inactive() -> None:
     policy = RecordingTransitionPolicy(id=EntityId.new())
     evidence = _evidence(signal=EvidenceSignal.RECORDING_CONTINUITY_ESTABLISHED)
 
-    result = policy.evaluate_result(current_state=None, evidence_sets=(evidence,))
+    result = policy.evaluate_result(
+                 evaluated_at=AWARE_TIMESTAMP,
+                 current_state=None, evidence_sets=(evidence,))
 
     assert result.outcome is TransitionPolicyResult.TRANSITION_SUPPORTED
     assert result.proposed_state is OperationalStateValue.ACTIVE
@@ -242,7 +249,9 @@ def test_already_current_is_preserved_for_supported_values() -> None:
 
     for value, signal in cases:
         current_state, evidence = _evaluation(value, signal)
-        evaluation = policy.evaluate(current_state=current_state, evidence_sets=(evidence,))
+        evaluation = policy.evaluate(
+                         evaluated_at=AWARE_TIMESTAMP,
+                         current_state=current_state, evidence_sets=(evidence,))
 
         assert evaluation.outcome is TransitionPolicyResult.ALREADY_CURRENT
         assert evaluation.proposed_state is value
@@ -258,7 +267,9 @@ def test_unsupported_lifecycle_combinations_are_not_silently_supported() -> None
 
     for value, signal in cases:
         current_state, evidence = _evaluation(value, signal)
-        evaluation = policy.evaluate(current_state=current_state, evidence_sets=(evidence,))
+        evaluation = policy.evaluate(
+                         evaluated_at=AWARE_TIMESTAMP,
+                         current_state=current_state, evidence_sets=(evidence,))
 
         assert evaluation.outcome is TransitionPolicyResult.TRANSITION_NOT_SUPPORTED
 
@@ -274,7 +285,9 @@ def test_different_recording_blocks_return_insufficient_without_a_rule_winner() 
         recording_block_id=EntityId.new(),
     )
 
-    result = policy.evaluate_result(current_state=None, evidence_sets=(second, first))
+    result = policy.evaluate_result(
+                 evaluated_at=AWARE_TIMESTAMP,
+                 current_state=None, evidence_sets=(second, first))
 
     assert result.outcome is TransitionPolicyResult.INSUFFICIENT_EVIDENCE
     assert result.proposed_state is None
@@ -304,7 +317,9 @@ def test_different_stages_return_insufficient_even_when_timeline_is_nearby() -> 
         timeline_end=11.0,
     )
 
-    evaluation = policy.evaluate(current_state=None, evidence_sets=(first, second))
+    evaluation = policy.evaluate(
+                     evaluated_at=AWARE_TIMESTAMP,
+                     current_state=None, evidence_sets=(first, second))
 
     assert evaluation.outcome is TransitionPolicyResult.INSUFFICIENT_EVIDENCE
     assert "incompatible recording contexts" in evaluation.rationale.message
@@ -327,7 +342,9 @@ def test_same_recording_block_and_stage_are_one_compatible_context() -> None:
         correlation_id=CorrelationId.new(),
     )
 
-    result = policy.evaluate_result(current_state=current, evidence_sets=(first, second))
+    result = policy.evaluate_result(
+                 evaluated_at=AWARE_TIMESTAMP,
+                 current_state=current, evidence_sets=(first, second))
 
     assert result.outcome is TransitionPolicyResult.TRANSITION_SUPPORTED
     assert result.proposed_state is OperationalStateValue.PAUSED
@@ -343,7 +360,9 @@ def test_known_and_unknown_contexts_are_not_merged() -> None:
     )
     unknown = _evidence(signal=EvidenceSignal.RECORDING_CONTINUITY_ESTABLISHED)
 
-    evaluation = policy.evaluate(current_state=None, evidence_sets=(known, unknown))
+    evaluation = policy.evaluate(
+                     evaluated_at=AWARE_TIMESTAMP,
+                     current_state=None, evidence_sets=(known, unknown))
 
     assert evaluation.outcome is TransitionPolicyResult.INSUFFICIENT_EVIDENCE
 
@@ -353,7 +372,9 @@ def test_unknown_contexts_can_combine_only_for_one_compatible_signal() -> None:
     first = _evidence(signal=EvidenceSignal.RECORDING_CONTINUITY_ESTABLISHED)
     second = _evidence(signal=EvidenceSignal.RECORDING_CONTINUITY_ESTABLISHED)
 
-    evaluation = policy.evaluate(current_state=None, evidence_sets=(first, second))
+    evaluation = policy.evaluate(
+                     evaluated_at=AWARE_TIMESTAMP,
+                     current_state=None, evidence_sets=(first, second))
 
     assert evaluation.outcome is TransitionPolicyResult.TRANSITION_SUPPORTED
     assert set(evaluation.supporting_evidence_ids) == {first.id, second.id}
@@ -364,7 +385,9 @@ def test_unknown_contexts_with_conflicting_signals_are_insufficient() -> None:
     first = _evidence(signal=EvidenceSignal.RECORDING_CONTINUITY_ESTABLISHED)
     second = _evidence(signal=EvidenceSignal.RECORDING_END_INDICATED)
 
-    evaluation = policy.evaluate(current_state=None, evidence_sets=(first, second))
+    evaluation = policy.evaluate(
+                     evaluated_at=AWARE_TIMESTAMP,
+                     current_state=None, evidence_sets=(first, second))
 
     assert evaluation.outcome is TransitionPolicyResult.INSUFFICIENT_EVIDENCE
     assert "conflicting lifecycle Signals" in evaluation.rationale.message
@@ -388,10 +411,14 @@ def test_media_artifact_identity_is_secondary_to_a_shared_recording_block() -> N
         artifact_id="other-recording.mov",
     )
 
-    assert policy.evaluate(current_state=None, evidence_sets=(first, second)).outcome is (
+    assert policy.evaluate(
+               evaluated_at=AWARE_TIMESTAMP,
+               current_state=None, evidence_sets=(first, second)).outcome is (
         TransitionPolicyResult.TRANSITION_SUPPORTED
     )
     assert policy.evaluate(
+               evaluated_at=AWARE_TIMESTAMP,
+
         current_state=None,
         evidence_sets=(first, unrelated_artifact),
     ).outcome is (
@@ -438,7 +465,9 @@ def test_current_state_kind_subject_value_and_status_are_validated() -> None:
     )
 
     for current_state in invalid_states:
-        evaluation = policy.evaluate(current_state=current_state, evidence_sets=(evidence,))
+        evaluation = policy.evaluate(
+                         evaluated_at=AWARE_TIMESTAMP,
+                         current_state=current_state, evidence_sets=(evidence,))
         assert evaluation.outcome is TransitionPolicyResult.UNKNOWN
         assert evaluation.proposed_state is None
         assert evaluation.metadata["current_state_validation"] != "valid"
@@ -452,7 +481,9 @@ def test_current_state_context_mismatch_is_not_supported() -> None:
         recording_block_id=EntityId.new(),
     )
 
-    evaluation = policy.evaluate(current_state=current, evidence_sets=(evidence,))
+    evaluation = policy.evaluate(
+                     evaluated_at=AWARE_TIMESTAMP,
+                     current_state=current, evidence_sets=(evidence,))
 
     assert evaluation.outcome is TransitionPolicyResult.TRANSITION_NOT_SUPPORTED
     assert "different recording block" in evaluation.rationale.message
@@ -486,6 +517,8 @@ def test_explicit_contradiction_only_blocks_the_signal_item_it_links() -> None:
     )
 
     evaluation = policy.evaluate(
+                     evaluated_at=AWARE_TIMESTAMP,
+
         current_state=_state(OperationalStateValue.INACTIVE, recording_block_id=block),
         evidence_sets=(evidence,),
     )
@@ -504,6 +537,8 @@ def test_linked_contradictory_recording_signal_blocks_transition() -> None:
     )
 
     evaluation = policy.evaluate(
+                     evaluated_at=AWARE_TIMESTAMP,
+
         current_state=_state(OperationalStateValue.INACTIVE, recording_block_id=block),
         evidence_sets=(evidence,),
     )
@@ -527,8 +562,12 @@ def test_conflicting_signals_use_reliable_order_not_rule_or_input_order() -> Non
         timeline_end=20.0,
     )
 
-    first = policy.evaluate(current_state=current, evidence_sets=(start, pause))
-    second = policy.evaluate(current_state=current, evidence_sets=(pause, start))
+    first = policy.evaluate(
+                evaluated_at=AWARE_TIMESTAMP,
+                current_state=current, evidence_sets=(start, pause))
+    second = policy.evaluate(
+                 evaluated_at=AWARE_TIMESTAMP,
+                 current_state=current, evidence_sets=(pause, start))
 
     assert first.outcome is TransitionPolicyResult.TRANSITION_SUPPORTED
     assert first.proposed_state is OperationalStateValue.PAUSED
@@ -566,10 +605,14 @@ def test_equal_time_conflicts_and_unaccepted_intermediate_transitions_are_insuff
     )
 
     equal_result = policy.evaluate(
+                       evaluated_at=AWARE_TIMESTAMP,
+
         current_state=_state(OperationalStateValue.ACTIVE, recording_block_id=block),
         evidence_sets=(pause, restored),
     )
     accumulated_result = policy.evaluate(
+                             evaluated_at=AWARE_TIMESTAMP,
+
         current_state=_state(OperationalStateValue.INACTIVE, recording_block_id=block),
         evidence_sets=(start, later_pause),
     )
@@ -599,14 +642,20 @@ def test_duplicate_sets_and_signal_references_are_deduplicated_without_content_m
     current = _state(OperationalStateValue.INACTIVE, recording_block_id=block)
 
     duplicate_result = policy.evaluate_result(
+                           evaluated_at=AWARE_TIMESTAMP,
+
         current_state=current,
         evidence_sets=(evidence, duplicate),
     )
     distinct_result = policy.evaluate(
+                          evaluated_at=AWARE_TIMESTAMP,
+
         current_state=current,
         evidence_sets=(evidence, distinct),
     )
     reference_result = policy.evaluate(
+                           evaluated_at=AWARE_TIMESTAMP,
+
         current_state=current,
         evidence_sets=(repeated_reference,),
     )
@@ -632,8 +681,12 @@ def test_first_class_signals_are_authoritative_and_legacy_markers_remain_visible
     )
     current = _state(OperationalStateValue.ACTIVE, recording_block_id=block)
 
-    legacy_result = policy.evaluate_result(current_state=current, evidence_sets=(legacy,))
+    legacy_result = policy.evaluate_result(
+                        evaluated_at=AWARE_TIMESTAMP,
+                        current_state=current, evidence_sets=(legacy,))
     first_class_result = policy.evaluate(
+                             evaluated_at=AWARE_TIMESTAMP,
+
         current_state=current,
         evidence_sets=(first_class,),
     )
@@ -654,6 +707,8 @@ def test_unrelated_concerns_and_signals_are_ignored() -> None:
     unrelated_signal = _evidence(signal=EvidenceSignal.MEDIA_AVAILABILITY_INDICATED)
 
     result = policy.evaluate_result(
+                 evaluated_at=AWARE_TIMESTAMP,
+
         current_state=None,
         evidence_sets=(unrelated_concern, unrelated_signal),
     )
@@ -673,6 +728,8 @@ def test_traceability_exposes_context_rule_items_observations_and_ambiguity() ->
         stage_id=stage,
     )
     result = policy.evaluate_result(
+                 evaluated_at=AWARE_TIMESTAMP,
+
         current_state=_state(
             OperationalStateValue.ACTIVE,
             recording_block_id=block,

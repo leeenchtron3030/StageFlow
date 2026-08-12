@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from app.contexts.production.timeline import TimelinePosition, TimelineRange
 from app.shared.ids import CorrelationId, EntityId
+from app.shared.metadata import freeze_metadata
 
 from .evidence_context import EvidenceContext
 from .evidence_context_conflict import (
@@ -106,7 +107,7 @@ class EvidenceContextResolution:
             "unresolved_fields",
             tuple(sorted(dict.fromkeys(self.unresolved_fields))),
         )
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        object.__setattr__(self, "metadata", freeze_metadata(self.metadata))
 
     @property
     def has_conflicts(self) -> bool:

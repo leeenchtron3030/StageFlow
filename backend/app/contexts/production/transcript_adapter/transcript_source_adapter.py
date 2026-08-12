@@ -4,7 +4,6 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
-from types import MappingProxyType
 from typing import Any
 
 from app.contexts.production.production_event.production_event import ProductionEvent
@@ -18,6 +17,7 @@ from app.contexts.production.transcript_adapter.transcript_segment_event import 
     TranscriptSegmentEvent,
 )
 from app.shared.ids import CorrelationId, EntityId
+from app.shared.metadata import freeze_metadata
 
 
 class TranscriptAdapterStatus(StrEnum):
@@ -45,7 +45,7 @@ class TranscriptSourceAdapter:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "supported_capabilities", tuple(self.supported_capabilities))
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        object.__setattr__(self, "metadata", freeze_metadata(self.metadata))
 
     def supports_capability(self, capability: TranscriptAdapterCapability) -> bool:
         return capability in self.supported_capabilities
@@ -54,7 +54,7 @@ class TranscriptSourceAdapter:
         self,
         segment_event: TranscriptSegmentEvent,
         correlation_id: CorrelationId,
-        received_at: datetime | None = None,
+        received_at: datetime,
     ) -> ProductionEvent:
         return segment_event.to_production_event(
             correlation_id=correlation_id,

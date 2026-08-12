@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from types import MappingProxyType
 from typing import Any
 
 from app.contexts.production.timeline import TimelinePosition, TimelineRange
 from app.shared.ids import CorrelationId, EntityId
+from app.shared.metadata import freeze_metadata
 
 
 def _empty_metadata() -> Mapping[str, Any]:
@@ -44,7 +44,7 @@ class ObservationContext:
             raise ValueError(
                 "ObservationContext cannot contain both timeline_position and timeline_range."
             )
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        object.__setattr__(self, "metadata", freeze_metadata(self.metadata))
 
     @classmethod
     def unknown(cls) -> ObservationContext:

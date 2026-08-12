@@ -14,10 +14,25 @@ authorized by this document.
   related business context.
 - **Distinction:** Not a `ProductionEvent`, which is a technical ingress fact.
 - **Current aliases/legacy names:** Older documents use unqualified `Event`.
-- **Migration:** Use `Business Event` in architecture and qualify future schemas/APIs;
-  no implemented entity requires migration yet.
+- **Migration:** The Kernel implements the qualified `BusinessEvent` contract and
+  normalized PostgreSQL identity; continue qualifying new schemas/APIs.
 - **Example:** “Devcon 2026” is a Business Event; “media asset registered” is a
   Production Event.
+
+### Program Expectation
+
+- **Definition:** StageFlow's durable, revisioned representation of what an external
+  program source or authorized operator expects to occur, including planned Business
+  Event/Stage, start/end, title, speakers, status, and versioned external references.
+- **Distinction:** It describes planned reality. It is not proof that activity occurred,
+  not a realized Session, and not authority for actual Session Stage or boundaries.
+- **Current aliases/legacy names:** `ScheduledActivity` is the existing schedule-adapter
+  input contract; older documents use schedule item, scheduled session, or program item.
+- **Migration:** Preserve `ScheduledActivity` as an adapter contract. The Kernel stores
+  Program Expectations as separate revisioned planned-world records without treating
+  import or linkage as Session creation.
+- **Example:** A program expects a keynote on Main Stage from 10:00 to 10:45; observation
+  later determines whether, where, and when a Session actually occurred.
 
 ### Production Event
 
@@ -27,19 +42,24 @@ authorized by this document.
   no meaning beyond its source report.
 - **Current aliases/legacy names:** `ProductionEvent` in code; generic “event” in some
   discussions.
-- **Migration:** Qualify all future serialized and public references; stable ingress
-  identity correction is separately planned.
+- **Migration:** Qualify serialized/public references. Stable ingress identity is
+  implemented and reused by the completed-asset registration path.
 - **Example:** A recorder source reports that recording activity started.
 
 ### Session
 
-- **Definition:** A future first-class durable StageFlow domain concept with its own
-  immutable StageFlow Session ID and versioned external references.
-- **Distinction:** Not a schedule record, directory, Session Candidate, Timeline Window
-  Candidate, Session Window Product, or Operational State assertion.
+- **Definition:** The complete logical media package representing one actual on-stage
+  substantive presentation or discussion, including Q&A when part of the presentation,
+  with one immutable StageFlow Session ID and versioned external references.
+- **Distinction:** Not a Program Expectation, schedule-adapter record, directory, file,
+  recording process, Session Candidate, Timeline Window Candidate, Session Window
+  Product, or Operational State assertion. Multiple media files may contribute to it.
 - **Current aliases/legacy names:** Older specifications describe Session as a scheduled
-  presentation and primary aggregate; no authoritative Session class currently exists.
-- **Migration:** Requires an ADR and implementation plan before schema or API work.
+  presentation. The Kernel `Session` aggregate is authoritative for realized production
+  identity while schedule records remain Program Expectations.
+- **Migration:** ADR-0023 fixes the meaning and ADR-0024 fixes Kernel authority. The
+  normalized schema, human realization/correction, package history, and bounded status
+  projection are implemented; later automated realization/split/merge remains deferred.
 - **Example:** One reconciled keynote workflow retains the same StageFlow Session ID when
   its schedule time changes.
 
@@ -100,6 +120,20 @@ authorized by this document.
 - **Example:** A finalized recording segment registered after sufficient resource
   observations support `safe_to_read`.
 
+### Media Timing Evidence
+
+- **Definition:** An immutable, durable, asset-linked revision containing sanitized
+  Observed recorder/media timing facts, Derived candidate intervals, inspection
+  provenance, recorder-profile qualification state, and explicit limitations.
+- **Distinction:** It is not a mutable Completed Media Asset field, authoritative content
+  time, Semantic Evidence specialization, Session boundary, or association decision.
+- **Current aliases/legacy names:** `MediaTimingEvidence` under ADR-0027; the earlier
+  candidate architecture is accepted and renamed to the canonical architecture document.
+- **Migration:** Additive `0006_media_timing_evidence`; pre-existing assets require no
+  evidence/backfill and remain valid.
+- **Example:** Unqualified vMix `creation_time` and measured duration support a Derived
+  candidate interval shown as advisory evidence during media-uncertainty drill-down.
+
 ### Editorial Candidate Moment
 
 - **Definition:** A proposed editorial highlight awaiting human review.
@@ -120,6 +154,35 @@ authorized by this document.
   exists.
 - **Migration:** Use the qualified term at cross-context boundaries when implemented.
 - **Example:** A reviewer approves a 45-second range from an Editorial Candidate Moment.
+
+### Hot Moment
+
+- **Definition:** An urgency designation indicating that an Editorial Candidate Moment
+  or approved editorial output may require prompt reviewer attention.
+- **Distinction:** It is not a separate aggregate, editorial tier, approval action, or
+  grant of automatic authority.
+- **Current aliases/legacy names:** Foundational documents use `Hot Moment` and sometimes
+  describe a hot flag on Candidate Moment.
+- **Migration:** Keep urgency first-class where behavior-driving, but do not introduce a
+  `HotMoment` authority object in the first post-Kernel slice.
+- **Example:** A time-sensitive announcement candidate is prioritized in Editorial review
+  while remaining unapproved.
+
+### Session Assembly
+
+- **Definition:** A versioned downstream presentation plan that combines one fixed
+  Session package revision with template, approved packaging-asset, placement, and
+  resolved metadata references.
+- **Distinction:** It describes how a package should be presented; it does not change
+  Session boundaries, media membership, package revision, or package completeness.
+- **Current aliases/legacy names:** Foundational documents describe package/export
+  branding settings but do not define this separate aggregate. The existing Runtime
+  asset assembly plan is a Completed Media Asset manifest mapping and is not Session
+  Assembly.
+- **Migration:** No implementation exists. Assembly revision must remain independent of
+  Session package revision when introduced.
+- **Example:** Replacing a sponsor outro creates Assembly revision 4 while Session
+  package revision 2 remains unchanged.
 
 ### Operational State
 
@@ -167,12 +230,13 @@ authorized by this document.
 
 ### Stage
 
-- **Definition:** The event production location/context to which sources and future
-  Sessions may be associated.
+- **Definition:** A StageFlow-owned production location/context within one Business Event
+  to which sources, Program Expectations, and realized Sessions may be associated.
 - **Distinction:** It is not a Runtime host, Node deployment profile, or source adapter.
-- **Current aliases/legacy names:** Stage IDs/context exist; no authoritative Stage
-  aggregate is implemented.
-- **Migration:** Event/Stage ownership remains an open Session architecture decision.
+- **Current aliases/legacy names:** Stage IDs/context remain widespread; the Kernel adds
+  the authoritative Event-owned `Stage` aggregate and source-binding records.
+- **Migration:** ADR-0023 requires one fixed Stage per realized Session and ADR-0024
+  resolves explicit idempotent bootstrap. That persistence/authority is implemented.
 - **Example:** “Main Stage” contextualizes one recorder source and scheduled activities.
 
 ### Durable Operation
@@ -182,7 +246,10 @@ authorized by this document.
 - **Distinction:** Deterministic domain policy calls remain synchronous and are not Jobs
   merely because they perform work.
 - **Current aliases/legacy names:** Older documents use `Job`; no implementation exists.
-- **Migration:** Final naming and schema require an implementation ADR/plan.
+- **Migration:** The first Kernel does not require a generic Durable Operation for its
+  bounded synchronous media cycle. Proposed ADR-0025 now evaluates the first concrete
+  asynchronous consumer, transcription; no operation schema exists until that decision
+  is accepted and implemented.
 - **Example:** A transcription provider request that may be deferred until online.
 
 ### Deployment profile
@@ -203,9 +270,11 @@ authorized by this document.
 | Concept | Current evidence | Unresolved decision |
 | --- | --- | --- |
 | Source Segment / durable Segment record | Disposition reserves a qualified durable media record; older documents use Media Chunk and Timeline Segment | Canonical record name, rename/alias behavior, and relationship to Completed Media Asset |
-| Job / Durable Operation / Task | Durable at-least-once work is accepted; no model exists | Public term and exact operation/attempt/worker schema |
-| Session creation/promotion action | StageFlow-owned Session ID is accepted | Command names and authority for create, promote, merge, split, and reassign |
+| Job / Durable Operation / Task | Durable at-least-once work is accepted; proposed ADR-0025 defines a minimal model | ADR-0025 acceptance plus public term and exact operation/attempt/worker schema |
+| Post-Kernel Session evolution | Human Session realization and reassignment are implemented | Automated realization, merge, and split policy |
 | Package and publication milestones | Distinct milestones are accepted | Aggregate names and detailed state machines remain deferred |
+| Packaging Asset / Event Asset | Session Assembly needs reusable approved presentation media distinct from package correctness | Aggregate name/owner and whether content composes a Completed Media Asset or a separate manifest |
+| Automation Policy / Approval Policy | Evidence -> Policy -> Authority and per-decision activation are proposed in ADR-0026 | Acceptance, public term, scope storage, and activation authority |
 
 Do not resolve these terms through incidental code naming. Record the decision first and
 then plan compatibility for documentation, contracts, storage, and APIs.

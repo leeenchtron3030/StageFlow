@@ -4,11 +4,12 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from math import isfinite
-from types import MappingProxyType
 from typing import Any
 
 from app.contexts.production.timeline import TimelinePosition, TimelineRange
 from app.shared.ids import CorrelationId, EntityId
+from app.shared.metadata import freeze_metadata
+from app.shared.time import require_aware_datetime
 
 
 def _empty_metadata() -> Mapping[str, Any]:
@@ -55,6 +56,11 @@ class EvidenceContext:
     )
 
     def __post_init__(self) -> None:
+        if self.organizational_anchor is not None:
+            require_aware_datetime(
+                self.organizational_anchor,
+                "EvidenceContext.organizational_anchor",
+            )
         object.__setattr__(
             self,
             "transcript_stream_ids",
@@ -98,7 +104,7 @@ class EvidenceContext:
                 "organizational_anchor_seconds",
                 float(self.organizational_anchor_seconds),
             )
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        object.__setattr__(self, "metadata", freeze_metadata(self.metadata))
 
     @classmethod
     def unknown(cls) -> EvidenceContext:

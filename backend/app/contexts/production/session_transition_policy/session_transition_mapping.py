@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
-from types import MappingProxyType
 from typing import Any
 from uuid import NAMESPACE_URL, uuid5
 
@@ -14,6 +13,7 @@ from app.contexts.production.evidence import (
 )
 from app.contexts.production.operational_state import OperationalStateValue
 from app.shared.ids import EntityId
+from app.shared.metadata import freeze_metadata
 
 from .session_transition_requirement import SessionTransitionRequirement
 from .session_transition_rule import (
@@ -63,7 +63,7 @@ class SessionTransitionMapping:
             raise ValueError("Session transition mapping requires a known Signal.")
         if not self.rationale.strip():
             raise ValueError("Session transition mapping rationale must not be empty.")
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        object.__setattr__(self, "metadata", freeze_metadata(self.metadata))
 
 
 _START_SPECIFIC_SIGNALS = (

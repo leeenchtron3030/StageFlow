@@ -13,12 +13,15 @@ from app.contexts.production.operational_product import (
     OperationalProductType,
 )
 from app.shared.ids import CorrelationId, EntityId
+from tests.timestamp_fixtures import AWARE_TIMESTAMP
 
 
 def _product(
     origin: OperationalProductOrigin = OperationalProductOrigin.VERIFIED_FINDING,
 ) -> OperationalProduct:
     return OperationalProduct(
+               created_at=AWARE_TIMESTAMP,
+
         id=EntityId.new(),
         product_type=OperationalProductType.SESSION_WINDOW,
         status=OperationalProductStatus.CREATED,
@@ -175,6 +178,8 @@ def test_product_status_does_not_modify_reasoning_artifacts() -> None:
 def test_product_requires_reasoning_lineage_unless_origin_allows_otherwise() -> None:
     with pytest.raises(ValueError, match="requires Finding or Verification Decision lineage"):
         OperationalProduct(
+            created_at=AWARE_TIMESTAMP,
+
             id=EntityId.new(),
             product_type=OperationalProductType.UNKNOWN,
             status=OperationalProductStatus.CREATED,
@@ -185,6 +190,8 @@ def test_product_requires_reasoning_lineage_unless_origin_allows_otherwise() -> 
         )
 
     imported_product = OperationalProduct(
+                           created_at=AWARE_TIMESTAMP,
+
         id=EntityId.new(),
         product_type=OperationalProductType.UNKNOWN,
         status=OperationalProductStatus.CREATED,

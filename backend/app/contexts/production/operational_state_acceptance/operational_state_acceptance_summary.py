@@ -10,6 +10,7 @@ from app.contexts.production.operational_state import (
     OperationalStateValue,
 )
 from app.shared.ids import EntityId
+from app.shared.time import require_aware_datetime
 
 from .operational_state_acceptance_outcome import OperationalStateAcceptanceOutcome
 from .operational_state_acceptance_reason import OperationalStateAcceptanceReasonCode
@@ -40,6 +41,11 @@ class OperationalStateAcceptanceSummary:
     reason_codes: Sequence[OperationalStateAcceptanceReasonCode]
 
     def __post_init__(self) -> None:
+        require_aware_datetime(self.accepted_at, "OperationalStateAcceptanceSummary.accepted_at")
+        require_aware_datetime(
+            self.evaluation_timestamp,
+            "OperationalStateAcceptanceSummary.evaluation_timestamp",
+        )
         object.__setattr__(self, "reason_codes", tuple(self.reason_codes))
 
     @classmethod

@@ -3,8 +3,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "StageFlow",
-  description: "StageFlow frontend foundation",
+  title: "StageFlow · Operational Console",
+  description: "Local-first StageFlow Producer and Editorial operational interface",
 };
 
 export default function RootLayout({
@@ -13,7 +13,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" data-theme="operational-dark">
       <body>{children}</body>
     </html>
   );

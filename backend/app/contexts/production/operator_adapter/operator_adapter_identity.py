@@ -3,8 +3,9 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
-from types import MappingProxyType
 from typing import Any
+
+from app.shared.metadata import freeze_metadata
 
 
 class OperatorAdapterKind(StrEnum):
@@ -34,4 +35,4 @@ class OperatorAdapterIdentity:
             raise ValueError("OperatorAdapterIdentity adapter_name must not be empty.")
         if self.stage_label is not None and not self.stage_label.strip():
             raise ValueError("OperatorAdapterIdentity stage_label must not be empty.")
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        object.__setattr__(self, "metadata", freeze_metadata(self.metadata))

@@ -48,6 +48,7 @@ from app.contexts.production.transcript_observation_interpreter import (
     TranscriptObservationInterpreter,
 )
 from app.shared.ids import CorrelationId, EntityId
+from tests.timestamp_fixtures import AWARE_TIMESTAMP
 
 EVENT_TIME = datetime(2026, 7, 16, 10, 0, tzinfo=timezone(timedelta(hours=-7)))
 OBSERVATION_TIME = datetime(2026, 7, 16, 17, 0, 2, tzinfo=UTC)
@@ -146,7 +147,7 @@ def _transcript_event(
         correlation_id=correlation_id,
         stage_id=stage_id,
         recording_block_id=recording_block_id,
-        metadata={"stream_id": "metadata-stream", "transcript_adapter_event": True},
+        metadata={"stream_id": stream_id, "transcript_adapter_event": True},
     )
 
 
@@ -193,6 +194,8 @@ def test_legacy_observation_construction_derives_first_class_context() -> None:
     recording_block_id = EntityId.new()
     correlation_id = CorrelationId.new()
     observation = Observation(
+                      observed_at=AWARE_TIMESTAMP,
+
         id=EntityId.new(),
         recording_block_id=recording_block_id,
         observation_type=ObservationType.UNKNOWN,
@@ -244,7 +247,7 @@ def test_recording_interpreter_preserves_exact_lineage_context_and_time() -> Non
     assert dict(event.metadata) == original_metadata
 
 
-def test_transcript_stream_precedence_and_unknown_context_are_deterministic() -> None:
+def test_equivalent_transcript_stream_candidates_and_unknown_context_are_deterministic() -> None:
     correlation_id = CorrelationId.new()
     stage_id = EntityId.new()
     recording_block_id = EntityId.new()
@@ -280,17 +283,16 @@ def test_transcript_stream_precedence_and_unknown_context_are_deterministic() ->
     assert context.media_artifact_id is None
 
 
-def test_metadata_context_fallback_is_recorded_and_references_win() -> None:
+def test_equivalent_reference_and_metadata_context_is_recorded() -> None:
     correlation_id = CorrelationId.new()
     referenced_stage_id = EntityId.new()
-    metadata_stage_id = EntityId.new()
     event = _event(
         event_type=ProductionEventType.MEDIA_FILE_CREATED,
         source=ProductionEventSource.INTERNAL_SYSTEM,
         payload={"artifact_id": "artifact-a"},
         correlation_id=correlation_id,
         stage_id=referenced_stage_id,
-        metadata={"stage_id": metadata_stage_id.to_json()},
+        metadata={"stage_id": referenced_stage_id.to_json()},
     )
     context = observation_context_from_event(
         event,
@@ -305,7 +307,7 @@ def test_metadata_context_fallback_is_recorded_and_references_win() -> None:
         fallback_event,
         _context(correlation_id=correlation_id),
     )
-    assert fallback_context.stage_id == metadata_stage_id
+    assert fallback_context.stage_id == referenced_stage_id
     assert fallback_context.metadata["stage_id_source"] == "event_metadata.stage_id"
 
 

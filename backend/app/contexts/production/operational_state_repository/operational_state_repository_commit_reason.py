@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
-from types import MappingProxyType
 from typing import Any
 
 from app.contexts.production.operational_state import (
@@ -11,6 +10,7 @@ from app.contexts.production.operational_state import (
     OperationalStateSubject,
 )
 from app.shared.ids import EntityId
+from app.shared.metadata import freeze_metadata
 
 
 class OperationalStateRepositoryCommitReasonCode(StrEnum):
@@ -75,7 +75,7 @@ class OperationalStateRepositoryCommitReason:
         if self.actual_revision is not None and self.actual_revision < 0:
             raise ValueError("Actual repository revision must not be negative.")
         object.__setattr__(self, "related_ids", tuple(dict.fromkeys(self.related_ids)))
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        object.__setattr__(self, "metadata", freeze_metadata(self.metadata))
 
 
 def commit_reason_sort_key(

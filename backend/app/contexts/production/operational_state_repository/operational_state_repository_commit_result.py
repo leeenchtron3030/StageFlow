@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
-from types import MappingProxyType
 from typing import Any
 
 from app.contexts.production.operational_state import (
@@ -12,6 +11,7 @@ from app.contexts.production.operational_state import (
     OperationalStateSubject,
 )
 from app.shared.ids import EntityId
+from app.shared.metadata import freeze_metadata
 
 from .operational_state_repository_commit_outcome import (
     OperationalStateRepositoryCommitOutcome,
@@ -84,7 +84,7 @@ class OperationalStateRepositoryCommitResult:
         ):
             raise ValueError("Repository errors are represented only by the unknown outcome.")
         object.__setattr__(self, "reasons", reasons)
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        object.__setattr__(self, "metadata", freeze_metadata(self.metadata))
 
     def _validate_committed_shape(self) -> None:
         if not self.storage_changed:

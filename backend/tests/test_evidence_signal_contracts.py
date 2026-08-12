@@ -13,6 +13,7 @@ from app.contexts.production.evidence import (
     EvidenceStrength,
 )
 from app.shared.ids import CorrelationId, EntityId
+from tests.timestamp_fixtures import AWARE_TIMESTAMP
 
 
 def _item(observation_id: EntityId | None = None) -> EvidenceItem:
@@ -88,6 +89,8 @@ def test_signal_references_remain_id_only() -> None:
 def test_evidence_set_with_one_signal() -> None:
     item = _item()
     evidence_set = EvidenceSet(
+                       created_at=AWARE_TIMESTAMP,
+
         id=EntityId.new(),
         recording_block_id=EntityId.new(),
         concern=EvidenceConcern.RECORDING_COVERAGE,
@@ -110,6 +113,8 @@ def test_evidence_set_with_one_signal() -> None:
 def test_evidence_set_with_multiple_signals() -> None:
     item = _item()
     evidence_set = EvidenceSet(
+                       created_at=AWARE_TIMESTAMP,
+
         id=EntityId.new(),
         recording_block_id=EntityId.new(),
         concern=EvidenceConcern.POSSIBLE_SESSION_START,

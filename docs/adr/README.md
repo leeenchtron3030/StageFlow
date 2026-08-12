@@ -72,7 +72,7 @@ new context and names every superseded ADR. Update this index and mark the older
 | ADR | Decision | Status | Implementation note |
 | --- | --- | --- | --- |
 | [ADR-0001](../../ARCHITECTURE_DECISIONS.md) | Modular monolith | Accepted | Implemented/protected |
-| [ADR-0002](../../ARCHITECTURE_DECISIONS.md) | Sessions are primary Production aggregate | Accepted | Authoritative Session not implemented; D-01 details open |
+| [ADR-0002](../../ARCHITECTURE_DECISIONS.md) | Sessions are primary Production aggregate | Accepted | Authoritative Session aggregate implemented in the bounded Kernel; post-Kernel evolution remains open |
 | [ADR-0003](../../ARCHITECTURE_DECISIONS.md) | Media chunks are storage artifacts | Accepted | Preserved by candidate/readiness/asset separation |
 | [ADR-0004](../../ARCHITECTURE_DECISIONS.md) | StageFlow owns workflow, not conference data | Accepted | External systems not implemented |
 | [ADR-0005](../../ARCHITECTURE_DECISIONS.md) | External integrations use adapters | Accepted | Contracts align; provider adapters absent |
@@ -89,19 +89,24 @@ new context and names every superseded ADR. Update this index and mark the older
 | [ADR-0016](../../ARCHITECTURE_DECISIONS.md) | ObservationLocation is location authority | Accepted | Implemented in Observation contracts |
 | [ADR-0017](../../ARCHITECTURE_DECISIONS.md) | Observation traceability should become first-class | Accepted | Future contract correction |
 | [ADR-0018](../../ARCHITECTURE_DECISIONS.md) | Observation payloads may need first-class modeling | Accepted | Future capability; not authorized yet |
-| [ADR-0019](ADR-0019-stable-ingress-and-interpreter-boundary.md) | Stable ingress identity and one dispatcher-facing interpreter protocol | Accepted | Not implemented |
-| [ADR-0020](ADR-0020-canonical-media-to-event-path.md) | Canonical candidate-to-asset-to-Event path | Accepted | Contracts partial; durable path not implemented |
-| [ADR-0021](ADR-0021-time-authority.md) | Domain and infrastructure time authority | Accepted | Newer contracts align; legacy correction pending |
+| [ADR-0019](ADR-0019-stable-ingress-and-interpreter-boundary.md) | Stable ingress identity and one dispatcher-facing interpreter protocol | Accepted | Both boundaries implemented; ingress and Kernel persistence verified on isolated real PostgreSQL |
+| [ADR-0020](ADR-0020-canonical-media-to-event-path.md) | Canonical candidate-to-asset-to-Event path | Accepted | Bounded durable filesystem candidate-to-asset-to-stable-ingress path implemented |
+| [ADR-0021](ADR-0021-time-authority.md) | Domain and infrastructure time authority | Accepted | Strict-aware internal transition implemented |
+| [ADR-0022](ADR-0022-postgresql-authoritative-operational-store.md) | PostgreSQL authoritative operational store | Accepted | Ingress and bounded Kernel authority are composed; broader durable workflows remain future work |
+| [ADR-0023](ADR-0023-session-authority-and-completion.md) | Session meaning, Stage invariants, association, boundaries, and completion authority | Accepted | Kernel Session aggregate, package approval/revision, and typed history implemented |
+| [ADR-0024](ADR-0024-durable-kernel-authority-and-persistence.md) | Explicit bootstrap, human Session realization, deterministic association, normalized state/history | Accepted | Kernel corrections and Green follow-up are closure-validated |
+| [ADR-0025](ADR-0025-postgresql-durable-operations-and-workers.md) | PostgreSQL-backed Durable Operations, attempts, leases, and Worker coordination | Proposed | Yellow decision; no implementation |
+| [ADR-0026](ADR-0026-policy-scoped-automatic-authority.md) | Evidence-to-policy-to-authority evaluation with scoped activation and durable provenance | Proposed | Yellow decision; no implementation |
+| [ADR-0027](ADR-0027-media-timing-evidence.md) | Dedicated durable revisioned advisory Media Timing Evidence linked to Completed Media Asset | Accepted | MTE v1 implemented; recorder qualification and automatic authority remain Yellow |
 
 ## Unresolved ADR candidates
 
 | Candidate | Accepted boundary | Decision still required |
 | --- | --- | --- |
-| Session identity and lifecycle authority | StageFlow-owned immutable Session ID; distinct completion milestones | Creation/promotion, scheduled/observed reconciliation, Event/Stage ownership, split/merge/reassign, late-media policy |
-| Relational store and transaction design | One relational durable store; media by reference; append-oriented records where needed | Database technology, schema, migrations, topology, backup/restore |
-| Durable operation and worker lifecycle | Database-backed at-least-once work for real asynchronous/external tasks | Operation/attempt schema, lease rules, cancellation, worker deployment |
-| Configuration boundary | Accepted precedence and redacted effective configuration | File format, secret resolution mechanism, schema lifecycle |
-| Session completion and late media | Ended, grace, settled, editorial final, package, publication/delivery, archive remain distinct | Grace defaults, reopening authority, post-package/publication behavior |
+| Kernel aggregate evolution | Explicit bootstrap; human Session realization; deterministic association; normalized state plus typed history | Post-Kernel split/merge and automated realization policy |
+| Relational store evolution | PostgreSQL normalized state plus typed append-only Kernel history | Backup/restore policy and schemas for future capabilities |
+| Packaging asset identity | Completed Media Asset remains production-media completion/readiness authority | Whether a separate Packaging Asset composes a Completed Media Asset/content manifest, and which context owns approval/applicability |
+| Post-Kernel Session revision policy | Human completion applies to one package revision; valid late media returns the current package to correction/review | Grace defaults, split/merge, and post-publication behavior |
 | Transactional outbox | Required for future externally meaningful durable messages | First consumer, message schema, dispatch/reconciliation ownership |
 
 The documentation-authority decision D-10 is implemented by

@@ -8,6 +8,8 @@ from typing import Any
 
 from app.contexts.production.production_event import ProductionEventType
 from app.shared.ids import EntityId
+from app.shared.metadata import freeze_metadata
+from app.shared.time import require_aware_datetime
 
 
 def _empty_metadata() -> Mapping[str, Any]:
@@ -28,6 +30,11 @@ class ObservationProvenance:
     metadata: Mapping[str, Any] = field(default_factory=_empty_metadata)
 
     def __post_init__(self) -> None:
+        if self.source_event_occurred_at is not None:
+            require_aware_datetime(
+                self.source_event_occurred_at,
+                "ObservationProvenance.source_event_occurred_at",
+            )
         if not self.interpreter_kind.strip():
             raise ValueError("ObservationProvenance interpreter_kind must not be empty.")
         if self.producer_identifier is not None and not self.producer_identifier.strip():
@@ -39,7 +46,7 @@ class ObservationProvenance:
                 raise ValueError(
                     "ObservationProvenance interpretation_rule_id must not be empty."
                 )
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        object.__setattr__(self, "metadata", freeze_metadata(self.metadata))
 
     @property
     def source_event_timestamp(self) -> datetime | None:

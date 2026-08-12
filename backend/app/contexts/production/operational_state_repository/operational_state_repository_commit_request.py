@@ -3,10 +3,10 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
-from types import MappingProxyType
 from typing import Any
 
 from app.shared.ids import EntityId
+from app.shared.metadata import freeze_metadata
 
 from ..operational_state_acceptance.operational_state_acceptance_result import (
     OperationalStateAcceptanceResult,
@@ -37,7 +37,7 @@ class OperationalStateRepositoryCommitRequest:
         _require_aware(self.commit_at, "OperationalStateRepositoryCommitRequest.commit_at")
         if self.expected_revision is not None and self.expected_revision < 0:
             raise ValueError("Expected repository revision must not be negative.")
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        object.__setattr__(self, "metadata", freeze_metadata(self.metadata))
 
     @property
     def acceptance_id(self) -> EntityId:

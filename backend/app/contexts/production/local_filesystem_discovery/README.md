@@ -12,6 +12,18 @@ An oversized directory is blocked without returning an arbitrary enumeration-ord
 subset. Eligible entries are filtered and ordered deterministically before candidate
 truncation.
 
+For shallow-directory discovery, POSIX platforms that expose descriptor-based
+`os.scandir` plus no-follow directory-open flags bind enumeration and child inspection to
+the validated directory object. The opened descriptor identity must match the initial
+target identity. Windows and other platforms without that Python/OS support use pathname
+inspection with identity revalidation after enumeration and again after child
+inspection. Persistent missing, inaccessible, symlinked, non-directory, or changed
+targets fail closed and return no candidates. The fallback cannot detect a transient
+swap-and-restore entirely between checkpoints, and filesystems without meaningful
+device/object identifiers receive only type/symlink revalidation. Deployments must not
+claim stronger guarantees. Later media-content access must independently revalidate its
+own target and authority.
+
 Eligibility is immutable configuration: extension matching, deliberate allow-all,
 hidden-entry handling, regular-file enforcement, excluded suffixes, and optional
 extension-derived hints are explicit. Extensions and filenames remain descriptive;

@@ -3,12 +3,13 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from types import MappingProxyType
 from typing import Any
 
 from app.contexts.production.evidence import EvidenceConcern, EvidenceContext
 from app.contexts.production.timeline import TimelinePosition, TimelineRange
 from app.shared.ids import CorrelationId, EntityId
+from app.shared.metadata import freeze_metadata
+from app.shared.time import require_aware_datetime
 
 
 def _empty_metadata() -> Mapping[str, Any]:
@@ -36,6 +37,11 @@ class SessionBoundaryEvidenceContext:
     metadata: Mapping[str, Any] = field(default_factory=_empty_metadata)
 
     def __post_init__(self) -> None:
+        if self.boundary_anchor_at is not None:
+            require_aware_datetime(
+                self.boundary_anchor_at,
+                "SessionBoundaryEvidenceContext.boundary_anchor_at",
+            )
         if self.boundary_concern not in {
             EvidenceConcern.POSSIBLE_SESSION_START,
             EvidenceConcern.POSSIBLE_SESSION_END,
@@ -77,7 +83,7 @@ class SessionBoundaryEvidenceContext:
                 )
             ),
         )
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        object.__setattr__(self, "metadata", freeze_metadata(self.metadata))
 
     def to_evidence_context(self) -> EvidenceContext:
         timeline_position: TimelinePosition | None = None

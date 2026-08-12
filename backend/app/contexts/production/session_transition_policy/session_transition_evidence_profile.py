@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from types import MappingProxyType
 from typing import Any
 
 from app.contexts.production.evidence import (
@@ -11,6 +10,7 @@ from app.contexts.production.evidence import (
     EvidenceStrength,
 )
 from app.shared.ids import EntityId
+from app.shared.metadata import freeze_metadata
 
 from .session_transition_mapping import SessionTransitionEvidenceCategory
 
@@ -82,4 +82,4 @@ class SessionTransitionEvidenceProfile:
             tuple(self.scheduled_activity_ids),
         )
         object.__setattr__(self, "boundary_anchors", tuple(self.boundary_anchors))
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        object.__setattr__(self, "metadata", freeze_metadata(self.metadata))

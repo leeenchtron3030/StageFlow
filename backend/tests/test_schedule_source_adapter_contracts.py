@@ -174,13 +174,15 @@ def test_helper_production_event_mapping() -> None:
     production_event = adapter.production_event_from_activity(
         activity,
         correlation_id=CorrelationId.new(),
+        occurred_at=received_at - timedelta(seconds=1),
         received_at=received_at,
     )
 
     assert isinstance(production_event, ProductionEvent)
     assert production_event.event_type is ProductionEventType.SCHEDULE_ARTIFACT_UPDATED
     assert production_event.source is ProductionEventSource.SCHEDULE_SYSTEM
-    assert production_event.occurred_at == received_at
+    assert production_event.occurred_at == received_at - timedelta(seconds=1)
+    assert production_event.received_at == received_at
     assert production_event.received_at == received_at
     assert production_event.payload.get("scheduled_activity_id") == activity.id.to_json()
     assert production_event.payload.get("activity_title") == "Opening talk"
@@ -209,6 +211,7 @@ def test_allowed_production_event_mappings() -> None:
         activity = _activity(activity_status)
         production_event = activity.to_production_event(
             correlation_id=CorrelationId.new(),
+            occurred_at=datetime(2026, 7, 7, 11, 59, 59, tzinfo=UTC),
             received_at=datetime(2026, 7, 7, 12, 0, tzinfo=UTC),
         )
 

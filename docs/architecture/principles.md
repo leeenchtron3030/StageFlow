@@ -30,8 +30,8 @@ ADRs, or the authoritative architecture-baseline disposition. “Accepted” doe
   event.
 - **Current alignment:** **Aligned.** The backend is one application; no broker or remote
   internal service exists.
-- **Related decisions:** ADR-0001; disposition D-02 and D-03. Exact database and worker
-  details remain open.
+- **Related decisions:** ADR-0001; ADR-0022; disposition D-02 and D-03. Worker details
+  remain open.
 
 ## 3. Event-mode operation is locally capable
 
@@ -42,10 +42,12 @@ ADRs, or the authoritative architecture-baseline disposition. “Accepted” doe
   local production must continue under degraded connectivity.
 - **Implications:** Local media ingest and durable state cannot require cloud services.
   Provider work records retry/defer state when introduced.
-- **Non-goals:** A claim that the current health-only application is a complete offline
+- **Non-goals:** A claim that the current bounded Kernel is a complete offline
   event workflow, or a ban on optional cloud enhancement.
-- **Current alignment:** **Partially aligned.** Current production contracts make no
-  network calls, but no composed event workflow exists.
+- **Current alignment:** **Partially aligned.** The composed Kernel loads local
+  configuration, uses PostgreSQL authority, runs bounded filesystem media cycles and
+  source/restart reconciliation, and exposes status without cloud calls. Continuous
+  ingest and downstream processing/delivery workflows are not implemented.
 - **Related decisions:** Product Constitution principles 9–11; ABR-017 disposition.
 
 ## 4. Session is a first-class durable concept
@@ -59,10 +61,12 @@ ADRs, or the authoritative architecture-baseline disposition. “Accepted” doe
   finality, packaging, and delivery remain distinct concepts.
 - **Non-goals:** Treating a directory, schedule record, observed candidate, or Operational
   State as the Session aggregate.
-- **Current alignment:** **Not implemented.** Only Session-related values, policy, and
-  process-local state exist.
-- **Related decisions:** ADR-0002; disposition D-01 and D-06. Creation/promotion,
-  Event/Stage ownership, reconciliation, and late-media policy remain open.
+- **Current alignment:** **Implemented for the bounded Kernel.** StageFlow-owned Session
+  identity, Event/Stage ownership, authoritative boundaries, package revision/completion
+  history, approved asset membership, human-command replay, and restart reconstruction
+  are durable in PostgreSQL. Editorial finality, delivery, and broader late-media policy
+  remain outside the implemented slice.
+- **Related decisions:** ADR-0002, ADR-0023, and ADR-0024; disposition D-01 and D-06.
 
 ## 5. Segment-based ingest preserves semantic boundaries
 
@@ -76,9 +80,11 @@ ADRs, or the authoritative architecture-baseline disposition. “Accepted” doe
   completed-segment Events.
 - **Non-goals:** Recursive scanning, a stateful watcher-manager, fixed 60-second identity,
   or exposing source files as Editorial Clips.
-- **Current alignment:** **Partially aligned.** Candidate discovery and contracts through
-  Completed Media Asset exist; observation execution, registration, persistence, and
-  reconciliation do not.
+- **Current alignment:** **Implemented for bounded explicit cycles.** Shallow read-only
+  discovery, objective observations, readiness, Completed Media Asset registration,
+  stable ingress, conservative Session association, persistence, and reconciliation are
+  composed as separate boundaries. Continuous watching and downstream editorial work
+  remain absent.
 - **Related decisions:** ADR-0003, ADR-0020, disposition D-05, ABR-008/016.
 
 ## 6. Operational state is durable before automation
@@ -92,10 +98,12 @@ ADRs, or the authoritative architecture-baseline disposition. “Accepted” doe
   idempotent commits, and startup reconciliation.
 - **Non-goals:** Full event sourcing, exactly-once claims, or durable infrastructure before
   operational behavior needs it.
-- **Current alignment:** **Not implemented.** Current repository, coordinator, and Agent
-  histories are explicitly process-local.
-- **Related decisions:** Disposition D-02, D-03, and D-09. Database technology, schema,
-  migrations, backup/restore, and deployment topology remain open.
+- **Current alignment:** **Implemented for Kernel authority.** PostgreSQL migrations
+  `0001` through `0005` preserve ingress, Event/Stage/Session/media current state, typed
+  history, completion membership, command replay, and reconciliation. Runtime
+  composition, startup reconstruction, dependency recovery, and bounded backup/restore
+  qualification exist; production deployment operations and generic workers do not.
+- **Related decisions:** ADR-0019; ADR-0022; disposition D-02, D-03, and D-09.
 
 ## 7. Processing is incremental, explainable, and human-authorized
 
@@ -125,9 +133,12 @@ ADRs, or the authoritative architecture-baseline disposition. “Accepted” doe
   distinct times remain separate; nested metadata is recursively immutable.
 - **Non-goals:** Hashing mutable metadata into identity, silently attaching UTC to naive
   time, or treating deployment profile as a trust/identity tier.
-- **Current alignment:** **Mixed.** ED-0046 through ED-0053 largely align; legacy Event,
-  Observation, Evidence, and reasoning contracts require bounded corrections.
-- **Related decisions:** ADR-0019, ADR-0021, ABR-003/005/006/016 dispositions.
+- **Current alignment:** **Aligned at implemented Kernel boundaries.** Stable ingress,
+  durable domain identity/history, strict aware timestamps, recursive metadata
+  protection, deterministic association provenance, approved membership snapshots, and
+  original-result replay are implemented. Downstream editorial/delivery replay remains
+  future work.
+- **Related decisions:** ADR-0019, ADR-0021, ADR-0022, ABR-003/005/006/016 dispositions.
 
 ## 9. External systems remain behind provider-neutral adapters
 
@@ -153,8 +164,11 @@ ADRs, or the authoritative architecture-baseline disposition. “Accepted” doe
   structured logs and metrics supplement rather than replace it.
 - **Non-goals:** Building a complete producer UI before backend status exists, or
   interpreting an HTTP liveness response as event readiness.
-- **Current alignment:** **Not implemented beyond liveness.** `/api/v1/health` reports
-  only that the HTTP process answers.
+- **Current alignment:** **Implemented for the bounded Kernel.** `/api/v1/health`
+  remains liveness-only, while `/api/v1/kernel/status` separately reports configuration
+  validity, composition, PostgreSQL/source availability, reconciliation/recovery,
+  bounded Session/media projections, and readiness. Full operator workflow interfaces
+  and future worker visibility remain unimplemented.
 - **Related decisions:** ABR-011 disposition; D-02/D-03/D-08 dependencies.
 
 ## 11. Evolution is bounded, evidence-led, and reversible

@@ -1,68 +1,123 @@
-# StageFlow Frontend
+# StageFlow operational frontend
 
 ## Purpose
 
-This directory contains the StageFlow frontend workspace created by ED-0003.
+This Next.js workspace implements the first locally runnable StageFlow operational UI.
+Its current milestone is a testable Producer experience, with a minimum Editorial shell
+that reserves the accepted temporal workspace without fabricating AI output.
 
-The frontend is a workflow-oriented Next.js application shell. It is intentionally not organized around backend entities or database tables.
+The UI is a presentation client. The backend/domain remains authority.
 
-## Technology Stack
+## Implemented routes
 
-- Next.js
-- TypeScript
-- Tailwind CSS
-- shadcn/ui
-- TanStack Query
-- React Hook Form
-- Zod
+| Route | Current purpose |
+| --- | --- |
+| `/` | Producer Mission Control with fixed Stage order, bounded Attention, and Infrastructure summary |
+| `/event` | Event lifecycle/readiness plus visibly unavailable authority actions |
+| `/sessions` | Active/assembling and completed Session operational views |
+| `/sessions/[sessionId]` | Session lifecycle, declared boundaries, package revision, and media aggregate |
+| `/stages/[stageKey]` | Previous/current/next Stage context and source/media consequences |
+| `/infrastructure` | Health, impact, and Attention as separate dimensions |
+| `/editorial` | Minimum development-only temporal/Candidate shell; no real AI or transcript execution |
 
-## Current Scope
+Stage and Session drill-down can also render bounded Media Timing Evidence when available.
+Observed recorder facts, Derived candidate intervals, recorder-profile qualification, and
+limitations remain visibly advisory and never enter ordinary Producer Attention.
 
-ED-0003 implements only the minimum application shell required to verify startup and build behavior.
+## Prerequisites
 
-The root page displays:
+- Node.js compatible with the committed Next.js version (the verified local run used
+  Node `24.14.0`).
+- npm and the committed `package-lock.json`.
+- For Kernel mode: the StageFlow backend and its existing Kernel configuration/runtime
+  prerequisites.
 
-- StageFlow
-- Architecture Release: AR-1.2
-- Engineering Directive: ED-0003
-- Backend Status: Not Connected
+Install exactly from the lockfile:
 
-No backend communication is implemented.
-
-## Local Setup
-
-```bash
-cd frontend
-npm install
+```powershell
+cd C:\Dev\StageFlow\frontend
+npm ci
 ```
 
-## Run the Frontend
+## Fixture-mode operator preview
 
-```bash
-cd frontend
+Development defaults to fixture mode. The explicit environment value makes the source
+choice obvious:
+
+```powershell
+cd C:\Dev\StageFlow\frontend
+$env:STAGEFLOW_UI_DATA_MODE = "fixture"
 npm run dev
 ```
 
-## Verification Commands
+Open [http://127.0.0.1:3000](http://127.0.0.1:3000). The navigation rail exposes requested
+operational scenarios A through G and sanitized Run 002/003/004 reference states. Every
+fixture surface is persistently labeled `Development fixture` and `Not production
+authority`.
 
-```bash
-cd frontend
-npm run build
-npm run lint
-npm run typecheck
+Fixture query examples:
+
+```text
+http://127.0.0.1:3000/?scenario=quiet
+http://127.0.0.1:3000/?scenario=turnover
+http://127.0.0.1:3000/?scenario=source-unavailable
+http://127.0.0.1:3000/?scenario=run-004
 ```
 
-## What Belongs Here
+## Read-only Kernel mode
 
-- Frontend application shell and future workflow-oriented UI.
-- Shared frontend components and layouts.
-- Design tokens and theme foundations.
-- Frontend tests after a future directive defines the test runner.
+Terminal 1:
 
-## What Does Not Belong Here
+```powershell
+cd C:\Dev\StageFlow\backend
+# Configure STAGEFLOW_KERNEL_CONFIG_PATH and its referenced DSN secret first.
+uv run uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
 
-- Backend communication before a future directive approves it.
-- Authentication or authorization.
-- Operational dashboards or workflow screens.
-- Database-entity-oriented feature folders.
-- Docker or CI configuration.
+Terminal 2:
+
+```powershell
+cd C:\Dev\StageFlow\frontend
+$env:STAGEFLOW_UI_DATA_MODE = "kernel"
+$env:STAGEFLOW_KERNEL_STATUS_URL = "http://127.0.0.1:8000/api/v1/kernel/status"
+$env:STAGEFLOW_MTE_API_BASE_URL = "http://127.0.0.1:8000/api/v1"
+npm run dev
+```
+
+The frontend fetches the existing bounded read-only status response server-side and maps
+it into a presentation model. It does not duplicate association policy or expose command
+authority. If the endpoint is unavailable, it identifies the local client connection
+loss without inventing database state; it never silently falls back to fixture state.
+
+Production builds default to Kernel mode unless `STAGEFLOW_UI_DATA_MODE=fixture` is set
+explicitly. An explicitly enabled production-build fixture remains visibly labeled and is
+still not production authority.
+
+## Validation
+
+```powershell
+cd C:\Dev\StageFlow\frontend
+npm test
+npm run lint
+npm run typecheck
+npm run build
+```
+
+The test suite uses Node's native TypeScript-capable test runner and adds no test
+dependency.
+
+Focused behavior coverage includes MTE fixture/projection labeling and verifies that
+unqualified timing evidence remains advisory drill-down rather than Producer Attention.
+
+## Known limitations
+
+- Status is server-rendered on navigation/refresh; continuous polling is not implemented.
+- No HTTP authority-command surface exists, so Event/Session/package actions remain
+  disabled with an explanation.
+- No authentication, authorization, multi-operator command conflict handling, or role
+  permissions are implemented.
+- Editorial media playback, transcripts, Candidate execution, and decisions are not
+  implemented. Fixture Candidate text is synthetic and visibly labeled.
+- Worker/GPU, Internet, cloud, and transfer status render only when modeled by fixtures;
+  the current Kernel projection does not report those capabilities.
+- The interface is an operator-review milestone, not Event-readiness evidence.

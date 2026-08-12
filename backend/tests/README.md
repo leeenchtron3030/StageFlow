@@ -20,6 +20,8 @@ the deployment-neutral declarative StageFlow Runtime and combination validation.
 ED-0051 adds the first explicit in-process Software Agent Runtime lifecycle. ED-0052
 adds explicit bounded media-candidate discovery and objective observation orchestration.
 ED-0053 adds the first concrete bounded local-filesystem candidate-discovery adapter.
+ED-0054 adds durable advisory Media Timing Evidence contracts, repository behavior,
+PostgreSQL persistence, a sanitized read API, and authority-separation checks.
 
 Tests remain under `backend/tests/` rather than inside application packages. The suite
 emphasizes contract validation, negative architectural boundaries, deterministic
@@ -134,6 +136,14 @@ profile vocabulary with first-class `development`. Focused deployment-neutrality
 identity tests prove Development needs no metadata, unknown remains valid only as an
 explicit unresolved category, and profile does not alter discovery identity, ordering,
 readiness policy results, or Completed Media Asset meaning.
+
+ED-0054 adds `media_timing_evidence_fixtures.py` plus focused contract, persistence,
+authority, migration, and API suites. Coverage includes timezone-aware immutable facts;
+Observed/Derived separation; asset, manifest, revision, and predecessor lineage;
+qualification and limitations; credential/path/filename sanitization; exact and
+conflicting replay; reconstruction across repository instances; additive reversal and
+reapplication against gated PostgreSQL; sanitized projection/API behavior; and proof
+that applying MTE does not mutate Session, association, package, or Attention authority.
 
 ## What Does Not Belong Here
 

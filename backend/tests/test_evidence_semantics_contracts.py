@@ -27,6 +27,7 @@ from app.contexts.production.observation import (
     ObservationType,
 )
 from app.shared.ids import CorrelationId, EntityId
+from tests.timestamp_fixtures import AWARE_TIMESTAMP
 
 
 def _context() -> EvidenceBuilderContext:
@@ -123,6 +124,8 @@ def test_evidence_item_compatibility_and_first_class_role() -> None:
 
 def test_evidence_set_has_explicit_concern_and_purpose() -> None:
     evidence_set = EvidenceSet(
+                       created_at=AWARE_TIMESTAMP,
+
         id=EntityId.new(),
         recording_block_id=None,
         concern=EvidenceConcern.RECORDING_COVERAGE,
@@ -170,6 +173,8 @@ def test_mixed_roles_coexist_in_one_evidence_set() -> None:
     )
 
     evidence_set = EvidenceSet(
+                       created_at=AWARE_TIMESTAMP,
+
         id=EntityId.new(),
         recording_block_id=None,
         concern=EvidenceConcern.POSSIBLE_SESSION_START,
@@ -186,6 +191,8 @@ def test_mixed_roles_coexist_in_one_evidence_set() -> None:
 
 def test_evidence_summary_reports_role_counts_and_concern() -> None:
     evidence_set = EvidenceSet(
+                       created_at=AWARE_TIMESTAMP,
+
         id=EntityId.new(),
         recording_block_id=None,
         concern=EvidenceConcern.POSSIBLE_SESSION_START,
@@ -317,6 +324,8 @@ def test_concern_purpose_role_strength_and_weight_remain_distinct() -> None:
         weight=0.2,
     )
     evidence_set = EvidenceSet(
+                       created_at=AWARE_TIMESTAMP,
+
         id=EntityId.new(),
         recording_block_id=None,
         concern=EvidenceConcern.MEDIA_AVAILABILITY,
@@ -340,6 +349,8 @@ def test_metadata_is_not_required_for_core_evidence_semantics() -> None:
         strength=EvidenceStrength.MODERATE,
     )
     evidence_set = EvidenceSet(
+                       created_at=AWARE_TIMESTAMP,
+
         id=EntityId.new(),
         recording_block_id=None,
         concern=EvidenceConcern.TRANSCRIPT_CONTINUITY,

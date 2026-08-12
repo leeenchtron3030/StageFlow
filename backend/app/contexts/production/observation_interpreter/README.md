@@ -16,7 +16,9 @@ ED-0014 introduced the generic `production/interpreter` package.
 
 ED-0023 keeps that package in place and adds this more explicit AR-2.0 Observation Interpreter layer. The two packages overlap conceptually, but ED-0023 does not consolidate, delete, or rename ED-0014 contracts.
 
-Future architecture work may consolidate the generic interpreter package and this explicit Observation Interpreter package once the Production Event to Observation boundary has more concrete implementations.
+The dispatcher-owned compatibility adapter allows the six concrete Observation
+Interpreters to participate in `ProductionEventDispatcher` without consolidating these
+contracts. Their direct single-Event and batch APIs remain supported.
 
 ## Traceability
 
@@ -28,12 +30,14 @@ time, interpreter ID and stable kind, and applied rule identity. Compatibility m
 containing `source_production_event_ids` and `observation_interpreter_id` remains
 available but is secondary.
 
-`event_observation_lineage.py` centralizes context extraction. The deterministic order
-is Event references, structured Event payload, structured Event metadata, then the
-explicit interpreter context for stage and recording block compatibility. Each retained
-fallback records its source in `ObservationContext.metadata`. Transcript stream lookup
-uses `transcript_stream_id`, then `stream_id`, then `transcript_source_id`; text is never
-inspected. First-class Observation context is authoritative downstream.
+`event_observation_lineage.py` centralizes context extraction. It evaluates every
+authoritative Event reference, structured payload value, and structured metadata value
+for each lineage category. Multiple equivalent values are accepted; malformed input or
+disagreement fails closed instead of being resolved by precedence. Explicit interpreter
+context may supply Stage and Recording Block values only when the Event value is truly
+absent, and each retained value records its source in `ObservationContext.metadata`.
+Transcript text is never inspected. First-class Observation context is authoritative
+downstream.
 
 Interpreters do not compare source and Observation timestamps. They preserve Event time
 and assign Observation time independently, remain side-effect free, and do not mutate

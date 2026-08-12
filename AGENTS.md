@@ -110,6 +110,115 @@ of deployed event-operational readiness.
 - Do not silently change canonical terminology. Update the domain glossary first and
   plan compatibility for public contracts, storage, or APIs.
 
+## Bounded autonomous execution
+
+Classify consequential Codex work as Green, Yellow, or Red before implementation. This
+classification governs execution approval; it does not change the repository authority
+hierarchy, expand task scope, or bypass environment/tool approval requirements.
+
+### Green — autonomous execution
+
+Codex may investigate, plan, implement, validate, self-review, and complete work without
+an additional human approval turn only when all of the following are true:
+
+- The objective is already authorized by an accepted architecture document, ADR,
+  disposition, approved backlog item, or Engineering Directive.
+- No unresolved product or architecture decision is required.
+- Accepted StageFlow semantics do not materially change.
+- No intentional public compatibility break is required.
+- No new external infrastructure service is required.
+- No destructive data migration is required.
+- No security or trust boundary is materially changed.
+- Objective acceptance criteria and required validation can be identified.
+- The implementation remains reasonably reversible.
+
+For Green work, Codex is authorized to:
+
+- inspect repository code, history, architecture, reviews, and prior plans;
+- investigate and verify current behavior;
+- create or update a required implementation plan, classify it as Green, and mark it
+  implementation-ready when all decisions are already resolved;
+- select the smallest clear implementation details that conform to accepted architecture;
+- modify in-scope production code, tests, and directly affected documentation;
+- add internal modules or types required by the authorized design;
+- refactor directly affected code when needed for correctness or maintainability;
+- run non-destructive tests, linters, type checks, builds, and other validation;
+- diagnose and correct failures introduced by the task without asking whether to proceed;
+- update the plan completion record and deliberately self-review the final diff;
+- create logically isolated local or approved feature-branch commits when useful and
+  permitted by the active environment; and
+- continue to the next explicitly approved Green task without another architecture
+  review.
+
+Ordinary implementation ambiguity is not an escalation. Choose the smallest, clearest,
+reversible solution consistent with current authority and document the choice.
+
+### Yellow — escalation required
+
+Stop before implementing the affected work and request architectural or human review
+when the task requires or unexpectedly reveals:
+
+- a new or changed architecture decision or an unaccepted ADR decision;
+- a conflict among the Constitution, accepted ADRs, architecture documents,
+  dispositions, or Engineering Directives;
+- a material change to Session, Business Event, Stage, Segment/media, editorial, or
+  lifecycle semantics;
+- an intentional public API, storage, or serialization compatibility break;
+- a new production dependency with architectural consequences;
+- selection of a database, queue/broker, external service, or deployment topology not
+  already approved;
+- a new schema architecture or materially consequential migration;
+- a material change to authentication, authorization, trust, identity, or secret
+  handling;
+- an unresolved retention/deletion, late-media, finality, or product decision;
+- material expansion beyond the authorized scope; or
+- evidence that the approved plan or architecture is incorrect.
+
+An escalation must state the decision required, repository evidence, available options,
+tradeoffs, recommended default, blocked work, and independent work that may safely
+continue. Do not request approval for implementation details that do not meet a Yellow
+or Red condition.
+
+### Red — explicit action approval required
+
+Never perform the following without explicit authorization for the specific action:
+
+- destructive production-data operations;
+- production deployment;
+- deletion or irreversible migration of important data;
+- force pushes or repository-history rewrites;
+- exposure, creation, rotation, or transmission of real credentials or secrets outside
+  an already approved secret workflow;
+- irreversible external side effects;
+- merging consequential architecture changes directly into a protected primary branch
+  where project workflow requires review; or
+- disabling meaningful safety, validation, or test controls merely to make a change
+  pass.
+
+### Green planning, validation, and review
+
+- Plans remain required by the existing plan triggers. A separate human plan-approval
+  turn is not required for Green work.
+- A Green plan must record its execution classification, authority evidence, objective
+  acceptance criteria, bounded scope, identifiable tests, and implementation-ready
+  status before implementation begins.
+- Codex owns proportionate validation and continues correcting in-scope defects until
+  required checks pass or a Yellow/Red condition appears.
+- Classify failures as caused by the change, pre-existing, environmental/tooling, or an
+  architecture conflict. Correct in-scope failures automatically; document unrelated
+  failures and continue when they do not compromise confidence.
+- Never claim a check passed unless it ran.
+- Every Green implementation receives implementation-time tests/static validation and a
+  deliberate diff/self-review.
+- Fresh independent Codex review is expected at the end of a higher-risk Green task or a
+  logical batch of related Green tasks, not necessarily after every Green increment.
+- Human review normally occurs at architecture decisions, phase boundaries,
+  release/event-readiness milestones, and Yellow or Red escalations.
+
+Autonomy does not authorize opportunistic expansion. Record and classify unrelated
+findings; fix them immediately only when they directly block the authorized task and the
+correction itself remains Green.
+
 ## Data, compatibility, and dependencies
 
 - Schema or data migrations require an approved plan, explicit forward and reversal

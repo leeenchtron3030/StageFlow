@@ -94,6 +94,10 @@ def _interpreter(
     )
 
 
+media_event_fixture = _media_event
+interpreter_fixture = _interpreter
+
+
 def _field_names() -> set[str]:
     return {field.name for contract in CONTRACTS for field in fields(contract)}
 

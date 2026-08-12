@@ -4,7 +4,6 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
-from types import MappingProxyType
 from typing import Any
 
 from app.contexts.production.operator_adapter.operator_adapter_capability import (
@@ -16,6 +15,7 @@ from app.contexts.production.operator_adapter.operator_adapter_identity import (
 from app.contexts.production.operator_adapter.operator_event import OperatorEvent
 from app.contexts.production.production_event.production_event import ProductionEvent
 from app.shared.ids import CorrelationId, EntityId
+from app.shared.metadata import freeze_metadata
 
 
 class OperatorAdapterStatus(StrEnum):
@@ -43,7 +43,7 @@ class OperatorSourceAdapter:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "supported_capabilities", tuple(self.supported_capabilities))
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        object.__setattr__(self, "metadata", freeze_metadata(self.metadata))
 
     def supports_capability(self, capability: OperatorAdapterCapability) -> bool:
         return capability in self.supported_capabilities
@@ -52,7 +52,7 @@ class OperatorSourceAdapter:
         self,
         operator_event: OperatorEvent,
         correlation_id: CorrelationId,
-        received_at: datetime | None = None,
+        received_at: datetime,
     ) -> ProductionEvent:
         return operator_event.to_production_event(
             correlation_id=correlation_id,

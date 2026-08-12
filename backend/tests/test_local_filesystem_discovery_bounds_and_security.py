@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import errno
 import os
+from collections.abc import Callable, Iterator
 from dataclasses import replace
 from pathlib import Path
+from typing import cast
 
 import pytest
 from local_filesystem_discovery_fixtures import make_adapter
@@ -18,6 +21,27 @@ from app.contexts.production.media_collection import (
     MediaCandidateDiscoveryResult,
 )
 from app.contexts.production.software_agent_runtime import AgentRuntimeExecutionPermission
+
+
+def _create_symlink_or_skip(
+    link: Path,
+    target: Path,
+    *,
+    target_is_directory: bool = False,
+) -> None:
+    try:
+        link.symlink_to(target, target_is_directory=target_is_directory)
+    except OSError as error:
+        error_code = getattr(error, "winerror", None) or error.errno
+        unsupported_codes = {
+            errno.EACCES,
+            errno.ENOSYS,
+            errno.EPERM,
+            getattr(errno, "EOPNOTSUPP", errno.ENOSYS),
+        }
+        if getattr(error, "winerror", None) == 1314 or error.errno in unsupported_codes:
+            pytest.skip(f"symlink creation is unavailable: {error_code}")
+        raise
 
 
 def _filenames(result: MediaCandidateDiscoveryResult) -> set[str]:
@@ -84,7 +108,7 @@ def test_configured_target_symlink_is_blocked_without_following(tmp_path: Path) 
     target = tmp_path / "real.mov"
     target.write_bytes(b"")
     link = tmp_path / "link.mov"
-    link.symlink_to(target)
+    _create_symlink_or_skip(link, target)
     adapter, request = make_adapter(link, scope=LocalFilesystemTargetScope.SINGLE_FILE)
 
     result = adapter.discover(request)
@@ -98,11 +122,15 @@ def test_child_symlinks_are_skipped_and_never_escape_scope(tmp_path: Path) -> No
     outside = tmp_path.parent / "outside-ed0053.mov"
     outside.write_bytes(b"outside")
     (tmp_path / "inside.mov").write_bytes(b"inside")
-    (tmp_path / "escape.mov").symlink_to(outside)
+    _create_symlink_or_skip(tmp_path / "escape.mov", outside)
     nested = tmp_path / "nested"
     nested.mkdir()
     (nested / "nested.mov").write_bytes(b"nested")
-    (tmp_path / "nested-link").symlink_to(nested, target_is_directory=True)
+    _create_symlink_or_skip(
+        tmp_path / "nested-link",
+        nested,
+        target_is_directory=True,
+    )
     adapter, request = make_adapter(tmp_path)
 
     result = adapter.discover(request)
@@ -121,7 +149,11 @@ def test_symlinked_ancestor_is_blocked_as_scope_escape(tmp_path: Path) -> None:
     real_directory.mkdir()
     (real_directory / "capture.mov").write_bytes(b"")
     linked_directory = tmp_path / "linked"
-    linked_directory.symlink_to(real_directory, target_is_directory=True)
+    _create_symlink_or_skip(
+        linked_directory,
+        real_directory,
+        target_is_directory=True,
+    )
     configured = linked_directory / "capture.mov"
     adapter, request = make_adapter(
         configured,
@@ -149,6 +181,11 @@ def test_entry_disappearance_returns_remaining_candidates_as_partial(
     adapter, request = make_adapter(tmp_path)
     real_lstat = os.lstat
 
+    monkeypatch.setattr(
+        "app.contexts.production.local_filesystem_discovery.local_filesystem_candidate_discovery_adapter._descriptor_relative_directory_supported",
+        lambda: False,
+    )
+
     def lstat_with_race(path: str | bytes) -> os.stat_result:
         if os.fspath(path) == str(vanished):
             raise FileNotFoundError
@@ -170,10 +207,12 @@ def test_entry_disappearance_returns_remaining_candidates_as_partial(
     assert LocalFilesystemDiscoveryLimitation.ENTRIES_BECAME_UNAVAILABLE.value in result.limitations
 
 
-@pytest.mark.skipif(not hasattr(os, "mkfifo"), reason="FIFO creation is not portable")
 def test_special_filesystem_objects_never_become_candidates(tmp_path: Path) -> None:
+    mkfifo = getattr(os, "mkfifo", None)
+    if mkfifo is None:
+        pytest.skip("FIFO creation is not portable")
     (tmp_path / "capture.mov").write_bytes(b"")
-    os.mkfifo(tmp_path / "device-looking.mov")
+    mkfifo(tmp_path / "device-looking.mov")
     adapter, request = make_adapter(tmp_path)
 
     result = adapter.discover(request)
@@ -181,6 +220,183 @@ def test_special_filesystem_objects_never_become_candidates(tmp_path: Path) -> N
     assert result.outcome is MediaCandidateDiscoveryOutcome.PARTIAL
     assert _filenames(result) == {"capture.mov"}
     assert LocalFilesystemDiscoveryReasonCode.SPECIAL_ENTRY_SKIPPED.value in result.reasons
+
+
+@pytest.mark.parametrize("replacement_target_lstat_call", [2, 3])
+def test_directory_replacement_fails_closed_before_candidates_are_returned(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    replacement_target_lstat_call: int,
+) -> None:
+    configured = tmp_path / "configured"
+    configured.mkdir()
+    (configured / "capture.mov").write_bytes(b"")
+    replacement = tmp_path / "replacement"
+    replacement.mkdir()
+    (replacement / "outside.mov").write_bytes(b"")
+    adapter, request = make_adapter(configured)
+    real_lstat = os.lstat
+    target_calls = 0
+
+    def lstat_with_replacement(path: str | bytes) -> os.stat_result:
+        nonlocal target_calls
+        if os.fspath(path) == str(configured):
+            target_calls += 1
+            if target_calls == replacement_target_lstat_call:
+                return real_lstat(replacement)
+        return real_lstat(path)
+
+    monkeypatch.setattr(
+        "app.contexts.production.local_filesystem_discovery.local_filesystem_candidate_discovery_adapter.os.lstat",
+        lstat_with_replacement,
+    )
+
+    result = adapter.discover(request)
+
+    assert result.outcome is MediaCandidateDiscoveryOutcome.BLOCKED
+    assert result.discovered_candidates == ()
+    assert (
+        LocalFilesystemDiscoveryReasonCode.TARGET_CHANGED_DURING_DISCOVERY.value
+        in result.reasons
+    )
+    assert (
+        LocalFilesystemDiscoveryLimitation.TARGET_IDENTITY_CHANGED_DURING_DISCOVERY.value
+        in result.limitations
+    )
+
+
+def test_actual_directory_replacement_between_validation_and_enumeration_fails_closed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    configured = tmp_path / "configured"
+    configured.mkdir()
+    (configured / "capture.mov").write_bytes(b"")
+    replacement = tmp_path / "replacement"
+    replacement.mkdir()
+    (replacement / "outside.mov").write_bytes(b"")
+    displaced = tmp_path / "displaced"
+    adapter, request = make_adapter(configured)
+    real_scandir = os.scandir
+    swapped = False
+
+    def scandir_after_replacement(path: str) -> Iterator[os.DirEntry[str]]:
+        nonlocal swapped
+        if not swapped and os.fspath(path) == str(configured):
+            configured.rename(displaced)
+            replacement.rename(configured)
+            swapped = True
+        return real_scandir(path)
+
+    monkeypatch.setattr(
+        "app.contexts.production.local_filesystem_discovery.local_filesystem_candidate_discovery_adapter._descriptor_relative_directory_supported",
+        lambda: False,
+    )
+    monkeypatch.setattr(
+        "app.contexts.production.local_filesystem_discovery.local_filesystem_candidate_discovery_adapter.os.scandir",
+        scandir_after_replacement,
+    )
+
+    result = adapter.discover(request)
+
+    assert result.outcome is MediaCandidateDiscoveryOutcome.BLOCKED
+    assert result.discovered_candidates == ()
+    assert (
+        LocalFilesystemDiscoveryReasonCode.TARGET_CHANGED_DURING_DISCOVERY.value
+        in result.reasons
+    )
+
+
+def test_actual_directory_replacement_during_child_inspection_fails_closed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    configured = tmp_path / "configured"
+    configured.mkdir()
+    (configured / "capture.mov").write_bytes(b"")
+    replacement = tmp_path / "replacement"
+    replacement.mkdir()
+    (replacement / "capture.mov").write_bytes(b"outside")
+    displaced = tmp_path / "displaced"
+    adapter, request = make_adapter(configured)
+    real_lstat = os.lstat
+    swapped = False
+
+    def lstat_after_replacement(path: str | bytes) -> os.stat_result:
+        nonlocal swapped
+        if not swapped and os.fspath(path) == str(configured / "capture.mov"):
+            configured.rename(displaced)
+            replacement.rename(configured)
+            swapped = True
+        return real_lstat(path)
+
+    monkeypatch.setattr(
+        "app.contexts.production.local_filesystem_discovery.local_filesystem_candidate_discovery_adapter._descriptor_relative_directory_supported",
+        lambda: False,
+    )
+    monkeypatch.setattr(
+        "app.contexts.production.local_filesystem_discovery.local_filesystem_candidate_discovery_adapter.os.lstat",
+        lstat_after_replacement,
+    )
+
+    result = adapter.discover(request)
+
+    assert result.outcome is MediaCandidateDiscoveryOutcome.BLOCKED
+    assert result.discovered_candidates == ()
+    assert (
+        LocalFilesystemDiscoveryReasonCode.TARGET_CHANGED_DURING_DISCOVERY.value
+        in result.reasons
+    )
+
+
+@pytest.mark.skipif(
+    os.name == "nt",
+    reason="descriptor-bound scandir is a supported POSIX path",
+)
+def test_descriptor_bound_enumeration_opens_and_inspects_the_validated_object(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    configured = tmp_path / "configured"
+    configured.mkdir()
+    (configured / "capture.mov").write_bytes(b"")
+    replacement = tmp_path / "replacement"
+    replacement.mkdir()
+    (replacement / "outside.mov").write_bytes(b"")
+    displaced = tmp_path / "displaced"
+    adapter, request = make_adapter(configured)
+    real_scandir = cast(
+        Callable[[int], Iterator[os.DirEntry[str]]],
+        os.scandir,
+    )
+    swapped = False
+
+    def scandir_after_replacement(directory_fd: int) -> Iterator[os.DirEntry[str]]:
+        nonlocal swapped
+        assert isinstance(directory_fd, int)
+        if not swapped:
+            configured.rename(displaced)
+            replacement.rename(configured)
+            swapped = True
+        return real_scandir(directory_fd)
+
+    monkeypatch.setattr(
+        "app.contexts.production.local_filesystem_discovery.local_filesystem_candidate_discovery_adapter._descriptor_relative_directory_supported",
+        lambda: True,
+    )
+    monkeypatch.setattr(
+        "app.contexts.production.local_filesystem_discovery.local_filesystem_candidate_discovery_adapter.os.scandir",
+        scandir_after_replacement,
+    )
+
+    result = adapter.discover(request)
+
+    assert result.outcome is MediaCandidateDiscoveryOutcome.BLOCKED
+    assert result.discovered_candidates == ()
+    assert (
+        LocalFilesystemDiscoveryReasonCode.TARGET_CHANGED_DURING_DISCOVERY.value
+        in result.reasons
+    )
 
 
 def test_per_entry_inspection_failure_is_sanitized_and_partial(
@@ -193,6 +409,11 @@ def test_per_entry_inspection_failure_is_sanitized_and_partial(
     remaining.write_bytes(b"")
     adapter, request = make_adapter(tmp_path)
     real_lstat = os.lstat
+
+    monkeypatch.setattr(
+        "app.contexts.production.local_filesystem_discovery.local_filesystem_candidate_discovery_adapter._descriptor_relative_directory_supported",
+        lambda: False,
+    )
 
     def lstat_with_failure(path: str | bytes) -> os.stat_result:
         if os.fspath(path) == str(inaccessible):

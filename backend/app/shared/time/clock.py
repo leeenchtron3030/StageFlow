@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Protocol
 
+from app.shared.time.validation import require_aware_datetime
+
 type Timestamp = datetime
 
 
@@ -28,6 +30,9 @@ class FixedClock:
     """Deterministic clock for tests and future simulation mode."""
 
     fixed_at: Timestamp
+
+    def __post_init__(self) -> None:
+        require_aware_datetime(self.fixed_at, "fixed_at")
 
     def now(self) -> Timestamp:
         return self.fixed_at

@@ -741,18 +741,9 @@ class OperationalStateRepositoryCompliance:
             OperationalStateRepositoryCommitOutcome.INVALID_SUCCESSOR_STATE
         )
 
-    def test_naive_acceptance_timestamp_is_rejected_without_storage(self) -> None:
-        repository = self.repository_factory()
-        fixture = make_accepted_state(accepted_at=datetime(2026, 7, 16, 10, 5))
-
-        result = repository.commit_acceptance(fixture.request)
-
-        assert result.outcome is (
-            OperationalStateRepositoryCommitOutcome.INVALID_ACCEPTANCE_RESULT
-        )
-        assert repository.get_state(fixture.successor.id).outcome is (
-            OperationalStateRepositoryQueryOutcome.NOT_FOUND
-        )
+    def test_naive_acceptance_timestamp_is_rejected_before_storage(self) -> None:
+        with pytest.raises(ValueError, match="accepted_at must be timezone-aware"):
+            make_accepted_state(accepted_at=datetime(2026, 7, 16, 10, 5))
 
     def test_caller_contracts_remain_unchanged_after_commit(self) -> None:
         repository = self.repository_factory()

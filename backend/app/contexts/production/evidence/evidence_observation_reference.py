@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from types import MappingProxyType
 from typing import Any
 
 from app.contexts.production.evidence.evidence_role import EvidenceRole
 from app.contexts.production.evidence.evidence_strength import EvidenceStrength
 from app.shared.ids import EntityId
+from app.shared.metadata import freeze_metadata
 
 
 def _empty_metadata() -> Mapping[str, Any]:
@@ -30,4 +30,4 @@ class EvidenceObservationReference:
             raise ValueError(
                 "EvidenceObservationReference weight must be between 0.0 and 1.0 when provided."
             )
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        object.__setattr__(self, "metadata", freeze_metadata(self.metadata))

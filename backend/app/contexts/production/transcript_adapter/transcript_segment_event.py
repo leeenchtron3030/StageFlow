@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
-from types import MappingProxyType
+from datetime import datetime
 from typing import Any
 
 from app.contexts.production.production_event.production_event import ProductionEvent
@@ -25,6 +24,8 @@ from app.contexts.production.transcript_adapter.transcript_segment_status import
     TranscriptSegmentStatus,
 )
 from app.shared.ids import CorrelationId, EntityId
+from app.shared.metadata import freeze_metadata
+from app.shared.time import require_aware_datetime
 
 
 def _empty_metadata() -> Mapping[str, Any]:
@@ -58,6 +59,7 @@ class TranscriptSegmentEvent:
     metadata: Mapping[str, Any] = field(default_factory=_empty_metadata)
 
     def __post_init__(self) -> None:
+        require_aware_datetime(self.occurred_at, "TranscriptSegmentEvent.occurred_at")
         if not self.transcript_segment_identifier.strip():
             raise ValueError(
                 "TranscriptSegmentEvent transcript_segment_identifier must not be empty."
@@ -70,12 +72,12 @@ class TranscriptSegmentEvent:
             raise ValueError("TranscriptSegmentEvent text_excerpt must not be empty.")
         if self.confidence is not None and not 0.0 <= self.confidence <= 1.0:
             raise ValueError("TranscriptSegmentEvent confidence must be between 0.0 and 1.0.")
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        object.__setattr__(self, "metadata", freeze_metadata(self.metadata))
 
     def to_production_event(
         self,
         correlation_id: CorrelationId,
-        received_at: datetime | None = None,
+        received_at: datetime,
     ) -> ProductionEvent:
         return ProductionEvent(
             id=EntityId.new(),
@@ -85,7 +87,7 @@ class TranscriptSegmentEvent:
             references=self._production_event_references(),
             correlation_id=correlation_id,
             occurred_at=self.occurred_at,
-            received_at=received_at or datetime.now(UTC),
+            received_at=require_aware_datetime(received_at, "received_at"),
             metadata={"transcript_adapter_event": True},
             notes=self.language_label,
         )

@@ -13,6 +13,7 @@ from app.contexts.production.observation import (
 )
 from app.contexts.production.timeline import TimelinePosition, TimelineRange
 from app.shared.ids import CorrelationId, EntityId
+from tests.timestamp_fixtures import AWARE_TIMESTAMP
 
 
 def _position(recording_block_id: EntityId, seconds: int) -> TimelinePosition:
@@ -235,6 +236,8 @@ def test_observation_location_rejects_conflicting_recording_block_anchors() -> N
 def test_observation_metadata_is_optional() -> None:
     recording_block_id = EntityId.new()
     observation = Observation(
+                      observed_at=AWARE_TIMESTAMP,
+
         id=EntityId.new(),
         recording_block_id=recording_block_id,
         observation_type=ObservationType.UNKNOWN,
@@ -252,6 +255,8 @@ def test_observation_metadata_is_optional() -> None:
 def test_observation_can_be_anchored_to_wall_clock_without_recording_block() -> None:
     timestamp = datetime(2026, 7, 8, 10, 0, tzinfo=UTC)
     observation = Observation(
+                      observed_at=AWARE_TIMESTAMP,
+
         id=EntityId.new(),
         recording_block_id=None,
         observation_type=ObservationType.UNKNOWN,
@@ -268,6 +273,8 @@ def test_observation_can_be_anchored_to_wall_clock_without_recording_block() -> 
 def test_observation_derives_recording_block_from_location_when_omitted() -> None:
     recording_block_id = EntityId.new()
     observation = Observation(
+                      observed_at=AWARE_TIMESTAMP,
+
         id=EntityId.new(),
         recording_block_id=None,
         observation_type=ObservationType.RECORDING_ACTIVITY,
@@ -285,6 +292,8 @@ def test_observation_uses_generic_entity_id_and_correlation_id() -> None:
     observation_id = EntityId.new()
     correlation_id = CorrelationId.new()
     observation = Observation(
+                      observed_at=AWARE_TIMESTAMP,
+
         id=observation_id,
         recording_block_id=recording_block_id,
         observation_type=ObservationType.OPERATOR_MARKER,
@@ -302,6 +311,8 @@ def test_observation_uses_generic_entity_id_and_correlation_id() -> None:
 def test_observation_rejects_location_from_different_recording_block() -> None:
     with pytest.raises(ValueError, match="recording_block_id"):
         Observation(
+            observed_at=AWARE_TIMESTAMP,
+
             id=EntityId.new(),
             recording_block_id=EntityId.new(),
             observation_type=ObservationType.SPEECH_DETECTED,

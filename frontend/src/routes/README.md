@@ -2,20 +2,15 @@
 
 ## Purpose
 
-`routes` is reserved for frontend route metadata and route support structures.
+Next.js App Router pages live in `frontend/app/`. This directory remains available for
+shared route metadata if route complexity later justifies it.
 
 ## What Belongs Here
 
-- Route constants approved by future directives.
-- Route-level metadata helpers.
-- Navigation support after navigation is approved.
+- Shared route constants or metadata only when several routes need them.
+- Presentation-safe navigation helpers that do not own domain policy.
 
 ## What Does Not Belong Here
 
-- Additional pages for ED-0003.
-- Navigation implementation.
 - Backend route or API definitions.
-
-## Expected Future Directives
-
-- Future frontend directives may define application routes and navigation.
+- Domain/authority behavior.

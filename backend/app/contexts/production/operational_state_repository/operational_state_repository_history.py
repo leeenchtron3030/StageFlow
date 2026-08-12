@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from types import MappingProxyType
 from typing import Any
 
 from app.contexts.production.operational_state import (
@@ -11,6 +10,7 @@ from app.contexts.production.operational_state import (
     OperationalStateSubject,
 )
 from app.shared.ids import EntityId
+from app.shared.metadata import freeze_metadata
 
 from .operational_state_repository_record import OperationalStateRepositoryRecord
 
@@ -98,7 +98,7 @@ class OperationalStateRepositoryHistory:
                     raise ValueError("Repository history predecessor chain is incomplete.")
 
         object.__setattr__(self, "records", records)
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        object.__setattr__(self, "metadata", freeze_metadata(self.metadata))
 
     @property
     def state_ids(self) -> tuple[EntityId, ...]:

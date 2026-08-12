@@ -25,6 +25,7 @@ from app.contexts.production.evidence_builder.evidence_builder_rule import (
 )
 from app.contexts.production.observation import Observation, ObservationType
 from app.shared.ids import EntityId
+from app.shared.metadata import freeze_metadata
 
 
 class EvidenceBuilderStatus(StrEnum):
@@ -112,7 +113,7 @@ class ObservationEvidenceBuilder:
         if not self.name.strip():
             raise ValueError("ObservationEvidenceBuilder name must not be empty.")
         object.__setattr__(self, "rules", tuple(self.rules))
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        object.__setattr__(self, "metadata", freeze_metadata(self.metadata))
 
     def can_build(self) -> bool:
         return self.status in _BUILDABLE_STATUSES

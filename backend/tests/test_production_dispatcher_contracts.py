@@ -1,11 +1,16 @@
-from dataclasses import fields
+from collections.abc import Sequence
+from dataclasses import dataclass, fields
 from datetime import UTC, datetime, timedelta
 from inspect import getmembers, isfunction
+from typing import cast
+
+import pytest
 
 from app.contexts.production.dispatcher import (
     DispatchContext,
     DispatchResult,
     DispatchRule,
+    DispatchStatus,
     DispatchSummary,
     ProductionEventDispatcher,
 )
@@ -30,6 +35,7 @@ from app.contexts.production.production_event import (
 )
 from app.contexts.production.timeline import TimelinePosition
 from app.shared.ids import CorrelationId, EntityId
+from tests.timestamp_fixtures import AWARE_TIMESTAMP
 
 
 class FixedResultInterpreter(ProductionEventInterpreter):
@@ -56,6 +62,30 @@ class FixedResultInterpreter(ProductionEventInterpreter):
         context: InterpreterContext,
     ) -> InterpreterResult:
         return self.fixed_result
+
+
+@dataclass(frozen=True, slots=True)
+class RaisingSupportInterpreter:
+    id: EntityId
+
+    def can_interpret(self, event: ProductionEvent) -> bool:
+        raise RuntimeError("sensitive predicate detail")
+
+    def interpret(
+        self,
+        event: ProductionEvent,
+        context: InterpreterContext,
+    ) -> InterpreterResult:
+        raise AssertionError("interpret must not be called")
+
+
+class RaisingInterpreter(ProductionEventInterpreter):
+    def interpret(
+        self,
+        event: ProductionEvent,
+        context: InterpreterContext,
+    ) -> InterpreterResult:
+        raise RuntimeError("sensitive failure detail")
 
 
 def _event(
@@ -99,7 +129,8 @@ def _interpreter(
 
 
 def _dispatcher(
-    interpreters: list[ProductionEventInterpreter] | None = None,
+    interpreters: Sequence[ProductionEventInterpreter | RaisingSupportInterpreter]
+    | None = None,
     rules: list[DispatchRule] | None = None,
 ) -> ProductionEventDispatcher:
     return ProductionEventDispatcher(
@@ -113,6 +144,8 @@ def _dispatcher(
 
 def _observation(recording_block_id: EntityId) -> Observation:
     return Observation(
+               observed_at=AWARE_TIMESTAMP,
+
         id=EntityId.new(),
         recording_block_id=recording_block_id,
         observation_type=ObservationType.SCHEDULE_BOUNDARY,
@@ -153,6 +186,7 @@ def test_dispatch_with_zero_interpreters() -> None:
     assert result.invoked_interpreter_ids == ()
     assert result.interpreter_results == ()
     assert result.declined_interpreter_count == 0
+    assert result.status is DispatchStatus.NO_MATCH
 
 
 def test_dispatch_with_one_interpreter() -> None:
@@ -219,7 +253,52 @@ def test_dispatch_result_generation() -> None:
     assert result.invoked_interpreter_ids == (interpreter.id,)
     assert len(result.interpreter_results) == 1
     assert result.warnings == ("diagnostic",)
+    assert result.status is DispatchStatus.SUCCESS_WITH_WARNINGS
     assert dict(result.metadata) == {"route": "direct"}
+
+
+def test_dispatch_result_derives_missing_aggregate_warnings_from_interpreter_results() -> None:
+    event = _event()
+    interpreter_id = EntityId.new()
+    result = DispatchResult(
+        source_production_event_id=event.id,
+        interpreter_count=1,
+        invoked_interpreter_ids=(interpreter_id,),
+        interpreter_results=(
+            InterpreterResult(
+                source_production_event_id=event.id,
+                observations=(),
+                interpreter_status=InterpreterStatus.ACTIVE,
+                warnings=("limited detail",),
+            ),
+        ),
+    )
+
+    assert result.warnings == ("limited detail",)
+    assert result.status is DispatchStatus.SUCCESS_WITH_WARNINGS
+    assert DispatchSummary.from_dispatch_result(result).warning_count == 1
+
+
+def test_support_evaluation_exception_is_typed_and_later_matches_continue() -> None:
+    event = _event()
+    later = _interpreter()
+    failing_id = EntityId.new()
+    dispatcher = _dispatcher(
+        interpreters=(RaisingSupportInterpreter(failing_id), later),
+    )
+
+    result = dispatcher.dispatch(event, _context())
+
+    assert result.status is DispatchStatus.PARTIAL_FAILURE
+    assert result.invoked_interpreter_ids == (later.id,)
+    assert len(result.interpreter_results) == 1
+    assert result.declined_interpreter_count == 0
+    assert len(result.support_failures) == 1
+    failure = result.support_failures[0]
+    assert failure.interpreter_id == failing_id
+    assert failure.failure_code == "support_evaluation_exception:RuntimeError"
+    assert "sensitive predicate detail" not in failure.warning
+    assert result.warnings == (failure.warning,)
 
 
 def test_dispatch_context_creation() -> None:
@@ -310,6 +389,220 @@ def test_dispatcher_does_not_modify_interpreter_results() -> None:
     assert result.interpreter_results == (interpreter_result,)
     assert result.interpreter_results[0].observations == (observation,)
     assert result.warnings == ("interpreter warning",)
+
+
+def test_dispatch_aggregation_preserves_warning_and_degraded_visibility() -> None:
+    event = _event()
+    warning_result = InterpreterResult(
+        source_production_event_id=event.id,
+        observations=(),
+        interpreter_status=InterpreterStatus.ACTIVE,
+        warnings=("limited source detail",),
+    )
+    degraded_result = InterpreterResult(
+        source_production_event_id=event.id,
+        observations=(),
+        interpreter_status=InterpreterStatus.DEGRADED,
+    )
+    dispatcher = _dispatcher(
+        interpreters=[
+            FixedResultInterpreter(interpreter_id=EntityId.new(), fixed_result=warning_result),
+            FixedResultInterpreter(
+                interpreter_id=EntityId.new(), fixed_result=degraded_result
+            ),
+        ]
+    )
+
+    result = dispatcher.dispatch(event, _context())
+
+    assert result.status is DispatchStatus.SUCCESS_WITH_WARNINGS
+    assert result.warnings == ("limited source detail",)
+    assert DispatchSummary.from_dispatch_result(result).successful_interpreter_count == 0
+
+
+def test_experimental_interpreter_is_not_counted_as_clean_success() -> None:
+    event = _event()
+    dispatcher = _dispatcher(
+        interpreters=[
+            FixedResultInterpreter(
+                interpreter_id=EntityId.new(),
+                fixed_result=InterpreterResult(
+                    source_production_event_id=event.id,
+                    observations=(),
+                    interpreter_status=InterpreterStatus.EXPERIMENTAL,
+                ),
+            )
+        ]
+    )
+
+    result = dispatcher.dispatch(event, _context())
+
+    assert DispatchSummary.from_dispatch_result(result).successful_interpreter_count == 0
+
+
+def test_exception_is_typed_and_later_matching_interpreter_still_runs() -> None:
+    event = _event()
+    raising = RaisingInterpreter(
+        id=EntityId.new(),
+        name="Raising interpreter",
+        supported_event_types=(ProductionEventType.SCHEDULE_BOUNDARY_REACHED,),
+        supported_event_sources=(ProductionEventSource.SCHEDULE_SYSTEM,),
+        status=InterpreterStatus.ACTIVE,
+    )
+    succeeding = _interpreter()
+    dispatcher = _dispatcher(interpreters=[raising, succeeding])
+
+    result = dispatcher.dispatch(event, _context())
+
+    assert result.status is DispatchStatus.PARTIAL_FAILURE
+    assert result.invoked_interpreter_ids == (raising.id, succeeding.id)
+    assert result.interpreter_results[0].interpreter_status is InterpreterStatus.FAILED
+    assert result.interpreter_results[1].interpreter_status is InterpreterStatus.ACTIVE
+    assert dict(result.interpreter_results[0].metadata) == {
+        "failure_code": "interpreter_exception:RuntimeError"
+    }
+    assert "sensitive failure detail" not in " ".join(result.warnings)
+
+
+def test_all_matching_failures_are_total_failure() -> None:
+    event = _event()
+    failed_result = InterpreterResult(
+        source_production_event_id=event.id,
+        observations=(),
+        interpreter_status=InterpreterStatus.FAILED,
+        warnings=("typed failure",),
+    )
+    dispatcher = _dispatcher(
+        interpreters=[
+            FixedResultInterpreter(interpreter_id=EntityId.new(), fixed_result=failed_result)
+        ]
+    )
+
+    result = dispatcher.dispatch(event, _context())
+
+    assert result.status is DispatchStatus.TOTAL_FAILURE
+
+
+@pytest.mark.parametrize(
+    "status",
+    (
+        InterpreterStatus.UNKNOWN,
+        InterpreterStatus.CONFIGURED,
+        InterpreterStatus.FAILED,
+        InterpreterStatus.DISABLED,
+        InterpreterStatus.ARCHIVED,
+    ),
+)
+def test_invoked_non_interpretable_status_fails_closed(status: InterpreterStatus) -> None:
+    event = _event()
+    invalid_result = InterpreterResult(
+        source_production_event_id=event.id,
+        observations=(_observation(EntityId.new()),),
+        interpreter_status=status,
+    )
+    dispatcher = _dispatcher(
+        interpreters=[
+            FixedResultInterpreter(interpreter_id=EntityId.new(), fixed_result=invalid_result)
+        ]
+    )
+
+    result = dispatcher.dispatch(event, _context())
+
+    assert result.status is DispatchStatus.TOTAL_FAILURE
+    assert result.observations == ()
+    assert dict(result.interpreter_results[0].metadata) == {
+        "failure_code": f"non_interpretable_status:{status.value}"
+    }
+
+
+@pytest.mark.parametrize(
+    ("status", "expected_status", "observations_survive"),
+    (
+        (InterpreterStatus.READY, DispatchStatus.SUCCESS, True),
+        (InterpreterStatus.ACTIVE, DispatchStatus.SUCCESS, True),
+        (InterpreterStatus.DEGRADED, DispatchStatus.SUCCESS_WITH_WARNINGS, True),
+        (InterpreterStatus.EXPERIMENTAL, DispatchStatus.SUCCESS_WITH_WARNINGS, True),
+        (InterpreterStatus.UNKNOWN, DispatchStatus.TOTAL_FAILURE, False),
+        (InterpreterStatus.CONFIGURED, DispatchStatus.TOTAL_FAILURE, False),
+        (InterpreterStatus.FAILED, DispatchStatus.TOTAL_FAILURE, False),
+        (InterpreterStatus.DISABLED, DispatchStatus.TOTAL_FAILURE, False),
+        (InterpreterStatus.ARCHIVED, DispatchStatus.TOTAL_FAILURE, False),
+        (
+            cast(InterpreterStatus, object()),
+            DispatchStatus.TOTAL_FAILURE,
+            False,
+        ),
+    ),
+)
+def test_direct_dispatch_result_construction_filters_observations_by_status_semantics(
+    status: InterpreterStatus,
+    expected_status: DispatchStatus,
+    observations_survive: bool,
+) -> None:
+    event = _event()
+    interpreter_id = EntityId.new()
+    observation = _observation(EntityId.new())
+
+    result = DispatchResult(
+        source_production_event_id=event.id,
+        interpreter_count=1,
+        invoked_interpreter_ids=(interpreter_id,),
+        interpreter_results=(
+            InterpreterResult(
+                source_production_event_id=event.id,
+                observations=(observation,),
+                interpreter_status=status,
+            ),
+        ),
+    )
+
+    assert result.status is expected_status
+    assert result.observations == ((observation,) if observations_survive else ())
+
+
+def test_legacy_experimental_status_survives_with_warning_aggregate() -> None:
+    event = _event()
+    experimental_result = InterpreterResult(
+        source_production_event_id=event.id,
+        observations=(_observation(EntityId.new()),),
+        interpreter_status=InterpreterStatus.EXPERIMENTAL,
+    )
+    dispatcher = _dispatcher(
+        interpreters=[
+            FixedResultInterpreter(
+                interpreter_id=EntityId.new(), fixed_result=experimental_result
+            )
+        ]
+    )
+
+    result = dispatcher.dispatch(event, _context())
+
+    assert result.status is DispatchStatus.SUCCESS_WITH_WARNINGS
+    assert result.observations == experimental_result.observations
+
+
+def test_future_unsupported_status_fails_closed_without_releasing_observations() -> None:
+    event = _event()
+    unsupported_result = InterpreterResult(
+        source_production_event_id=event.id,
+        observations=(_observation(EntityId.new()),),
+        interpreter_status=cast(InterpreterStatus, object()),
+    )
+    dispatcher = _dispatcher(
+        interpreters=[
+            FixedResultInterpreter(
+                interpreter_id=EntityId.new(), fixed_result=unsupported_result
+            )
+        ]
+    )
+
+    result = dispatcher.dispatch(event, _context())
+
+    assert result.status is DispatchStatus.TOTAL_FAILURE
+    assert result.observations == ()
+    assert dict(result.interpreter_results[0].metadata) == {
+        "failure_code": "unsupported_interpreter_status"
+    }
 
 
 def test_dispatcher_does_not_create_observations_directly() -> None:

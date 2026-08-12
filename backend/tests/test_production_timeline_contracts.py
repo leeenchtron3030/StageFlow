@@ -15,10 +15,13 @@ from app.contexts.production.timeline import (
     VerificationStatus,
 )
 from app.shared.ids import CorrelationId, EntityId
+from tests.timestamp_fixtures import AWARE_TIMESTAMP
 
 
 def test_recording_block_creation() -> None:
     block = RecordingBlock(
+                created_at=AWARE_TIMESTAMP,
+
         id=EntityId.new(),
         stage_id=EntityId.new(),
         label="Main Stage morning recording block",
@@ -121,6 +124,9 @@ def test_session_window_confidence_validation() -> None:
 
     with pytest.raises(ValueError, match="confidence"):
         SessionWindow(
+            created_at=AWARE_TIMESTAMP,
+            updated_at=AWARE_TIMESTAMP,
+
             id=EntityId.new(),
             schedule_reference=ScheduleReference(EntityId.new(), "external-session-123"),
             recording_block_id=recording_block_id,
@@ -139,6 +145,9 @@ def test_session_window_can_represent_proposed_and_verified_windows() -> None:
     schedule_reference = ScheduleReference(EntityId.new(), "external-session-123")
 
     proposed = SessionWindow(
+                   created_at=AWARE_TIMESTAMP,
+                   updated_at=AWARE_TIMESTAMP,
+
         id=EntityId.new(),
         schedule_reference=schedule_reference,
         recording_block_id=recording_block_id,
@@ -147,6 +156,9 @@ def test_session_window_can_represent_proposed_and_verified_windows() -> None:
         confidence=0.65,
     )
     verified = SessionWindow(
+                   created_at=AWARE_TIMESTAMP,
+                   updated_at=AWARE_TIMESTAMP,
+
         id=EntityId.new(),
         schedule_reference=schedule_reference,
         recording_block_id=recording_block_id,

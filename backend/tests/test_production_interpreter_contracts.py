@@ -173,11 +173,15 @@ def test_interpreter_result_references_source_production_event_id() -> None:
 
 def test_interpreter_status_allowed_values() -> None:
     assert {status.value for status in InterpreterStatus} == {
+        "unknown",
+        "configured",
+        "ready",
         "active",
         "disabled",
         "degraded",
         "experimental",
         "archived",
+        "failed",
     }
 
 

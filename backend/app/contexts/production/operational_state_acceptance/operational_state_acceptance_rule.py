@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from types import MappingProxyType
 from typing import Any
 
 from app.contexts.production.operational_state import (
@@ -12,6 +11,7 @@ from app.contexts.production.operational_state import (
     OperationalStateValue,
 )
 from app.shared.ids import EntityId
+from app.shared.metadata import freeze_metadata
 
 
 def _empty_metadata() -> Mapping[str, Any]:
@@ -55,4 +55,4 @@ class OperationalStateAcceptanceRule:
             "required_lineage_fields",
             tuple(dict.fromkeys(self.required_lineage_fields)),
         )
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        object.__setattr__(self, "metadata", freeze_metadata(self.metadata))

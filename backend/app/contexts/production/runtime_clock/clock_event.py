@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
-from types import MappingProxyType
+from datetime import datetime
 from typing import Any
 
 from app.contexts.production.production_event.production_event import ProductionEvent
@@ -20,6 +19,8 @@ from app.contexts.production.production_event.production_event_source import (
 from app.contexts.production.production_event.production_event_type import ProductionEventType
 from app.contexts.production.runtime_clock.time_boundary_type import TimeBoundaryType
 from app.shared.ids import CorrelationId, EntityId
+from app.shared.metadata import freeze_metadata
+from app.shared.time import require_aware_datetime
 
 
 def _empty_metadata() -> Mapping[str, Any]:
@@ -55,14 +56,15 @@ class ClockEvent:
     metadata: Mapping[str, Any] = field(default_factory=_empty_metadata)
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        require_aware_datetime(self.occurred_at, "ClockEvent.occurred_at")
+        object.__setattr__(self, "metadata", freeze_metadata(self.metadata))
 
     def to_production_event(
         self,
         correlation_id: CorrelationId,
-        received_at: datetime | None = None,
+        received_at: datetime,
     ) -> ProductionEvent:
-        event_timestamp = received_at or datetime.now(UTC)
+        event_timestamp = require_aware_datetime(received_at, "received_at")
         return ProductionEvent(
             id=EntityId.new(),
             event_type=_EVENT_TYPE_BY_BOUNDARY_TYPE[self.boundary_type],

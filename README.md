@@ -2,6 +2,8 @@
 
 An observational intelligence system for live event media.
 
+**Start here:** [StageFlow Master Project Brief](docs/PROJECT_BRIEF.md)
+
 ⸻
 
 Overview

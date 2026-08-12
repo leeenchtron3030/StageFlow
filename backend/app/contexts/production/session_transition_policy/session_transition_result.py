@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from types import MappingProxyType
 from typing import Any
 
 from app.contexts.production.operational_state import OperationalStateValue
@@ -11,6 +10,7 @@ from app.contexts.production.transition_policy import (
     TransitionPolicyResult,
 )
 from app.shared.ids import EntityId
+from app.shared.metadata import freeze_metadata
 
 from .session_transition_evidence_profile import SessionTransitionEvidenceProfile
 
@@ -59,7 +59,7 @@ class SessionTransitionResult:
             "duplicate_evidence_set_ids",
             tuple(self.duplicate_evidence_set_ids),
         )
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        object.__setattr__(self, "metadata", freeze_metadata(self.metadata))
 
     @property
     def outcome(self) -> TransitionPolicyResult:

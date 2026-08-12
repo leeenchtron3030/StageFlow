@@ -85,25 +85,33 @@ def test_binding_requires_positive_entry_bound(tmp_path: Path, entry_limit: int)
 
 
 @pytest.mark.parametrize(
-    "location, message",
+    "location_kind, message",
     [
         ("relative/recordings", "absolute"),
-        ("/recordings/../escape", "parent traversal"),
-        ("/recordings/*.mov", "glob or wildcard"),
-        ("/recordings/clip.mov?access_token=secret", "credential"),
-        ("/recordings/clip\x00.mov", "null byte"),
+        ("parent_traversal", "parent traversal"),
+        ("wildcard", "glob or wildcard"),
+        ("credential", "credential"),
+        ("null_byte", "null byte"),
     ],
 )
 def test_binding_rejects_unbounded_or_credential_bearing_locations(
     tmp_path: Path,
-    location: str,
+    location_kind: str,
     message: str,
 ) -> None:
     adapter, _ = make_adapter(tmp_path)
+    absolute_root = Path(tmp_path.anchor) / "recordings"
+    locations = {
+        "relative/recordings": "relative/recordings",
+        "parent_traversal": str(absolute_root / ".." / "escape"),
+        "wildcard": str(absolute_root / "*.mov"),
+        "credential": str(absolute_root / "clip.mov?access_token=secret"),
+        "null_byte": str(absolute_root / "clip\x00.mov"),
+    }
     with pytest.raises(ValueError, match=message):
         replace(
             adapter.configuration.target_bindings[0],
-            configured_absolute_target_location=location,
+            configured_absolute_target_location=locations[location_kind],
         )
 
 

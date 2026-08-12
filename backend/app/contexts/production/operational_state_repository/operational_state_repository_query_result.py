@@ -3,8 +3,9 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
-from types import MappingProxyType
 from typing import Any
+
+from app.shared.metadata import freeze_metadata
 
 from .operational_state_repository_error import OperationalStateRepositoryError
 
@@ -43,7 +44,7 @@ class OperationalStateRepositoryQueryResult[T]:
             and self.outcome is not OperationalStateRepositoryQueryOutcome.UNKNOWN
         ):
             raise ValueError("Repository errors are represented only by the unknown outcome.")
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        object.__setattr__(self, "metadata", freeze_metadata(self.metadata))
 
     @property
     def is_found(self) -> bool:
