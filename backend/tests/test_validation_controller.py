@@ -267,6 +267,29 @@ def test_prepare_dry_run_derives_paths_and_constructs_only_existing_runner_comma
     assert not root.exists()
 
 
+def test_validation_boundary_accepts_exact_named_segment_on_native_path(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "nested" / "stageflow-validation"
+
+    result = run_controller(
+        "-Run",
+        "3",
+        "-Action",
+        "Prepare",
+        "-ValidationRoot",
+        str(root),
+        "-UvPath",
+        sys.executable,
+        "-DryRun",
+        environment=validation_environment("stageflow_validation_003"),
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "validation_root_must_include_stageflow-validation_directory" not in result.stderr
+    assert not root.exists()
+
+
 def test_prepare_refuses_an_existing_run_artifact_without_overwriting_it(tmp_path: Path) -> None:
     root = validation_root(tmp_path)
     root.mkdir(parents=True)

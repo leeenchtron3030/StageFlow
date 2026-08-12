@@ -238,10 +238,7 @@ function Assert-ValidationBoundary {
     if (Test-PathInside -Candidate $Root -Parent $RepositoryRoot) {
         throw "validation_root_must_be_outside_repository"
     }
-    $segments = (Get-NormalizedFullPath $Root).Split(
-        @([System.IO.Path]::DirectorySeparatorChar, [System.IO.Path]::AltDirectorySeparatorChar),
-        [System.StringSplitOptions]::RemoveEmptyEntries
-    )
+    $segments = (Get-NormalizedFullPath $Root) -split '[\\/]+'
     if (-not ($segments | Where-Object { $_ -eq "stageflow-validation" })) {
         throw "validation_root_must_include_stageflow-validation_directory"
     }
