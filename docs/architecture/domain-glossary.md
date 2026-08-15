@@ -274,6 +274,8 @@ authorized by this document.
 | Post-Kernel Session evolution | Human Session realization and reassignment are implemented | Automated realization, merge, and split policy |
 | Package and publication milestones | Distinct milestones are accepted | Aggregate names and detailed state machines remain deferred |
 | Packaging Asset / Event Asset | Session Assembly needs reusable approved presentation media distinct from package correctness | Aggregate name/owner and whether content composes a Completed Media Asset or a separate manifest |
+| Transcript Evidence Revision / Session Transcript | Provider results require immutable asset/manifest-scoped revisions; the foundational Session Transcript is a later cross-asset product concept | Accept aggregate name/owner, persistence, correction/stitching policy, and relationship to Session Transcript |
+| Wall-Clock Transcript Alignment | MTE can derive advisory wall-clock intervals from immutable asset-relative transcript offsets | Accept aggregate name/owner and authorized consumers; automatic Session/media authority remains prohibited |
 | Automation Policy / Approval Policy | Evidence -> Policy -> Authority and per-decision activation are proposed in ADR-0026 | Acceptance, public term, scope storage, and activation authority |
 
 Do not resolve these terms through incidental code naming. Record the decision first and

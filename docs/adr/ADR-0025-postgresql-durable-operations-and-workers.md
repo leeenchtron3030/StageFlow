@@ -107,6 +107,186 @@ The implementation must begin with the minimum schema and code for transcription
 operation kinds are added only with a concrete owner, input/result contract,
 idempotency/reconciliation design, and tests.
 
+## First-transcription-worker decision package
+
+This section narrows the Yellow decision to the first consumer. It does not change this
+ADR's Proposed status and is not implementation authority.
+
+### Concrete topology
+
+```text
+Producer/browser clients
+  -> modular FastAPI control plane
+       -> PostgreSQL authoritative operation + transcript-evidence state
+  <- bounded status/lag projections
+
+one or more local worker processes
+  -> bounded PostgreSQL claim/renew/complete polling
+  -> provider-neutral TranscriptionExecutionPort
+  -> local/offline adapter first when a later provider decision selects one
+```
+
+The control plane and workers are deployment roles in the same modular monolith/codebase,
+not independently owned microservices. PostgreSQL is the only coordination authority.
+There is no broker, Redis, cloud queue, continuous-Internet dependency, provider SDK in
+the domain, or worker-to-Producer connection.
+
+### Minimal durable entities
+
+The first migration would add only these logical records; exact SQL names remain a
+bounded implementation detail:
+
+1. **Durable Operation** — stable operation identity; kind/schema version fixed to the
+   first transcription contract; deployment/Event scope; Completed Media Asset and
+   manifest identity/version; immutable input/configuration profile references; stable
+   work/idempotency key; priority; eligibility time; current lifecycle state; attempt
+   and fencing generation; cancellation intent/time; terminal result type/identity/
+   revision; created/updated times; optimistic row revision.
+2. **Operation Attempt** — stable attempt identity and number; operation/worker identity;
+   fencing generation; claim/lease start/current expiry; execution start/end; finalized
+   outcome; retryability; reason code; bounded sanitized diagnostic summary; created and
+   finalized times. Attempts remain retained. An active attempt may renew its lease;
+   after finalization its historical facts are immutable.
+3. **Worker** — stable Worker, Node, and deployment identity; optional Event assignment;
+   enabled/draining state; implementation version; created/updated times; optimistic
+   revision.
+4. **Worker Capability** — worker identity plus versioned operation/provider/model/runtime
+   descriptor, local/cloud class, configured eligibility, and effective interval. It
+   describes placement capability, not semantic authority.
+5. **Worker Presence** — latest heartbeat observation with database-recorded time,
+   expiry, capacity/concurrency declaration, and bounded health/pressure state. Presence
+   is time-sensitive and replaceable; attempt leases remain work ownership.
+
+Transcript Evidence Revision and its segments are owned by the transcription evidence
+boundary, not opaque Operation payload columns. The proposed shape is documented in
+[Transcription evidence readiness](../architecture/transcription-evidence-readiness.md)
+and requires its own accepted implementation plan/migration detail.
+
+### Lifecycle and assignment
+
+The minimum lifecycle meanings are:
+
+```text
+pending -> eligible -> leased -> running -> succeeded
+                    \-> retry_wait -> eligible
+                    \-> deferred | blocked
+                    \-> terminal_failed
+                    \-> cancel_requested -> cancelled
+```
+
+`pending` may wait for an explicit eligibility time. `deferred` means policy currently
+forbids otherwise valid work, such as cloud-dependent execution in Event Mode. `blocked`
+means a required capability, readable asset revision, or dependency is absent and needs
+operator/configuration resolution. Neither is silently counted as provider failure.
+
+The claimer uses one PostgreSQL transaction, database time, deterministic priority and
+age ordering, bounded candidate selection, row locking/skip-locked semantics, capability
+and Event/deployment matching, and configured concurrency ceilings. It increments the
+fencing generation and creates exactly one attempt before returning the claim. No
+sticky worker assignment is required; eligible retries may run elsewhere.
+
+### Lease, retry, and crash recovery
+
+- Lease duration and renewal cadence are versioned operation-kind policy values.
+- Renewal requires operation, attempt, worker, active state, and fencing generation to
+  match; database time supplies the new expiry.
+- A worker stops applying results immediately when renewal or fencing validation fails.
+- Startup and periodic reconciliation finalize expired active attempts with a typed
+  lease-loss outcome, inspect durable result/idempotency state, then either mark success,
+  schedule bounded retry, defer/block, or terminally fail.
+- Provider calls are at least once. Retry count/backoff are bounded and classify timeout,
+  provider/transient resource, invalid input, unsupported asset, cancellation, and
+  terminal provider result separately.
+- A PostgreSQL outage stops claims, lease authority, and result application. A worker may
+  cooperatively stop an in-flight provider call, but it cannot commit to memory and sync
+  later as authority.
+
+The first implementation needs process kill/restart and crash-point tests before the
+provider call, after provider return, during transcript-result application, and after
+the shared result/Operation commit.
+
+### Idempotent transcript result application
+
+The work key binds operation kind/schema, Completed Media Asset/manifest identity,
+provider/model/configuration profile, and requested transcript capabilities. Exact
+enqueue replay returns the existing Operation; conflicting replay fails.
+
+Provider output is normalized into an immutable proposed Transcript Evidence Revision.
+Within one PostgreSQL transaction, the application:
+
+1. locks and validates the Operation/attempt/fencing generation;
+2. applies exact/conflicting transcript-result idempotency and appends the evidence
+   revision when new;
+3. records the stable result identity/revision on the Operation; and
+4. finalizes the Attempt and Operation as succeeded.
+
+A stale or expired worker can do none of these. Reconciliation first checks whether the
+stable result already exists before scheduling another provider execution. Exactly-once
+provider execution is not claimed.
+
+### Cancellation
+
+Cancellation is optional for the initial API surface but the schema/lifecycle preserves
+intent. Before provider execution it transitions eligible work directly to cancelled.
+During execution the worker receives a cooperative cancellation signal; a late result is
+fenced from authoritative commit. Provider activity may continue externally and is
+reported honestly. Cancellation never deletes a prior transcript evidence revision.
+
+### GPU/capability routing and provider neutrality
+
+Capability matching is categorical: supported operation schema, provider adapter,
+model/runtime revision, local/cloud class, accepted asset formats, timing/word/
+diarization capabilities, and configured device class. Raw GPU telemetry is not a claim
+predicate except through a bounded, expiring effective-availability/pressure policy.
+
+The first provider remains an independent Yellow dependency/model choice. ADR acceptance
+does not select Whisper, a cloud API, FFmpeg, CUDA, or any package. A CPU-only worker may
+be eligible only when the selected adapter/configuration declares that mode.
+
+### Event Mode and what remains ephemeral
+
+- Local/offline-capable transcription may be eligible within configured Event Mode
+  ceilings and yields to capture/production pressure.
+- Cloud-required work defaults to deferred unless the active versioned policy explicitly
+  permits it.
+- Resume uses bounded backoff and concurrency so accumulated work does not surge.
+- PostgreSQL Operation, Attempt, Worker identity/capability, cancellation, and result
+  references are durable.
+- In-process provider handles, cancellation primitives, poll timers, current raw GPU
+  samples, and short-lived telemetry buffers remain ephemeral.
+- Worker loss affects intelligence lag/backlog only. It cannot change Session, media,
+  package, Editorial approval, recorder, or OS authority.
+
+### Failure and Attention semantics
+
+Ordinary pending/running/retry-wait work is processing state, not Producer Attention.
+Bounded projections expose transcript lag, backlog, oldest eligible age, deferred reason,
+worker/capability availability, attempt count, and freshness without transcript content,
+paths, provider payloads, or hardware-noise detail.
+
+Attention is reserved for actionable operational consequences such as no eligible local
+capability for Event-required work, terminal failure of configured-required intelligence,
+stalled backlog beyond policy threshold, repeated lease loss, or explicit dependency/
+configuration blockage. Even then, the consequence is “transcription unavailable or
+delayed”; it does not make Session media/package authority false or incomplete.
+
+### Smallest implementation unlocked by acceptance
+
+Acceptance would unlock one bounded plan containing:
+
+- the five logical Work Execution records above and forward/reversal migration;
+- one transcription Operation kind/schema and deterministic enqueue application;
+- PostgreSQL claim/renew/finalize/reconcile repository and local worker loop;
+- the provider-neutral execution port with a deterministic fake adapter only;
+- accepted Transcript Evidence contracts/repository/application and atomic result commit;
+- bounded status/lag projections; and
+- concurrency, replay, lease, crash/restart, Event Mode, outage, migration, and privacy
+  tests.
+
+It would **not** authorize a real provider/model/dependency, automatic enqueue policy,
+Candidate generation, automatic AI/editorial authority, cloud service, production
+deployment, or generalized rendering/vision scheduler.
+
 ## Alternatives
 
 ### Keep all processing synchronous in the control-plane request/process

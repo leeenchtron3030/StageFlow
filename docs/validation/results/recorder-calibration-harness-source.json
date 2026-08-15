@@ -1,0 +1,43 @@
+{
+  "audio_markers": {
+    "boundary_hz": 1700,
+    "end_hz": 750,
+    "once_per_second_hz": 1000,
+    "start_hz": 500
+  },
+  "authority_use_prohibited": true,
+  "boundary_marker_seconds": 60.0,
+  "dimensions": "1280x720",
+  "duration_seconds": 190.0,
+  "epistemic_kind": "external_calibration_source",
+  "frame_rate": 30,
+  "harness": {
+    "name": "stageflow-recorder-calibration-harness",
+    "version": "1.0"
+  },
+  "inspection_tool": {
+    "name": "ffmpeg6.exe",
+    "version": "6.0"
+  },
+  "limitations": [
+    "timeline origin becomes wall-clock evidence only with an independently verified real-time playback start",
+    "generated source does not exercise vMix or qualify a recorder profile"
+  ],
+  "marker": {
+    "cell_height": 8,
+    "cell_width": 8,
+    "counter_bits": 24,
+    "precision_seconds": 0.03333333333333333,
+    "schema": "binary-frame-clock-v1",
+    "sync_pattern": [
+      1,
+      0,
+      1,
+      0
+    ]
+  },
+  "schema_name": "stageflow.recorder-calibration-source",
+  "schema_version": "1.0",
+  "source_alias": "harness-multisegment-self-check",
+  "timeline_origin_utc": "2026-08-15T03:00:00+00:00"
+}

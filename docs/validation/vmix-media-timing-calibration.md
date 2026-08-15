@@ -2,9 +2,11 @@
 
 ## Status
 
-**Proposed qualification experiment; not yet executed.** It is Green to run against an
-isolated, non-customer corpus with the qualification probe. Its results cannot alone
-accept the proposed production architecture or change association policy.
+**Qualification experiment defined; deterministic harness implemented and self-checked;
+controlled vMix execution remains not run.** It is Green to run against an isolated,
+non-customer corpus with the qualification probe and
+[recorder calibration harness](recorder-calibration-harness.md). Results cannot alone
+accept recorder qualification or change association policy.
 
 ## Objective
 
@@ -89,6 +91,10 @@ expiry/requalification triggers, fault behavior, and authorized consumers.
   error, percentile distribution, drift slope, discontinuities, exclusions, and failures;
 - a proposed recorder-profile identifier/revision and exact configuration fingerprint;
 - a recommendation to qualify, reject, or gather more evidence, clearly marked advisory.
+
+The harness source manifest and analysis report schemas are versioned qualification-only
+artifacts. The committed [synthetic self-check](results/recorder-calibration-harness-self-check.md)
+proves the tooling boundary without being included in a vMix profile sample.
 
 ## Stop conditions
 

@@ -85,6 +85,7 @@ or architecture document unless those documents are explicitly updated.
 
 | Plan | Status | Owner | Related decision/finding |
 | --- | --- | --- | --- |
+| [Recorder calibration and transcription readiness](recorder-calibration-transcription-readiness.md) | Completed - Green qualification/readiness milestone; controlled vMix and worker decisions remain Yellow | StageFlow Validation / Architecture / Backend | ADR-0027; proposed ADR-0025; controlled vMix calibration |
 | [Producer UX operational refinement and real-data integration](producer-ux-operational-refinement.md) | In progress - Green autonomous operational-refinement milestone | StageFlow UX / Frontend | Producer UX workstream; Runs 002-004; ADR-0023, ADR-0024, ADR-0027 |
 | [Producer operational UI MVP](producer-ui-mvp.md) | Completed - Green autonomous runnable Producer milestone | StageFlow UX / Frontend | Producer UX specifications; Run 002-004; read-only Kernel status |
 | [Media Timing Evidence v1 production slice](media-timing-evidence-v1.md) | Completed - Green autonomous durable advisory evidence slice | StageFlow Production / Backend / UX | Accepted ADR-0027 and MTE-001 through MTE-005 |

@@ -37,6 +37,7 @@ Proposed behavior must never be described as current implementation.
 | [Durable Kernel operations](durable-kernel-operations.md) | Reference-node configuration, bootstrap, status, recovery, and reversal procedure |
 | [Post-Kernel capability layer](post-kernel-capability-layer.md) | Proposed live intelligence, worker execution, Session Assembly, progressive-automation boundaries, sequencing, and Yellow decisions |
 | [Media Timing Evidence](media-timing-evidence.md) | Accepted provider-neutral durable observation, derivation, qualification, advisory-consumption, and disclosure boundary |
+| [Transcription evidence readiness](transcription-evidence-readiness.md) | Proposed provider-neutral transcript revision, MTE alignment, provider-port, and Yellow implementation boundary |
 | [UX specification index](../ux/README.md) | Role-specific interaction specifications and their implementation status |
 | [Validation artifact index](../validation/README.md) | Non-media validation plans, corpus annotations, run templates, and sanitized evidence |
 | [ADR index](../adr/README.md) | Accepted decisions, historical ADRs, and unresolved ADR candidates |
