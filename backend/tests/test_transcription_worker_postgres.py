@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import os
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
@@ -38,6 +39,18 @@ from app.infrastructure.postgres import (
 from app.shared.ids import EntityId
 
 _POSTGRES_DSN = os.getenv("STAGEFLOW_TEST_POSTGRES_DSN")
+
+
+def test_fenced_postgres_transitions_select_database_time() -> None:
+    transition_names = (
+        "_advance_active_claim",
+        "record_failure",
+        "apply_transcript_result",
+    )
+
+    for transition_name in transition_names:
+        transition = getattr(PostgresWorkExecutionRepository, transition_name)
+        assert "statement_timestamp() AS database_now" in inspect.getsource(transition)
 
 
 def _seed_asset(
@@ -229,7 +242,7 @@ def _result(produced_at: datetime, *, text: str) -> NormalizedTranscriptResult:
             model_version="v1",
             execution_tool_id="test-adapter",
             execution_tool_version="v1",
-            execution_revision=f"fixture-{text}",
+            execution_revision=f"fixture-{text.replace(' ', '-')}",
             produced_at=produced_at,
         ),
         language="en",
@@ -410,7 +423,8 @@ def test_real_postgres_worker_concurrency_fencing_lineage_and_reversal() -> None
         connection.execute(
             """
             UPDATE stageflow.work_operation_attempt
-            SET lease_expires_at = statement_timestamp() - interval '1 second'
+            SET lease_started_at = statement_timestamp() - interval '2 seconds',
+                lease_expires_at = statement_timestamp() - interval '1 second'
             WHERE attempt_id = %s
             """,
             (stale_claim.attempt.id.value,),

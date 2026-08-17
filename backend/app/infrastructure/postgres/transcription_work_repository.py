@@ -584,7 +584,8 @@ class PostgresWorkExecutionRepository(WorkExecutionRepository):
             with self._connect() as connection:
                 operation_row = connection.execute(
                     """
-                    SELECT * FROM stageflow.work_operation
+                    SELECT o.*, statement_timestamp() AS database_now
+                    FROM stageflow.work_operation o
                     WHERE operation_id = %s FOR UPDATE
                     """,
                     (claim.operation.id.value,),
@@ -889,8 +890,8 @@ class PostgresWorkExecutionRepository(WorkExecutionRepository):
                     """,
                     (
                         pending.id.value,
-                        claim.operation.id.value,
                         evidence_revision,
+                        claim.operation.id.value,
                         claim.attempt.id.value,
                         claim.attempt.fence_generation,
                     ),

@@ -2,7 +2,7 @@
 
 ## Status
 
-Implementation complete; isolated PostgreSQL qualification pending
+Implementation and isolated PostgreSQL qualification complete; publication-ready
 
 ## Execution authority
 
@@ -229,29 +229,29 @@ utilization declaration.
 
 ## Acceptance criteria
 
-- [ ] Migration 0007 applies, reverses, reapplies, and preserves all pre-0007 Kernel/MTE
+- [x] Migration 0007 applies, reverses, reapplies, and preserves all pre-0007 Kernel/MTE
       tables during reversal.
-- [ ] Explicit enqueue is idempotent and conflicting replay is rejected.
-- [ ] Capability and Event/deployment matching allow only one eligible Worker claim.
-- [ ] Claim and Attempt creation are one transaction using database time and a new fence.
-- [ ] Renewal, start, failure, and result application require the active lease/fence.
-- [ ] A stale or expired Attempt cannot overwrite a newer accepted result.
-- [ ] Retry, terminal failure, missing capability, local-only cloud deferral, and resume
+- [x] Explicit enqueue is idempotent and conflicting replay is rejected.
+- [x] Capability and Event/deployment matching allow only one eligible Worker claim.
+- [x] Claim and Attempt creation are one transaction using database time and a new fence.
+- [x] Renewal, start, failure, and result application require the active lease/fence.
+- [x] A stale or expired Attempt cannot overwrite a newer accepted result.
+- [x] Retry, terminal failure, missing capability, local-only cloud deferral, and resume
       are explicit and bounded.
-- [ ] Restart reconciliation recovers expired Attempts without memory authority.
-- [ ] Transcript evidence and Operation completion commit atomically and replay safely.
+- [x] Restart reconciliation recovers expired Attempts without memory authority.
+- [x] Transcript evidence and Operation completion commit atomically and replay safely.
 - [x] Provider/model/tool provenance, relative timing, optional word/speaker/confidence,
       limitations, partial status, and reprocessing lineage are preserved.
 - [x] MTE alignment preserves relative timing and records Derived advisory wall-clock
       evidence without elevating an unqualified recorder profile.
 - [x] Live presence/capacity/health remain expiring observations; current utilization is
       lease-derived.
-- [ ] Routine retries remain diagnostic; only configured consequential blockage/failure
+- [x] Routine retries remain diagnostic; only configured consequential blockage/failure
       appears as Attention.
 - [x] No real provider/model/dependency, automatic enqueue, Session/media/package/
       Editorial authority, recorder qualification, broker, frontend redesign, or
       deployment change is introduced.
-- [ ] Full required validation and deliberate self-review pass.
+- [x] Full required validation and deliberate self-review pass.
 
 ## Rollback or reversal
 
@@ -274,6 +274,25 @@ Operation, Attempt, Worker Capability, and Transcript Evidence history.
 - Operational thresholds for required-transcription Attention remain versioned
   configuration calibration unless they change product authority.
 
+## Qualification evidence
+
+- The first real-PostgreSQL run reached `mark_running()` and failed with
+  `KeyError: 'database_now'`. The active-claim lock query omitted the database-time
+  projection already used by the other fenced transitions. The query now selects
+  `statement_timestamp() AS database_now`, and an always-running supplemental regression
+  guard verifies all three fenced transitions retain that projection.
+- Subsequent real-database runs exposed three additional latent qualification defects:
+  the atomic success update passed `operation_id` and `evidence_revision` in the wrong
+  placeholder order (`uuid = smallint`), a synthetic execution revision contained spaces,
+  and the synthetic expired Attempt violated `lease_expires_at > lease_started_at`. Each
+  defect was corrected at its existing boundary without changing accepted semantics.
+- The focused PostgreSQL file then passed both tests, including migration 0007
+  forward/reversal/reapply, concurrent claims, restart reconciliation, fencing, replay,
+  lineage, Event Mode deferral/resume, and preservation of pre-0007 asset state.
+- The first complete PostgreSQL-enabled suite exposed a legacy migration test that counted
+  all migration markers and expected five. Its assertion now verifies that 0005 is removed
+  while unrelated 0007 remains; the focused reversal test and final complete suite pass.
+
 ## Completion record
 
 - **Implemented revision:** Local milestone commit on
@@ -283,24 +302,27 @@ Operation, Attempt, Worker Capability, and Transcript Evidence history.
   contracts/application services; PostgreSQL migration 0007 forward/reverse, runner,
   repository adapter, and exports; focused unit/gated PostgreSQL tests; architecture,
   glossary, ADR index, persistence, and this plan.
-- **Commands and tests actually run:** Complete backend `pytest -p no:cacheprovider`,
-  `ruff check .`, and `pyright`; focused worker/MTE regression runs; strict UTF-8 and
-  relative-link validation across eight changed documents; privacy/scope searches;
-  `git diff --check`; sanitized environment/target availability checks.
-- **Results and warnings:** 1,697 tests passed, 14 environment-gated tests skipped, Ruff
-  passed, Pyright passed, changed-document UTF-8/links passed, scope/privacy review
-  passed, and the unrelated frontend file retained SHA-256
-  `083E23C4C5E7761DB151134EA1EF7896120C86C5888CDC8A861F534F7E86D6FD`.
-  One pre-existing Starlette/httpx deprecation warning remains. The new real-PostgreSQL
-  lifecycle test is among the skips because `STAGEFLOW_TEST_POSTGRES_DSN` is absent;
-  the configured validation DSN failed authentication before any query or mutation.
+- **Commands and tests actually run:** Focused real-PostgreSQL worker qualification and
+  migration-0007 reset/reapply against the exact isolated `stageflow_worker_test`
+  database; focused legacy migration reversal; complete PostgreSQL-enabled backend
+  `pytest -p no:cacheprovider`; `ruff check .`; and `pyright`. The original publication
+  validation also included focused worker/MTE regressions, strict UTF-8/relative-link and
+  privacy/scope checks, and `git diff --check`; final documentation/diff checks are
+  recorded in the publication revision.
+- **Results and warnings:** Final focused worker qualification: 2 passed. Focused legacy
+  migration reversal: 1 passed. Final complete backend suite with the real PostgreSQL
+  checks enabled: 1,707 passed and 5 unrelated environment-gated skips. Ruff passed;
+  Pyright passed with zero errors or warnings. One pre-existing Starlette/httpx
+  deprecation warning remains. The failing qualification results and their corrections
+  are preserved above as evidence; no DSN value was printed, logged, persisted, or
+  committed.
 - **Execution authority used:** Green autonomous under accepted ADR-0025 and the explicit
   operator objective.
 - **Approved deviations:** None.
-- **Rollback status:** A bounded 0007 reverse script and dependency-ordered runner path
-  are implemented and statically reviewed. Isolated database reversal execution remains
-  pending a valid empty test DSN.
-- **Remaining work:** Run the gated PostgreSQL migration/concurrency/restart/fencing/
-  replay/reversal test against a valid empty isolated database, then complete publication
-  review. Real provider/model, automatic enqueue, and broader authority remain Yellow.
+- **Rollback status:** The bounded 0007 reverse script and dependency-ordered runner path
+  were executed repeatedly against the exact isolated `stageflow_worker_test` database.
+  Reversal removed only 0007-owned schema/data and preserved pre-0007 Kernel/MTE state;
+  reapply and final qualification passed.
+- **Remaining work:** Review PR #61. Real provider/model,
+  automatic enqueue, and broader authority remain Yellow.
 
