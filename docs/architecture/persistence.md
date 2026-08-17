@@ -10,8 +10,8 @@ never redirect authoritative writes into process memory.
 
 ## Current implementation
 
-The current branch implements stable ingress plus the bounded Durable Event-Mode Kernel
-persistence boundary:
+The current branch implements stable ingress, the bounded Durable Event-Mode Kernel,
+Media Timing Evidence, and the first bounded transcription-worker persistence slice:
 
 - repository-neutral stable ingress contracts under `production.ingress`;
 - a synchronous Psycopg 3 PostgreSQL adapter under `infrastructure.postgres`;
@@ -54,12 +54,22 @@ Asset-scoped revisions preserve earlier interpretations. The schema stores sanit
 normalized facts/provenance/limitations rather than private paths or provider dumps and
 does not update Session, association, or package tables.
 
+`0007_transcription_worker` adds durable transcription Operations, retained Attempts,
+durable Worker identity and effective-dated capability declarations, one replaceable
+expiring Worker Presence observation, and normalized Transcript Evidence revision,
+segment, word, and optional advisory MTE-alignment rows. Claims, renewal, expiry,
+reconciliation, and result application use PostgreSQL coordination and database time.
+Attempt history and evidence are durable; live health/capacity/pressure expire, and
+current utilization derives from valid leases rather than a durable utilization field.
+The schema does not select a provider/model, enqueue automatically, or change Session,
+media, package, Editorial, recorder-profile, or AI authority.
+
 Registration is at least once and idempotent. It does not claim exactly-once delivery.
 Only a newly created ingress record is eligible for the included dispatcher path; an
 exact replay does not repeat that caller-visible dispatch path. The asset-registration
 bridge is stable and replay-safe, but it is a direct synchronous boundary rather than an
-outbox. Generic asynchronous operations, workers, leases, retries, and brokers remain
-outside this implementation.
+outbox. Generalized operation kinds, a broker, automatic enqueue, and real execution
+providers remain outside this implementation.
 
 ## Identity and time
 
@@ -79,10 +89,12 @@ application time remain separate fields.
 table. `0002_event_mode_kernel_forward.sql`, `0003_kernel_projections_forward.sql`,
 `0004_kernel_review_corrections_forward.sql`, and
 `0005_kernel_follow_up_closure_forward.sql` and
-`0006_media_timing_evidence_forward.sql` add only bounded Production-owned objects.
-Reversal removes `0006`, `0005`, `0004`, `0003`, then `0002` and their ledger rows while preserving
-ingress and the shared schema. The `0005` reverse removes only membership tagged as its
-legacy reconstruction before dropping its additive columns.
+`0006_media_timing_evidence_forward.sql` add bounded Production-owned objects.
+`0007_transcription_worker_forward.sql` adds the bounded first Work Execution and
+Transcript Evidence objects. Reversal removes `0007`, `0006`, `0005`, `0004`,
+`0003`, then `0002` and their ledger rows while preserving ingress and the shared
+schema. The `0005` reverse removes only membership tagged as its legacy reconstruction
+before dropping its additive columns.
 Reversal is an explicit operator action for an isolated database and is never automatic.
 
 ## Windows reference-node validation

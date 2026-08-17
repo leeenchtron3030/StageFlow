@@ -241,17 +241,34 @@ authorized by this document.
 
 ### Durable Operation
 
-- **Definition:** An accepted future persisted unit of asynchronous, long-running,
-  retryable, or externally dependent work with stable identity, claim/lease, attempts,
-  and result.
-- **Distinction:** Deterministic domain policy calls remain synchronous and are not Jobs
-  merely because they perform work.
-- **Current aliases/legacy names:** Older documents use `Job`; no implementation exists.
-- **Migration:** The first Kernel does not require a generic Durable Operation for its
-  bounded synchronous media cycle. Accepted ADR-0025 selects transcription as the first
-  concrete consumer; no operation schema or runtime exists until a bounded plan is
-  approved and implemented.
-- **Example:** A transcription provider request that may be deferred until online.
+- **Definition:** A persisted unit of asynchronous, long-running, retryable, or externally
+  dependent work with stable identity, claim/lease, retained Attempts, and terminal
+  result identity.
+- **Distinction:** Deterministic domain policy calls remain synchronous and are not
+  Operations merely because they perform work.
+- **Current aliases/legacy names:** Older documents use `Job`. Migration 0007 implements
+  only the qualified `transcription` operation kind.
+- **Migration:** Accepted ADR-0025 and the bounded first-worker plan establish the
+  PostgreSQL Operation/Attempt/lease/fencing substrate. Generalized operation kinds,
+  automatic enqueue, and a broker remain unimplemented.
+- **Example:** An explicitly enqueued transcription request deferred during local-only
+  Event Mode because its configured execution requires cloud access.
+
+### Transcript Evidence Revision
+
+- **Definition:** An immutable asset/manifest-scoped normalized transcript result with
+  provider/model/tool provenance, preserved asset-relative timing, limitations, and
+  predecessor revision lineage.
+- **Distinction:** It is evidence about one Completed Media Asset manifest, not the
+  foundational cross-asset Session Transcript, Session/media authority, Editorial
+  approval, or verified speaker identity.
+- **Current aliases/legacy names:** `Transcript Evidence Revision` is the accepted
+  internal term for the migration-0007 aggregate. Public API naming is not selected.
+- **Migration:** Migration 0007 persists the parent, segments, optional words, and
+  optional Derived MTE alignment. Session Transcript composition/correction remains a
+  later decision.
+- **Example:** A provider-neutral revision whose offsets remain relative to the immutable
+  asset while an optional wall-clock interval is explicitly Derived from unqualified MTE.
 
 ### Deployment profile
 
@@ -271,11 +288,11 @@ authorized by this document.
 | Concept | Current evidence | Unresolved decision |
 | --- | --- | --- |
 | Source Segment / durable Segment record | Disposition reserves a qualified durable media record; older documents use Media Chunk and Timeline Segment | Canonical record name, rename/alias behavior, and relationship to Completed Media Asset |
-| Job / Durable Operation / Task | Accepted ADR-0025 defines the minimal durable model and retains `Durable Operation` as the qualified architecture term | Exact public/storage names and operation/attempt/worker schema in the bounded implementation plan |
+| Job / Durable Operation / Task | ADR-0025 and migration 0007 implement the internal `Durable Operation`/Attempt/Worker schema for transcription | Public API aliases and any generalized operation kinds remain unresolved |
 | Post-Kernel Session evolution | Human Session realization and reassignment are implemented | Automated realization, merge, and split policy |
 | Package and publication milestones | Distinct milestones are accepted | Aggregate names and detailed state machines remain deferred |
 | Packaging Asset / Event Asset | Session Assembly needs reusable approved presentation media distinct from package correctness | Aggregate name/owner and whether content composes a Completed Media Asset or a separate manifest |
-| Transcript Evidence Revision / Session Transcript | Provider results require immutable asset/manifest-scoped revisions; the foundational Session Transcript is a later cross-asset product concept | Accept aggregate name/owner, persistence, correction/stitching policy, and relationship to Session Transcript |
+| Session Transcript composition | Transcript Evidence Revision is the implemented internal asset-scoped evidence aggregate; the foundational Session Transcript is a later cross-asset product concept | Accept correction/stitching policy, public naming, and relationship to asset-scoped evidence revisions |
 | Wall-Clock Transcript Alignment | MTE can derive advisory wall-clock intervals from immutable asset-relative transcript offsets | Accept aggregate name/owner and authorized consumers; automatic Session/media authority remains prohibited |
 | Automation Policy / Approval Policy | Evidence -> Policy -> Authority and per-decision activation are proposed in ADR-0026 | Acceptance, public term, scope storage, and activation authority |
 
