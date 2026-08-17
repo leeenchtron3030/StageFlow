@@ -1,0 +1,59 @@
+{
+  "schema": "stageflow.devcon-av-write-qualification-evidence.v1",
+  "qualification_status": "blocked",
+  "run_observed_at": "2026-08-17T15:41:05.294289+00:00",
+  "independent_verification_at": "2026-08-17T15:46:54.0549119+00:00",
+  "target": {
+    "api_origin": "https://api.devcon.org",
+    "event": "test-devcon-8",
+    "session": "a-dacc-vision-for-decentralized-ai",
+    "field": "sources_youtubeId"
+  },
+  "preflight": {
+    "focused_safety_tests_passed": 14,
+    "event_identity_verified": true,
+    "original_value_state": "empty",
+    "marker_absent": true,
+    "credential_present_without_value_disclosure": true
+  },
+  "marker_write": {
+    "http_status": 204,
+    "marker_observed_by_api": true,
+    "persistence_commit": "a4d195f48514e6c22199375ef56b42d7be16c2ee",
+    "persistence_commit_message": "[skip deploy] PUT /sessions/a-dacc-vision-for-decentralized-ai"
+  },
+  "restoration": {
+    "attempted": true,
+    "http_status": 500,
+    "original_empty_value_observed_by_api": true,
+    "restoration_commit_observed": false,
+    "durably_restored": false
+  },
+  "independent_verification": {
+    "api_event": "test-devcon-8",
+    "api_field_state": "empty",
+    "git_field_state": "marker",
+    "git_blob_sha": "0303e9d3866b1095461177ef5f914216990512f7",
+    "api_and_git_match": false
+  },
+  "harness_result": {
+    "outcome": "fail",
+    "new_skip_deploy_commits": 1,
+    "persistence_verified": false,
+    "failure_codes": [
+      "restore_put_not_204",
+      "persistence_unverified"
+    ]
+  },
+  "disposition": {
+    "remote_state": "not_durably_restored",
+    "another_devcon_write_authorized": false,
+    "autonomous_upstream_modification_authorized": false,
+    "stageflow_devcon_live_write_qualification": "blocked_pending_http_500_persistence_failure_disposition",
+    "restoration_verification_requires": [
+      "an independently observed upstream restoration commit after a4d195f48514e6c22199375ef56b42d7be16c2ee",
+      "the Git-backed field reporting the original empty value",
+      "the live API field reporting the original empty value"
+    ]
+  }
+}

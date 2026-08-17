@@ -205,3 +205,21 @@ are audit evidence and are not rewritten or deleted.
   the AV key into the process environment through the approved password-manager
   workflow; coordinate exclusive use of the fixed test field. A production StageFlow
   Devcon adapter remains a separate architecture and implementation task.
+
+## Subsequent live qualification result
+
+The operator subsequently approved the bounded live round trip. On 2026-08-17 the fixed
+marker PUT returned HTTP 204 and persisted as `[skip deploy]` commit
+`a4d195f48514e6c22199375ef56b42d7be16c2ee`. The restoration PUT returned HTTP 500. The
+live API then reported the original empty value, but an independent read found the Git
+file still contained the marker at blob
+`0303e9d3866b1095461177ef5f914216990512f7`; no restoration commit was observed.
+
+The failed qualification evidence is retained in
+[`docs/validation/results/devcon-av-write-smoke-test-2026-08-17.md`](../validation/results/devcon-av-write-smoke-test-2026-08-17.md).
+No retry or additional write is authorized. Upstream data must not be modified
+autonomously. Restoration requires an independently observed upstream commit after the
+marker commit plus matching original-empty state in both Git and the live API. Devcon
+live-write qualification remains blocked after restoration pending disposition of the
+HTTP 500 persistence failure; unrelated StageFlow Green work may resume only after
+restoration is verified.

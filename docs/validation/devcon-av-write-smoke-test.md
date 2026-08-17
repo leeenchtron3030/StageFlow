@@ -11,6 +11,22 @@ The upstream references are:
 - [`av-write-test.ts`](https://github.com/efdevcon/monorepo/blob/main/devcon-api/src/scripts/av-write-test.ts)
 - [Devcon AV stack overview](https://github.com/efdevcon/monorepo/blob/main/docs/av/av-stack-overview.md)
 
+## Current qualification block
+
+The approved live qualification run on 2026-08-17 failed. The marker write returned HTTP
+204 and persisted as `[skip deploy]` commit
+`a4d195f48514e6c22199375ef56b42d7be16c2ee`. The restoration request returned HTTP 500.
+Although the live API subsequently reported the original empty value, the Git-backed
+file still reported the marker and no restoration commit was observed.
+
+Preserve the sanitized
+[failed qualification evidence](results/devcon-av-write-smoke-test-2026-08-17.md). Do not
+issue another Devcon AV write or modify upstream data autonomously. Restoration is not
+durably verified until an upstream restoration commit after the marker commit is
+independently observed and both Git and the live API report the original empty value.
+Even after restoration, Devcon live-write qualification remains blocked pending
+disposition of the HTTP 500 persistence failure.
+
 ## Fixed safety boundary
 
 The harness has no CLI option for an arbitrary session, event, field, value, or API

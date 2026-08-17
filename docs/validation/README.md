@@ -14,7 +14,8 @@ readiness.
 
 | Artifact | Purpose | Status |
 | --- | --- | --- |
-| [Devcon AV write smoke-test](devcon-av-write-smoke-test.md) | Fixed-target, credential-safe preflight and reversible write/restore durability runbook | Harness validated; read-only preflight passed; live PUT not authorized or executed |
+| [Devcon AV write smoke-test](devcon-av-write-smoke-test.md) | Fixed-target, credential-safe preflight and reversible write/restore durability runbook | Harness validated; approved live run failed restoration durability qualification |
+| [Devcon AV failed qualification - 2026-08-17](results/devcon-av-write-smoke-test-2026-08-17.md) | Sanitized marker-write, HTTP 500 restoration, API/Git mismatch, and blocking disposition evidence | **BLOCKED - marker commit persisted; restoration commit not observed** |
 | [Real-Event Playback Validation and UX Calibration](../plans/real-event-playback-validation.md) | Current-Kernel direct/vMix replay runbook, measurements, UX calibration, and future reuse | Run 002 passed; Run 003 invalid; Run 004 partially qualified turnover |
 | [Run 004 qualification-tooling hardening](../plans/run-004-qualification-tooling-hardening.md) | Turnover authority guard, host-local lock, atomic evidence, incremental checkpoints, and runtime protection | Green qualification-only hardening validated and used by Run 004 |
 | [Run 004 qualification closure and timing telemetry](../plans/run-004-qualification-closure.md) | Immediate authority timestamp capture, source-aware runtime telemetry, and partial qualification closure | Green qualification-only closure completed and validated |
