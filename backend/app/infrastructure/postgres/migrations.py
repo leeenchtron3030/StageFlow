@@ -30,6 +30,7 @@ class PostgresMigrationRunner:
         )
         self.apply_kernel_follow_up_closure()
         self.apply_media_timing_evidence_v1()
+        self.apply_transcription_worker_v1()
 
     def apply_kernel_follow_up_closure(self) -> None:
         self._execute_if_missing(
@@ -43,7 +44,14 @@ class PostgresMigrationRunner:
             version="0006_media_timing_evidence",
         )
 
+    def apply_transcription_worker_v1(self) -> None:
+        self._execute_if_missing(
+            "0007_transcription_worker_forward.sql",
+            version="0007_transcription_worker",
+        )
+
     def reverse_event_mode_kernel_v1(self) -> None:
+        self.reverse_transcription_worker_v1()
         self.reverse_media_timing_evidence_v1()
         self.reverse_kernel_follow_up_closure()
         self._execute("0004_kernel_review_corrections_reverse.sql")
@@ -57,9 +65,16 @@ class PostgresMigrationRunner:
         )
 
     def reverse_media_timing_evidence_v1(self) -> None:
+        self.reverse_transcription_worker_v1()
         self._execute_if_present(
             "0006_media_timing_evidence_reverse.sql",
             version="0006_media_timing_evidence",
+        )
+
+    def reverse_transcription_worker_v1(self) -> None:
+        self._execute_if_present(
+            "0007_transcription_worker_reverse.sql",
+            version="0007_transcription_worker",
         )
 
     def _execute(self, filename: str) -> None:

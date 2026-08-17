@@ -2,15 +2,16 @@
 
 ## Status
 
-**Proposed provider-neutral architecture; no production implementation authority.**
+**Accepted bounded provider-neutral architecture; first-worker substrate implemented.**
 
-This document prepares the first transcription evidence boundary requested by the
+This document defines the first transcription evidence boundary requested by the
 recorder-calibration/transcription-readiness milestone. It specializes the accepted
-post-Kernel direction and accepted ADR-0025 without selecting a provider/model, adding
-persistence, or claiming transcription execution exists.
+post-Kernel direction and accepted ADR-0025. Migration 0007 and the bounded internal
+contracts/repository implement the provider-neutral evidence and operation substrate
+without selecting a real provider/model or authorizing automatic enqueue.
 
-`Transcript Evidence Revision` is a provisional qualified term. It remains visibly
-unresolved in the domain glossary until the persistence/consumer design is accepted.
+`Transcript Evidence Revision` is the accepted internal asset/manifest-scoped evidence
+term. Session Transcript composition and any public API naming remain unresolved.
 
 ## Evidence and authority boundary
 
@@ -196,23 +197,22 @@ membership, ADR-0024 association, package state, Producer authority, or publishi
 
 ## Persistence and transaction candidate
 
-After this proposed evidence model receives architecture authority and a bounded plan is
-approved, the smallest PostgreSQL ownership is one append-only transcript-evidence parent
-plus typed segment, optional word/score, and idempotency rows. Alignment uses a separate
-parent/interval set because its inputs and revision cadence differ from transcript output.
-Large raw provider artifacts and media remain outside these rows behind explicit
+The implemented smallest PostgreSQL ownership is one append-only transcript-evidence
+parent plus typed segment, optional word/score, and operation idempotency rows. Alignment
+uses separate typed rows because its inputs and revision cadence differ from transcript
+output. Large raw provider artifacts and media remain outside these rows behind explicit
 manifests and retention policy.
 
-When the Operation and evidence share PostgreSQL, applying the transcript revision and
+Because the Operation and evidence share PostgreSQL, applying the transcript revision and
 marking the Operation succeeded with its terminal result reference occur in one
 transaction. Stale fencing generation rejects both. No in-memory authoritative fallback
 or outbox is required for the first local consumer.
 
-Exact table names, migration, storage limits, raw-artifact retention, public API shape,
-and Session Transcript composition remain implementation-plan decisions after the
-Yellow gates.
+Migration 0007 fixes the bounded internal table names and constraints. Raw-artifact
+retention, public API shape, and Session Transcript composition remain later decisions.
+No provider-specific storage or automatic downstream authority is implied.
 
-## Required validation after acceptance
+## Validation contract
 
 - strict aware-time, non-negative range, end ordering, asset-duration tolerance, and
   recursive immutability contract tests;

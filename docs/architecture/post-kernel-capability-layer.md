@@ -7,8 +7,10 @@ from consequential decisions that still require approval.
 
 This document defines the first capability layer above the accepted Durable Event-Mode
 Kernel. It covers live Session intelligence, bounded AI/media worker execution, Session
-Assembly, and progressive approval automation. It is planning authority only: no
-capability described here is implemented merely because it appears in this document.
+Assembly, and progressive approval automation. It remains planning authority for those
+broader capabilities. Only the bounded transcription Work Execution and evidence slice
+explicitly authorized by ADR-0025 and its implementation-ready plan is currently
+implemented.
 
 The Kernel remains the protected operational foundation. New capabilities reference its
 Business Event, Stage, Program Expectation, realized Session, media registration,
@@ -122,7 +124,7 @@ or externally dependent.
 | Program Expectation `speakers: Sequence[str]` | Requires bounded extension | Supplies provisional display names only; it has no participant identity, role, affiliation, ordering authority, or observed-presence meaning |
 | In-memory Operational State repository | Legacy for durable capability authority | Useful policy evidence only; restart-safe candidate, worker, approval, and assembly state belongs in PostgreSQL |
 | Foundational broad Candidate Moment/Clip documents | Reusable business meaning, legacy implementation detail | Preserve Candidate → Clip and Hot urgency semantics; do not copy unapproved lifecycle/event shapes mechanically |
-| LLM/transcription/vision execution provider interfaces | Missing | No provider SDK, execution port, model runtime, FFmpeg boundary, or durable analysis artifact store exists |
+| Transcription/vision execution provider interfaces | Bounded transcription port implemented | Provider-neutral transcription port and durable normalized evidence exist; no provider SDK/model runtime, FFmpeg boundary, or vision execution port is selected |
 
 Provider request/response contracts must be isolated behind capability-specific ports.
 Provider/model output becomes a versioned analysis artifact with provenance before a
@@ -283,7 +285,7 @@ status map keeps the boundary explicit:
 | Candidate, Producer-mark, unreviewed, and approved counts per Session | No durable Editorial Candidate store | Candidate/review projection derived from authoritative candidate and append-only decision records | Future; depends on the Moment slices |
 | Producer-mark priority | Kernel has typed human-command patterns but no `Mark Moment` command | Declared Candidate provenance plus explicit priority signal; never automatic Editorial approval | Proposed Green slice after an implementation-ready plan |
 | Candidate rationale and provenance | Observation/Evidence provenance and epistemic vocabulary exist | Candidate source/input, policy/model, actor, reason, and evidence references become first-class | Accepted semantic direction; persistence future |
-| Intelligence-processing lag | No worker/operation implementation | Operation/artifact timestamps and backlog projected as transcript/Moment lag | Architecture accepted by ADR-0025; bounded implementation plan still required |
+| Intelligence-processing lag | Transcription Operation timestamps and bounded status projection implemented | Operation/artifact timestamps and backlog projected as transcript/Moment lag | First-worker basis implemented; product read model and calibration remain future |
 | Human Editorial review lag | No Editorial queue implementation | Derived age of the oldest eligible priority Candidate, separate from compute lag | Proposed read-model calculation |
 | Selected review position versus live edge | Timeline contracts exist but no Editorial playback state | Preserve Session-relative review/playback position independently from current live position; expose explicit behind-live and return-to-live state | Proposed frontend/read-model contract |
 | Stable queue interaction | No Editorial queue implementation | Preserve selected Candidate, mode, filters, ordering generation, and return position while arrivals accumulate behind an explicit refresh signal | Proposed frontend/read-model contract |
@@ -337,9 +339,10 @@ The minimal model contains:
 - idempotent result commit in the domain owner's transaction; and
 - startup/periodic reconciliation of expired leases and incomplete commits.
 
-Workers poll PostgreSQL with bounded backoff; no broker is required. One operation kind
-and one concrete transcription consumer should prove the boundary before generalizing.
-Deterministic policies do not become operations.
+Workers poll PostgreSQL with bounded backoff; no broker is required. Migration 0007 and
+the provider-neutral first transcription consumer now prove one operation kind, durable
+attempts, database-time leases/fencing, bounded retry/defer, and atomic evidence commit.
+Deterministic policies do not become operations, and generalization remains deferred.
 
 ### Worker capability and state
 
@@ -549,10 +552,10 @@ Use a bounded sequence C:
    review UI, or clip rendering.
 2. **Editorial review foundation:** bounded candidate query and append-only review
    decision that can create an Editorial Clip contract. No export/publishing.
-3. **Concrete transcription execution:** under accepted ADR-0025 and a separate bounded
-   implementation-ready plan, implement only the Durable Operation/attempt/worker pieces
-   required for one local transcription consumer, durable transcript artifacts, and
-   status/lag projection.
+3. **Concrete transcription execution (bounded substrate implemented):** migration 0007
+   and its internal contracts/repository implement the Durable Operation/Attempt/Worker
+   pieces, provider-neutral transcript evidence, and bounded status projection. A real
+   provider/model and deployment qualification remain separate Yellow work.
 4. **Machine candidate generation:** deterministic and then inferred candidates consume
    versioned transcript/analysis artifacts with provenance and idempotent outputs.
 5. **Assembly foundation:** after packaging-asset identity is approved, add templates,
@@ -608,8 +611,9 @@ itself. Each slice still needs a bounded implementation-ready plan and objective
 ### Resolved decision
 
 - **ADR-0025:** accepted on 2026-08-17 for the PostgreSQL Durable
-  Operation/attempt/lease/Worker model and its first transcription consumer. This does
-  not select a provider or implement the boundary.
+  Operation/Attempt/lease/Worker model and its first transcription consumer. The bounded
+  migration-0007 substrate is implemented; this does not select a real provider/model,
+  authorize automatic enqueue, or expand Session/media/Editorial authority.
 
 ### Yellow decisions
 

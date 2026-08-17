@@ -1329,8 +1329,17 @@ def test_real_postgres_legacy_completion_membership_migration_and_reversal() -> 
         runner.reverse_kernel_follow_up_closure()
         runner.reverse_kernel_follow_up_closure()
         with psycopg.connect(_POSTGRES_DSN) as connection:
-            migration_count = connection.execute(
-                "SELECT count(*) FROM stageflow.schema_migration"
+            migration_markers = connection.execute(
+                """
+                SELECT
+                    count(*) FILTER (
+                        WHERE version = '0005_kernel_follow_up_closure'
+                    ),
+                    count(*) FILTER (
+                        WHERE version = '0007_transcription_worker'
+                    )
+                FROM stageflow.schema_migration
+                """
             ).fetchone()
             reconstructed_count = connection.execute(
                 """
@@ -1347,7 +1356,7 @@ def test_real_postgres_legacy_completion_membership_migration_and_reversal() -> 
                   AND column_name = 'result_snapshot'
                 """
             ).fetchone()
-            assert migration_count == (5,)
+            assert migration_markers == (0, 1)
             assert reconstructed_count == (0,)
             assert snapshot_column == (0,)
 

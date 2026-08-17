@@ -85,6 +85,7 @@ or architecture document unless those documents are explicitly updated.
 
 | Plan | Status | Owner | Related decision/finding |
 | --- | --- | --- | --- |
+| [Durable transcription worker substrate](transcription-worker-substrate.md) | Implementation complete; isolated PostgreSQL qualification pending | StageFlow Backend / Work Execution | Accepted ADR-0022/ADR-0025/ADR-0027 |
 | [Recorder calibration and transcription readiness](recorder-calibration-transcription-readiness.md) | Completed - Green qualification/readiness milestone; ADR-0025 subsequently accepted; controlled vMix remains Yellow | StageFlow Validation / Architecture / Backend | Accepted ADR-0025/ADR-0027; controlled vMix calibration |
 | [Producer UX operational refinement and real-data integration](producer-ux-operational-refinement.md) | In progress - Green autonomous operational-refinement milestone | StageFlow UX / Frontend | Producer UX workstream; Runs 002-004; ADR-0023, ADR-0024, ADR-0027 |
 | [Producer operational UI MVP](producer-ui-mvp.md) | Completed - Green autonomous runnable Producer milestone | StageFlow UX / Frontend | Producer UX specifications; Run 002-004; read-only Kernel status |
