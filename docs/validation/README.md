@@ -14,6 +14,7 @@ readiness.
 
 | Artifact | Purpose | Status |
 | --- | --- | --- |
+| [Devcon AV write smoke-test](devcon-av-write-smoke-test.md) | Fixed-target, credential-safe preflight and reversible write/restore durability runbook | Green harness setup in progress; live PUT not authorized or executed |
 | [Real-Event Playback Validation and UX Calibration](../plans/real-event-playback-validation.md) | Current-Kernel direct/vMix replay runbook, measurements, UX calibration, and future reuse | Run 002 passed; Run 003 invalid; Run 004 partially qualified turnover |
 | [Run 004 qualification-tooling hardening](../plans/run-004-qualification-tooling-hardening.md) | Turnover authority guard, host-local lock, atomic evidence, incremental checkpoints, and runtime protection | Green qualification-only hardening validated and used by Run 004 |
 | [Run 004 qualification closure and timing telemetry](../plans/run-004-qualification-closure.md) | Immediate authority timestamp capture, source-aware runtime telemetry, and partial qualification closure | Green qualification-only closure completed and validated |
