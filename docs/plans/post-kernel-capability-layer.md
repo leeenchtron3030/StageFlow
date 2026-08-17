@@ -4,6 +4,15 @@
 
 Proposed
 
+## Subsequent authority
+
+On 2026-08-17 the operator accepted ADR-0025's bounded first-transcription-worker
+PostgreSQL Operation/Attempt/lease/Worker model. This resolves the worker-topology Yellow
+decision but does not make this multi-phase plan implementation-ready. The transcript
+evidence aggregate/persistence plan, provider/model/dependency selection, migration,
+runtime composition, and first-worker validation still require separate bounded scope.
+ADR-0026 and Packaging Asset identity remain unresolved Yellow decisions.
+
 This is a phased architecture/implementation plan. It is not implementation authority
 for the Yellow decisions or for a combined four-capability delivery.
 
@@ -15,13 +24,14 @@ for the Yellow decisions or for a combined four-capability delivery.
   architecture and closure; current domain glossary; user-authorized post-Kernel
   product direction.
 - **Implementation-ready:** No, as a whole. The human-declared Moment slice can be
-  extracted into a Green implementation plan without waiting for worker or automation
-  decisions. Worker execution requires ADR-0025 acceptance; automatic authority requires
-  ADR-0026 acceptance; Assembly persistence requires packaging-asset identity approval.
-- **Required escalation or approval:** Architecture acceptance of proposed ADR-0025 and
-  ADR-0026 for their affected phases; explicit packaging-asset identity decision before
-  Assembly persistence; approval of the selected first-slice implementation plan and
-  schema/migration behavior.
+  extracted into a Green implementation plan. Accepted ADR-0025 permits a separate
+  bounded first-worker plan; automatic authority requires ADR-0026 acceptance; Assembly
+  persistence requires packaging-asset identity approval.
+- **Required escalation or approval:** Acceptance of the proposed transcript evidence
+  persistence/consumer boundary and any consequential provider/model/dependency;
+  architecture acceptance of ADR-0026 for automatic authority; explicit packaging-asset
+  identity decision before Assembly persistence; approval of each selected bounded
+  implementation plan and schema/migration behavior.
 
 ## Related findings or ADRs
 
@@ -29,9 +39,8 @@ for the Yellow decisions or for a combined four-capability delivery.
   Event-Mode Kernel independent review, corrections, targeted verification, and Green
   closure DKR-001 through DKR-007 and DKV-001 through DKV-004.
 - **Accepted ADR:** ADR-0001, ADR-0002, ADR-0005, ADR-0009, ADR-0012, ADR-0013,
-  ADR-0019 through ADR-0024.
-- **Proposed ADR:** ADR-0025 (durable operations/workers), ADR-0026 (policy-scoped
-  automatic authority).
+  ADR-0019 through ADR-0025.
+- **Proposed ADR:** ADR-0026 (policy-scoped automatic authority).
 - **Engineering Directive or other authority:** ED-0006 through ED-0011, ED-0013,
   ED-0020 through ED-0023, ED-0043 through ED-0053, and the root bounded-autonomy policy.
 - **UX specifications:** [UX specification index](../ux/README.md), containing Producer,
@@ -168,8 +177,9 @@ StageFlow gains independently deliverable capability slices that:
 
 ### Phase 3 — one concrete transcription worker
 
-1. After ADR-0025 acceptance, add only the typed Durable Operation, attempt, lease,
-   worker, and reconciliation fields needed for local transcription.
+1. Under accepted ADR-0025 and a separate bounded implementation-ready plan, add only
+   the typed Durable Operation, attempt, lease, worker, and reconciliation fields needed
+   for local transcription.
 2. Define a provider-neutral transcription execution port and a versioned transcript
    artifact/result boundary. Provider-specific formats remain in adapters.
 3. Enqueue from an explicit application boundary after eligible Session media exists;
@@ -352,7 +362,8 @@ Required later validation:
   scale, and human-attention pressure plus future component/read-model requirements;
   it is not reported as executed UX qualification.
 - [x] The smallest first slice and dependent delivery sequence are explicit.
-- [ ] ADR-0025 is accepted or rejected before worker implementation.
+- [x] ADR-0025 is accepted before worker implementation; implementation remains a
+  separate bounded plan.
 - [ ] ADR-0026 is accepted or rejected before automatic-authority implementation.
 - [ ] Packaging Asset identity is approved before Assembly persistence.
 - [ ] Phase 1 is extracted into a Green implementation-ready plan with exact schema,
@@ -371,7 +382,9 @@ post-Kernel capability rollback.
 
 ## Open questions
 
-- **Yellow:** Accept ADR-0025's PostgreSQL Operation/attempt/lease/Worker model?
+- **Resolved 2026-08-17:** ADR-0025's PostgreSQL
+  Operation/attempt/lease/Worker model is accepted; no implementation or provider is
+  selected by that acceptance.
 - **Yellow:** Accept ADR-0026's scoped activation and automatic-authority provenance?
 - **Yellow, deferred until Assembly:** Is Packaging Asset a separate aggregate composed
   with a Completed Media Asset/content manifest, as recommended?
@@ -401,5 +414,6 @@ post-Kernel capability rollback.
   objective; Yellow decisions remain proposed and unimplemented.
 - **Approved deviations:** None.
 - **Rollback status:** Documentation diff is reversible.
-- **Remaining work:** Review/decide ADR-0025, ADR-0026, and Packaging Asset identity;
-  extract and approve the Phase 1 Green implementation plan.
+- **Remaining work:** Create the bounded first-worker/transcript evidence implementation
+  plan; decide any consequential provider/model/dependency; review/decide ADR-0026 and
+  Packaging Asset identity; extract and approve the Phase 1 Green implementation plan.

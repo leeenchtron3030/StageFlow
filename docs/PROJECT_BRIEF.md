@@ -534,9 +534,10 @@ The working principle is:
 
 ### Work execution
 
-- Proposed ADR-0025: Durable Operation/attempt identity, claim/lease, cancellation,
-  retry, and worker deployment semantics.
-- GPU resource ownership and scheduling.
+- Implementation plan, schema, and validation for accepted ADR-0025's first
+  transcription Operation/attempt/lease/Worker boundary.
+- Consequential provider/model/dependency selection and reference-worker qualification;
+  no provider is selected by ADR-0025.
 
 ### Post-Kernel authority and presentation
 

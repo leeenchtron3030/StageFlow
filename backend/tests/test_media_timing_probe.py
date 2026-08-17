@@ -62,6 +62,24 @@ def test_parser_separates_raw_packet_timing_from_derived_interval() -> None:
     assert candidate["authority_use_prohibited"] is True
 
 
+def test_parser_accepts_ffmpeg_six_input_and_stream_packet_identifier() -> None:
+    header = HEADER_TEMPLATE.format(
+        creation_time="2026-08-12T00:51:01.000000Z"
+    ).replace("ist_index:0", "ist_index:0:0").replace(
+        "ist_index:1", "ist_index:0:1"
+    )
+    tail = TAIL.replace("ist_index:0", "ist_index:0:0").replace(
+        "ist_index:1", "ist_index:0:1"
+    )
+
+    raw = probe.parse_ffmpeg_observations(header, tail)
+
+    assert raw["packet_timing"]["first_by_stream"][0]["stream_index"] == 0
+    assert raw["packet_timing"]["first_by_stream"][1]["stream_index"] == 1
+    assert raw["packet_timing"]["last_by_stream"][0]["stream_index"] == 0
+    assert raw["packet_timing"]["last_by_stream"][1]["stream_index"] == 1
+
+
 @pytest.mark.parametrize("creation_time", ["2026-08-12T00:51:01", "not-a-time"])
 def test_naive_or_invalid_creation_time_is_preserved_but_not_derived(
     creation_time: str,

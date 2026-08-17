@@ -45,6 +45,13 @@ This directory is reserved for repository maintenance and developer utility scri
   work or media decode/transcode, and its candidate intervals are prohibited from
   production authority use.
 
+- [Recorder calibration harness](../backend/tests/qualification/calibration_harness.py)
+  generates deterministic visual/audio marker media, decodes recorded-segment content
+  boundaries, composes them with the media timing probe, and summarizes repeated trials
+  for one exact recorder-profile revision. See the
+  [controlled runbook](../docs/validation/recorder-calibration-harness.md). It requires an
+  explicitly supplied local FFmpeg-compatible executable and remains qualification-only.
+
 ## Local application preview
 
 - [`Start-StageFlowPreview.ps1`](preview/Start-StageFlowPreview.ps1) is a dev-only

@@ -1,0 +1,205 @@
+{
+  "authority_use_prohibited": true,
+  "content_adjacency_residuals": [],
+  "environment": {
+    "local_timezone": "Pacific Daylight Time",
+    "machine": "AMD64",
+    "os": "Windows",
+    "os_release": "11"
+  },
+  "harness": {
+    "name": "stageflow-recorder-calibration-harness",
+    "version": "1.0"
+  },
+  "inspection_tool": {
+    "name": "ffmpeg6.exe",
+    "version": "6.0"
+  },
+  "limitations": [
+    "this trial remains unqualified until its explicit recorder profile is accepted through Yellow review",
+    "qualification-grade trial means inputs are analyzable; it does not grant production authority",
+    "reports omit private paths and filenames but do not sanitize external media content"
+  ],
+  "marker": {
+    "counter_bits": 24,
+    "frame_rate": 30,
+    "precision_seconds": 0.03333333333333333,
+    "schema": "binary-frame-clock-v1"
+  },
+  "media": [
+    {
+      "derived_candidate_interval": {
+        "authority_use_prohibited": true,
+        "derivation_rule": "embedded-creation-time-plus-container-duration",
+        "derivation_version": "1.0",
+        "duration_seconds": 190.0,
+        "end_at": "2026-08-15T03:03:10+00:00",
+        "epistemic_kind": "derived",
+        "limitations": [
+          "embedded creation_time semantics are not qualified as content start",
+          "container duration and timestamps can differ from useful content boundaries",
+          "candidate interval must not drive Session or media association decisions"
+        ],
+        "start_at": "2026-08-15T03:00:00+00:00",
+        "status": "unqualified_candidate"
+      },
+      "derived_content_timing": {
+        "authority_use_prohibited": true,
+        "candidate_content_ended_at": "2026-08-15T03:03:10+00:00",
+        "candidate_content_started_at": "2026-08-15T03:00:00+00:00",
+        "content_duration_seconds": 190.0,
+        "content_end_exclusive_offset_seconds": 190.0,
+        "content_start_offset_seconds": 0.0,
+        "embedded_anchor_minus_content_start_seconds": 0.0,
+        "embedded_candidate_end_minus_content_end_seconds": 0.0,
+        "epistemic_kind": "derived",
+        "limitations": [
+          "absolute comparison is not qualification-grade because clock status is not verified_stable"
+        ],
+        "precision_seconds": 0.03333333333333333
+      },
+      "media_ref": "media-00000",
+      "raw_observations": {
+        "content_markers": {
+          "content_end_exclusive_offset_seconds": 190.0,
+          "decoded_frame_count": 5700,
+          "duplicate_transition_count": 0,
+          "epistemic_kind": "observed",
+          "first_content_offset_seconds": 0.0,
+          "first_frame_index": 0,
+          "invalid_marker_frame_count": 0,
+          "last_content_frame_offset_seconds": 189.96666666666667,
+          "last_frame_index": 5699,
+          "marker_schema": "binary-frame-clock-v1",
+          "missing_source_frame_count": 0,
+          "precision_seconds": 0.03333333333333333,
+          "reverse_transition_count": 0,
+          "sequence_repeatable": true
+        },
+        "filesystem_proxy": {
+          "authority": "non_authoritative_filesystem_proxy",
+          "epistemic_kind": "observed",
+          "limitations": [
+            "filesystem timestamps do not establish recorder or useful-content timing"
+          ],
+          "modified_time": "2026-08-15T04:39:42.438688+00:00",
+          "platform_change_or_creation_time": "2026-08-15T04:39:21.831428+00:00",
+          "size_bytes": 117136037
+        },
+        "media_inspection": {
+          "container": {
+            "bitrate_description": "4932 kb/s",
+            "duration_seconds": 190.0,
+            "format": "mov,mp4,m4a,3gp,3g2,mj2",
+            "start_seconds": 0,
+            "tags": {
+              "compatible_brands": "isomiso2avc1mp41",
+              "creation_time": "2026-08-15T03:00:00.000000Z",
+              "major_brand": "isom",
+              "minor_version": "512"
+            }
+          },
+          "epistemic_kind": "observed",
+          "packet_timing": {
+            "first_by_stream": [
+              {
+                "dts": -1024,
+                "dts_seconds": -0.0666667,
+                "duration": 512,
+                "duration_seconds": 0.0333333,
+                "kind": "video",
+                "pts": 0,
+                "pts_seconds": 0,
+                "stream_index": 0
+              },
+              {
+                "dts": -1024,
+                "dts_seconds": -0.0213333,
+                "duration": 1024,
+                "duration_seconds": 0.0213333,
+                "kind": "audio",
+                "pts": -1024,
+                "pts_seconds": -0.0213333,
+                "stream_index": 1
+              }
+            ],
+            "last_by_stream": [
+              {
+                "dts": 2916864,
+                "dts_seconds": 189.9,
+                "duration": 512,
+                "duration_seconds": 0.0333333,
+                "kind": "video",
+                "pts": 2917888,
+                "pts_seconds": 189.967,
+                "stream_index": 0
+              },
+              {
+                "dts": 9119744,
+                "dts_seconds": 189.995,
+                "duration": 256,
+                "duration_seconds": 0.00533333,
+                "kind": "audio",
+                "pts": 9119744,
+                "pts_seconds": 189.995,
+                "stream_index": 1
+              }
+            ]
+          },
+          "parse_limitations": [],
+          "streams": [
+            {
+              "codec_description": "h264 (High) (avc1 / 0x31637661), yuv420p(progressive), 1280x720 [SAR 1:1 DAR 16:9], 4911 kb/s, 30 fps, 30 tbr, 15360 tbn (default)",
+              "dimensions": "1280x720",
+              "kind": "video",
+              "stream_index": 0
+            },
+            {
+              "codec_description": "aac (LC) (mp4a / 0x6134706D), 48000 Hz, mono, fltp, 11 kb/s (default)",
+              "kind": "audio",
+              "sample_rate_hz": 48000,
+              "stream_index": 1
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "observed_at": "2026-08-15T04:45:40.371551+00:00",
+  "production_semantics_changed": false,
+  "qualification_grade_trial": false,
+  "qualification_status": "unqualified_candidate_evidence",
+  "recorder": {
+    "configuration": [
+      "audio=aac",
+      "video=h264"
+    ],
+    "product": "ffmpeg-fixture",
+    "profile_id": "ffmpeg-fixture-h264-aac-source",
+    "profile_revision": 1,
+    "version": "6.0"
+  },
+  "schema_name": "stageflow.recorder-calibration-report",
+  "schema_version": "1.0",
+  "source": {
+    "alias": "harness-source-self-check",
+    "media_count": 1
+  },
+  "trial": {
+    "batch_id": "fixture-batch",
+    "clock_source": "manifest-fixed-origin",
+    "clock_status": "synthetic_fixture",
+    "condition": "harness_self_check_source",
+    "repetition": 1,
+    "segment_duration_seconds": 190.0,
+    "trial_id": "harness-source-r1",
+    "vmix_exercised": false
+  },
+  "trial_statistics": {
+    "all_marker_sequences_repeatable": true,
+    "anchor_error_sample_count": 1,
+    "maximum_absolute_anchor_error_seconds": 0.0,
+    "median_absolute_anchor_error_seconds": 0.0,
+    "segment_count": 1
+  }
+}

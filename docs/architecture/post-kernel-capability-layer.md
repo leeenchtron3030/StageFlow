@@ -16,9 +16,10 @@ association, package revision, completion, reconciliation, time, and PostgreSQL
 authority. They do not create parallel versions of those concepts.
 
 Related authority includes the Product Constitution, ADR-0001, ADR-0002, ADR-0009,
-ADR-0012, ADR-0013, ADR-0022 through ADR-0024, the current domain glossary, and the
-Durable Event-Mode Kernel architecture and closure record. Proposed ADR-0025 and
-ADR-0026 contain the unresolved execution and automation-authority decisions.
+ADR-0012, ADR-0013, ADR-0022 through ADR-0025, the current domain glossary, and the
+Durable Event-Mode Kernel architecture and closure record. ADR-0025 accepts the bounded
+first-transcription-worker execution model; proposed ADR-0026 retains the unresolved
+automation-authority decision.
 
 ## Protected Kernel boundary
 
@@ -282,7 +283,7 @@ status map keeps the boundary explicit:
 | Candidate, Producer-mark, unreviewed, and approved counts per Session | No durable Editorial Candidate store | Candidate/review projection derived from authoritative candidate and append-only decision records | Future; depends on the Moment slices |
 | Producer-mark priority | Kernel has typed human-command patterns but no `Mark Moment` command | Declared Candidate provenance plus explicit priority signal; never automatic Editorial approval | Proposed Green slice after an implementation-ready plan |
 | Candidate rationale and provenance | Observation/Evidence provenance and epistemic vocabulary exist | Candidate source/input, policy/model, actor, reason, and evidence references become first-class | Accepted semantic direction; persistence future |
-| Intelligence-processing lag | No worker/operation implementation | Operation/artifact timestamps and backlog projected as transcript/Moment lag | Decision-gated by proposed ADR-0025 |
+| Intelligence-processing lag | No worker/operation implementation | Operation/artifact timestamps and backlog projected as transcript/Moment lag | Architecture accepted by ADR-0025; bounded implementation plan still required |
 | Human Editorial review lag | No Editorial queue implementation | Derived age of the oldest eligible priority Candidate, separate from compute lag | Proposed read-model calculation |
 | Selected review position versus live edge | Timeline contracts exist but no Editorial playback state | Preserve Session-relative review/playback position independently from current live position; expose explicit behind-live and return-to-live state | Proposed frontend/read-model contract |
 | Stable queue interaction | No Editorial queue implementation | Preserve selected Candidate, mode, filters, ordering generation, and return position while arrivals accumulate behind an explicit refresh signal | Proposed frontend/read-model contract |
@@ -321,7 +322,7 @@ product.
 Transcription is the first concrete consumer that is long-running, retryable, and may
 outlive a process. The Kernel's earlier deferral of a generic Job was correct because its
 bounded media cycle is synchronous; that reasoning no longer covers transcription,
-model inference, or rendering. Proposed ADR-0025 therefore recommends a minimal
+model inference, or rendering. Accepted ADR-0025 therefore establishes a minimal
 PostgreSQL-backed Durable Operation and Worker coordination boundary.
 
 The minimal model contains:
@@ -548,9 +549,10 @@ Use a bounded sequence C:
    review UI, or clip rendering.
 2. **Editorial review foundation:** bounded candidate query and append-only review
    decision that can create an Editorial Clip contract. No export/publishing.
-3. **Concrete transcription execution:** after ADR-0025 acceptance, implement only the
-   Durable Operation/attempt/worker pieces required for one local transcription
-   consumer, durable transcript artifacts, and status/lag projection.
+3. **Concrete transcription execution:** under accepted ADR-0025 and a separate bounded
+   implementation-ready plan, implement only the Durable Operation/attempt/worker pieces
+   required for one local transcription consumer, durable transcript artifacts, and
+   status/lag projection.
 4. **Machine candidate generation:** deterministic and then inferred candidates consume
    versioned transcript/analysis artifacts with provenance and idempotent outputs.
 5. **Assembly foundation:** after packaging-asset identity is approved, add templates,
@@ -603,13 +605,17 @@ are healthy.
 Green classification does not authorize implementation from this proposed document by
 itself. Each slice still needs a bounded implementation-ready plan and objective tests.
 
+### Resolved decision
+
+- **ADR-0025:** accepted on 2026-08-17 for the PostgreSQL Durable
+  Operation/attempt/lease/Worker model and its first transcription consumer. This does
+  not select a provider or implement the boundary.
+
 ### Yellow decisions
 
-1. **ADR-0025:** accept the PostgreSQL Durable Operation/attempt/lease/Worker coordination
-   model and its first transcription consumer.
-2. **ADR-0026:** accept versioned, policy-scoped automatic decision authority and
+1. **ADR-0026:** accept versioned, policy-scoped automatic decision authority and
    activation/provenance semantics.
-3. **Packaging asset identity:** approve the recommended separate Packaging Asset
+2. **Packaging asset identity:** approve the recommended separate Packaging Asset
    aggregate and its composition with Completed Media Asset before Assembly persistence.
 
 Moment naming is not Yellow at this baseline because the current qualified glossary

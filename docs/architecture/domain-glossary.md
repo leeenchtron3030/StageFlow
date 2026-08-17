@@ -241,15 +241,16 @@ authorized by this document.
 
 ### Durable Operation
 
-- **Definition:** A future persisted unit of asynchronous, long-running, retryable, or
-  externally dependent work with stable identity, claim/lease, attempts, and result.
+- **Definition:** An accepted future persisted unit of asynchronous, long-running,
+  retryable, or externally dependent work with stable identity, claim/lease, attempts,
+  and result.
 - **Distinction:** Deterministic domain policy calls remain synchronous and are not Jobs
   merely because they perform work.
 - **Current aliases/legacy names:** Older documents use `Job`; no implementation exists.
 - **Migration:** The first Kernel does not require a generic Durable Operation for its
-  bounded synchronous media cycle. Proposed ADR-0025 now evaluates the first concrete
-  asynchronous consumer, transcription; no operation schema exists until that decision
-  is accepted and implemented.
+  bounded synchronous media cycle. Accepted ADR-0025 selects transcription as the first
+  concrete consumer; no operation schema or runtime exists until a bounded plan is
+  approved and implemented.
 - **Example:** A transcription provider request that may be deferred until online.
 
 ### Deployment profile
@@ -270,10 +271,12 @@ authorized by this document.
 | Concept | Current evidence | Unresolved decision |
 | --- | --- | --- |
 | Source Segment / durable Segment record | Disposition reserves a qualified durable media record; older documents use Media Chunk and Timeline Segment | Canonical record name, rename/alias behavior, and relationship to Completed Media Asset |
-| Job / Durable Operation / Task | Durable at-least-once work is accepted; proposed ADR-0025 defines a minimal model | ADR-0025 acceptance plus public term and exact operation/attempt/worker schema |
+| Job / Durable Operation / Task | Accepted ADR-0025 defines the minimal durable model and retains `Durable Operation` as the qualified architecture term | Exact public/storage names and operation/attempt/worker schema in the bounded implementation plan |
 | Post-Kernel Session evolution | Human Session realization and reassignment are implemented | Automated realization, merge, and split policy |
 | Package and publication milestones | Distinct milestones are accepted | Aggregate names and detailed state machines remain deferred |
 | Packaging Asset / Event Asset | Session Assembly needs reusable approved presentation media distinct from package correctness | Aggregate name/owner and whether content composes a Completed Media Asset or a separate manifest |
+| Transcript Evidence Revision / Session Transcript | Provider results require immutable asset/manifest-scoped revisions; the foundational Session Transcript is a later cross-asset product concept | Accept aggregate name/owner, persistence, correction/stitching policy, and relationship to Session Transcript |
+| Wall-Clock Transcript Alignment | MTE can derive advisory wall-clock intervals from immutable asset-relative transcript offsets | Accept aggregate name/owner and authorized consumers; automatic Session/media authority remains prohibited |
 | Automation Policy / Approval Policy | Evidence -> Policy -> Authority and per-decision activation are proposed in ADR-0026 | Acceptance, public term, scope storage, and activation authority |
 
 Do not resolve these terms through incidental code naming. Record the decision first and

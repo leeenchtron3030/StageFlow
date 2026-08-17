@@ -101,8 +101,11 @@ def _packet_observation(line: str) -> dict[str, Any] | None:
     kind = fields.get("type")
     if stream_index is None or kind not in {"audio", "video"}:
         return None
+    normalized_stream_index = stream_index.rsplit(":", maxsplit=1)[-1]
+    if not normalized_stream_index.isdigit():
+        return None
     return {
-        "stream_index": int(stream_index),
+        "stream_index": int(normalized_stream_index),
         "kind": kind,
         "pts": _number(fields.get("pkt_pts")),
         "pts_seconds": _number(fields.get("pkt_pts_time")),
