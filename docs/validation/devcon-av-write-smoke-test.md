@@ -79,6 +79,11 @@ The process exits non-zero if any required condition is missing. A memory-visibl
 with a non-204 response is a failure even if restoration succeeds, because durability is
 not established.
 
+Coordinate exclusive use of this test session field for the short live-run window. The
+upstream endpoint has no compare-and-swap precondition, so the harness detects a third
+value before restoration and verifies the final value afterward but cannot eliminate a
+concurrent write inside the PUT window.
+
 ## Failure handling
 
 - `wrong_event`: no PUT is made.
@@ -86,7 +91,8 @@ not established.
 - `target_unverifiable`: no blind restore is attempted; escalate to the Devcon API
   operator because session-ID resolution may have changed.
 - `concurrent_change`: an unexpected third value is not overwritten.
-- `restore_failed` or `restore_unverified`: manual upstream inspection is required.
+- `restore_request_failed`, `restore_put_not_204`, or `restore_unverified`: manual
+  upstream inspection is required.
 - `persistence_unverified`: both HTTP operations may have succeeded, but the required Git
   durability evidence did not appear; treat the pipeline as unhealthy.
 

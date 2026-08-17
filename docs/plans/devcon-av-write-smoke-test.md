@@ -2,7 +2,7 @@
 
 ## Status
 
-In progress
+Completed
 
 ## Execution authority
 
@@ -162,14 +162,14 @@ headers, raw response bodies, or the original field value.
 
 ## Acceptance criteria
 
-- [ ] Default invocation cannot perform a write.
-- [ ] Live mode is fixed to the upstream test identity and requires exact confirmation.
-- [ ] Wrong-event resolution causes zero PUT calls.
-- [ ] Marker application, restoration, and two durable commits are all required for pass.
-- [ ] Non-204, timeout, target drift, concurrency, restore failure, and missing Git
+- [x] Default invocation cannot perform a write.
+- [x] Live mode is fixed to the upstream test identity and requires exact confirmation.
+- [x] Wrong-event resolution causes zero PUT calls.
+- [x] Marker application, restoration, and two durable commits are all required for pass.
+- [x] Non-204, timeout, target drift, concurrency, restore failure, and missing Git
       evidence return sanitized non-pass results.
-- [ ] Tests prove the API key cannot appear in reports or expected error paths.
-- [ ] No production code, dependency, schema, migration, runtime configuration, or
+- [x] Tests prove the API key cannot appear in reports or expected error paths.
+- [x] No production code, dependency, schema, migration, runtime configuration, or
       frontend file changes.
 
 ## Rollback or reversal
@@ -187,12 +187,21 @@ are audit evidence and are not rewritten or deleted.
 
 ## Completion record
 
-- Implemented revision: Pending.
-- Files and migrations actually changed: Pending.
-- Commands and tests actually run: Pending.
-- Results and warnings: Pending.
+- Implemented revision: `6d9eba0a04ceba2a617d1ff76a674dc3c66a808b`.
+- Files and migrations actually changed: qualification-only harness and offline tests;
+  plan and validation indexes; plan and runbook. No migrations.
+- Commands and tests actually run: focused pytest with cache disabled; focused Ruff;
+  focused strict Pyright; the default live-API dry-run; public path-scoped GitHub commit
+  query; strict UTF-8, relative-link, credential-signature, and Git whitespace checks.
+- Results and warnings: 14 tests passed; Ruff passed; Pyright reported zero errors and
+  warnings; the read-only preflight verified `test-devcon-8` and performed no PUT; the
+  fixed Git path returned commit history; documentation/privacy checks passed. Git line
+  ending normalization warnings were informational. The live write/restore was not
+  authorized or executed.
 - Execution authority used: Green qualification-tooling setup only.
 - Approved deviations: None.
 - Rollback status: Revert-only; no live PUT authorized or performed.
-- Remaining work: Complete tooling validation, then request explicit approval for a live
-  round trip.
+- Remaining work: Request explicit approval immediately before a live round trip; load
+  the AV key into the process environment through the approved password-manager
+  workflow; coordinate exclusive use of the fixed test field. A production StageFlow
+  Devcon adapter remains a separate architecture and implementation task.

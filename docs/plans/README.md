@@ -85,7 +85,7 @@ or architecture document unless those documents are explicitly updated.
 
 | Plan | Status | Owner | Related decision/finding |
 | --- | --- | --- | --- |
-| [Devcon AV write smoke-test qualification tooling](devcon-av-write-smoke-test.md) | In progress - Green setup only; live two-write run requires separate approval | StageFlow Validation / Integration | ADR-0004/ADR-0005; Devcon AV write-test reference |
+| [Devcon AV write smoke-test qualification tooling](devcon-av-write-smoke-test.md) | Completed - harness/offline validation and read-only preflight passed; live two-write run requires separate approval | StageFlow Validation / Integration | ADR-0004/ADR-0005; Devcon AV write-test reference |
 | [Producer UX operational refinement and real-data integration](producer-ux-operational-refinement.md) | In progress - Green autonomous operational-refinement milestone | StageFlow UX / Frontend | Producer UX workstream; Runs 002-004; ADR-0023, ADR-0024, ADR-0027 |
 | [Producer operational UI MVP](producer-ui-mvp.md) | Completed - Green autonomous runnable Producer milestone | StageFlow UX / Frontend | Producer UX specifications; Run 002-004; read-only Kernel status |
 | [Media Timing Evidence v1 production slice](media-timing-evidence-v1.md) | Completed - Green autonomous durable advisory evidence slice | StageFlow Production / Backend / UX | Accepted ADR-0027 and MTE-001 through MTE-005 |
