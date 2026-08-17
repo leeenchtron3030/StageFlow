@@ -6,8 +6,8 @@
 
 This document prepares the first transcription evidence boundary requested by the
 recorder-calibration/transcription-readiness milestone. It specializes the accepted
-post-Kernel direction without accepting proposed ADR-0025, selecting a provider/model,
-adding persistence, or claiming transcription execution exists.
+post-Kernel direction and accepted ADR-0025 without selecting a provider/model, adding
+persistence, or claiming transcription execution exists.
 
 `Transcript Evidence Revision` is a provisional qualified term. It remains visibly
 unresolved in the domain glossary until the persistence/consumer design is accepted.
@@ -196,11 +196,12 @@ membership, ADR-0024 association, package state, Producer authority, or publishi
 
 ## Persistence and transaction candidate
 
-After the model and ADR-0025 are accepted, the smallest PostgreSQL ownership is one
-append-only transcript-evidence parent plus typed segment, optional word/score, and
-idempotency rows. Alignment uses a separate parent/interval set because its inputs and
-revision cadence differ from transcript output. Large raw provider artifacts and media
-remain outside these rows behind explicit manifests and retention policy.
+After this proposed evidence model receives architecture authority and a bounded plan is
+approved, the smallest PostgreSQL ownership is one append-only transcript-evidence parent
+plus typed segment, optional word/score, and idempotency rows. Alignment uses a separate
+parent/interval set because its inputs and revision cadence differ from transcript output.
+Large raw provider artifacts and media remain outside these rows behind explicit
+manifests and retention policy.
 
 When the Operation and evidence share PostgreSQL, applying the transcript revision and
 marking the Operation succeeded with its terminal result reference occur in one

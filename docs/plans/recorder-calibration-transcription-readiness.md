@@ -4,6 +4,15 @@
 
 Completed
 
+## Subsequent authority
+
+On 2026-08-17 the operator accepted Yellow B: the exact first-transcription-worker
+PostgreSQL Operation/Attempt/lease/Worker package recorded in ADR-0025. ADR-0025 is now
+Accepted. Earlier references in this completed plan to Proposed/Yellow worker status are
+historical execution context. Acceptance changes architecture authority only: no worker,
+schema, migration, provider, dependency, runtime configuration, or automatic enqueue was
+implemented, and a new bounded implementation-ready plan remains required.
+
 ## Execution authority
 
 - **Classification:** Green autonomous for qualification-only tooling, synthetic

@@ -2,11 +2,11 @@
 
 ## Status
 
-Proposed
+Accepted
 
 ## Date
 
-2026-08-09
+2026-08-17 (accepted; originally proposed 2026-08-09)
 
 ## Context
 
@@ -28,12 +28,13 @@ workers/nodes to share it. StageFlow remains a modular monolith, local-first Eve
 operation must not require a broker or Internet access, and deterministic domain policy
 calls must remain synchronous.
 
-The decision is Yellow because it introduces durable execution identity, concurrency,
+This decision was Yellow because it introduces durable execution identity, concurrency,
 failure/retry, and worker ownership semantics that will shape multiple future consumers.
+The operator accepted the first-transcription-worker package on 2026-08-17.
 
 ## Decision
 
-If accepted, StageFlow will introduce a minimal PostgreSQL-backed Durable Operation and
+StageFlow will introduce a minimal PostgreSQL-backed Durable Operation and
 Worker coordination boundary, proved first by one local transcription consumer.
 
 ### Operation and attempt
@@ -109,8 +110,9 @@ idempotency/reconciliation design, and tests.
 
 ## First-transcription-worker decision package
 
-This section narrows the Yellow decision to the first consumer. It does not change this
-ADR's Proposed status and is not implementation authority.
+This section records the accepted first-consumer scope. Acceptance is architecture
+authority, not implementation authority; a bounded implementation-ready plan remains
+required before schema or runtime work begins.
 
 ### Concrete topology
 
@@ -272,7 +274,7 @@ delayed”; it does not make Session media/package authority false or incomplete
 
 ### Smallest implementation unlocked by acceptance
 
-Acceptance would unlock one bounded plan containing:
+Acceptance unlocks one bounded plan containing:
 
 - the five logical Work Execution records above and forward/reversal migration;
 - one transcription Operation kind/schema and deterministic enqueue application;
@@ -349,7 +351,7 @@ transcription consumer must prove the minimal boundary.
 
 ## Validation
 
-Acceptance and implementation plans must require:
+Implementation plans must require:
 
 - exact/conflicting enqueue replay and stable work-key tests;
 - concurrent claim uniqueness and deterministic priority ordering;

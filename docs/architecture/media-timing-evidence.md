@@ -87,9 +87,10 @@ state. Reversal remains an explicit isolated-database operator action.
 - `MediaTimingEvidenceRepository.append/get_active/history` owns durable evidence only.
 - qualification tooling may continue synchronous local inspection outside production.
 
-Actual long-running production inspection must use the durable worker boundary only after
-ADR-0025 reaches its existing Yellow gate. Transcription remains the intended first
-durable worker consumer and no provider/model is selected by MTE v1.
+Actual long-running production inspection must use the durable worker boundary accepted
+by ADR-0025 after that boundary is implemented through a separate approved plan.
+Transcription remains the intended first durable worker consumer and no provider/model
+is selected by MTE v1 or ADR-0025.
 
 ## Qualification representation
 
@@ -134,5 +135,6 @@ Transcript evidence remains separate and non-authoritative Session evidence.
 
 - qualifying a concrete recorder/source profile and calibration thresholds;
 - allowing MTE to change automatic Session association or eligibility;
-- accepting ADR-0025 worker/lease execution for production inspection/transcription;
+- implementing ADR-0025 worker/lease execution for production inspection/transcription
+  through a separate bounded plan;
 - automatic AI authority or a consequential inspection/provider dependency.
