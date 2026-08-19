@@ -9,5 +9,6 @@ export default async function SessionPage({ params, searchParams }: { params: Pr
   const workspace = await loadWorkspace({ scenario: typeof query.scenario === "string" ? query.scenario : undefined, includeTimingEvidence: true });
   const session = workspace.sessions.find((item) => item.id === decodeURIComponent(route.sessionId));
   const demoActorId = process.env.STAGEFLOW_DEMO_OPERATOR_ID;
-  return <OperationalShell activePath="/sessions" workspace={workspace}><SessionOperationalView demoActorId={demoActorId} session={session} workspace={workspace} /></OperationalShell>;
+  const demoLaunchContext = process.env.STAGEFLOW_DEMO_LAUNCH_CONTEXT;
+  return <OperationalShell activePath="/sessions" workspace={workspace}><SessionOperationalView demoActorId={demoActorId} demoLaunchContext={demoLaunchContext} session={session} workspace={workspace} /></OperationalShell>;
 }

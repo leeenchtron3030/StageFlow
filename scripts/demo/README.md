@@ -52,6 +52,18 @@ Transcription Evidence provenance/counts, Moments, package state, and Devcon cac
 Reports omit transcript text, media/config paths, DSNs, credentials, tokens, raw provider
 diagnostics, and API request bodies.
 
+## Launch-scoped authority protection
+
+Each `start` creates a new cryptographically random, process-only launch context for the
+Producer UI. Mutating Demo authority requests must present that exact context; pages
+from a prior launcher run and requests with no context fail closed at the Next.js proxy
+before the loopback backend is contacted. Refresh the Producer page after restarting the
+stack before issuing an explicit human command. GET and status projections are unchanged.
+
+Normal output and reports never contain the launch context. Authority-request diagnosis
+records only its short SHA-256 fingerprint plus bounded request attribution; it never
+records request bodies, transcripts, credentials, DSNs, or the launch context itself.
+
 ## Devcon publication
 
 Publication is never automatic and never follows Session end. It is permitted only for
