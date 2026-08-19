@@ -1,3 +1,25 @@
+import { generateUuidV4, type UuidCryptoSource } from "../shared/ids/uuid-v4.ts";
+
+export interface DemoCommandEnvelope {
+  operation_id: string;
+  actor_id: string;
+  confirmed: "confirmed";
+  [key: string]: unknown;
+}
+
+export function createDemoCommandEnvelope(
+  actorId: string,
+  fields: Record<string, unknown>,
+  source?: UuidCryptoSource,
+): DemoCommandEnvelope {
+  return {
+    ...fields,
+    operation_id: generateUuidV4(source),
+    actor_id: actorId,
+    confirmed: "confirmed",
+  };
+}
+
 export interface DemoOperation {
   operation_id: string;
   asset_id: string;

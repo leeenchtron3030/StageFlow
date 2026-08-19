@@ -1,3 +1,5 @@
+import { generateUuidV4, type UuidCryptoSource } from "./uuid-v4.ts";
+
 declare const entityIdBrand: unique symbol;
 
 export type EntityId = string & {
@@ -9,8 +11,8 @@ export function createEntityId(value: string): EntityId {
   return value as EntityId;
 }
 
-export function generateEntityId(): EntityId {
-  return createEntityId(crypto.randomUUID());
+export function generateEntityId(source?: UuidCryptoSource): EntityId {
+  return createEntityId(generateUuidV4(source));
 }
 
 function assertUuidCompatible(value: string, label: string): void {

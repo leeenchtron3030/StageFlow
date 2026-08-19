@@ -3,7 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import type { DemoSessionWorkspace as DemoWorkspace } from "@/experience/demo-api.ts";
+import {
+  createDemoCommandEnvelope,
+  type DemoSessionWorkspace as DemoWorkspace,
+} from "@/experience/demo-api.ts";
 
 const apiRoot = "/api/stageflow/demo";
 
@@ -58,13 +61,12 @@ export function DemoStartSessionControl({
         method: "POST",
         cache: "no-store",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          operation_id: crypto.randomUUID(),
-          actor_id: actorId,
-          confirmed: "confirmed",
-          stage_id: stageId,
-          authoritative_start: new Date().toISOString(),
-        }),
+        body: JSON.stringify(
+          createDemoCommandEnvelope(actorId, {
+            stage_id: stageId,
+            authoritative_start: new Date().toISOString(),
+          }),
+        ),
       });
       if (!response.ok) throw new Error(await responseDetail(response));
       setMessage("Session start recorded durably.");
@@ -166,13 +168,12 @@ export function DemoSessionWorkspace({
           method: "POST",
           cache: "no-store",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            operation_id: crypto.randomUUID(),
-            actor_id: actorId,
-            confirmed: "confirmed",
-            session_id: sessionId,
-            ...values,
-          }),
+          body: JSON.stringify(
+            createDemoCommandEnvelope(actorId, {
+              session_id: sessionId,
+              ...values,
+            }),
+          ),
         });
         if (!response.ok) throw new Error(await responseDetail(response));
         setMessage("Command recorded durably.");

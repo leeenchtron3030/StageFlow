@@ -6,14 +6,15 @@ In progress - prerequisite provisioning pending
 
 ## Execution authority
 
-- Classification: Green autonomous, validation-only
-- Authority evidence: the explicit 2026-08-19 request to begin a separate Demo Hardware
-  Rehearsal workstream after merged PR #63; the completed
+- Classification: Green autonomous rehearsal plus bounded compatibility correction
+- Authority evidence: the explicit 2026-08-19 requests to begin a separate Demo Hardware
+  Rehearsal workstream after merged PR #63 and to correct the confirmed LAN UUID blocker; the
+  completed
   [Demo Single-Stage Vertical Slice](demo-single-stage-vertical-slice.md); accepted
   ADR-0022 through ADR-0025 and ADR-0027; and the scoped Demo 1 transcription baseline.
-- Implementation-ready: Yes for prerequisite verification, rehearsal, and evidence capture.
-  No product-capability implementation is authorized.
-- Required escalation or approval, if any: stop for any proposed production code, dependency,
+- Implementation-ready: Yes for the bounded UUID compatibility correction, prerequisite
+  verification, rehearsal, and evidence capture. No product-capability expansion is authorized.
+- Required escalation or approval, if any: stop for any other proposed production code, dependency,
   schema, migration, public contract, authority-semantic, trust-boundary, or Devcon-write change.
   Production deployment and production-data access remain prohibited.
 
@@ -41,6 +42,12 @@ truthful evidence without implying production or Event readiness.
   directories are absent, and STAGEFLOW_DEMO_POSTGRES_DSN is absent at Windows User scope.
 - The prior bounded launcher run stopped with configured_media_source_unavailable and did not
   prove a successful live stack.
+- The HTTP LAN-facing Producer UI exposed a confirmed compatibility blocker: Web Crypto is
+  available, but randomUUID is absent. Direct frontend calls prevented authority commands from
+  constructing operation IDs; backend and authority semantics were not implicated.
+- The frontend compatibility correction now uses native randomUUID when present and a
+  getRandomValues-only RFC 4122 UUID-v4 construction otherwise. Frontend tests, TypeScript,
+  ESLint, the production build, and focused Demo API/authority/launcher checks pass.
 
 ## Desired behavior
 
@@ -80,17 +87,19 @@ offline-cache behavior are demonstrated without expanding product semantics.
 
 ## Implementation approach
 
-1. Provision and validate external config, Demo database identity, model revision, controlled
+1. Correct and qualify the bounded frontend UUID-v4 compatibility blocker without changing
+   authority, idempotency, API, backend, or LAN security behavior.
+2. Provision and validate external config, Demo database identity, model revision, controlled
    media, LAN/Mac reachability, and vMix output without starting authority commands.
-2. Run launcher preflight and capture bounded component/version/readiness evidence.
-3. Synchronize Devcon, confirm External Program Expectations, remove upstream connectivity, and
+3. Run launcher preflight and capture bounded component/version/readiness evidence.
+4. Synchronize Devcon, confirm External Program Expectations, remove upstream connectivity, and
    verify the durable cache remains visible.
-4. Execute one Session through Start, vMix media, Process/Transcribe, Presentation End, Package
+5. Execute one Session through Start, vMix media, Process/Transcribe, Presentation End, Package
    Ready, and Mark Moment from the Mac UI.
-5. Restart launcher-owned processes and verify reconstruction of Session, media, Operation,
+6. Restart launcher-owned processes and verify reconstruction of Session, media, Operation,
    Transcription Evidence, and declared Moment state.
-6. Repeat with representative accented/noisy non-customer samples and record limitations.
-7. Publish a factual result distinguishing passed, failed, unavailable, and unqualified facts.
+7. Repeat with representative accented/noisy non-customer samples and record limitations.
+8. Publish a factual result distinguishing passed, failed, unavailable, and unqualified facts.
 
 ## Files or modules expected to change
 
@@ -98,9 +107,11 @@ offline-cache behavior are demonstrated without expanding product semantics.
 | --- | --- |
 | docs/plans/demo-hardware-rehearsal.md | Plan, progress, and completion record |
 | docs/validation/results/demo-hardware-rehearsal-001.md | Factual result after execution |
+| frontend/src/shared/ids and Demo command construction | UUID-v4 LAN compatibility fix and tests |
 | External Demo configuration | Local-only values and secret references; never committed |
 
-No production source, dependency, migration, schema, or runtime-default change is planned.
+A bounded frontend production-source correction is authorized and implemented. No dependency,
+migration, schema, backend, API, authority, trust-boundary, or runtime-default change is planned.
 
 ## Data or migration considerations
 
@@ -135,6 +146,8 @@ record secret values, media paths, raw diagnostics, or unapproved transcript tex
 
 ## Acceptance criteria
 
+- [x] Frontend UUID-v4 generation supports native randomUUID and a cryptographic
+  getRandomValues-only fallback, including Demo command operation IDs.
 - [ ] External config, Demo DSN, exact model revision, controlled media, vMix output, and LAN
   identities are verified without secret or private-path disclosure.
 - [ ] The real Razer stack starts with backend/PostgreSQL loopback-only and Next.js reachable from
@@ -166,7 +179,7 @@ or alter production. Revert documentation-only commits if the plan is abandoned.
 - Files and migrations actually changed:
 - Commands and tests actually run:
 - Results and warnings:
-- Execution authority used: Green autonomous validation-only rehearsal workstream.
+- Execution authority used: Green autonomous rehearsal plus bounded compatibility correction.
 - Approved deviations:
 - Rollback status:
 - Remaining work:

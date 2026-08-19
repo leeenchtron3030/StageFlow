@@ -8,7 +8,7 @@
     "build": "next build",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "node --test src/experience/presentation.test.ts src/experience/demo-proxy.test.ts"
+    "test": "node --test src/experience/presentation.test.ts src/experience/demo-proxy.test.ts src/shared/ids/uuid-v4.test.ts"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.101.2",
