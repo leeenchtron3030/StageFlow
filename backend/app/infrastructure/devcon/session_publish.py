@@ -123,6 +123,15 @@ def _request_headers(
     return headers
 
 
+def _durable_request_headers() -> dict[str, str]:
+    return {
+        "Accept": "application/vnd.github.raw+json",
+        "Cache-Control": "no-cache",
+        "User-Agent": "StageFlow-Demo-Devcon-Publish/1.0",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+
+
 _REJECTION_REASONS = {
     (400, "no body"): "no_body",
     (400, "invalid id"): "invalid_id",
@@ -149,6 +158,7 @@ def _publish_rejection(
 
 class DevconSessionPublishAdapter:
     _maximum_response_bytes = 2 * 1024 * 1024
+    _durable_base_url = "https://api.github.com/repos/efdevcon/monorepo/contents"
 
     def __init__(
         self,
@@ -190,6 +200,44 @@ class DevconSessionPublishAdapter:
             event_id=_required_text(data.get("eventId"), "event_id"),
             transcript_text=transcript,
             duration_seconds=_optional_duration(data.get("duration")),
+        )
+
+    def get_durable_session(
+        self, *, event_id: str, session_id: str
+    ) -> RemoteDevconSession:
+        normalized_event_id = event_id.strip()
+        normalized_session_id = session_id.strip()
+        if not normalized_event_id:
+            raise ValueError("devcon_publish_event_id_required")
+        if not normalized_session_id:
+            raise ValueError("devcon_publish_session_id_required")
+        path = (
+            "devcon-api/data/sessions/"
+            f"{quote(normalized_event_id, safe='')}/"
+            f"{quote(normalized_session_id, safe='')}.json"
+        )
+        status, payload = self._requester(
+            "GET",
+            f"{self._durable_base_url}/{path}?ref=main",
+            None,
+            _durable_request_headers(),
+            self._timeout_seconds,
+            self._maximum_response_bytes,
+        )
+        if status != 200 or payload is None:
+            raise DevconPublishError(
+                f"devcon_publish_durable_http_status_{status}"
+            )
+        transcript = payload.get("transcript_text")
+        if transcript is not None and not isinstance(transcript, str):
+            raise DevconPublishContractError(
+                "devcon_publish_durable_transcript_text_invalid"
+            )
+        return RemoteDevconSession(
+            session_id=_required_text(payload.get("id"), "durable_session_id"),
+            event_id=_required_text(payload.get("eventId"), "durable_event_id"),
+            transcript_text=transcript,
+            duration_seconds=_optional_duration(payload.get("duration")),
         )
 
     def put_enrichment(

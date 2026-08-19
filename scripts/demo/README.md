@@ -85,11 +85,19 @@ Publish this StageFlow enrichment to Devcon? [y/N]
 
 Confirmation is bound to a SHA-256 digest of the exact candidate. Before the PUT, the
 controller reconstructs current local state and rejects any digest change. It sends one
-bounded PUT with exactly the two named fields, then requires two matching GETs: immediate
-read-back and durability verification. It never retries the PUT automatically.
+bounded PUT with exactly the two named fields. After HTTP 204, it verifies the exact
+Git-backed devcon-api/data/sessions/{eventId}/{sessionId}.json file using credential-free,
+cache-bypassing reads. A durable mismatch fails closed.
 
-`-ConfirmHumanAuthority` is available only when the human confirmation is already
+Public GET /sessions/:id is cache-sensitive (max-age=60,
+stale-while-revalidate=120), so it is convergence evidence rather than durability
+authority. The controller performs only bounded GET polling: one immediate check followed
+by at most three 65-second waits. Matching durable Git state plus a still-stale public API
+returns published_durable_api_stale, not publication failure. A later match returns
+published_durable_api_converged. No read result can cause a second PUT.
+
+-ConfirmHumanAuthority is available only when the human confirmation is already
 explicitly captured by the invoking operator workflow. It does not bypass package,
-identity, credential, digest, read-back, or durability gates.
+identity, credential, digest, durable Git, or public-convergence gates.
 
 This is Demo tooling, not a production publisher or a LAN-exposed Devcon write surface.

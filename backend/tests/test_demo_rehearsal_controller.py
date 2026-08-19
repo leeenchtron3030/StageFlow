@@ -202,15 +202,27 @@ def test_no_session_summary_is_bounded_and_non_authoritative() -> None:
 
 
 class FakeDevconAdapter:
-    def __init__(self, candidate_text: str = "sensitive transcript sentence") -> None:
+    def __init__(
+        self,
+        candidate_text: str = "sensitive transcript sentence",
+        *,
+        public_values: tuple[tuple[str | None, int | None], ...] | None = None,
+        durable_matches: bool = True,
+    ) -> None:
         self.candidate_text = candidate_text
+        self.public_values = public_values or (
+            (None, 0),
+            (candidate_text, 1800),
+        )
+        self.durable_matches = durable_matches
         self.get_calls = 0
+        self.durable_calls: list[tuple[str, str]] = []
         self.put_calls: list[dict[str, object]] = []
 
     def get_session(self, session_id: str) -> RemoteDevconSession:
+        value_index = min(self.get_calls, len(self.public_values) - 1)
+        transcript, duration = self.public_values[value_index]
         self.get_calls += 1
-        transcript = None if self.get_calls == 1 else self.candidate_text
-        duration = 0 if self.get_calls == 1 else 1800
         return RemoteDevconSession(
             session_id=session_id,
             event_id="test-devcon-8",
@@ -218,11 +230,26 @@ class FakeDevconAdapter:
             duration_seconds=duration,
         )
 
+    def get_durable_session(
+        self, *, event_id: str, session_id: str
+    ) -> RemoteDevconSession:
+        self.durable_calls.append((event_id, session_id))
+        return RemoteDevconSession(
+            session_id=session_id,
+            event_id=event_id,
+            transcript_text=(
+                self.candidate_text
+                if self.durable_matches
+                else "different durable transcript"
+            ),
+            duration_seconds=1800,
+        )
+
     def put_enrichment(self, **values: object) -> None:
         self.put_calls.append(values)
 
 
-def test_publish_preview_and_execution_require_confirmation_and_verify_twice() -> None:
+def test_publish_preview_and_execution_distinguish_verification_states() -> None:
     candidate = build_devcon_publish_candidate(_kernel(), _workspace())
     preview_adapter = FakeDevconAdapter()
     preview = preview_devcon_publish(
@@ -251,6 +278,7 @@ def test_publish_preview_and_execution_require_confirmation_and_verify_twice() -
             adapter=denied_adapter,  # type: ignore[arg-type]
         )
     assert denied_adapter.get_calls == 0
+    assert denied_adapter.durable_calls == []
     assert denied_adapter.put_calls == []
 
     adapter = FakeDevconAdapter(candidate.transcript_text)
@@ -262,7 +290,10 @@ def test_publish_preview_and_execution_require_confirmation_and_verify_twice() -
         adapter=adapter,  # type: ignore[arg-type]
     )
 
-    assert adapter.get_calls == 3
+    assert adapter.get_calls == 2
+    assert adapter.durable_calls == [
+        ("test-devcon-8", "a-dacc-vision-for-decentralized-ai")
+    ]
     assert len(adapter.put_calls) == 1
     assert set(adapter.put_calls[0]) == {
         "session_id",
@@ -270,13 +301,98 @@ def test_publish_preview_and_execution_require_confirmation_and_verify_twice() -
         "transcript_text",
         "duration_seconds",
     }
+    assert result["write_accepted"] is True
+    assert result["durable_persistence_verified"] is True
+    assert result["public_api_convergence_verified"] is True
+    assert result["publication_status"] == "published_durable_api_converged"
     assert result["read_back_verified"] is True
     assert result["durability_verified"] is True
     assert "secret-value" not in json.dumps(result)
     assert candidate.transcript_text not in json.dumps(result)
 
 
-def test_rejected_publish_does_not_retry_or_run_read_back() -> None:
+def test_stale_public_get_with_durable_match_is_success_without_second_put() -> None:
+    candidate = build_devcon_publish_candidate(_kernel(), _workspace())
+    adapter = FakeDevconAdapter(
+        candidate.transcript_text,
+        public_values=((None, 0),),
+    )
+
+    result = execute_devcon_publish(
+        candidate,
+        expected_digest=candidate.digest,
+        confirmed=True,
+        api_key="secret-value",
+        adapter=adapter,  # type: ignore[arg-type]
+        api_convergence_delays_seconds=(0.0,),
+    )
+
+    assert result["write_accepted"] is True
+    assert result["durable_persistence_verified"] is True
+    assert result["public_api_convergence_verified"] is False
+    assert result["public_api_state"] == "stale"
+    assert result["publication_status"] == "published_durable_api_stale"
+    assert adapter.get_calls == 2
+    assert len(adapter.durable_calls) == 1
+    assert len(adapter.put_calls) == 1
+
+
+def test_later_public_api_convergence_is_fully_verified_with_gets_only() -> None:
+    candidate = build_devcon_publish_candidate(_kernel(), _workspace())
+    adapter = FakeDevconAdapter(
+        candidate.transcript_text,
+        public_values=(
+            (None, 0),
+            (None, 0),
+            (candidate.transcript_text, 1800),
+        ),
+    )
+    sleep_calls: list[float] = []
+
+    result = execute_devcon_publish(
+        candidate,
+        expected_digest=candidate.digest,
+        confirmed=True,
+        api_key="secret-value",
+        adapter=adapter,  # type: ignore[arg-type]
+        api_convergence_delays_seconds=(0.0, 65.0),
+        sleeper=sleep_calls.append,
+    )
+
+    assert result["publication_status"] == "published_durable_api_converged"
+    assert result["public_api_convergence_verified"] is True
+    assert sleep_calls == [65.0]
+    assert adapter.get_calls == 3
+    assert len(adapter.durable_calls) == 1
+    assert len(adapter.put_calls) == 1
+
+
+def test_durable_git_mismatch_fails_closed_after_one_accepted_put() -> None:
+    candidate = build_devcon_publish_candidate(_kernel(), _workspace())
+    adapter = FakeDevconAdapter(
+        candidate.transcript_text,
+        durable_matches=False,
+    )
+
+    with pytest.raises(
+        DemoControllerError,
+        match=r"write_accepted_durable_git_mismatch$",
+    ):
+        execute_devcon_publish(
+            candidate,
+            expected_digest=candidate.digest,
+            confirmed=True,
+            api_key="secret-value",
+            adapter=adapter,  # type: ignore[arg-type]
+            api_convergence_delays_seconds=(0.0,),
+        )
+
+    assert adapter.get_calls == 1
+    assert len(adapter.durable_calls) == 1
+    assert len(adapter.put_calls) == 1
+
+
+def test_rejected_publish_does_not_retry_or_run_verification() -> None:
     candidate = build_devcon_publish_candidate(_kernel(), _workspace())
 
     class RejectingDevconAdapter(FakeDevconAdapter):
@@ -298,7 +414,30 @@ def test_rejected_publish_does_not_retry_or_run_read_back() -> None:
         )
 
     assert adapter.get_calls == 1
+    assert adapter.durable_calls == []
     assert len(adapter.put_calls) == 1
+
+
+def test_api_convergence_bounds_fail_before_any_remote_request() -> None:
+    candidate = build_devcon_publish_candidate(_kernel(), _workspace())
+    adapter = FakeDevconAdapter(candidate.transcript_text)
+
+    with pytest.raises(
+        ValueError,
+        match=r"api_convergence_bounds_invalid$",
+    ):
+        execute_devcon_publish(
+            candidate,
+            expected_digest=candidate.digest,
+            confirmed=True,
+            api_key="secret-value",
+            adapter=adapter,  # type: ignore[arg-type]
+            api_convergence_delays_seconds=(0.0, 0.0, 0.0, 0.0, 0.0),
+        )
+
+    assert adapter.get_calls == 0
+    assert adapter.durable_calls == []
+    assert adapter.put_calls == []
 
 
 def test_publish_requires_package_approval() -> None:

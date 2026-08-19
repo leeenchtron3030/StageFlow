@@ -405,8 +405,10 @@ function Publish-Devcon {
     $result = Invoke-DemoPython -Arguments @(
         "publish", "--expected-digest", [string]$preview.candidate_digest, "--confirmed"
     ) -Capture | ConvertFrom-Json
-    "Devcon publish read-back verified: $($result.read_back_verified)"
-    "Devcon publish durability verified: $($result.durability_verified)"
+    "Devcon write accepted: $(if ($result.write_accepted) { 'YES' } else { 'NO' })"
+    "Devcon durable Git persistence verified: $(if ($result.durable_persistence_verified) { 'YES' } else { 'NO' })"
+    "Devcon public API convergence: $([string]$result.public_api_state)"
+    "Devcon publication status: $([string]$result.publication_status)"
 }
 
 $configuration = $null

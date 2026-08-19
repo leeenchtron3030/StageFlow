@@ -135,6 +135,55 @@ def test_session_publish_adapter_uses_sources_contract_and_only_approved_fields(
         "duration": 120,
     }
 
+def test_durable_session_reader_uses_exact_git_file_without_credentials() -> None:
+    requests: list[
+        tuple[str, str, bytes | None, Mapping[str, str]]
+    ] = []
+
+    def request(
+        method: str,
+        url: str,
+        body: bytes | None,
+        headers: Mapping[str, str],
+        timeout: int,
+        maximum_bytes: int,
+    ) -> tuple[int, Mapping[str, object] | None]:
+        requests.append((method, url, body, headers))
+        assert timeout == 5
+        assert maximum_bytes == 2 * 1024 * 1024
+        return (
+            200,
+            {
+                "id": "target-session",
+                "eventId": "test-devcon-8",
+                "transcript_text": "durable synthetic transcript",
+                "duration": 120,
+            },
+        )
+
+    adapter = DevconSessionPublishAdapter(timeout_seconds=5, requester=request)
+    durable = adapter.get_durable_session(
+        event_id="test-devcon-8",
+        session_id="target-session",
+    )
+
+    assert durable.session_id == "target-session"
+    assert durable.event_id == "test-devcon-8"
+    assert durable.duration_seconds == 120
+    method, url, body, headers = requests[0]
+    parsed_url = urlsplit(url)
+    assert method == "GET"
+    assert parsed_url.path == (
+        "/repos/efdevcon/monorepo/contents/"
+        "devcon-api/data/sessions/test-devcon-8/target-session.json"
+    )
+    assert parsed_url.query == "ref=main"
+    assert body is None
+    assert headers["Accept"] == "application/vnd.github.raw+json"
+    assert headers["Cache-Control"] == "no-cache"
+    assert "x-api-key" not in headers
+
+
 
 def test_urllib_request_sends_json_headers_content_length_and_unicode() -> None:
     CapturingHandler.observed = {}
