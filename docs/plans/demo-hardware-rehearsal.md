@@ -1,0 +1,172 @@
+# Demo hardware rehearsal
+
+## Status
+
+In progress - prerequisite provisioning pending
+
+## Execution authority
+
+- Classification: Green autonomous, validation-only
+- Authority evidence: the explicit 2026-08-19 request to begin a separate Demo Hardware
+  Rehearsal workstream after merged PR #63; the completed
+  [Demo Single-Stage Vertical Slice](demo-single-stage-vertical-slice.md); accepted
+  ADR-0022 through ADR-0025 and ADR-0027; and the scoped Demo 1 transcription baseline.
+- Implementation-ready: Yes for prerequisite verification, rehearsal, and evidence capture.
+  No product-capability implementation is authorized.
+- Required escalation or approval, if any: stop for any proposed production code, dependency,
+  schema, migration, public contract, authority-semantic, trust-boundary, or Devcon-write change.
+  Production deployment and production-data access remain prohibited.
+
+## Related findings or ADRs
+
+- Finding/disposition: Demo 1 and the first local transcription implementation are accepted;
+  broader provider/model selection remains conditional on representative accented/noisy evidence.
+- ADR: ADR-0022 through ADR-0025 and ADR-0027.
+- Engineering Directive or other authority: merged PR #63; Product Constitution; ED-0053.
+
+## Problem statement
+
+The Demo Single-Stage Vertical Slice is implemented and CI-qualified, but it has not run as a
+real Razer/vMix/Next.js/Mac system. This workstream must provision approved external
+prerequisites, exercise the merged architecture without adding product capability, and record
+truthful evidence without implying production or Event readiness.
+
+## Verified current behavior
+
+- PR #63 merged to main at f4e0398721ea29f9e5de116694aeeee0354e51d3 with both GitHub
+  quality-matrix jobs green.
+- The Razer reports an NVIDIA GeForce RTX 3080 Ti Laptop GPU with driver 581.57.
+- vMix is present at its common Windows installation location and frontend dependencies exist.
+- No concrete examples/demo-single-stage.toml exists. The documented model and media
+  directories are absent, and STAGEFLOW_DEMO_POSTGRES_DSN is absent at Windows User scope.
+- The prior bounded launcher run stopped with configured_media_source_unavailable and did not
+  prove a successful live stack.
+
+## Desired behavior
+
+Using external configuration and non-customer rehearsal media, the Razer runs the merged
+launcher, loopback backend/PostgreSQL, vMix media path, CUDA worker, and LAN-facing Next.js UI.
+A Mac exercises explicit human controls and observes bounded Program Expectations, Operations,
+Transcription Evidence, provenance, timing, limitations, and declared Moments. Restart and
+offline-cache behavior are demonstrated without expanding product semantics.
+
+## In scope
+
+- Provision and verify an external concrete Demo config, Demo database secret, exact qualified
+  large-v3-turbo model revision, controlled media directory, LAN identity, and vMix output.
+- Run launcher, Devcon online-to-offline cache, vMix media, CUDA worker, Mac UI, human controls,
+  restart, and reconstruction checks.
+- Use synthetic, licensed, or consented non-customer accented/noisy samples.
+- Capture bounded evidence and correct only a demonstrated Green rehearsal blocker.
+
+## Out of scope
+
+- New product features, providers, models, dependencies, schemas, migrations, APIs, authority
+  semantics, automatic Session/Moment behavior, Devcon writes, production deployment, and
+  production or customer data.
+- Broader provider/model acceptance or an Event-readiness claim.
+- Committing DSNs, credentials, model files, media, transcripts, raw provider payloads, or
+  private local paths.
+
+## Constraints
+
+- Architecture and terminology constraints: Program Expectations remain External; Transcript
+  Evidence remains non-authoritative; human commands remain explicit and attributable.
+- Compatibility constraints: exercise merged PR #63 without intentional contract changes.
+- Offline/event-mode constraints: demonstrate local operation after explicit Devcon sync.
+- Security and data-handling constraints: backend/PostgreSQL remain loopback-only; only Next.js
+  binds to the trusted Demo LAN; secrets and transcript content stay out of normal logs and
+  browser storage.
+
+## Implementation approach
+
+1. Provision and validate external config, Demo database identity, model revision, controlled
+   media, LAN/Mac reachability, and vMix output without starting authority commands.
+2. Run launcher preflight and capture bounded component/version/readiness evidence.
+3. Synchronize Devcon, confirm External Program Expectations, remove upstream connectivity, and
+   verify the durable cache remains visible.
+4. Execute one Session through Start, vMix media, Process/Transcribe, Presentation End, Package
+   Ready, and Mark Moment from the Mac UI.
+5. Restart launcher-owned processes and verify reconstruction of Session, media, Operation,
+   Transcription Evidence, and declared Moment state.
+6. Repeat with representative accented/noisy non-customer samples and record limitations.
+7. Publish a factual result distinguishing passed, failed, unavailable, and unqualified facts.
+
+## Files or modules expected to change
+
+| Path or module | Expected change |
+| --- | --- |
+| docs/plans/demo-hardware-rehearsal.md | Plan, progress, and completion record |
+| docs/validation/results/demo-hardware-rehearsal-001.md | Factual result after execution |
+| External Demo configuration | Local-only values and secret references; never committed |
+
+No production source, dependency, migration, schema, or runtime-default change is planned.
+
+## Data or migration considerations
+
+No schema or migration is authorized. Use only an approved development/Demo database. Cleanup
+may remove only data created by the rehearsal and identified by recorded Event, Stage, Session,
+Operation, or command identities. Abort if ownership is uncertain. Migration reversal is not
+normal rehearsal cleanup.
+
+## Failure and recovery considerations
+
+- Stop if any database identity, model revision, CUDA mode, source, LAN bind, or upstream identity
+  differs from the approved configuration.
+- Preserve failed Operation and bounded launcher output; do not hide failure by changing provider,
+  model, device, compute type, or authority semantics.
+- Stop only launcher-owned processes. Restart must use durable state, not browser/process memory.
+- Abort cleanup if unexpected dependencies or non-rehearsal data appear.
+
+## Observability requirements
+
+Record versions, GPU/device/compute type, profile/deployment identity, loopback/LAN binds, Devcon
+cache state, Session/package revisions, media lifecycle, Operation state, transcript evidence
+provenance/timing/limitations, Moment lineage, restart outcome, and bounded failure codes. Never
+record secret values, media paths, raw diagnostics, or unapproved transcript text.
+
+## Test strategy
+
+- Keep the merged backend/frontend/launcher validation as baseline.
+- Run real launcher preflight and verify profile/model/CUDA/loopback/LAN facts.
+- Exercise real Devcon offline cache and controlled vMix discovery/association.
+- Exercise the real worker, transcript projection, controls, restart, and Mac UI.
+- Run secret/privacy checks and git diff --check for evidence-document changes.
+
+## Acceptance criteria
+
+- [ ] External config, Demo DSN, exact model revision, controlled media, vMix output, and LAN
+  identities are verified without secret or private-path disclosure.
+- [ ] The real Razer stack starts with backend/PostgreSQL loopback-only and Next.js reachable from
+  the trusted Mac.
+- [ ] Real Devcon Program Expectations remain External and visible from cache while offline.
+- [ ] Controlled vMix media reaches safe Session association, a durable Operation, and real
+  CUDA/float16 Transcription Evidence.
+- [ ] The Mac UI shows bounded evidence and attributable controls without persistence, path/secret
+  exposure, or Devcon write capability.
+- [ ] Restart reconstructs important Session/media/Operation/evidence/Moment state.
+- [ ] Accented/noisy non-customer samples are evaluated without an automatic broader claim.
+- [ ] A factual result distinguishes rehearsal success from production or Event certification.
+
+## Rollback or reversal
+
+Stop only launcher-owned processes, preserve evidence, and remove only recorded rehearsal-owned
+database rows or non-customer artifacts. Do not reverse migration 0008, delete unrelated state,
+or alter production. Revert documentation-only commits if the plan is abandoned.
+
+## Open questions
+
+- Which external path will hold the concrete Demo config and exact model revision?
+- Which Demo database, LAN address, Mac, vMix output directory, and approved non-customer corpus
+  will be used?
+
+## Completion record
+
+- Implemented revision:
+- Files and migrations actually changed:
+- Commands and tests actually run:
+- Results and warnings:
+- Execution authority used: Green autonomous validation-only rehearsal workstream.
+- Approved deviations:
+- Rollback status:
+- Remaining work:
