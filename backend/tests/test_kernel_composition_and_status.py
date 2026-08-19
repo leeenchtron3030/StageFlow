@@ -109,6 +109,7 @@ def test_kernel_status_route_is_read_only_and_reports_unconfigured() -> None:
 
     assert response.status_code == 200
     assert response.json()["configured"] is False
+    assert response.json()["runtime_profile"] is None
     assert response.json()["configuration_supplied"] is False
     assert response.json()["configuration_valid"] is None
     assert response.json()["runtime_composed"] is False
@@ -289,6 +290,7 @@ def test_explicit_bootstrap_and_startup_reconciliation_use_observed_source_state
     assert "startup_reconciliation_failed" in unavailable.attention_codes
     assert any("source_unavailable" in code for code in unavailable.attention_codes)
     assert unavailable_response.json()["configured"] is True
+    assert unavailable_response.json()["runtime_profile"] == "standard"
     assert unavailable_response.json()["configuration_supplied"] is True
     assert unavailable_response.json()["configuration_valid"] is True
     assert unavailable_response.json()["runtime_composed"] is True

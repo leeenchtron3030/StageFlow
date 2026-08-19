@@ -66,3 +66,29 @@ This directory is reserved for repository maintenance and developer utility scri
 - [Frontend launch guide](../frontend/README.md) documents locked npm setup, fixture/live
   distinction, shutdown, common failures, routes, validation, security triage, and current
   limitations.
+
+## Demo single-stage launcher
+
+- [`Start-StageFlowDemo.ps1`](demo/Start-StageFlowDemo.ps1) starts the bounded Demo 1
+  profile after database, media-source, public Devcon-program, NVIDIA CUDA, and exact
+  local-transcription preflight checks pass. The backend remains on loopback while the
+  producer UI binds to one selected LAN IPv4 address.
+
+  ```powershell
+  cd backend
+  uv sync --dev --group transcription --locked
+  cd ..\frontend
+  npm ci
+  cd ..
+  .\scripts\demo\Start-StageFlowDemo.ps1 `
+    -ConfigPath .\examples\demo-single-stage.toml `
+    -OperatorId <operator-uuid>
+  ```
+
+  `OperatorId` is mandatory attribution for human authority commands; controls remain
+  disabled when it is absent. The configuration names the process environment variable
+  that contains the PostgreSQL DSN; the launcher never prints or persists that value.
+  Devcon program data is fetched
+  only during the explicit startup sync and remains available from the durable cache if
+  connectivity is subsequently lost. Press Ctrl+C to stop only launcher-owned child
+  processes.

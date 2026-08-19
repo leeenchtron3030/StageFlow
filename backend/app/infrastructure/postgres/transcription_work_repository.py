@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from dataclasses import replace
 from datetime import datetime, timedelta
 from typing import Any, cast
 
@@ -183,11 +184,41 @@ class PostgresWorkExecutionRepository(WorkExecutionRepository):
                 ).fetchone()
                 if existing is not None:
                     restored = _worker(existing)
-                    if restored != worker:
+                    if (
+                        restored.id != worker.id
+                        or restored.node_id != worker.node_id
+                        or restored.deployment_id != worker.deployment_id
+                        or restored.event_id != worker.event_id
+                    ):
                         raise WorkExecutionConflictError(
                             "worker_identity_conflict"
                         )
-                    return restored
+                    if (
+                        restored.enabled == worker.enabled
+                        and restored.draining == worker.draining
+                        and restored.implementation_version
+                        == worker.implementation_version
+                    ):
+                        return restored
+                    updated = connection.execute(
+                        """
+                        UPDATE stageflow.work_worker
+                        SET enabled = %s, draining = %s,
+                            implementation_version = %s,
+                            revision = revision + 1, updated_at = %s
+                        WHERE worker_id = %s
+                        RETURNING *
+                        """,
+                        (
+                            worker.enabled,
+                            worker.draining,
+                            worker.implementation_version,
+                            worker.updated_at,
+                            worker.id.value,
+                        ),
+                    ).fetchone()
+                    assert updated is not None
+                    return _worker(updated)
                 connection.execute(
                     """
                     INSERT INTO stageflow.work_worker (
@@ -234,7 +265,12 @@ class PostgresWorkExecutionRepository(WorkExecutionRepository):
                 ).fetchone()
                 if existing is not None:
                     restored = _capability(existing)
-                    if restored != capability:
+                    replay = replace(
+                        capability,
+                        effective_from=restored.effective_from,
+                        effective_until=restored.effective_until,
+                    )
+                    if restored != replay:
                         raise WorkExecutionConflictError(
                             "worker_capability_identity_conflict"
                         )
@@ -1139,6 +1175,69 @@ class PostgresWorkExecutionRepository(WorkExecutionRepository):
                     assert updated is not None
                     reconciled.append(_operation(updated))
                 return tuple(reconciled)
+        except (psycopg.InterfaceError, psycopg.OperationalError) as exc:
+            raise WorkExecutionStorageUnavailableError(
+                "postgresql_work_execution_unavailable"
+            ) from exc
+
+    def list_operations(
+        self,
+        *,
+        deployment_id: str,
+        event_id: EntityId | None,
+        limit: int = 100,
+    ) -> tuple[DurableOperation, ...]:
+        if limit < 1 or limit > 500:
+            raise ValueError("limit must be between 1 and 500")
+        try:
+            with self._connect() as connection:
+                rows = connection.execute(
+                    """
+                    SELECT * FROM stageflow.work_operation
+                    WHERE deployment_id = %s
+                      AND event_id IS NOT DISTINCT FROM %s
+                    ORDER BY created_at DESC, operation_id
+                    LIMIT %s
+                    """,
+                    (
+                        deployment_id,
+                        None if event_id is None else event_id.value,
+                        limit,
+                    ),
+                ).fetchall()
+                return tuple(_operation(row) for row in rows)
+        except (psycopg.InterfaceError, psycopg.OperationalError) as exc:
+            raise WorkExecutionStorageUnavailableError(
+                "postgresql_work_execution_unavailable"
+            ) from exc
+
+    def list_transcript_evidence_for_asset(
+        self,
+        asset_id: EntityId,
+        *,
+        limit: int = 10,
+    ) -> tuple[TranscriptEvidenceRevision, ...]:
+        if limit < 1 or limit > 100:
+            raise ValueError("limit must be between 1 and 100")
+        try:
+            with self._connect() as connection:
+                rows = connection.execute(
+                    """
+                    SELECT evidence_id
+                    FROM stageflow.transcript_evidence_revision
+                    WHERE asset_id = %s
+                    ORDER BY evidence_revision DESC, applied_at DESC
+                    LIMIT %s
+                    """,
+                    (asset_id.value, limit),
+                ).fetchall()
+                return tuple(
+                    self._load_evidence(
+                        connection,
+                        EntityId(str(row["evidence_id"])),
+                    )
+                    for row in rows
+                )
         except (psycopg.InterfaceError, psycopg.OperationalError) as exc:
             raise WorkExecutionStorageUnavailableError(
                 "postgresql_work_execution_unavailable"

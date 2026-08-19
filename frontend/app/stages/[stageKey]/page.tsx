@@ -8,5 +8,6 @@ export default async function StagePage({ params, searchParams }: { params: Prom
   const [route, query] = await Promise.all([params, searchParams]);
   const workspace = await loadWorkspace({ scenario: typeof query.scenario === "string" ? query.scenario : undefined, includeTimingEvidence: true });
   const stage = workspace.stages.find((item) => item.key === decodeURIComponent(route.stageKey));
-  return <OperationalShell activePath="/" workspace={workspace}><StageOperationalView stage={stage} workspace={workspace} /></OperationalShell>;
+  const demoActorId = process.env.STAGEFLOW_DEMO_OPERATOR_ID;
+  return <OperationalShell activePath="/" workspace={workspace}><StageOperationalView demoActorId={demoActorId} stage={stage} workspace={workspace} /></OperationalShell>;
 }

@@ -6,6 +6,7 @@ from collections.abc import Mapping
 from enum import StrEnum
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from types import MappingProxyType
+from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -26,6 +27,100 @@ class NetworkPolicy(StrEnum):
     OFFLINE = "offline"
     LOCAL_ONLY = "local_only"
     OPTIONAL = "optional"
+
+
+class RuntimeProfile(StrEnum):
+    STANDARD = "standard"
+    DEMO_SINGLE_STAGE = "demo-single-stage"
+
+
+class DevconReadConfiguration(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    base_url: str = "https://api.devcon.org"
+    event_id: str
+    room_id: str
+    page_size: int = Field(default=500, ge=1, le=1000)
+    maximum_catalog_sessions: int = Field(default=5000, ge=1, le=10_000)
+    timeout_seconds: int = Field(default=10, ge=1, le=30)
+
+    @field_validator("event_id", "room_id")
+    @classmethod
+    def non_empty(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("value must not be empty")
+        return normalized
+
+    @field_validator("base_url")
+    @classmethod
+    def official_https_endpoint(cls, value: str) -> str:
+        normalized = value.strip().rstrip("/")
+        parsed = urlsplit(normalized)
+        if (
+            parsed.scheme != "https"
+            or parsed.hostname != "api.devcon.org"
+            or parsed.port is not None
+            or parsed.path not in {"", "/"}
+            or parsed.query
+            or parsed.fragment
+        ):
+            raise ValueError("Devcon read base_url must be https://api.devcon.org")
+        return "https://api.devcon.org"
+
+
+class LocalTranscriptionConfiguration(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    provider: str = "faster-whisper"
+    model_id: str = "large-v3-turbo"
+    model_version: str
+    model_path: str
+    device: str = "cuda"
+    compute_type: str = "float16"
+    execution_profile_id: str = "faster-whisper-large-v3-turbo-cuda-float16"
+    execution_profile_version: str = "1.0"
+
+    @field_validator(
+        "provider",
+        "model_id",
+        "model_version",
+        "model_path",
+        "device",
+        "compute_type",
+        "execution_profile_id",
+        "execution_profile_version",
+    )
+    @classmethod
+    def non_empty(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("value must not be empty")
+        return normalized
+
+    @field_validator("model_path")
+    @classmethod
+    def absolute_model_path(cls, value: str) -> str:
+        windows = PureWindowsPath(value)
+        posix = PurePosixPath(value)
+        if not windows.is_absolute() and not posix.is_absolute():
+            raise ValueError("transcription model path must be absolute")
+        if ".." in windows.parts or ".." in posix.parts:
+            raise ValueError("transcription model path cannot contain parent traversal")
+        return value
+
+    @model_validator(mode="after")
+    def qualified_demo_baseline(self) -> LocalTranscriptionConfiguration:
+        if (
+            self.provider != "faster-whisper"
+            or self.model_id != "large-v3-turbo"
+            or self.device != "cuda"
+            or self.compute_type != "float16"
+        ):
+            raise ValueError(
+                "Demo transcription must use faster-whisper large-v3-turbo CUDA float16"
+            )
+        return self
 
 
 class SourceBindingConfiguration(BaseModel):
@@ -140,6 +235,7 @@ class KernelDeploymentConfiguration(BaseModel):
     schema_version: str
     deployment_id: str
     node_id: str
+    runtime_profile: RuntimeProfile = RuntimeProfile.STANDARD
     node_role: NodeRole
     event_mode: EventModePolicy = EventModePolicy.EVENT
     network_policy: NetworkPolicy = NetworkPolicy.OPTIONAL
@@ -147,6 +243,8 @@ class KernelDeploymentConfiguration(BaseModel):
     event: EventDeploymentConfiguration
     resources: ResourceLimits = Field(default_factory=ResourceLimits)
     schedule_source_reference: str | None = None
+    devcon_read: DevconReadConfiguration | None = None
+    local_transcription: LocalTranscriptionConfiguration | None = None
 
     @field_validator(
         "schema_version",
@@ -171,6 +269,27 @@ class KernelDeploymentConfiguration(BaseModel):
             NetworkPolicy.OPTIONAL,
         }:
             raise ValueError("Event mode cannot require continuous Internet access")
+        if self.runtime_profile is RuntimeProfile.DEMO_SINGLE_STAGE:
+            if len(self.event.stages) != 1:
+                raise ValueError(
+                    "demo-single-stage runtime profile requires exactly one Stage"
+                )
+            if self.node_role is not NodeRole.NODE:
+                raise ValueError(
+                    "demo-single-stage runtime profile requires a StageFlow Node"
+                )
+            if self.network_policy is not NetworkPolicy.OPTIONAL:
+                raise ValueError(
+                    "demo-single-stage runtime profile requires optional Internet"
+                )
+            if self.devcon_read is None:
+                raise ValueError(
+                    "demo-single-stage runtime profile requires Devcon read configuration"
+                )
+            if self.local_transcription is None:
+                raise ValueError(
+                    "demo-single-stage runtime profile requires local transcription"
+                )
         return self
 
 
@@ -200,6 +319,7 @@ class EffectiveKernelConfiguration(BaseModel):
             "deployment_id": self.deployment.deployment_id,
             "node_id": self.deployment.node_id,
             "node_role": self.deployment.node_role.value,
+            "runtime_profile": self.deployment.runtime_profile.value,
             "event_mode": self.deployment.event_mode.value,
             "network_policy": self.deployment.network_policy.value,
             "event_key": self.deployment.event.key,
@@ -261,12 +381,15 @@ def load_kernel_deployment_configuration(
 
 
 __all__ = [
+    "DevconReadConfiguration",
     "EffectiveKernelConfiguration",
     "EventDeploymentConfiguration",
     "EventModePolicy",
     "KernelDeploymentConfiguration",
+    "LocalTranscriptionConfiguration",
     "NetworkPolicy",
     "NodeRole",
+    "RuntimeProfile",
     "ResourceLimits",
     "SourceBindingConfiguration",
     "StageDeploymentConfiguration",

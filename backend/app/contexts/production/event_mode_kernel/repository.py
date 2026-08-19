@@ -26,6 +26,7 @@ from .contracts import (
     MediaCandidate,
     MediaOperationalProjection,
     MediaRegistrationState,
+    PackageReadyDecision,
     ReconciliationRun,
     ReconciliationStatus,
     RegisteredMediaAsset,
@@ -67,6 +68,11 @@ class EventModeKernelRepository(ABC):
 
     @abstractmethod
     def get_program_expectation(self, expectation_id: EntityId) -> ProgramExpectation | None: ...
+
+    @abstractmethod
+    def list_program_expectations(
+        self, event_id: EntityId
+    ) -> tuple[ProgramExpectation, ...]: ...
 
     @abstractmethod
     def start_session(self, request: StartSessionRequest) -> Session: ...
@@ -136,6 +142,11 @@ class EventModeKernelRepository(ABC):
     def set_package_state(self, session_id: EntityId, state: str, at: datetime) -> Session: ...
 
     @abstractmethod
+    def declare_package_ready(
+        self, decision: PackageReadyDecision, *, request_digest: str
+    ) -> Session: ...
+
+    @abstractmethod
     def complete_session(
         self, decision: CompletionDecision, *, request_digest: str
     ) -> Session: ...
@@ -189,6 +200,7 @@ class InMemoryEventModeKernelRepository(EventModeKernelRepository):
         self._associations: dict[EntityId, MediaAssociation] = {}
         self._association_history: list[MediaAssociation] = []
         self._completion_history: list[CompletionDecision] = []
+        self._package_ready_history: list[PackageReadyDecision] = []
         self._approved_package_assets: dict[EntityId, tuple[EntityId, ...]] = {}
         self._human_commands: dict[
             EntityId, tuple[HumanCommandKind, str, object]
@@ -353,6 +365,25 @@ class InMemoryEventModeKernelRepository(EventModeKernelRepository):
     def get_program_expectation(self, expectation_id: EntityId) -> ProgramExpectation | None:
         with self._lock:
             return self._expectations.get(expectation_id)
+
+    def list_program_expectations(
+        self, event_id: EntityId
+    ) -> tuple[ProgramExpectation, ...]:
+        with self._lock:
+            return tuple(
+                sorted(
+                    (
+                        expectation
+                        for expectation in self._expectations.values()
+                        if expectation.event_id == event_id
+                    ),
+                    key=lambda expectation: (
+                        expectation.planned_start is None,
+                        expectation.planned_start,
+                        expectation.key,
+                    ),
+                )
+            )
 
     def start_session(self, request: StartSessionRequest) -> Session:
         from .contracts import SessionActivityState, SessionPackageState
@@ -753,6 +784,46 @@ class InMemoryEventModeKernelRepository(EventModeKernelRepository):
                 updated_at=at,
             )
             self._sessions[session_id] = updated
+            return updated
+
+    def declare_package_ready(
+        self, decision: PackageReadyDecision, *, request_digest: str
+    ) -> Session:
+        from .contracts import SessionActivityState, SessionPackageState
+
+        with self._lock:
+            replay = self._human_commands.get(decision.operation_id)
+            if replay is not None:
+                kind, prior_digest, result = replay
+                if kind is not HumanCommandKind.PACKAGE_READY or prior_digest != request_digest:
+                    raise KernelConflictError("human_command_operation_id_conflict")
+                assert isinstance(result, Session)
+                return result
+            session = self._sessions.get(decision.session_id)
+            if session is None:
+                raise KernelNotFoundError("session_not_found")
+            if decision.package_revision != session.package_revision:
+                raise KernelConflictError("package_revision_conflict")
+            if (
+                session.activity_state is not SessionActivityState.PRESENTATION_ENDED
+                or session.authoritative_end is None
+            ):
+                raise KernelConflictError("session_presentation_not_ended")
+            if session.package_state is not SessionPackageState.ASSEMBLING:
+                raise KernelConflictError("package_not_assembling")
+            updated = replace(
+                session,
+                package_state=SessionPackageState.READY_FOR_REVIEW,
+                revision=session.revision + 1,
+                updated_at=decision.decided_at,
+            )
+            self._sessions[session.id] = updated
+            self._package_ready_history.append(decision)
+            self._human_commands[decision.operation_id] = (
+                HumanCommandKind.PACKAGE_READY,
+                request_digest,
+                updated,
+            )
             return updated
 
     def complete_session(

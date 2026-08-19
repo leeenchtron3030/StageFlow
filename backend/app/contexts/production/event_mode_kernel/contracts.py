@@ -68,6 +68,7 @@ class HumanCommandKind(StrEnum):
     SESSION_START = "session_start"
     SESSION_BOUNDARY_CORRECTION = "session_boundary_correction"
     MEDIA_ASSIGNMENT = "media_assignment"
+    PACKAGE_READY = "package_ready"
     PACKAGE_COMPLETION = "package_completion"
 
 
@@ -370,6 +371,23 @@ class CompletionDecision:
 
 
 @dataclass(frozen=True, slots=True)
+class PackageReadyDecision:
+    id: EntityId
+    session_id: EntityId
+    package_revision: int
+    actor_id: EntityId
+    reason: str
+    decided_at: datetime
+    operation_id: EntityId
+
+    def __post_init__(self) -> None:
+        if self.package_revision < 1:
+            raise ValueError("package_revision must be positive.")
+        object.__setattr__(self, "reason", _text(self.reason, "reason"))
+        require_aware_datetime(self.decided_at, "decided_at")
+
+
+@dataclass(frozen=True, slots=True)
 class ReconciliationRun:
     id: EntityId
     event_id: EntityId
@@ -630,6 +648,7 @@ __all__ = [
     "MediaCandidate",
     "MediaOperationalProjection",
     "MediaRegistrationState",
+    "PackageReadyDecision",
     "ReconciliationRun",
     "ReconciliationStatus",
     "RegisteredMediaAsset",

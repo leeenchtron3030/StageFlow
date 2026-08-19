@@ -31,6 +31,7 @@ class PostgresMigrationRunner:
         self.apply_kernel_follow_up_closure()
         self.apply_media_timing_evidence_v1()
         self.apply_transcription_worker_v1()
+        self.apply_demo_vertical_slice_v1()
 
     def apply_kernel_follow_up_closure(self) -> None:
         self._execute_if_missing(
@@ -50,7 +51,14 @@ class PostgresMigrationRunner:
             version="0007_transcription_worker",
         )
 
+    def apply_demo_vertical_slice_v1(self) -> None:
+        self._execute_if_missing(
+            "0008_demo_vertical_slice_forward.sql",
+            version="0008_demo_vertical_slice",
+        )
+
     def reverse_event_mode_kernel_v1(self) -> None:
+        self.reverse_demo_vertical_slice_v1()
         self.reverse_transcription_worker_v1()
         self.reverse_media_timing_evidence_v1()
         self.reverse_kernel_follow_up_closure()
@@ -75,6 +83,12 @@ class PostgresMigrationRunner:
         self._execute_if_present(
             "0007_transcription_worker_reverse.sql",
             version="0007_transcription_worker",
+        )
+
+    def reverse_demo_vertical_slice_v1(self) -> None:
+        self._execute_if_present(
+            "0008_demo_vertical_slice_reverse.sql",
+            version="0008_demo_vertical_slice",
         )
 
     def _execute(self, filename: str) -> None:

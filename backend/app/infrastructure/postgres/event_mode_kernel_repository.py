@@ -33,6 +33,7 @@ from app.contexts.production.event_mode_kernel.contracts import (
     MediaCandidate,
     MediaOperationalProjection,
     MediaRegistrationState,
+    PackageReadyDecision,
     ReconciliationRun,
     ReconciliationStatus,
     RegisteredMediaAsset,
@@ -814,6 +815,23 @@ class PostgresEventModeKernelRepository(EventModeKernelRepository):
                     (expectation_id.value,),
                 ).fetchone()
                 return None if row is None else _expectation(row)
+        except psycopg.OperationalError as exc:
+            raise KernelStorageUnavailableError("postgresql_unavailable") from exc
+
+    def list_program_expectations(
+        self, event_id: EntityId
+    ) -> tuple[ProgramExpectation, ...]:
+        try:
+            with self._connect() as connection:
+                rows = connection.execute(
+                    """
+                    SELECT * FROM stageflow.program_expectation
+                    WHERE event_id = %s
+                    ORDER BY planned_start ASC NULLS LAST, expectation_key ASC
+                    """,
+                    (event_id.value,),
+                ).fetchall()
+                return tuple(_expectation(row) for row in rows)
         except psycopg.OperationalError as exc:
             raise KernelStorageUnavailableError("postgresql_unavailable") from exc
 
@@ -1679,6 +1697,90 @@ class PostgresEventModeKernelRepository(EventModeKernelRepository):
                 if row is None:
                     raise KernelNotFoundError("session_not_found")
                 return _session(row)
+        except psycopg.OperationalError as exc:
+            raise KernelStorageUnavailableError("postgresql_unavailable") from exc
+
+    def declare_package_ready(
+        self, decision: PackageReadyDecision, *, request_digest: str
+    ) -> Session:
+        try:
+            with self._connect() as connection:
+                replay_id = self._reserve_human_command(
+                    connection,
+                    operation_id=decision.operation_id,
+                    command_kind=HumanCommandKind.PACKAGE_READY,
+                    request_digest=request_digest,
+                    result_id=decision.id,
+                    recorded_at=decision.decided_at,
+                )
+                if replay_id is not None:
+                    replay = connection.execute(
+                        """
+                        SELECT session_id FROM stageflow.session_package_ready_history
+                        WHERE package_ready_decision_id = %s
+                        """,
+                        (replay_id.result_id.value,),
+                    ).fetchone()
+                    assert replay is not None
+                    if replay_id.result_snapshot is not None:
+                        return _session_from_result_snapshot(replay_id.result_snapshot)
+                    replayed_session = connection.execute(
+                        "SELECT * FROM stageflow.session WHERE session_id = %s",
+                        (str(replay["session_id"]),),
+                    ).fetchone()
+                    assert replayed_session is not None
+                    return _session(replayed_session)
+                row = connection.execute(
+                    "SELECT * FROM stageflow.session WHERE session_id = %s FOR UPDATE",
+                    (decision.session_id.value,),
+                ).fetchone()
+                if row is None:
+                    raise KernelNotFoundError("session_not_found")
+                current = _session(row)
+                if current.package_revision != decision.package_revision:
+                    raise KernelConflictError("package_revision_conflict")
+                if (
+                    current.activity_state is not SessionActivityState.PRESENTATION_ENDED
+                    or current.authoritative_end is None
+                ):
+                    raise KernelConflictError("session_presentation_not_ended")
+                if current.package_state is not SessionPackageState.ASSEMBLING:
+                    raise KernelConflictError("package_not_assembling")
+                updated = connection.execute(
+                    """
+                    UPDATE stageflow.session SET package_state = 'ready_for_review',
+                        revision = revision + 1, updated_at = %s
+                    WHERE session_id = %s RETURNING *
+                    """,
+                    (decision.decided_at, decision.session_id.value),
+                ).fetchone()
+                assert updated is not None
+                saved = _session(updated)
+                connection.execute(
+                    """
+                    INSERT INTO stageflow.session_package_ready_history (
+                        package_ready_decision_id, session_id, package_revision,
+                        actor_id, reason, decided_at, operation_id,
+                        resulting_session_revision
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    """,
+                    (
+                        decision.id.value,
+                        decision.session_id.value,
+                        decision.package_revision,
+                        decision.actor_id.value,
+                        decision.reason,
+                        decision.decided_at,
+                        decision.operation_id.value,
+                        saved.revision,
+                    ),
+                )
+                self._record_session_result(
+                    connection,
+                    operation_id=decision.operation_id,
+                    session=saved,
+                )
+                return saved
         except psycopg.OperationalError as exc:
             raise KernelStorageUnavailableError("postgresql_unavailable") from exc
 

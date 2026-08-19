@@ -1,5 +1,8 @@
 """PostgreSQL adapters and explicit schema migrations."""
 
+from app.infrastructure.postgres.editorial_moment_repository import (
+    PostgresEditorialMomentRepository,
+)
 from app.infrastructure.postgres.event_mode_kernel_repository import (
     PostgresEventModeKernelRepository,
 )
@@ -13,6 +16,7 @@ from app.infrastructure.postgres.transcription_work_repository import (
 )
 
 __all__ = [
+    "PostgresEditorialMomentRepository",
     "PostgresEventModeKernelRepository",
     "PostgresIngressRepository",
     "PostgresMediaTimingEvidenceRepository",
