@@ -82,11 +82,17 @@ This directory is reserved for repository maintenance and developer utility scri
   cd ..
   .\scripts\demo\Start-StageFlowDemo.ps1 `
     -ConfigPath .\examples\demo-single-stage.toml `
-    -OperatorId <operator-uuid>
+    -OperatorId <operator-uuid> `
+    -CudaRuntimePath C:\StageFlowDemo\runtime\whisper-cuda-12.4\Release
   ```
 
   `OperatorId` is mandatory attribution for human authority commands; controls remain
-  disabled when it is absent. The configuration names the process environment variable
+  disabled when it is absent. `CudaRuntimePath` names the isolated, qualified Demo CUDA
+  library directory. The launcher verifies its required libraries, prepends it only to
+  the launcher process and owned children, performs a real silent-audio inference probe,
+  and restores the prior process `PATH` on exit. It does not modify the system NVIDIA
+  driver or global CUDA environment. The configuration names the process
+  environment variable
   that contains the PostgreSQL DSN; the launcher never prints or persists that value.
   Devcon program data is fetched
   only during the explicit startup sync and remains available from the durable cache if

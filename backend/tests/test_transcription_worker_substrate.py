@@ -186,9 +186,10 @@ def transcript_result() -> NormalizedTranscriptResult:
 
 class FakeRepository(WorkExecutionRepository):
     def __init__(self, claim: OperationClaim) -> None:
-        self.claim: OperationClaim | None = claim
+        self.claims = [claim]
         self.renewal_count = 0
         self.applied: PendingTranscriptEvidence | None = None
+        self.failures: list[OperationFailure] = []
 
     def enqueue(self, pending: PendingOperation) -> DurableOperation:
         raise NotImplementedError
@@ -214,9 +215,8 @@ class FakeRepository(WorkExecutionRepository):
         raise NotImplementedError
 
     def claim_next(self, request: ClaimRequest) -> OperationClaim | None:
-        claim = self.claim
-        self.claim = None
-        return claim
+        del request
+        return None if not self.claims else self.claims.pop(0)
 
     def mark_running(self, claim: OperationClaim) -> OperationClaim:
         active = OperationClaim(
@@ -247,7 +247,19 @@ class FakeRepository(WorkExecutionRepository):
         claim: OperationClaim,
         failure: OperationFailure,
     ) -> DurableOperation:
-        return replace(claim.operation, status=OperationStatus.TERMINAL_FAILED)
+        self.failures.append(failure)
+        retry = (
+            failure.retryable
+            and claim.operation.attempt_count < claim.operation.max_attempts
+        )
+        return replace(
+            claim.operation,
+            status=(
+                OperationStatus.RETRY_WAIT
+                if retry
+                else OperationStatus.TERMINAL_FAILED
+            ),
+        )
 
     def apply_transcript_result(
         self,
@@ -329,6 +341,27 @@ class FailingAdapter:
         )
 
 
+class FailsOnceThenSucceedsAdapter:
+    def __init__(self, result: NormalizedTranscriptResult) -> None:
+        self.result = result
+        self.calls = 0
+
+    def execute(
+        self,
+        request: TranscriptionExecutionRequest,
+        renew_lease: Callable[[], None],
+    ) -> NormalizedTranscriptResult:
+        del request, renew_lease
+        self.calls += 1
+        if self.calls == 1:
+            raise TranscriptionExecutionError(
+                "provider_execution_failed",
+                retryable=True,
+                diagnostic_summary="faster-whisper execution failed",
+            )
+        return self.result
+
+
 def test_stable_work_key_excludes_schedule_but_enqueue_digest_does_not() -> None:
     value = operation_input()
     first = enqueue_request(value)
@@ -385,6 +418,62 @@ def test_worker_cycle_maps_typed_execution_failure_without_retry() -> None:
     worker = TranscriptionWorker(
         repository=FakeRepository(claim),
         execution_port=FailingAdapter(),
+    )
+
+    result = worker.run_once(
+        ClaimRequest(
+            worker_id=claim.attempt.worker_id,
+            network_policy=EventNetworkPolicy.LOCAL_ONLY,
+            lease_duration=timedelta(seconds=30),
+        )
+    )
+
+    assert result.outcome is WorkerCycleOutcome.TERMINAL_FAILED
+
+
+def test_worker_cycle_records_bounded_retry_and_processes_next_operation() -> None:
+    first_claim = claimed_operation(operation_input())
+    next_claim = claimed_operation(operation_input())
+    repository = FakeRepository(first_claim)
+    repository.claims.append(next_claim)
+    adapter = FailsOnceThenSucceedsAdapter(transcript_result())
+    worker = TranscriptionWorker(repository=repository, execution_port=adapter)
+    request = ClaimRequest(
+        worker_id=first_claim.attempt.worker_id,
+        network_policy=EventNetworkPolicy.LOCAL_ONLY,
+        lease_duration=timedelta(seconds=30),
+    )
+
+    failed = worker.run_once(request)
+    succeeded = worker.run_once(request)
+
+    assert failed.outcome is WorkerCycleOutcome.RETRY_SCHEDULED
+    assert failed.operation_id == first_claim.operation.id
+    assert repository.failures == [
+        OperationFailure(
+            reason_code="provider_execution_failed",
+            retryable=True,
+            diagnostic_summary="faster-whisper execution failed",
+        )
+    ]
+    assert succeeded.outcome is WorkerCycleOutcome.SUCCEEDED
+    assert succeeded.operation_id == next_claim.operation.id
+    assert repository.applied is not None
+    assert repository.applied.asset_id == next_claim.operation.input.asset_id
+
+
+def test_worker_cycle_stops_retrying_at_existing_max_attempts() -> None:
+    claim = claimed_operation(operation_input())
+    claim = OperationClaim(
+        operation=replace(
+            claim.operation,
+            attempt_count=claim.operation.max_attempts,
+        ),
+        attempt=claim.attempt,
+    )
+    worker = TranscriptionWorker(
+        repository=FakeRepository(claim),
+        execution_port=FailsOnceThenSucceedsAdapter(transcript_result()),
     )
 
     result = worker.run_once(

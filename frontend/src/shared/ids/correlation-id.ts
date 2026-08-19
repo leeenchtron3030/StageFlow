@@ -1,3 +1,5 @@
+import { generateUuidV4, type UuidCryptoSource } from "./uuid-v4.ts";
+
 declare const correlationIdBrand: unique symbol;
 
 export type CorrelationId = string & {
@@ -9,8 +11,8 @@ export function createCorrelationId(value: string): CorrelationId {
   return value as CorrelationId;
 }
 
-export function generateCorrelationId(): CorrelationId {
-  return createCorrelationId(crypto.randomUUID());
+export function generateCorrelationId(source?: UuidCryptoSource): CorrelationId {
+  return createCorrelationId(generateUuidV4(source));
 }
 
 function assertUuidCompatible(value: string, label: string): void {

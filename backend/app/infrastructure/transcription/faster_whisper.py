@@ -271,7 +271,7 @@ class FasterWhisperExecutionAdapter:
                 vad_filter=False,
                 condition_on_previous_text=True,
             )
-        except (OSError, RuntimeError, ValueError) as exc:
+        except (IndexError, OSError, RuntimeError, ValueError) as exc:
             raise _provider_failure(exc) from exc
 
         segments: list[TranscriptSegment] = []
@@ -340,6 +340,8 @@ class FasterWhisperExecutionAdapter:
                 )
         except TranscriptionExecutionError:
             raise
+        except IndexError as exc:
+            raise _provider_failure(exc) from exc
         except (OSError, RuntimeError, TypeError, ValueError) as exc:
             if not segments:
                 raise _provider_failure(exc) from exc

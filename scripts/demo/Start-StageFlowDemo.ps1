@@ -4,6 +4,8 @@ param(
     [string]$ConfigPath,
     [Parameter(Mandatory)]
     [guid]$OperatorId,
+    [Parameter(Mandatory)]
+    [string]$CudaRuntimePath,
     [string]$ProducerAddress,
     [ValidateRange(1, 65535)]
     [int]$FrontendPort = 3000,
@@ -122,6 +124,19 @@ $resolvedConfigPath = [System.IO.Path]::GetFullPath($ConfigPath)
 if (-not (Test-Path -LiteralPath $resolvedConfigPath -PathType Leaf)) {
     throw "ConfigPath must name an existing file."
 }
+if ([string]::IsNullOrWhiteSpace($CudaRuntimePath)) {
+    throw "CudaRuntimePath must name the isolated Demo CUDA runtime directory."
+}
+$resolvedCudaRuntimePath = [System.IO.Path]::GetFullPath($CudaRuntimePath)
+if (-not (Test-Path -LiteralPath $resolvedCudaRuntimePath -PathType Container)) {
+    throw "CudaRuntimePath must name an existing directory."
+}
+foreach ($runtimeLibrary in @("cublas64_12.dll")) {
+    $libraryPath = Join-Path $resolvedCudaRuntimePath $runtimeLibrary
+    if (-not (Test-Path -LiteralPath $libraryPath -PathType Leaf)) {
+        throw "CudaRuntimePath is missing required Demo runtime library '$runtimeLibrary'."
+    }
+}
 if (-not (Test-Path -LiteralPath (Join-Path $frontendRoot "node_modules") -PathType Container)) {
     throw "Frontend dependencies are missing. Run 'npm ci' in frontend first."
 }
@@ -139,6 +154,8 @@ $env:STAGEFLOW_KERNEL_STATUS_URL = "http://127.0.0.1:$BackendPort/api/v1/kernel/
 $env:STAGEFLOW_MTE_API_BASE_URL = "http://127.0.0.1:$BackendPort/api/v1"
 $env:STAGEFLOW_DEMO_API_BASE_URL = "http://127.0.0.1:$BackendPort/api/v1/demo"
 $env:STAGEFLOW_DEMO_OPERATOR_ID = $OperatorId.ToString("D")
+$originalPath = $env:PATH
+$env:PATH = $resolvedCudaRuntimePath + [System.IO.Path]::PathSeparator + $originalPath
 
 try {
     Push-Location $backendRoot
@@ -203,6 +220,7 @@ try {
     }
 }
 finally {
+    $env:PATH = $originalPath
     foreach ($process in $ownedProcesses) {
         Stop-OwnedProcess $process
     }
