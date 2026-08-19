@@ -46,11 +46,28 @@ export interface KernelStageStatus {
   attention_codes: string[];
 }
 
+export interface KernelProgramExpectation {
+  expectation_id: string;
+  stage_id: string | null;
+  title: string;
+  speakers: string[];
+  planned_start: string | null;
+  planned_end: string | null;
+  revision: number;
+  recorded_at: string;
+  provider: string | null;
+  external_event_id: string | null;
+  external_session_id: string | null;
+  external_room_id: string | null;
+  evidence_kind: "external";
+}
+
 export interface KernelStatusPayload {
   configured: boolean;
   configuration_supplied: boolean;
   configuration_valid: boolean | null;
   runtime_composed: boolean;
+  runtime_profile?: string | null;
   event_id: string | null;
   event_key: string | null;
   event_name: string | null;
@@ -61,6 +78,7 @@ export interface KernelStatusPayload {
   reconciliation_started_at: string | null;
   reconciliation_completed_at: string | null;
   stages: KernelStageStatus[];
+  program_expectations?: KernelProgramExpectation[];
   recent_media?: KernelMediaStatus[];
   attention_codes: string[];
   startup_error?: string | null;
@@ -483,7 +501,9 @@ function globalAttention(payload: KernelStatusPayload): AttentionItemView[] {
 function infrastructure(payload: KernelStatusPayload): InfrastructureItemView[] {
   const sourceCount = payload.stages.filter((stage) => stage.source_available === true).length;
   const configurationReady = payload.configuration_supplied && payload.configuration_valid === true;
-  return [
+  const demo = payload.runtime_profile === "demo-single-stage";
+  const programCount = (payload.program_expectations ?? []).length;
+  const items: InfrastructureItemView[] = [
     {
       id: "postgresql",
       label: "PostgreSQL",
@@ -536,8 +556,10 @@ function infrastructure(payload: KernelStatusPayload): InfrastructureItemView[] 
       id: "workers",
       label: "Intelligence workers",
       health: "unknown",
-      state: "Not implemented",
-      impact: "No transcription or Moment execution is part of the current Kernel.",
+      state: demo ? "Configured · presence not projected" : "Not implemented",
+      impact: demo
+        ? "Bounded Operation state and Transcription Evidence are available in Session detail; process presence is not inferred."
+        : "No transcription or Moment execution is part of the current Kernel.",
     },
     {
       id: "internet",
@@ -547,6 +569,25 @@ function infrastructure(payload: KernelStatusPayload): InfrastructureItemView[] 
       impact: "The current local Kernel status has no cloud-connectivity projection.",
     },
   ];
+  if (demo) {
+    items.push(
+      {
+        id: "devcon-read",
+        label: "Devcon program read",
+        health: programCount > 0 ? "ready" : "unknown",
+        state: `${programCount} cached Program Expectations`,
+        impact: "Read-only external evidence; cached data does not create Session authority.",
+      },
+      {
+        id: "devcon-write",
+        label: "Devcon publication",
+        health: "unknown",
+        state: "Disabled",
+        impact: "No Devcon write capability is exposed; the upstream durability gate remains unqualified.",
+      },
+    );
+  }
+  return items;
 }
 
 export function adaptKernelStatus(
@@ -554,6 +595,18 @@ export function adaptKernelStatus(
   observedAt: string,
 ): OperationalWorkspace {
   const stages = payload.stages.map(stageView);
+  for (const stage of stages) {
+    const nextExpectation = (payload.program_expectations ?? []).find(
+      (expectation) => expectation.stage_id === stage.id,
+    );
+    if (nextExpectation) {
+      stage.nextExpectation = nextExpectation.title;
+      stage.nextExpectationSpeakers = nextExpectation.speakers;
+      stage.nextExpectationPlannedStart = nextExpectation.planned_start ?? undefined;
+      stage.nextExpectationPlannedEnd = nextExpectation.planned_end ?? undefined;
+      stage.nextExpectationProvider = nextExpectation.provider ?? undefined;
+    }
+  }
   const mediaAssets = (payload.recent_media ?? []).flatMap((item) => {
     const projected = mediaAssetView(item, payload.stages);
     return projected ? [projected] : [];
@@ -583,13 +636,17 @@ export function adaptKernelStatus(
       statusLabel: payload.configuration_supplied ? "LIVE — connected" : "LIVE — unconfigured",
       updatedAt: observedAt,
       authoritative: payload.configuration_supplied,
+      runtimeProfile: payload.runtime_profile ?? undefined,
     },
     event: {
       id: payload.event_id ?? undefined,
       key: payload.event_key ?? "unconfigured",
       name: payload.event_name ?? "StageFlow Kernel",
       lifecycle: payload.event_id && payload.ready ? "active" : "setup",
-      modeLabel: "Event Mode · Kernel projection",
+      modeLabel:
+        payload.runtime_profile === "demo-single-stage"
+          ? "Demo profile · single Stage · not Event-readiness certified"
+          : "Event Mode · Kernel projection",
       ready: payload.ready,
       recovering: payload.recovering,
       databaseAvailable: payload.database_available,
@@ -602,11 +659,17 @@ export function adaptKernelStatus(
     infrastructure: infrastructure(payload),
     editorialCandidates: [],
     editorialClips: [],
-    transcriptState: {
-      state: "not_connected",
-      label: "Not connected",
-      detail: "No transcription runtime is implemented in the current Kernel.",
-    },
+    transcriptState: payload.runtime_profile === "demo-single-stage"
+      ? {
+          state: "evidence_available",
+          label: "Transcription Evidence available",
+          detail: "Bounded normalized evidence is shown in Session detail; it is not authoritative Session Transcript truth.",
+        }
+      : {
+          state: "not_connected",
+          label: "Not connected",
+          detail: "No transcription runtime is implemented in the current Kernel.",
+        },
     mediaTimingEvidence: [],
     mediaTimingEvidenceStatus: "not_requested",
   };

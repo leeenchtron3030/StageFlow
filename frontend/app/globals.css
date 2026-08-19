@@ -557,3 +557,46 @@ button:disabled { cursor: not-allowed; color: var(--subtle-foreground); backgrou
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
 }
+
+.demo-command-panel, .demo-session-workspace {
+  margin-top: 16px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+.demo-command-panel { display: flex; align-items: center; gap: 16px; padding: 14px; }
+.demo-command-panel > div { flex: 1; }
+.demo-command-panel h2 { margin: 3px 0 5px; }
+.demo-command-panel p, .demo-command-panel > span { color: var(--muted-foreground); }
+.demo-authority-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+.demo-authority-actions button:not(:disabled), .demo-command-panel button:not(:disabled) { border-color: var(--accent); color: var(--accent-strong); cursor: pointer; }
+.demo-authority-actions > span { color: var(--muted-foreground); font-size: 11px; }
+.demo-work-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--border); }
+.demo-work-summary > div { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; background: var(--surface-raised); }
+.demo-work-summary span { color: var(--subtle-foreground); font-size: 9px; font-weight: 650; letter-spacing: .07em; text-transform: uppercase; }
+.demo-work-summary strong { font-family: var(--font-mono); }
+.demo-operation-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 1px; border-bottom: 1px solid var(--border); background: var(--border); }
+.demo-operation-list article { display: flex; flex-direction: column; gap: 3px; padding: 12px 14px; background: var(--surface); }
+.demo-operation-list span { color: var(--muted-foreground); font-family: var(--font-mono); font-size: 10px; }
+.transcription-evidence-list { display: grid; gap: 1px; background: var(--border); }
+.transcription-evidence-card { background: var(--surface); }
+.transcription-evidence-card > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 14px; border-bottom: 1px solid var(--border); }
+.transcription-evidence-card > header div { display: flex; flex-direction: column; gap: 4px; }
+.transcription-evidence-card > header span { color: var(--muted-foreground); font-family: var(--font-mono); font-size: 10px; text-align: right; }
+.evidence-limitations, .bounded-notice { margin: 0; padding: 10px 14px; border-bottom: 1px solid var(--border); color: var(--review); font-size: 10px; }
+.transcript-segments > section { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 12px; padding: 13px 14px; border-bottom: 1px solid var(--border); }
+.transcript-segment-time { display: flex; flex-direction: column; color: var(--subtle-foreground); font-family: var(--font-mono); font-size: 10px; }
+.transcript-segments p { margin: 4px 0 8px; color: #e1e6eb; font-size: 13px; line-height: 1.55; }
+.transcript-segments details { color: var(--muted-foreground); font-size: 10px; }
+.transcript-segments summary { cursor: pointer; }
+.transcript-word-list { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+.transcript-word-list span { border: 1px solid var(--border); padding: 3px 5px; background: var(--surface-raised); color: #c4ccd4; font-family: var(--font-mono); }
+.declared-moment-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1px; border-top: 1px solid var(--border); background: var(--border); }
+.declared-moment-list article { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; background: var(--surface-raised); }
+.declared-moment-list span { color: var(--muted-foreground); font-size: 10px; }
+
+@media (max-width: 820px) {
+  .demo-command-panel { align-items: flex-start; flex-direction: column; }
+  .demo-work-summary { grid-template-columns: repeat(2, 1fr); }
+  .transcript-segments > section { grid-template-columns: 1fr; }
+  .transcript-segment-time { flex-direction: row; gap: 8px; }
+}

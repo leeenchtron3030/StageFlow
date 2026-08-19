@@ -100,6 +100,7 @@ test("Kernel adapter keeps stabilizing quiet and maps unresolved media to Review
     configuration_supplied: true,
     configuration_valid: true,
     runtime_composed: true,
+    runtime_profile: "demo-single-stage",
     event_id: "event-1",
     event_key: "event",
     event_name: "Kernel Event",
@@ -136,6 +137,23 @@ test("Kernel adapter keeps stabilizing quiet and maps unresolved media to Review
         attention_codes: ["media_association_unresolved"],
       },
     ],
+    program_expectations: [
+      {
+        expectation_id: "expectation-1",
+        stage_id: "stage-1",
+        title: "Durable Event Workflows",
+        speakers: ["Ada Producer", "Lin Operator"],
+        planned_start: "2026-08-12T02:00:00Z",
+        planned_end: "2026-08-12T02:45:00Z",
+        revision: 1,
+        recorded_at: "2026-08-12T01:00:00Z",
+        provider: "devcon",
+        external_event_id: "event-8",
+        external_session_id: "session-12",
+        external_room_id: "stage-1",
+        evidence_kind: "external",
+      },
+    ],
   };
 
   const workspace = adaptKernelStatus(payload, "2026-08-12T01:02:00Z");
@@ -146,6 +164,28 @@ test("Kernel adapter keeps stabilizing quiet and maps unresolved media to Review
   assert.equal(workspace.stages[0].media.stabilizing, 1);
   assert.equal(workspace.attention.length, 1);
   assert.equal(workspace.attention[0].level, "review");
+  assert.equal(workspace.stages[0].nextExpectation, "Durable Event Workflows");
+  assert.deepEqual(workspace.stages[0].nextExpectationSpeakers, [
+    "Ada Producer",
+    "Lin Operator",
+  ]);
+  assert.equal(workspace.stages[0].nextExpectationProvider, "devcon");
+  assert.equal(workspace.stages[0].nextExpectationPlannedStart, "2026-08-12T02:00:00Z");
+  assert.equal(workspace.stages[0].nextExpectationPlannedEnd, "2026-08-12T02:45:00Z");
+  assert.equal(workspace.transcriptState.state, "evidence_available");
+  assert.match(workspace.transcriptState.detail, /not authoritative Session Transcript/);
+  assert.equal(
+    workspace.infrastructure.find((item) => item.id === "workers")?.state,
+    "Configured · presence not projected",
+  );
+  assert.equal(
+    workspace.infrastructure.find((item) => item.id === "devcon-read")?.state,
+    "1 cached Program Expectations",
+  );
+  assert.equal(
+    workspace.infrastructure.find((item) => item.id === "devcon-write")?.state,
+    "Disabled",
+  );
   assert.equal(authorityActionsEnabled(workspace), false);
 });
 

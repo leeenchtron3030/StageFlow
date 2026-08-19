@@ -1,0 +1,52 @@
+# Copy outside the repository and replace the event/source values for the rehearsal.
+# The referenced environment variable contains the DSN; never put the DSN in this file.
+schema_version = "1.0"
+deployment_id = "razer-demo"
+node_id = "razer-event-node"
+runtime_profile = "demo-single-stage"
+node_role = "node"
+event_mode = "rehearsal"
+network_policy = "optional"
+postgres_dsn_secret_ref = "STAGEFLOW_DEMO_POSTGRES_DSN"
+schedule_source_reference = "https://api.devcon.org"
+
+[devcon_read]
+base_url = "https://api.devcon.org"
+event_id = "test-devcon-8"
+room_id = "stage-1"
+page_size = 500
+maximum_catalog_sessions = 5000
+timeout_seconds = 10
+
+[local_transcription]
+provider = "faster-whisper"
+model_id = "large-v3-turbo"
+model_version = "0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf"
+model_path = "C:/StageFlowDemo/models/faster-whisper-large-v3-turbo"
+device = "cuda"
+compute_type = "float16"
+execution_profile_id = "faster-whisper-large-v3-turbo-cuda-float16"
+execution_profile_version = "1.0"
+
+[resources]
+maximum_concurrent_assessments = 2
+maximum_cpu_percentage = 20
+maximum_memory_bytes = 536870912
+minimum_stable_seconds = 5
+
+[event]
+key = "stageflow-demo-1"
+name = "StageFlow Demo 1"
+external_references = { devcon_event_id = "test-devcon-8" }
+
+[[event.stages]]
+key = "main"
+name = "Main Stage"
+external_references = { devcon_room_id = "stage-1" }
+
+[[event.stages.sources]]
+key = "vmix-recordings"
+# Use the Razer-local rehearsal directory or the controlled vMix UNC share.
+path = "C:/StageFlowDemo/recordings"
+maximum_candidates = 1000
+allowed_extensions = [".mov", ".mp4", ".mkv", ".mxf", ".wav"]

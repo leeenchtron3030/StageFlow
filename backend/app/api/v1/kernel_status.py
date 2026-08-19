@@ -6,6 +6,7 @@ from fastapi import APIRouter, Request, Response
 from pydantic import BaseModel, ConfigDict
 
 from app.bootstrap.event_mode_kernel import KernelComponents, KernelStartupProgress
+from app.contexts.events import ProgramExpectation
 from app.contexts.production.event_mode_kernel.contracts import EventOperationalStatus
 from app.contexts.production.event_mode_kernel.repository import (
     KernelStorageUnavailableError,
@@ -110,6 +111,25 @@ class BoundaryProposalResponse(BaseModel):
     proposed_at: datetime
 
 
+class ProgramExpectationResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    expectation_id: str
+    key: str
+    stage_id: str | None
+    title: str
+    speakers: tuple[str, ...]
+    planned_start: datetime | None
+    planned_end: datetime | None
+    revision: int
+    recorded_at: datetime
+    provider: str | None
+    external_event_id: str | None
+    external_session_id: str | None
+    external_room_id: str | None
+    evidence_kind: str = "external"
+
+
 class KernelStatusResponse(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -117,6 +137,7 @@ class KernelStatusResponse(BaseModel):
     configuration_supplied: bool
     configuration_valid: bool | None
     runtime_composed: bool
+    runtime_profile: str | None
     event_id: str | None
     event_key: str | None
     event_name: str | None
@@ -127,6 +148,7 @@ class KernelStatusResponse(BaseModel):
     reconciliation_started_at: datetime | None
     reconciliation_completed_at: datetime | None
     stages: tuple[StageStatusResponse, ...]
+    program_expectations: tuple[ProgramExpectationResponse, ...] = ()
     recent_media: tuple[MediaStatusResponse, ...] = ()
     boundary_proposals: tuple[BoundaryProposalResponse, ...] = ()
     attention_codes: tuple[str, ...]
@@ -139,6 +161,8 @@ def _response(
     configuration_supplied: bool,
     configuration_valid: bool | None,
     runtime_composed: bool,
+    runtime_profile: str,
+    program_expectations: tuple[ProgramExpectation, ...],
 ) -> KernelStatusResponse:
     reconciliation = status.latest_reconciliation
 
@@ -185,6 +209,7 @@ def _response(
         configuration_supplied=configuration_supplied,
         configuration_valid=configuration_valid,
         runtime_composed=runtime_composed,
+        runtime_profile=runtime_profile,
         event_id=status.event_id.value,
         event_key=status.event_key,
         event_name=status.event_name,
@@ -199,6 +224,24 @@ def _response(
         ),
         reconciliation_completed_at=(
             None if reconciliation is None else reconciliation.completed_at
+        ),
+        program_expectations=tuple(
+            ProgramExpectationResponse(
+                expectation_id=item.id.value,
+                key=item.key,
+                stage_id=None if item.stage_id is None else item.stage_id.value,
+                title=item.title,
+                speakers=tuple(item.speakers),
+                planned_start=item.planned_start,
+                planned_end=item.planned_end,
+                revision=item.revision,
+                recorded_at=item.recorded_at,
+                provider=item.external_references.get("provider"),
+                external_event_id=item.external_references.get("devcon_event_id"),
+                external_session_id=item.external_references.get("devcon_session_id"),
+                external_room_id=item.external_references.get("devcon_room_id"),
+            )
+            for item in program_expectations
         ),
         stages=tuple(
             StageStatusResponse(
@@ -342,6 +385,7 @@ def kernel_status(request: Request, response: Response) -> KernelStatusResponse:
             configuration_supplied=configuration_supplied,
             configuration_valid=configuration_valid,
             runtime_composed=runtime_composed,
+            runtime_profile=None,
             event_id=None,
             event_key=None,
             event_name=None,
@@ -367,6 +411,7 @@ def kernel_status(request: Request, response: Response) -> KernelStatusResponse:
             configuration_supplied=configuration_supplied,
             configuration_valid=configuration_valid,
             runtime_composed=runtime_composed,
+            runtime_profile=components.configuration.deployment.runtime_profile.value,
             event_id=None,
             event_key=components.event_key,
             event_name=components.configuration.deployment.event.name,
@@ -386,6 +431,7 @@ def kernel_status(request: Request, response: Response) -> KernelStatusResponse:
             configuration_supplied=configuration_supplied,
             configuration_valid=configuration_valid,
             runtime_composed=runtime_composed,
+            runtime_profile=components.configuration.deployment.runtime_profile.value,
             event_id=None,
             event_key=components.event_key,
             event_name=components.configuration.deployment.event.name,
@@ -403,6 +449,10 @@ def kernel_status(request: Request, response: Response) -> KernelStatusResponse:
         configuration_supplied=configuration_supplied,
         configuration_valid=configuration_valid,
         runtime_composed=runtime_composed,
+        runtime_profile=components.configuration.deployment.runtime_profile.value,
+        program_expectations=components.repository.list_program_expectations(
+            status.event_id
+        ),
     )
 
 
@@ -411,6 +461,7 @@ __all__ = [
     "AssemblingSessionResponse",
     "KernelStatusResponse",
     "MediaStatusResponse",
+    "ProgramExpectationResponse",
     "StageStatusResponse",
     "router",
 ]

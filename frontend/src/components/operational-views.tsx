@@ -17,6 +17,7 @@ import {
   relativeTimeLabel,
 } from "@/experience/presentation.ts";
 
+import { DemoSessionWorkspace, DemoStartSessionControl } from "./demo-session-workspace";
 import { AttentionPanel, WorkspaceTitle } from "./mission-control";
 
 function href(path: string, workspace: OperationalWorkspace): string {
@@ -31,6 +32,14 @@ function Definition({ label, value }: { label: string; value: string }) {
 
 function readableCode(value: string): string {
   return value.replaceAll("_", " ");
+}
+
+function formatExpectationTime(value?: string): string | undefined {
+  if (!value) return undefined;
+  return new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
 }
 
 function MediaUncertaintyPanel({
@@ -331,16 +340,42 @@ function TimingEvidencePanel({
   );
 }
 
-export function StageOperationalView({ stage, workspace }: { stage?: StageView; workspace: OperationalWorkspace }) {
+export function StageOperationalView({
+  stage,
+  workspace,
+  demoActorId,
+}: {
+  stage?: StageView;
+  workspace: OperationalWorkspace;
+  demoActorId?: string;
+}) {
   if (!stage) return <><WorkspaceTitle eyebrow="Producer · Stage" title="Stage unavailable" summary="The requested Stage is not present in this bounded projection." /><Link className="text-link" href={href("/", workspace)}>Return to Mission Control</Link></>;
+  const isDemo = workspace.dataSource.runtimeProfile === "demo-single-stage";
   return (
     <>
       <WorkspaceTitle eyebrow={`Producer · Stage · ${stage.key}`} title={stage.name} summary={stage.attentionText ?? "No operational attention requested"} />
       <div className="stage-context-grid">
         <SessionContext label="Previous" session={stage.previousSession} />
         <SessionContext label="Current" session={stage.currentSession} />
-        <div className="context-column"><span className="eyebrow">Next · external</span><strong>{stage.nextExpectation ?? "Not reported"}</strong><span>Program Expectation is not Session authority.</span></div>
+        <div className="context-column">
+          <span className="eyebrow">Next · external{stage.nextExpectationProvider ? ` · ${stage.nextExpectationProvider}` : ""}</span>
+          <strong>{stage.nextExpectation ?? "Not reported"}</strong>
+          {stage.nextExpectationSpeakers?.length ? <span>{stage.nextExpectationSpeakers.join(" · ")}</span> : null}
+          {stage.nextExpectationPlannedStart ? (
+            <span>
+              {formatExpectationTime(stage.nextExpectationPlannedStart)}
+              {stage.nextExpectationPlannedEnd ? ` – ${formatExpectationTime(stage.nextExpectationPlannedEnd)}` : ""}
+            </span>
+          ) : null}
+          <span>Program Expectation is external evidence, not Session authority.</span>
+        </div>
       </div>
+      <DemoStartSessionControl
+        actorId={demoActorId}
+        enabled={isDemo}
+        hasCurrentSession={Boolean(stage.currentSession)}
+        stageId={stage.id}
+      />
       <div className="stage-detail-grid">
         <section className="detail-panel">
           <div className="section-heading"><h2>Current operation</h2><span>{stage.sourceLabel}</span></div>
@@ -353,19 +388,27 @@ export function StageOperationalView({ stage, workspace }: { stage?: StageView; 
             <Definition label="Source consequence" value={stage.sourceImpact} />
           </dl>
         </section>
-        <section className="detail-panel">
-          <div className="section-heading"><h2>Authority</h2><span>Read only</span></div>
-          <p>Declared boundaries are shown in Session detail. No command API is connected.</p>
-          <button
-            aria-label="Mark Moment. Would record an attributable human Editorial mark. Disabled because durable operator-mark execution is not implemented."
-            disabled
-            title="Would record an attributable human Editorial mark. Disabled: durable operator-mark execution is not implemented."
-            type="button"
-          >
-            Mark Moment
-          </button>
-          <p className="disabled-explanation">Unavailable: durable operator-mark execution is not implemented.</p>
-        </section>
+        {isDemo ? (
+          <section className="detail-panel">
+            <div className="section-heading"><h2>Authority</h2><span>Demo controls</span></div>
+            <p>Confirmed commands use the configured operator UUID and durable operation identities.</p>
+            <p>Start is available above; Session boundary, processing, Package Ready, and Mark Moment controls appear in realized Session detail.</p>
+          </section>
+        ) : (
+          <section className="detail-panel">
+            <div className="section-heading"><h2>Authority</h2><span>Read only</span></div>
+            <p>Declared boundaries are shown in Session detail. No command API is connected.</p>
+            <button
+              aria-label="Mark Moment. Would record an attributable human Editorial mark. Disabled because durable operator-mark execution is not implemented."
+              disabled
+              title="Would record an attributable human Editorial mark. Disabled: durable operator-mark execution is not implemented."
+              type="button"
+            >
+              Mark Moment
+            </button>
+            <p className="disabled-explanation">Unavailable: durable operator-mark execution is not implemented.</p>
+          </section>
+        )}
       </div>
       <MediaUncertaintyPanel
         assets={workspace.mediaAssets.filter((item) => item.stageKey === stage.key)}
@@ -380,7 +423,15 @@ export function StageOperationalView({ stage, workspace }: { stage?: StageView; 
   );
 }
 
-export function SessionOperationalView({ session, workspace }: { session?: SessionView; workspace: OperationalWorkspace }) {
+export function SessionOperationalView({
+  session,
+  workspace,
+  demoActorId,
+}: {
+  session?: SessionView;
+  workspace: OperationalWorkspace;
+  demoActorId?: string;
+}) {
   if (!session) return <><WorkspaceTitle eyebrow="Producer · Session" title="Session unavailable" summary="The requested Session is outside this bounded projection." /><Link className="text-link" href={href("/sessions", workspace)}>Return to Sessions</Link></>;
   return (
     <>
@@ -427,7 +478,19 @@ export function SessionOperationalView({ session, workspace }: { session?: Sessi
         )}
         status={workspace.mediaTimingEvidenceStatus}
       />
-      <AuthorityControls workspace={workspace} />
+      <DemoSessionWorkspace
+        actorId={demoActorId}
+        authoritativeEnd={session.authoritativeEnd}
+        authoritativeStart={session.authoritativeStart}
+        enabled={workspace.dataSource.runtimeProfile === "demo-single-stage"}
+        initialActivityState={session.activityState}
+        initialPackageState={session.packageState}
+        initialRevision={session.sessionRevision}
+        sessionId={session.id}
+      />
+      {workspace.dataSource.runtimeProfile === "demo-single-stage" ? null : (
+        <AuthorityControls workspace={workspace} />
+      )}
     </>
   );
 }

@@ -5,7 +5,9 @@ from dataclasses import dataclass, field
 
 import psycopg
 
+from app.contexts.editorial import EditorialMomentService
 from app.contexts.events import EventStageBootstrapRequest, StageBootstrapDefinition
+from app.contexts.integration.devcon import DevconProgramSync, ProgramSyncResult
 from app.contexts.production.event_mode_kernel import DurableEventModeKernel
 from app.contexts.production.event_mode_kernel.contracts import EventOperationalStatus
 from app.contexts.production.event_mode_kernel.repository import (
@@ -17,9 +19,12 @@ from app.contexts.production.media_timing_evidence import MediaTimingEvidenceRep
 from app.contexts.production.runtime import StageFlowRuntime
 from app.core.config.deployment import (
     EffectiveKernelConfiguration,
+    RuntimeProfile,
     load_kernel_deployment_configuration,
 )
+from app.infrastructure.devcon import DevconPublicProgramAdapter
 from app.infrastructure.postgres import (
+    PostgresEditorialMomentRepository,
     PostgresEventModeKernelRepository,
     PostgresIngressRepository,
     PostgresMediaTimingEvidenceRepository,
@@ -60,6 +65,8 @@ class KernelComponents:
     startup_error: str | None = None
     postgresql_recovery_required: bool = False
     media_timing_evidence_repository: MediaTimingEvidenceRepository | None = None
+    devcon_program_sync: DevconProgramSync | None = None
+    editorial_moments: EditorialMomentService | None = None
 
     @property
     def event_key(self) -> str:
@@ -135,6 +142,20 @@ class KernelComponents:
             self.postgresql_recovery_required = False
         return result
 
+    def sync_devcon_program(self) -> ProgramSyncResult:
+        if self.devcon_program_sync is None:
+            raise RuntimeError("devcon_read_not_configured")
+        event = self.repository.get_event_by_key(self.event_key)
+        if event is None:
+            raise RuntimeError("explicit_event_stage_bootstrap_required")
+        stages = self.repository.list_stages(event.id)
+        if len(stages) != 1:
+            raise RuntimeError("demo_single_stage_topology_invalid")
+        return self.devcon_program_sync.synchronize(
+            event_id=event.id,
+            stage_id=stages[0].id,
+        )
+
     def reconcile_postgresql_recovery(self) -> EventOperationalStatus | None:
         event = self.repository.get_event_by_key(self.event_key)
         if event is None:
@@ -180,6 +201,25 @@ def verify_kernel_schema(dsn: str) -> None:
         raise KernelDatabaseUnavailableError("postgresql_unavailable") from exc
 
 
+def verify_transcription_schema(dsn: str) -> None:
+    try:
+        with psycopg.connect(dsn) as connection:
+            row = connection.execute(
+                """
+                SELECT count(*) FROM stageflow.schema_migration
+                WHERE version IN (
+                    '0007_transcription_worker', '0008_demo_vertical_slice'
+                )
+                """
+            ).fetchone()
+            if row is None or row[0] != 2:
+                raise KernelSchemaMigrationRequiredError(
+                    "transcription_schema_migration_required"
+                )
+    except psycopg.OperationalError as exc:
+        raise KernelDatabaseUnavailableError("postgresql_unavailable") from exc
+
+
 def build_kernel_components(
     configuration: EffectiveKernelConfiguration,
     *,
@@ -192,12 +232,26 @@ def build_kernel_components(
         clock=clock or SystemClock(),
         asset_ingress_publisher=StableAssetIngressPublisher(ingress),
     )
+    devcon_configuration = configuration.deployment.devcon_read
     return KernelComponents(
         configuration=configuration,
         repository=repository,
         kernel=kernel,
+        editorial_moments=EditorialMomentService(
+            PostgresEditorialMomentRepository(configuration.postgres_dsn),
+            kernel.clock,
+        ),
         media_timing_evidence_repository=PostgresMediaTimingEvidenceRepository(
             configuration.postgres_dsn
+        ),
+        devcon_program_sync=(
+            None
+            if devcon_configuration is None
+            else DevconProgramSync(
+                repository=repository,
+                source=DevconPublicProgramAdapter(devcon_configuration),
+                clock=kernel.clock,
+            )
         ),
     )
 
@@ -222,6 +276,11 @@ def load_kernel_components_from_environment(
     startup.configuration_valid = True
     try:
         verify_kernel_schema(configuration.postgres_dsn)
+        if (
+            configuration.deployment.runtime_profile
+            is RuntimeProfile.DEMO_SINGLE_STAGE
+        ):
+            verify_transcription_schema(configuration.postgres_dsn)
     except KernelDatabaseUnavailableError:
         startup.database_available = False
         raise
@@ -255,4 +314,5 @@ __all__ = [
     "build_kernel_components",
     "load_kernel_components_from_environment",
     "verify_kernel_schema",
+    "verify_transcription_schema",
 ]

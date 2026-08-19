@@ -197,11 +197,108 @@ path = "C:/event/main"
 
     assert effective.postgres_dsn == "postgresql://secret-value"
     assert effective.sources == {"main-recorder": "C:/event/main"}
+    assert effective.deployment.runtime_profile.value == "standard"
     assert effective.redacted_summary()["postgres_dsn"] == "<redacted>"
+    assert effective.redacted_summary()["runtime_profile"] == "standard"
     assert effective.field_sources["postgres_dsn"] == (
         "environment:STAGEFLOW_KERNEL_DSN"
     )
     assert "secret-value" not in str(effective.redacted_summary())
+
+
+def test_demo_single_stage_profile_is_explicit_and_bounded(tmp_path: Path) -> None:
+    path = tmp_path / "demo.toml"
+    path.write_text(
+        """
+schema_version = "1.0"
+deployment_id = "razer-demo"
+node_id = "razer-node"
+runtime_profile = "demo-single-stage"
+node_role = "node"
+event_mode = "rehearsal"
+network_policy = "optional"
+postgres_dsn_secret_ref = "STAGEFLOW_KERNEL_DSN"
+schedule_source_reference = "https://api.devcon.org"
+[devcon_read]
+event_id = "test-devcon-8"
+room_id = "stage-1"
+[local_transcription]
+model_version = "0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf"
+model_path = "C:/StageFlowDemo/models/faster-whisper-large-v3-turbo"
+[event]
+key = "demo-event"
+name = "Demo Event"
+[[event.stages]]
+key = "main"
+name = "Main Stage"
+[[event.stages.sources]]
+key = "vmix-recordings"
+path = "C:/StageFlowDemo/recordings"
+""".strip(),
+        encoding="utf-8",
+    )
+
+    effective = load_kernel_deployment_configuration(
+        path,
+        environment={"STAGEFLOW_KERNEL_DSN": "postgresql://secret-value"},
+    )
+
+    assert effective.deployment.runtime_profile.value == "demo-single-stage"
+    assert len(effective.deployment.event.stages) == 1
+    assert effective.deployment.network_policy.value == "optional"
+    assert effective.deployment.devcon_read is not None
+    assert effective.deployment.devcon_read.event_id == "test-devcon-8"
+    assert effective.deployment.devcon_read.room_id == "stage-1"
+    assert effective.deployment.local_transcription is not None
+    assert effective.deployment.local_transcription.provider == "faster-whisper"
+    assert effective.deployment.local_transcription.device == "cuda"
+    assert effective.deployment.local_transcription.compute_type == "float16"
+    assert effective.redacted_summary()["runtime_profile"] == "demo-single-stage"
+
+
+@pytest.mark.parametrize(
+    ("extra_stage", "network_policy", "message"),
+    [
+        (
+            '[[event.stages]]\nkey = "second"\nname = "Second"\n'
+            '[[event.stages.sources]]\nkey = "second-source"\npath = "C:/second"',
+            "optional",
+            "exactly one Stage",
+        ),
+        ("", "local_only", "optional Internet"),
+    ],
+)
+def test_demo_single_stage_profile_rejects_incoherent_topology(
+    tmp_path: Path, extra_stage: str, network_policy: str, message: str
+) -> None:
+    path = tmp_path / "invalid-demo.toml"
+    path.write_text(
+        f"""
+schema_version = "1.0"
+deployment_id = "razer-demo"
+node_id = "razer-node"
+runtime_profile = "demo-single-stage"
+node_role = "node"
+network_policy = "{network_policy}"
+postgres_dsn_secret_ref = "TEST_DSN"
+[event]
+key = "demo"
+name = "Demo"
+[[event.stages]]
+key = "main"
+name = "Main"
+[[event.stages.sources]]
+key = "main-source"
+path = "C:/main"
+{extra_stage}
+""".strip(),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match=message):
+        load_kernel_deployment_configuration(
+            path, environment={"TEST_DSN": "postgresql://test"}
+        )
 
 
 def test_configuration_rejects_relative_or_parent_traversing_source_paths(

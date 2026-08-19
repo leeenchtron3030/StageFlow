@@ -16,6 +16,7 @@ export interface DataSourceView {
   scenarioLabel?: string;
   updatedAt: string;
   authoritative: boolean;
+  runtimeProfile?: string;
 }
 
 export interface AttentionItemView {
@@ -97,6 +98,10 @@ export interface StageView {
   currentSession?: SessionView;
   previousSession?: SessionView;
   nextExpectation?: string;
+  nextExpectationSpeakers?: string[];
+  nextExpectationPlannedStart?: string;
+  nextExpectationPlannedEnd?: string;
+  nextExpectationProvider?: string;
   media: MediaSummaryView;
   attentionLevel?: AttentionLevel;
   attentionText?: string;
@@ -180,7 +185,7 @@ export interface OperationalWorkspace {
     simulated: true;
   }>;
   transcriptState: {
-    state: "not_connected" | "fixture_available" | "deferred";
+    state: "not_connected" | "fixture_available" | "evidence_available" | "deferred";
     label: string;
     detail: string;
   };

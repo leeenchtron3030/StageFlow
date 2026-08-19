@@ -41,6 +41,7 @@ from .contracts import (
     MediaAssociation,
     MediaCandidate,
     MediaRegistrationState,
+    PackageReadyDecision,
     ReconciliationRun,
     ReconciliationStatus,
     RegisteredMediaAsset,
@@ -571,6 +572,38 @@ class DurableEventModeKernel:
         _require_presentation_ended(session)
         return self.repository.set_package_state(
             session_id, SessionPackageState.READY_FOR_REVIEW.value, self.clock.now()
+        )
+
+    def declare_package_ready(
+        self,
+        *,
+        operation_id: EntityId,
+        session_id: EntityId,
+        actor_id: EntityId,
+        reason: str,
+    ) -> Session:
+        session = self.repository.get_session(session_id)
+        if session is None:
+            raise KernelNotFoundError("session_not_found")
+        _require_presentation_ended(session)
+        return self.repository.declare_package_ready(
+            PackageReadyDecision(
+                id=EntityId.new(),
+                session_id=session_id,
+                package_revision=session.package_revision,
+                actor_id=actor_id,
+                reason=reason,
+                decided_at=self.clock.now(),
+                operation_id=operation_id,
+            ),
+            request_digest=_command_digest(
+                "package_ready",
+                {
+                    "session_id": session_id,
+                    "actor_id": actor_id,
+                    "reason": reason.strip(),
+                },
+            ),
         )
 
     def complete_package(
