@@ -2,18 +2,19 @@
 
 ## Status
 
-In progress - prerequisite provisioning pending
+In progress - core Razer/Mac flow proven; restart, offline, and representative-corpus qualification pending
 
 ## Execution authority
 
 - Classification: Green autonomous rehearsal plus bounded compatibility correction
 - Authority evidence: the explicit 2026-08-19 requests to begin a separate Demo Hardware
-  Rehearsal workstream after merged PR #63 and to correct the confirmed LAN UUID blocker; the
-  completed
+  Rehearsal workstream after merged PR #63, to correct the confirmed LAN UUID blocker, and to
+  normalize the confirmed provider IndexError and harden isolated CUDA preflight; the completed
   [Demo Single-Stage Vertical Slice](demo-single-stage-vertical-slice.md); accepted
   ADR-0022 through ADR-0025 and ADR-0027; and the scoped Demo 1 transcription baseline.
-- Implementation-ready: Yes for the bounded UUID compatibility correction, prerequisite
-  verification, rehearsal, and evidence capture. No product-capability expansion is authorized.
+- Implementation-ready: Yes for the bounded UUID and provider-failure compatibility corrections,
+  isolated CUDA preflight, rehearsal, and evidence capture. No product-capability expansion is
+  authorized.
 - Required escalation or approval, if any: stop for any other proposed production code, dependency,
   schema, migration, public contract, authority-semantic, trust-boundary, or Devcon-write change.
   Production deployment and production-data access remain prohibited.
@@ -27,10 +28,10 @@ In progress - prerequisite provisioning pending
 
 ## Problem statement
 
-The Demo Single-Stage Vertical Slice is implemented and CI-qualified, but it has not run as a
-real Razer/vMix/Next.js/Mac system. This workstream must provision approved external
-prerequisites, exercise the merged architecture without adding product capability, and record
-truthful evidence without implying production or Event readiness.
+The Demo Single-Stage Vertical Slice is implemented, CI-qualified, and has now run as a real
+Razer/vMix/Next.js/Mac system. This workstream must continue qualifying the merged architecture,
+correct only demonstrated bounded blockers, and record truthful evidence without implying
+production or Event readiness.
 
 ## Verified current behavior
 
@@ -38,16 +39,25 @@ truthful evidence without implying production or Event readiness.
   quality-matrix jobs green.
 - The Razer reports an NVIDIA GeForce RTX 3080 Ti Laptop GPU with driver 581.57.
 - vMix is present at its common Windows installation location and frontend dependencies exist.
-- No concrete examples/demo-single-stage.toml exists. The documented model and media
-  directories are absent, and STAGEFLOW_DEMO_POSTGRES_DSN is absent at Windows User scope.
-- The prior bounded launcher run stopped with configured_media_source_unavailable and did not
-  prove a successful live stack.
+- The concrete Demo TOML remains external to the repository. Its referenced model and media
+  directories are populated, and the Demo PostgreSQL secret is available at Windows User scope;
+  no path or secret value is recorded here.
+- The real launcher has now proved valid configuration, one ready Stage, loopback-only backend,
+  LAN-bound Producer UI, five External Program Expectations, and CUDA/float16 inference.
 - The HTTP LAN-facing Producer UI exposed a confirmed compatibility blocker: Web Crypto is
   available, but randomUUID is absent. Direct frontend calls prevented authority commands from
   constructing operation IDs; backend and authority semantics were not implicated.
 - The frontend compatibility correction now uses native randomUUID when present and a
   getRandomValues-only RFC 4122 UUID-v4 construction otherwise. Frontend tests, TypeScript,
   ESLint, the production build, and focused Demo API/authority/launcher checks pass.
+- Three real faster-whisper CUDA Operations produced durable Transcript Evidence revisions. A
+  later asset raised provider-originated IndexError and terminated the original worker process.
+- The corrected adapter maps immediate and lazy IndexError to provider_execution_failed. The real
+  failed Operation exhausted its existing bounded attempts and finalized terminally; the worker
+  remained alive until controlled interruption. All three prior evidence identities were preserved.
+- The launcher now supplies the isolated external cublas runtime only to its process and owned
+  children. A real silent-audio inference probe passed before readiness; no NVIDIA driver or global
+  CUDA environment was modified.
 
 ## Desired behavior
 
@@ -89,17 +99,19 @@ offline-cache behavior are demonstrated without expanding product semantics.
 
 1. Correct and qualify the bounded frontend UUID-v4 compatibility blocker without changing
    authority, idempotency, API, backend, or LAN security behavior.
-2. Provision and validate external config, Demo database identity, model revision, controlled
+2. Normalize demonstrated provider IndexError failures and qualify process-scoped isolated CUDA
+   runtime loading with a real inference preflight.
+3. Provision and validate external config, Demo database identity, model revision, controlled
    media, LAN/Mac reachability, and vMix output without starting authority commands.
-3. Run launcher preflight and capture bounded component/version/readiness evidence.
-4. Synchronize Devcon, confirm External Program Expectations, remove upstream connectivity, and
+4. Run launcher preflight and capture bounded component/version/readiness evidence.
+5. Synchronize Devcon, confirm External Program Expectations, remove upstream connectivity, and
    verify the durable cache remains visible.
-5. Execute one Session through Start, vMix media, Process/Transcribe, Presentation End, Package
+6. Execute one Session through Start, vMix media, Process/Transcribe, Presentation End, Package
    Ready, and Mark Moment from the Mac UI.
-6. Restart launcher-owned processes and verify reconstruction of Session, media, Operation,
+7. Restart launcher-owned processes and verify reconstruction of Session, media, Operation,
    Transcription Evidence, and declared Moment state.
-7. Repeat with representative accented/noisy non-customer samples and record limitations.
-8. Publish a factual result distinguishing passed, failed, unavailable, and unqualified facts.
+8. Repeat with representative accented/noisy non-customer samples and record limitations.
+9. Publish a factual result distinguishing passed, failed, unavailable, and unqualified facts.
 
 ## Files or modules expected to change
 
@@ -108,10 +120,13 @@ offline-cache behavior are demonstrated without expanding product semantics.
 | docs/plans/demo-hardware-rehearsal.md | Plan, progress, and completion record |
 | docs/validation/results/demo-hardware-rehearsal-001.md | Factual result after execution |
 | frontend/src/shared/ids and Demo command construction | UUID-v4 LAN compatibility fix and tests |
+| backend provider adapter, Demo preflight, and tests | Bounded provider failure and real CUDA inference readiness |
+| scripts/demo launcher and documentation | Process-scoped isolated CUDA runtime configuration |
 | External Demo configuration | Local-only values and secret references; never committed |
 
-A bounded frontend production-source correction is authorized and implemented. No dependency,
-migration, schema, backend, API, authority, trust-boundary, or runtime-default change is planned.
+Bounded frontend, provider-adapter, Demo-preflight, and launcher corrections are authorized and
+implemented. No dependency, migration, schema, API, authority, trust-boundary, database-data,
+or global runtime-default change is planned.
 
 ## Data or migration considerations
 
@@ -139,7 +154,8 @@ record secret values, media paths, raw diagnostics, or unapproved transcript tex
 ## Test strategy
 
 - Keep the merged backend/frontend/launcher validation as baseline.
-- Run real launcher preflight and verify profile/model/CUDA/loopback/LAN facts.
+- Run real launcher preflight and verify profile/model/CUDA/loopback/LAN facts, including an actual
+  silent-audio CUDA inference before readiness.
 - Exercise real Devcon offline cache and controlled vMix discovery/association.
 - Exercise the real worker, transcript projection, controls, restart, and Mac UI.
 - Run secret/privacy checks and git diff --check for evidence-document changes.
@@ -148,13 +164,15 @@ record secret values, media paths, raw diagnostics, or unapproved transcript tex
 
 - [x] Frontend UUID-v4 generation supports native randomUUID and a cryptographic
   getRandomValues-only fallback, including Demo command operation IDs.
-- [ ] External config, Demo DSN, exact model revision, controlled media, vMix output, and LAN
+- [x] Provider-originated IndexError is bounded at immediate and lazy execution boundaries; the
+  existing max-attempt policy applies and the worker continues polling.
+- [x] External config, Demo DSN, exact model revision, controlled media, vMix output, and LAN
   identities are verified without secret or private-path disclosure.
-- [ ] The real Razer stack starts with backend/PostgreSQL loopback-only and Next.js reachable from
+- [x] The real Razer stack starts with backend/PostgreSQL loopback-only and Next.js reachable from
   the trusted Mac.
 - [ ] Real Devcon Program Expectations remain External and visible from cache while offline.
-- [ ] Controlled vMix media reaches safe Session association, a durable Operation, and real
-  CUDA/float16 Transcription Evidence.
+- [x] Controlled vMix media reaches safe Session association, durable Operations, and three real
+  CUDA/float16 Transcript Evidence revisions; one later provider failure is preserved separately.
 - [ ] The Mac UI shows bounded evidence and attributable controls without persistence, path/secret
   exposure, or Devcon write capability.
 - [ ] Restart reconstructs important Session/media/Operation/evidence/Moment state.
@@ -169,9 +187,10 @@ or alter production. Revert documentation-only commits if the plan is abandoned.
 
 ## Open questions
 
-- Which external path will hold the concrete Demo config and exact model revision?
-- Which Demo database, LAN address, Mac, vMix output directory, and approved non-customer corpus
-  will be used?
+- Which approved representative accented/noisy non-customer corpus will complete the scoped model
+  qualification?
+- Which remaining Mac workflow, offline-cache, and restart/reconstruction steps will be captured in
+  the factual completion result?
 
 ## Completion record
 

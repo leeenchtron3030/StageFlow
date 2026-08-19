@@ -58,8 +58,16 @@ class StaticResolver:
 
 
 class FakeModel:
-    def __init__(self, *, fail_after_first: bool = False) -> None:
+    def __init__(
+        self,
+        *,
+        fail_after_first: bool = False,
+        immediate_failure: Exception | None = None,
+        iteration_failure: Exception | None = None,
+    ) -> None:
         self.fail_after_first = fail_after_first
+        self.immediate_failure = immediate_failure
+        self.iteration_failure = iteration_failure
 
     def transcribe(
         self,
@@ -71,6 +79,8 @@ class FakeModel:
         vad_filter: bool,
         condition_on_previous_text: bool,
     ) -> tuple[object, FasterWhisperInfo]:
+        if self.immediate_failure is not None:
+            raise self.immediate_failure
         assert audio.endswith("sample.wav")
         assert language == "en"
         assert beam_size == 5
@@ -90,6 +100,8 @@ class FakeModel:
 
         def values() -> object:
             yield first
+            if self.iteration_failure is not None:
+                raise self.iteration_failure
             if self.fail_after_first:
                 raise RuntimeError("simulated provider iteration failure")
 
@@ -195,6 +207,27 @@ def test_adapter_preserves_partial_provider_result(tmp_path: Path) -> None:
     assert result.status is TranscriptEvidenceStatus.PARTIAL
     assert result.partial_reason == "provider_iteration_failed"
     assert len(result.segments) == 1
+
+
+@pytest.mark.parametrize(
+    "model",
+    (
+        FakeModel(immediate_failure=IndexError("provider media index failed")),
+        FakeModel(iteration_failure=IndexError("provider segment index failed")),
+    ),
+)
+def test_adapter_normalizes_provider_index_error_as_retryable_failure(
+    tmp_path: Path,
+    model: FakeModel,
+) -> None:
+    adapter, _ = _adapter(tmp_path, model)
+
+    with pytest.raises(TranscriptionExecutionError) as captured:
+        adapter.execute(_request(), lambda: None)
+
+    assert captured.value.reason_code == "provider_execution_failed"
+    assert captured.value.retryable is True
+    assert captured.value.diagnostic_summary == "faster-whisper execution failed"
 
 
 def test_adapter_rejects_unqualified_runtime_without_cpu_fallback(

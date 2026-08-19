@@ -20,6 +20,18 @@ def test_demo_launcher_keeps_backend_loopback_and_ui_on_selected_lan() -> None:
     assert "0.0.0.0" not in source
 
 
+def test_demo_launcher_scopes_the_isolated_cuda_runtime_to_owned_processes() -> None:
+    source = LAUNCHER.read_text(encoding="utf-8")
+
+    assert "[string]$CudaRuntimePath" in source
+    assert '"cublas64_12.dll"' in source
+    assert source.index("$env:PATH = $resolvedCudaRuntimePath") < source.index(
+        "app.demo.cli preflight"
+    )
+    assert "$env:PATH = $originalPath" in source
+    assert "SetEnvironmentVariable" not in source
+
+
 def test_demo_launcher_preflights_before_start_and_cleans_only_owned_processes() -> None:
     source = LAUNCHER.read_text(encoding="utf-8")
 
