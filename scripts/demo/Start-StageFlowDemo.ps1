@@ -117,6 +117,12 @@ function Wait-HttpReady {
     throw "$Name did not become ready within 60 seconds."
 }
 
+function New-DemoLaunchContext {
+    $bytes = [byte[]]::new(32)
+    [System.Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
+    return [Convert]::ToBase64String($bytes).TrimEnd("=").Replace("+", "-").Replace("/", "_")
+}
+
 $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\.."))
 $backendRoot = Join-Path $repositoryRoot "backend"
 $frontendRoot = Join-Path $repositoryRoot "frontend"
@@ -197,6 +203,9 @@ try {
         WorkingDirectory = $frontendRoot
         NoNewWindow = $true
         PassThru = $true
+        Environment = @{
+            STAGEFLOW_DEMO_LAUNCH_CONTEXT = (New-DemoLaunchContext)
+        }
     }
     $frontend = Start-Process @frontendParameters
     $ownedProcesses.Add($frontend)

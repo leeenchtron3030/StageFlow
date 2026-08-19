@@ -1,4 +1,8 @@
+import { createHash, timingSafeEqual } from "node:crypto";
+
 import type { NextRequest } from "next/server";
+
+import { demoLaunchContextHeader } from "../../../../../src/experience/demo-launch-context.ts";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -13,6 +17,9 @@ const commandPaths = new Set([
 const workspacePath = /^sessions\/[0-9a-f-]{36}\/workspace$/i;
 const maximumCommandBytes = 32 * 1024;
 const maximumResponseBytes = 12 * 1024 * 1024;
+const maximumAttributionValueLength = 128;
+const uuidPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function backendBase(): URL {
   const configured =
@@ -47,6 +54,84 @@ function isSameOriginCommand(request: NextRequest): boolean {
   );
 }
 
+function currentLaunchContext(): string | undefined {
+  const value = process.env.STAGEFLOW_DEMO_LAUNCH_CONTEXT;
+  return value && value.length >= 32 ? value : undefined;
+}
+
+function launchContextFingerprint(value: string | undefined): string {
+  return value
+    ? createHash("sha256").update(value, "utf8").digest("hex").slice(0, 16)
+    : "unavailable";
+}
+
+function launchContextMatches(presented: string | null): boolean {
+  const current = currentLaunchContext();
+  if (!current || !presented) return false;
+  const expectedBytes = Buffer.from(current, "utf8");
+  const presentedBytes = Buffer.from(presented, "utf8");
+  return (
+    expectedBytes.byteLength === presentedBytes.byteLength &&
+    timingSafeEqual(expectedBytes, presentedBytes)
+  );
+}
+
+function boundedClientAddress(request: NextRequest): string {
+  const forwarded = request.headers.get("x-forwarded-for")?.split(",", 1)[0]?.trim();
+  const value = forwarded || request.headers.get("x-real-ip")?.trim() || "unavailable";
+  return value.slice(0, maximumAttributionValueLength);
+}
+
+function requestIdentity(body: string | undefined): {
+  correlation_id: string | null;
+  operation_id: string | null;
+} {
+  if (!body) return { correlation_id: null, operation_id: null };
+  try {
+    const payload = JSON.parse(body) as unknown;
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+      return { correlation_id: null, operation_id: null };
+    }
+    const values = payload as Record<string, unknown>;
+    const operationId = values.operation_id;
+    const correlationId = values.correlation_id;
+    return {
+      operation_id:
+        typeof operationId === "string" && uuidPattern.test(operationId)
+          ? operationId
+          : null,
+      correlation_id:
+        typeof correlationId === "string" && uuidPattern.test(correlationId)
+          ? correlationId
+          : null,
+    };
+  } catch {
+    return { correlation_id: null, operation_id: null };
+  }
+}
+
+function recordAuthorityRequest(
+  request: NextRequest,
+  path: string,
+  body: string | undefined,
+  launchContextValid: boolean,
+): void {
+  const identity = requestIdentity(body);
+  console.info(
+    "stageflow_demo_authority_request=" +
+      JSON.stringify({
+        timestamp: new Date().toISOString(),
+        command: path,
+        path: "/api/stageflow/demo/" + path,
+        launch_context_fingerprint: launchContextFingerprint(currentLaunchContext()),
+        operation_id: identity.operation_id,
+        correlation_id: identity.correlation_id,
+        producer_proxy_client_address: boundedClientAddress(request),
+        launch_context_valid: launchContextValid,
+      }),
+  );
+}
+
 async function proxy(
   request: NextRequest,
   segments: string[],
@@ -63,6 +148,7 @@ async function proxy(
     );
   }
   if (method === "POST" && !isSameOriginCommand(request)) {
+    recordAuthorityRequest(request, path, undefined, false);
     return Response.json(
       { detail: "demo_command_origin_not_allowed" },
       { status: 403, headers: noStoreHeaders() },
@@ -73,6 +159,7 @@ async function proxy(
   if (method === "POST") {
     const declaredLength = Number(request.headers.get("content-length") ?? "0");
     if (declaredLength > maximumCommandBytes) {
+      recordAuthorityRequest(request, path, undefined, false);
       return Response.json(
         { detail: "demo_command_too_large" },
         { status: 413, headers: noStoreHeaders() },
@@ -80,9 +167,20 @@ async function proxy(
     }
     body = await request.text();
     if (new TextEncoder().encode(body).byteLength > maximumCommandBytes) {
+      recordAuthorityRequest(request, path, undefined, false);
       return Response.json(
         { detail: "demo_command_too_large" },
         { status: 413, headers: noStoreHeaders() },
+      );
+    }
+    const launchContextValid = launchContextMatches(
+      request.headers.get(demoLaunchContextHeader),
+    );
+    recordAuthorityRequest(request, path, body, launchContextValid);
+    if (!launchContextValid) {
+      return Response.json(
+        { detail: "demo_launch_context_invalid" },
+        { status: 403, headers: noStoreHeaders() },
       );
     }
   }

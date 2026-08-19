@@ -7,6 +7,7 @@ import {
   createDemoCommandEnvelope,
   type DemoSessionWorkspace as DemoWorkspace,
 } from "@/experience/demo-api.ts";
+import { demoAuthorityHeaders } from "@/experience/demo-launch-context.ts";
 
 const apiRoot = "/api/stageflow/demo";
 
@@ -38,11 +39,13 @@ export function DemoStartSessionControl({
   actorId,
   enabled,
   hasCurrentSession,
+  launchContext,
 }: {
   stageId: string;
   actorId?: string;
   enabled: boolean;
   hasCurrentSession: boolean;
+  launchContext?: string;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -53,6 +56,10 @@ export function DemoStartSessionControl({
       setMessage("Unavailable: configure an explicit Demo operator UUID.");
       return;
     }
+    if (!launchContext) {
+      setMessage("Unavailable: current Demo launcher context is not available.");
+      return;
+    }
     if (!window.confirm("Declare a new authoritative Session start now?")) return;
     setBusy(true);
     setMessage(undefined);
@@ -60,7 +67,7 @@ export function DemoStartSessionControl({
       const response = await fetch(`${apiRoot}/sessions/start`, {
         method: "POST",
         cache: "no-store",
-        headers: { "Content-Type": "application/json" },
+        headers: demoAuthorityHeaders(launchContext),
         body: JSON.stringify(
           createDemoCommandEnvelope(actorId, {
             stage_id: stageId,
@@ -86,12 +93,13 @@ export function DemoStartSessionControl({
         <h2 id="demo-start-title">Session control</h2>
         <p>Program Expectations remain external evidence until this command realizes a Session.</p>
       </div>
-      <button disabled={busy || hasCurrentSession || !actorId} onClick={startSession} type="button">
+      <button disabled={busy || hasCurrentSession || !actorId || !launchContext} onClick={startSession} type="button">
         {busy ? "Recording…" : "Start Session"}
       </button>
       {hasCurrentSession ? <span>An active or assembling Session already exists.</span> : null}
       {!actorId ? <span>Commands disabled: explicit operator UUID is not configured.</span> : null}
       {message ? <span role="status">{message}</span> : null}
+      {!launchContext ? <span>Commands disabled: current launcher context is unavailable.</span> : null}
     </section>
   );
 }
@@ -105,6 +113,7 @@ export function DemoSessionWorkspace({
   initialPackageState,
   initialRevision,
   enabled,
+  launchContext,
 }: {
   sessionId: string;
   actorId?: string;
@@ -114,6 +123,7 @@ export function DemoSessionWorkspace({
   initialPackageState: string;
   initialRevision: number;
   enabled: boolean;
+  launchContext?: string;
 }) {
   const router = useRouter();
   const [workspace, setWorkspace] = useState<DemoWorkspace>();
@@ -160,6 +170,10 @@ export function DemoSessionWorkspace({
         setMessage("Unavailable: configure an explicit Demo operator UUID.");
         return;
       }
+      if (!launchContext) {
+        setMessage("Unavailable: current Demo launcher context is not available.");
+        return;
+      }
       if (!window.confirm(confirmation)) return;
       setBusy(path);
       setMessage(undefined);
@@ -167,7 +181,7 @@ export function DemoSessionWorkspace({
         const response = await fetch(`${apiRoot}/${path}`, {
           method: "POST",
           cache: "no-store",
-          headers: { "Content-Type": "application/json" },
+          headers: demoAuthorityHeaders(launchContext),
           body: JSON.stringify(
             createDemoCommandEnvelope(actorId, {
               session_id: sessionId,
@@ -185,7 +199,7 @@ export function DemoSessionWorkspace({
         setBusy(undefined);
       }
     },
-    [actorId, load, router, sessionId],
+    [actorId, launchContext, load, router, sessionId],
   );
 
   const markMoment = useCallback(async () => {
@@ -217,7 +231,7 @@ export function DemoSessionWorkspace({
 
       <div className="demo-authority-actions" aria-label="Demo Session authority controls">
         <button
-          disabled={!actorId || busy !== undefined || activityState !== "presentation_active"}
+          disabled={!actorId || !launchContext || busy !== undefined || activityState !== "presentation_active"}
           onClick={() =>
             void send(
               "sessions/end-presentation",
@@ -230,7 +244,7 @@ export function DemoSessionWorkspace({
           End Presentation
         </button>
         <button
-          disabled={!actorId || busy !== undefined}
+          disabled={!actorId || !launchContext || busy !== undefined}
           onClick={() =>
             void send(
               "sessions/process-transcription",
@@ -246,6 +260,7 @@ export function DemoSessionWorkspace({
           disabled={
             !actorId ||
             busy !== undefined ||
+            !launchContext ||
             activityState !== "presentation_ended" ||
             packageState !== "assembling"
           }
@@ -261,7 +276,7 @@ export function DemoSessionWorkspace({
           Package Ready
         </button>
         <button
-          disabled={!actorId || busy !== undefined || !authoritativeStart}
+          disabled={!actorId || !launchContext || busy !== undefined || !authoritativeStart}
           onClick={() => void markMoment()}
           type="button"
         >
@@ -269,6 +284,7 @@ export function DemoSessionWorkspace({
         </button>
         {!actorId ? <span>Commands disabled: explicit operator UUID is not configured.</span> : null}
         {message ? <span role="status">{message}</span> : null}
+        {!launchContext ? <span>Commands disabled: current launcher context is unavailable.</span> : null}
       </div>
 
       <div className="demo-work-summary">

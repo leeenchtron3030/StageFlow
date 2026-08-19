@@ -4,6 +4,7 @@ import os
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import cast
 from uuid import uuid4
 
 import psycopg
@@ -18,6 +19,7 @@ from app.contexts.events import (
 from app.contexts.production.event_mode_kernel.contracts import (
     AssociationAuthority,
     AssociationStatus,
+    BoundaryDecision,
     EpistemicKind,
     MediaCandidate,
     MediaRegistrationState,
@@ -439,6 +441,18 @@ def test_human_session_start_supports_expectation_and_ad_hoc_session() -> None:
     assert replay.id == started.id
     assert started.program_expectation_id == expectation.id
     assert ad_hoc.program_expectation_id is None
+    start_boundaries = [
+        decision
+        for decision in cast(list[BoundaryDecision], repository.__dict__["_boundaries"])
+        if decision.session_id in {started.id, ad_hoc.id}
+    ]
+    assert len(start_boundaries) == 2
+    assert {decision.authority for decision in start_boundaries} == {EpistemicKind.DECLARED}
+    assert {decision.reason for decision in start_boundaries} == {"human_session_start"}
+    assert {decision.actor_id for decision in start_boundaries} == {ACTOR_ID}
+    assert {decision.operation_id for decision in start_boundaries} == {
+        entity_id(20), entity_id(21)
+    }
     with pytest.raises(KernelConflictError, match="active_session"):
         repository.start_session(
             StartSessionRequest(

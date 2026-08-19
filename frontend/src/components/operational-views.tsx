@@ -344,10 +344,12 @@ export function StageOperationalView({
   stage,
   workspace,
   demoActorId,
+  demoLaunchContext,
 }: {
   stage?: StageView;
   workspace: OperationalWorkspace;
   demoActorId?: string;
+  demoLaunchContext?: string;
 }) {
   if (!stage) return <><WorkspaceTitle eyebrow="Producer · Stage" title="Stage unavailable" summary="The requested Stage is not present in this bounded projection." /><Link className="text-link" href={href("/", workspace)}>Return to Mission Control</Link></>;
   const isDemo = workspace.dataSource.runtimeProfile === "demo-single-stage";
@@ -374,6 +376,7 @@ export function StageOperationalView({
         actorId={demoActorId}
         enabled={isDemo}
         hasCurrentSession={Boolean(stage.currentSession)}
+        launchContext={demoLaunchContext}
         stageId={stage.id}
       />
       <div className="stage-detail-grid">
@@ -427,10 +430,12 @@ export function SessionOperationalView({
   session,
   workspace,
   demoActorId,
+  demoLaunchContext,
 }: {
   session?: SessionView;
   workspace: OperationalWorkspace;
   demoActorId?: string;
+  demoLaunchContext?: string;
 }) {
   if (!session) return <><WorkspaceTitle eyebrow="Producer · Session" title="Session unavailable" summary="The requested Session is outside this bounded projection." /><Link className="text-link" href={href("/sessions", workspace)}>Return to Sessions</Link></>;
   return (
@@ -483,6 +488,7 @@ export function SessionOperationalView({
         authoritativeEnd={session.authoritativeEnd}
         authoritativeStart={session.authoritativeStart}
         enabled={workspace.dataSource.runtimeProfile === "demo-single-stage"}
+        launchContext={demoLaunchContext}
         initialActivityState={session.activityState}
         initialPackageState={session.packageState}
         initialRevision={session.sessionRevision}
