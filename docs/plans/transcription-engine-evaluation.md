@@ -15,11 +15,16 @@ Completed
 - Required escalation or approval, if any: selecting a production engine/model,
   introducing its consequential runtime dependency, changing deployment, or promoting
   benchmark findings into Event/Editorial authority is Yellow and remains excluded.
+- Decision outcome: on 2026-08-18, faster-whisper 1.2.1 with CTranslate2 4.8.1 and the
+  pinned large-v3-turbo converted model was accepted for Demo 1 and the first real local
+  transcription implementation. Broader production-provider/model selection remains
+  subject to representative accented/noisy event qualification.
 
 ## Related findings or ADRs
 
-- Finding/disposition: transcription evidence is an approved post-Kernel capability;
-  provider selection and production integration remain open decisions.
+- Finding/disposition at plan start: transcription evidence was an approved post-Kernel
+  capability; provider selection and production integration were open decisions. The
+  scoped selection outcome is recorded below, while broader selection remains conditional.
 - ADR: accepted ADR-0025 (durable operations/workers) and ADR-0027 (Media Timing
   Evidence).
 - Engineering Directive or other authority: operator-authorized reversible research and
@@ -188,11 +193,14 @@ Delete the qualification-only modules, tests, documentation, and external evalua
 cache/virtual environments. No production data, schema, dependency manifest, runtime
 configuration, or public contract requires reversal.
 
-## Open questions
+## Decision outcome and remaining questions
 
-- Yellow decision: which engine, model, precision, runtime/dependency packaging, and
-  optional alignment/diarization stages should StageFlow adopt for its first production
-  Windows RTX transcription worker?
+- The original Yellow engine/model question was resolved in bounded scope on 2026-08-18:
+  faster-whisper 1.2.1, CTranslate2 4.8.1, and the pinned large-v3-turbo converted model
+  are accepted for Demo 1 and the first real local transcription implementation.
+- Broader production-provider/model selection remains subject to representative
+  accented/noisy event qualification. Dependency packaging, offline cache integrity,
+  operating limits, and optional alignment/diarization remain implementation-plan work.
 - What realistic, non-sensitive accented/noisy conference corpus may be retained or
   referenced for repeatable acceptance beyond the deterministic synthetic corpus?
 
@@ -219,5 +227,6 @@ configuration, or public contract requires reversal.
 - Approved deviations: None.
 - Rollback status: qualification files can be deleted directly; the isolated database was
   restored with migration 0007 applied and its tables empty; the reused base asset remained.
-- Remaining work: the documented Yellow provider/model/dependency/packaging decision and a
-  future realistic accented/noisy/multilingual conference corpus qualification.
+- Remaining work: a bounded first-implementation plan covering the accepted baseline's
+  dependency/packaging/offline-operation details, plus representative accented/noisy
+  event qualification before broader production-provider/model selection.

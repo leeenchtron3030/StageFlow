@@ -2,11 +2,15 @@
 
 ## Status and authority boundary
 
-**Green qualification complete on 2026-08-18. Production selection remains Yellow.**
+**Green qualification complete on 2026-08-18. Scoped acceptance recorded for Demo 1
+and the first real local transcription implementation.**
 
 This evaluation measures local/offline candidates behind TranscriptionExecutionPort. It
-does not select a production provider, add a runtime dependency, change deployment,
-create transcript/editorial authority, or qualify real event media.
+did not itself add a runtime dependency, change deployment, create transcript/editorial
+authority, or qualify real event media. Based on this evidence, faster-whisper 1.2.1,
+CTranslate2 4.8.1, and the pinned large-v3-turbo converted model are accepted for Demo 1
+and StageFlow's first real local transcription implementation. Broader production-provider
+or model selection remains subject to representative accented/noisy event qualification.
 
 Evidence applies to one Windows 11 host with an Intel Core i7-12800H, 32 GiB system
 memory, and an NVIDIA GeForce RTX 3080 Ti Laptop GPU with 16 GiB VRAM and driver 581.57.
@@ -16,7 +20,7 @@ It is not a general hardware claim.
 
 | Candidate | Exact identity | License and capabilities | Windows/offline outcome |
 | --- | --- | --- | --- |
-| faster-whisper / CTranslate2 | [faster-whisper v1.2.1](https://github.com/SYSTRAN/faster-whisper/releases/tag/v1.2.1), CTranslate2 4.8.1, large-v3-turbo converted snapshot 0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf | Runtime is [MIT](https://github.com/SYSTRAN/faster-whisper/blob/master/LICENSE); underlying [OpenAI turbo model is MIT](https://huggingface.co/openai/whisper-large-v3-turbo). Multilingual segment/word timing and language detection; no speaker identity. | PyAV bundles FFmpeg. Pinned model passed with HF_HUB_OFFLINE=1. Stock host failed on missing cublas64_12.dll; adding only the verified local CUDA DLL directory from the official whisper.cpp archive made it pass. **Measured evidence leader; adoption remains Yellow.** |
+| faster-whisper / CTranslate2 | [faster-whisper v1.2.1](https://github.com/SYSTRAN/faster-whisper/releases/tag/v1.2.1), CTranslate2 4.8.1, large-v3-turbo converted snapshot 0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf | Runtime is [MIT](https://github.com/SYSTRAN/faster-whisper/blob/master/LICENSE); underlying [OpenAI turbo model is MIT](https://huggingface.co/openai/whisper-large-v3-turbo). Multilingual segment/word timing and language detection; no speaker identity. | PyAV bundles FFmpeg. Pinned model passed with HF_HUB_OFFLINE=1. Stock host failed on missing cublas64_12.dll; adding only the verified local CUDA DLL directory from the official whisper.cpp archive made it pass. **Accepted for Demo 1 and the first real local transcription implementation; broader selection remains conditional.** |
 | whisper.cpp | [v1.9.2](https://github.com/ggml-org/whisper.cpp/releases/tag/v1.9.2), commit 306c88f4d1286aec1bf96e544632897886af5501, GGML model revision 5359861c739e955e79d9a303bcbc70fb988958b1 | Runtime is [MIT](https://github.com/ggml-org/whisper.cpp/blob/master/LICENSE); model is MIT. Multilingual segment timing. Documented word timing is [experimental](https://github.com/ggml-org/whisper.cpp#word-level-timestamp-experimental), so the adapter does not normalize it as word evidence. | Official Windows CPU and CUDA 12.4 archives loaded; CUDA detected compute capability 8.6. Pinned 16-bit WAV ran offline. **Viable, simpler packaged fallback with higher latency and no normalized word timing.** |
 | OpenAI Whisper reference runtime | [v20250625](https://github.com/openai/whisper/releases/tag/v20250625), turbo | [MIT](https://github.com/openai/whisper/blob/main/LICENSE); multilingual segment timing. | Official setup documents Python 3.8-3.11 and requires [system FFmpeg](https://github.com/openai/whisper#setup). This host used Python 3.13 and lacked system FFmpeg. The same model was measured through two more deployable runtimes, so this heavyweight PyTorch reference was not separately run. |
 | NVIDIA Parakeet TDT 0.6B v3 / NeMo Speech | [Parakeet](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3), [NeMo Speech v3.0.0](https://github.com/NVIDIA-NeMo/Speech/releases/tag/v3.0.0) | Model is CC BY 4.0; NeMo Speech is [Apache 2.0](https://github.com/NVIDIA-NeMo/Speech/blob/main/LICENSE). Twenty-five listed languages, word/segment/character timing, 16 kHz mono WAV/FLAC. | Official [installation](https://docs.nvidia.com/nemo/speech/nightly/starthere/install.html) centers on a much larger PyTorch/CUDA or Linux container stack. No native-Windows RTX path was qualified. Serious non-Whisper candidate, but it needs separate portable-runtime/host qualification. |
@@ -115,9 +119,9 @@ For faster-whisper, use a disposable environment, pinned local snapshot, forced 
 mode after acquisition, and explicitly reviewed DLL path. Do not add evaluation packages
 to StageFlow dependency manifests merely to reproduce this run.
 
-## Yellow selection package
+## Scoped acceptance decision
 
-One exact architecture/operations question remains:
+The evaluation originally posed this Yellow architecture/operations question:
 
 > Should StageFlow adopt faster-whisper 1.2.1 with CTranslate2 4.8.1 and the pinned
 > large-v3-turbo converted model as its first production Windows RTX provider, subject
@@ -126,8 +130,19 @@ One exact architecture/operations question remains:
 > latency and no normalized word timing; or defer until a realistic accented/noisy
 > conference corpus and portable Parakeet runtime are qualified?
 
-The measured evidence leader is faster-whisper. That is a benchmark result, not the
-Yellow production decision. Selection must separately approve dependency/lockfile
-changes, model distribution and license notices, DLL packaging, cache integrity/offline
-preflight, worker lifetime, resource limits, support ownership, and any later
-alignment/diarization stage.
+Decision recorded on 2026-08-18:
+
+- Accept faster-whisper 1.2.1 with CTranslate2 4.8.1 and the pinned large-v3-turbo
+  converted model for Demo 1 and StageFlow's first real local transcription
+  implementation.
+- Retain whisper.cpp as measured fallback evidence rather than the selected first
+  implementation baseline.
+- Keep broader production-provider and model selection conditional on representative
+  accented/noisy event qualification; the synthetic corpus does not resolve that wider
+  decision.
+
+This scoped acceptance does not itself change dependencies or runtime configuration.
+The implementation plan must explicitly cover dependency/lockfile changes, model
+distribution and license notices, CUDA/cuBLAS packaging, cache integrity/offline preflight,
+worker lifetime, resource limits, support ownership, and any later alignment/diarization
+stage.

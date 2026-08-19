@@ -14,7 +14,7 @@ readiness.
 
 | Artifact | Purpose | Status |
 | --- | --- | --- |
-| [Real transcription engine evaluation](transcription-engine-evaluation.md) | Provider-neutral Windows/RTX matrix, metrics, PostgreSQL worker evidence, and Yellow selection package | Green qualification complete; production selection remains Yellow |
+| [Real transcription engine evaluation](transcription-engine-evaluation.md) | Provider-neutral Windows/RTX matrix, metrics, PostgreSQL worker evidence, and scoped acceptance record | Accepted for Demo 1 and the first real local implementation; broader selection awaits representative event qualification |
 | [Real-Event Playback Validation and UX Calibration](../plans/real-event-playback-validation.md) | Current-Kernel direct/vMix replay runbook, measurements, UX calibration, and future reuse | Run 002 passed; Run 003 invalid; Run 004 partially qualified turnover |
 | [Run 004 qualification-tooling hardening](../plans/run-004-qualification-tooling-hardening.md) | Turnover authority guard, host-local lock, atomic evidence, incremental checkpoints, and runtime protection | Green qualification-only hardening validated and used by Run 004 |
 | [Run 004 qualification closure and timing telemetry](../plans/run-004-qualification-closure.md) | Immediate authority timestamp capture, source-aware runtime telemetry, and partial qualification closure | Green qualification-only closure completed and validated |
