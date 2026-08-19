@@ -1,0 +1,83 @@
+# Guarded Demo rehearsal controller
+
+Use `StageFlow-Demo.ps1` for the real Razer/Mac Demo rehearsal. It is a thin operator
+controller around the existing Python Demo CLI, loopback APIs, and
+`Start-StageFlowDemo.ps1`; it does not implement alternate application behavior.
+
+## One-time external configuration
+
+The controller never prints these values. It reads Process scope first and Windows User
+scope second:
+
+- `STAGEFLOW_DEMO_POSTGRES_DSN` — required secret; it must connect to exact database
+  `stageflow_demo`. Test, validation, worker, qualification, or any other database is
+  rejected before controller-triggered writes.
+- `STAGEFLOW_DEMO_CONFIG_PATH` — optional explicit path to the external Demo TOML. If
+  absent, the controller accepts exactly one TOML from the bounded `C:\StageFlowDemo`
+  or `C:\StageFlowDemo\config` locations.
+- `STAGEFLOW_DEMO_CUDA_RUNTIME_PATH` — optional explicit isolated CUDA runtime. The
+  qualified `C:\StageFlowDemo\runtime\whisper-cuda-12.4\Release` location is the bounded
+  fallback. PATH changes remain process-local and are restored.
+- `STAGEFLOW_DEMO_OPERATOR_ID` — optional attributable operator UUID. When absent, the
+  controller accepts exactly one actor already recorded for the unambiguous current
+  Demo Session; it never invents authority.
+- `STAGEFLOW_DEMO_DEVCON_API_KEY` — required only for `publish-devcon`; its presence is
+  reported, never its value.
+
+Configuration, model, media, and CUDA directories remain external and uncommitted.
+
+## Actions
+
+```powershell
+$demo = ".\scripts\demo\StageFlow-Demo.ps1"
+
+& $demo prepare
+& $demo start
+& $demo status
+& $demo diagnose
+& $demo rehearsal-report
+& $demo stop
+```
+
+`prepare` verifies the exact database, performs the existing real CUDA silent-inference
+preflight, bootstraps idempotently, and performs the explicit Devcon GET/cache sync.
+`start` re-verifies the database, launches the existing stack in an owned hidden process,
+and waits for loopback health plus the LAN-ready signal. `stop` targets only the recorded
+launcher process tree. It does not delete database rows, media, logs, models, or remote
+state.
+
+`status` and `rehearsal-report` resolve Event, Stage, and current Session identities
+without copy/paste. They summarize bounded media, Operations, worker presence,
+Transcription Evidence provenance/counts, Moments, package state, and Devcon cache state.
+Reports omit transcript text, media/config paths, DSNs, credentials, tokens, raw provider
+diagnostics, and API request bodies.
+
+## Devcon publication
+
+Publication is never automatic and never follows Session end. It is permitted only for
+the current unambiguous Session when Presentation has ended, package state is `complete`,
+the linked External Program Expectation resolves one remote Devcon Event/Session, and the
+bounded transcript projection is complete and untruncated.
+
+```powershell
+& $demo publish-devcon
+```
+
+The controller performs a credential-free GET identity check and displays only the
+Event, target Session, field names (`transcript_text` and `duration`), and YES/NO gates.
+It does not display field values. The default interactive path asks:
+
+```text
+Publish this StageFlow enrichment to Devcon? [y/N]
+```
+
+Confirmation is bound to a SHA-256 digest of the exact candidate. Before the PUT, the
+controller reconstructs current local state and rejects any digest change. It sends one
+bounded PUT with exactly the two named fields, then requires two matching GETs: immediate
+read-back and durability verification. It never retries the PUT automatically.
+
+`-ConfirmHumanAuthority` is available only when the human confirmation is already
+explicitly captured by the invoking operator workflow. It does not bypass package,
+identity, credential, digest, read-back, or durability gates.
+
+This is Demo tooling, not a production publisher or a LAN-exposed Devcon write surface.

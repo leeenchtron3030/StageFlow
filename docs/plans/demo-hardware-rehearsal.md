@@ -18,6 +18,8 @@ In progress - core Razer/Mac flow proven; restart, offline, and representative-c
 - Required escalation or approval, if any: stop for any other proposed production code, dependency,
   schema, migration, public contract, authority-semantic, trust-boundary, or Devcon-write change.
   Production deployment and production-data access remain prohibited.
+  The later [Demo rehearsal controller](demo-rehearsal-controller.md) records the separately approved
+  Demo-only, explicitly confirmed Devcon publication boundary; it does not change the LAN UI.
 
 ## Related findings or ADRs
 
@@ -79,8 +81,9 @@ offline-cache behavior are demonstrated without expanding product semantics.
 ## Out of scope
 
 - New product features, providers, models, dependencies, schemas, migrations, APIs, authority
-  semantics, automatic Session/Moment behavior, Devcon writes, production deployment, and
-  production or customer data.
+  semantics, automatic Session/Moment behavior, automatic or generic Devcon writes, production
+  deployment, and production or customer data. A real bounded Devcon PUT is permitted only through
+  the separately approved controller gates and a new explicit human confirmation.
 - Broader provider/model acceptance or an Event-readiness claim.
 - Committing DSNs, credentials, model files, media, transcripts, raw provider payloads, or
   private local paths.

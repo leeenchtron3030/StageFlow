@@ -85,6 +85,7 @@ or architecture document unless those documents are explicitly updated.
 
 | Plan | Status | Owner | Related decision/finding |
 | --- | --- | --- | --- |
+| [Demo rehearsal controller](demo-rehearsal-controller.md) | In progress - guarded Demo operations | StageFlow Demo Operations / Integration | Explicit 2026-08-19 controller and Devcon lifecycle decision |
 | [Demo hardware rehearsal](demo-hardware-rehearsal.md) | In progress - Green validation-only; local prerequisites pending | StageFlow Validation / Demo Operations | Merged Demo Single-Stage Vertical Slice; scoped Demo 1 transcription baseline |
 | [Demo single-stage vertical slice](demo-single-stage-vertical-slice.md) | Implementation complete; live rehearsal moved to the separate hardware plan | StageFlow Demo / Production / Editorial / Work Execution | ADR-0022-ADR-0025, ADR-0027; accepted Demo 1 transcription baseline |
 | [Real transcription engine evaluation](transcription-engine-evaluation.md) | Completed - Demo 1 and first local implementation baseline accepted; broader selection remains conditional | StageFlow Validation / Backend / Architecture | Accepted ADR-0025/ADR-0027; transcription-evidence readiness |
