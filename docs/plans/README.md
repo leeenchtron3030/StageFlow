@@ -85,6 +85,7 @@ or architecture document unless those documents are explicitly updated.
 
 | Plan | Status | Owner | Related decision/finding |
 | --- | --- | --- | --- |
+| [Demo Devcon publication contract correction](demo-devcon-publication-contract.md) | Completed - Green compatibility fix qualified locally and against upstream | StageFlow Demo Operations / Integration | Failed guarded PUT evidence; efdevcon/monorepo e797785 |
 | [Demo Program Expectation selection](demo-program-expectation-selection.md) | Completed - Green explicit-human-selection UX qualified live | StageFlow Demo Operations / Frontend | Explicit 2026-08-19 Program Expectation selection directive |
 | [Demo launch-scoped authority context](demo-launch-authority-context.md) | Completed - Green transport safety fix qualified live | StageFlow Demo Operations / Frontend | Explicit 2026-08-19 stale-launch authority protection directive |
 | [Demo rehearsal controller](demo-rehearsal-controller.md) | In progress - guarded Demo operations | StageFlow Demo Operations / Integration | Explicit 2026-08-19 controller and Devcon lifecycle decision |

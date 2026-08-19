@@ -14,7 +14,10 @@ from app.demo.controller import (
     summarize_demo_state,
     validate_database_identity,
 )
-from app.infrastructure.devcon.session_publish import RemoteDevconSession
+from app.infrastructure.devcon.session_publish import (
+    DevconPublishError,
+    RemoteDevconSession,
+)
 
 SESSION_ID = "6b4c60cc-9008-43db-976d-3fdba826b242"
 EXPECTATION_ID = "20000000-0000-0000-0000-000000000001"
@@ -271,6 +274,31 @@ def test_publish_preview_and_execution_require_confirmation_and_verify_twice() -
     assert result["durability_verified"] is True
     assert "secret-value" not in json.dumps(result)
     assert candidate.transcript_text not in json.dumps(result)
+
+
+def test_rejected_publish_does_not_retry_or_run_read_back() -> None:
+    candidate = build_devcon_publish_candidate(_kernel(), _workspace())
+
+    class RejectingDevconAdapter(FakeDevconAdapter):
+        def put_enrichment(self, **values: object) -> None:
+            self.put_calls.append(values)
+            raise DevconPublishError("devcon_publish_rejected:no_body")
+
+    adapter = RejectingDevconAdapter(candidate.transcript_text)
+    with pytest.raises(
+        DevconPublishError,
+        match=r"^devcon_publish_rejected:no_body$",
+    ):
+        execute_devcon_publish(
+            candidate,
+            expected_digest=candidate.digest,
+            confirmed=True,
+            api_key="secret-value",
+            adapter=adapter,  # type: ignore[arg-type]
+        )
+
+    assert adapter.get_calls == 1
+    assert len(adapter.put_calls) == 1
 
 
 def test_publish_requires_package_approval() -> None:

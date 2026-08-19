@@ -5,7 +5,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import cast
 from urllib.error import HTTPError, URLError
-from urllib.parse import quote, urlencode
+from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 
@@ -26,25 +26,22 @@ class RemoteDevconSession:
 
 
 SessionRequester = Callable[
-    [str, str, bytes | None, int, int],
+    [str, str, bytes | None, Mapping[str, str], int, int],
     tuple[int, Mapping[str, object] | None],
 ]
+
+_MAXIMUM_FAILURE_RESPONSE_BYTES = 4 * 1024
 
 
 def _request_json(
     method: str,
     url: str,
     body: bytes | None,
+    headers: Mapping[str, str],
     timeout_seconds: int,
     maximum_bytes: int,
 ) -> tuple[int, Mapping[str, object] | None]:
-    headers = {
-        "Accept": "application/json",
-        "User-Agent": "StageFlow-Demo-Devcon-Publish/1.0",
-    }
-    if body is not None:
-        headers["Content-Type"] = "application/json"
-    request = Request(url, data=body, headers=headers, method=method)
+    request = Request(url, data=body, headers=dict(headers), method=method)
     try:
         with urlopen(request, timeout=timeout_seconds) as response:  # noqa: S310
             status = response.status
@@ -53,7 +50,31 @@ def _request_json(
                 raise DevconPublishError("devcon_publish_response_too_large")
             payload_bytes = response.read(maximum_bytes + 1)
     except HTTPError as exc:
-        raise DevconPublishError(f"devcon_publish_http_status_{exc.code}") from None
+        declared_length = exc.headers.get("Content-Length")
+        try:
+            if (
+                declared_length is not None
+                and int(declared_length) > _MAXIMUM_FAILURE_RESPONSE_BYTES
+            ):
+                return exc.code, None
+        except ValueError:
+            return exc.code, None
+        payload_bytes = exc.read(_MAXIMUM_FAILURE_RESPONSE_BYTES + 1)
+        if len(payload_bytes) > _MAXIMUM_FAILURE_RESPONSE_BYTES:
+            return exc.code, None
+        try:
+            payload = json.loads(payload_bytes)
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            return exc.code, None
+        if not isinstance(payload, dict):
+            return exc.code, None
+        error_payload = cast(Mapping[str, object], payload)
+        if (
+            error_payload.get("status") != exc.code
+            or not isinstance(error_payload.get("message"), str)
+        ):
+            return exc.code, None
+        return exc.code, error_payload
     except (OSError, TimeoutError, URLError, ValueError):
         raise DevconPublishError("devcon_publish_unavailable") from None
     if len(payload_bytes) > maximum_bytes:
@@ -88,6 +109,44 @@ def _optional_duration(value: object) -> int | None:
     return duration
 
 
+def _request_headers(
+    *, body: bytes | None = None, api_key: str | None = None
+) -> dict[str, str]:
+    headers = {
+        "Accept": "application/json",
+        "User-Agent": "StageFlow-Demo-Devcon-Publish/1.0",
+    }
+    if body is not None:
+        headers["Content-Type"] = "application/json; charset=utf-8"
+    if api_key is not None:
+        headers["x-api-key"] = api_key
+    return headers
+
+
+_REJECTION_REASONS = {
+    (400, "no body"): "no_body",
+    (400, "invalid id"): "invalid_id",
+    (400, "invalid fields"): "invalid_fields",
+    (401, "unauthorized"): "unauthorized",
+    (404, "not found"): "not_found",
+    (500, "internal server error"): "internal_server_error",
+}
+
+
+def _publish_rejection(
+    status: int, payload: Mapping[str, object] | None
+) -> str:
+    message = payload.get("message") if payload is not None else None
+    reason = (
+        _REJECTION_REASONS.get((status, message.strip().casefold()))
+        if isinstance(message, str)
+        else None
+    )
+    if reason is not None:
+        return f"devcon_publish_rejected:{reason}"
+    return f"devcon_publish_http_status_{status}"
+
+
 class DevconSessionPublishAdapter:
     _maximum_response_bytes = 2 * 1024 * 1024
 
@@ -114,6 +173,7 @@ class DevconSessionPublishAdapter:
             "GET",
             f"{self._base_url}/sessions/{quote(normalized_id, safe='')}",
             None,
+            _request_headers(),
             self._timeout_seconds,
             self._maximum_response_bytes,
         )
@@ -157,16 +217,16 @@ class DevconSessionPublishAdapter:
             ensure_ascii=False,
             separators=(",", ":"),
         ).encode("utf-8")
-        query = urlencode({"apiKey": api_key})
-        status, _ = self._requester(
+        status, payload = self._requester(
             "PUT",
-            f"{self._base_url}/sessions/{quote(normalized_id, safe='')}?{query}",
+            f"{self._base_url}/sessions/sources/{quote(normalized_id, safe='')}",
             body,
+            _request_headers(body=body, api_key=api_key),
             self._timeout_seconds,
             self._maximum_response_bytes,
         )
         if status != 204:
-            raise DevconPublishError(f"devcon_publish_http_status_{status}")
+            raise DevconPublishError(_publish_rejection(status, payload))
 
 
 __all__ = [
