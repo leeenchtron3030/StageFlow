@@ -88,6 +88,18 @@ export interface SessionView {
   provenance: "declared" | "external" | "fixture";
 }
 
+export interface ProgramExpectationView {
+  id: string;
+  stageId: string;
+  title: string;
+  speakers: string[];
+  plannedStart?: string;
+  plannedEnd?: string;
+  provider?: string;
+  externalSessionId?: string;
+  evidenceKind: "external";
+}
+
 export interface StageView {
   id: string;
   key: string;
@@ -97,6 +109,7 @@ export interface StageView {
   sourceImpact: string;
   currentSession?: SessionView;
   previousSession?: SessionView;
+  programExpectations: ProgramExpectationView[];
   nextExpectation?: string;
   nextExpectationSpeakers?: string[];
   nextExpectationPlannedStart?: string;

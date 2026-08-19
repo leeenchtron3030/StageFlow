@@ -112,6 +112,7 @@ function stage(
     sourceLabel: "Available",
     sourceImpact: "Local media observation continuing normally.",
     currentSession,
+    programExpectations: [],
     media: currentSession?.media ?? media(0),
     ...options,
   };

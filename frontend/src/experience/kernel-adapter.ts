@@ -5,6 +5,7 @@ import type {
   MediaAssetView,
   MediaSummaryView,
   MediaTimingEvidenceView,
+  ProgramExpectationView,
   OperationalWorkspace,
   SessionView,
   StageView,
@@ -404,6 +405,7 @@ function stageView(stage: KernelStageStatus): StageView {
     previousSession: priorProjection
       ? sessionFromProjection(priorProjection, stage)
       : undefined,
+    programExpectations: [],
     media: mediaFromStage(stage),
     attentionLevel: state.level,
     attentionText: state.text,
@@ -590,21 +592,63 @@ function infrastructure(payload: KernelStatusPayload): InfrastructureItemView[] 
   return items;
 }
 
+function programExpectationView(
+  expectation: KernelProgramExpectation,
+  stageId: string,
+): ProgramExpectationView {
+  return {
+    id: expectation.expectation_id,
+    stageId,
+    title: expectation.title,
+    speakers: expectation.speakers,
+    plannedStart: expectation.planned_start ?? undefined,
+    plannedEnd: expectation.planned_end ?? undefined,
+    provider: expectation.provider ?? undefined,
+    externalSessionId: expectation.external_session_id ?? undefined,
+    evidenceKind: expectation.evidence_kind,
+  };
+}
+
+function plannedStartSortValue(value: string | undefined): number {
+  if (!value) return Number.POSITIVE_INFINITY;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : Number.POSITIVE_INFINITY;
+}
+
+function compareProgramExpectations(
+  left: ProgramExpectationView,
+  right: ProgramExpectationView,
+): number {
+  const plannedStartDifference =
+    plannedStartSortValue(left.plannedStart) - plannedStartSortValue(right.plannedStart);
+  if (Number.isFinite(plannedStartDifference) && plannedStartDifference !== 0) {
+    return plannedStartDifference;
+  }
+  if (left.title !== right.title) {
+    return left.title < right.title ? -1 : 1;
+  }
+  if (left.id === right.id) return 0;
+  return left.id < right.id ? -1 : 1;
+}
+
 export function adaptKernelStatus(
   payload: KernelStatusPayload,
   observedAt: string,
 ): OperationalWorkspace {
   const stages = payload.stages.map(stageView);
   for (const stage of stages) {
-    const nextExpectation = (payload.program_expectations ?? []).find(
-      (expectation) => expectation.stage_id === stage.id,
-    );
+    const expectations = (payload.program_expectations ?? [])
+      .filter((expectation) => expectation.stage_id === stage.id)
+      .map((expectation) => programExpectationView(expectation, stage.id))
+      .sort(compareProgramExpectations);
+    stage.programExpectations = expectations;
+    const nextExpectation = expectations[0];
     if (nextExpectation) {
       stage.nextExpectation = nextExpectation.title;
       stage.nextExpectationSpeakers = nextExpectation.speakers;
-      stage.nextExpectationPlannedStart = nextExpectation.planned_start ?? undefined;
-      stage.nextExpectationPlannedEnd = nextExpectation.planned_end ?? undefined;
-      stage.nextExpectationProvider = nextExpectation.provider ?? undefined;
+      stage.nextExpectationPlannedStart = nextExpectation.plannedStart;
+      stage.nextExpectationPlannedEnd = nextExpectation.plannedEnd;
+      stage.nextExpectationProvider = nextExpectation.provider;
     }
   }
   const mediaAssets = (payload.recent_media ?? []).flatMap((item) => {

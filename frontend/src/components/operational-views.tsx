@@ -17,7 +17,8 @@ import {
   relativeTimeLabel,
 } from "@/experience/presentation.ts";
 
-import { DemoSessionWorkspace, DemoStartSessionControl } from "./demo-session-workspace";
+import { DemoSessionWorkspace } from "./demo-session-workspace";
+import { DemoStartSessionControl } from "./demo-start-session-control";
 import { AttentionPanel, WorkspaceTitle } from "./mission-control";
 
 function href(path: string, workspace: OperationalWorkspace): string {
@@ -378,6 +379,7 @@ export function StageOperationalView({
         hasCurrentSession={Boolean(stage.currentSession)}
         launchContext={demoLaunchContext}
         stageId={stage.id}
+        programExpectations={stage.programExpectations}
       />
       <div className="stage-detail-grid">
         <section className="detail-panel">
