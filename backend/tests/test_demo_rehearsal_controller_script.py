@@ -94,6 +94,11 @@ def test_publish_requires_explicit_confirmation_and_never_follows_session_end() 
     assert '"--confirmed"' in source
     assert "publish-devcon" not in LAUNCHER.read_text(encoding="utf-8")
     assert source.count("Publish-Devcon") == 2
+    assert source.count('"publish", "--expected-digest"') == 1
+    assert "Devcon write accepted:" in source
+    assert "Devcon durable Git persistence verified:" in source
+    assert "Devcon public API convergence:" in source
+    assert "Devcon publication status:" in source
 
 
 def test_stop_targets_only_the_recorded_launcher_tree() -> None:

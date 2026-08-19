@@ -166,3 +166,16 @@ state as rollback. A real PUT is not part of implementation validation.
   closed. Existing Demo database/media state was preserved; no cleanup ran.
 - Remaining work: a real `publish-devcon` remains a separate run-time operator action requiring
   package approval and explicit human confirmation. Commit/publication was not requested.
+
+## 2026-08-19 post-completion verification correction
+
+The original controller milestone intentionally recorded its then-implemented two-immediate-GET
+model. Live publication evidence later proved that model incorrect for Devcon: the guarded PUT
+returned 204 and upstream Git persistence succeeded, while cached public GET remained stale. The
+historical completion record above is preserved rather than rewritten.
+
+The bounded correction is tracked in
+[Demo Devcon Post-Publish Verification Correction](demo-devcon-post-publish-verification.md).
+Git-backed exact-file state now owns durability verification; public GET is bounded convergence
+evidence only. A stale GET after matching durable state is not publication failure and never causes
+another PUT.

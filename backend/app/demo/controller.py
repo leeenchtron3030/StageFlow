@@ -8,7 +8,9 @@ import sys
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
+from math import isfinite
 from pathlib import Path
+from time import sleep
 from typing import Any, cast
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -20,6 +22,7 @@ from app.demo import cli as demo_cli
 from app.infrastructure.devcon.session_publish import (
     DevconPublishError,
     DevconSessionPublishAdapter,
+    RemoteDevconSession,
 )
 
 EXPECTED_DEMO_DATABASE = "stageflow_demo"
@@ -27,6 +30,7 @@ DEMO_DSN_SECRET = "STAGEFLOW_DEMO_POSTGRES_DSN"
 DEVCON_API_KEY_SECRET = "STAGEFLOW_DEMO_DEVCON_API_KEY"
 _API_BASE_URL = "http://127.0.0.1:8000/api/v1"
 _MAXIMUM_API_BYTES = 16 * 1024 * 1024
+_PUBLIC_API_CONVERGENCE_DELAYS_SECONDS = (0.0, 65.0, 65.0, 65.0)
 
 
 class DemoControllerError(RuntimeError):
@@ -480,6 +484,17 @@ def preview_devcon_publish(
     }
 
 
+def _session_matches_candidate(
+    remote: RemoteDevconSession, candidate: DevconPublishCandidate
+) -> bool:
+    return (
+        remote.session_id == candidate.remote_session_id
+        and remote.event_id == candidate.event_id
+        and remote.transcript_text == candidate.transcript_text
+        and remote.duration_seconds == candidate.duration_seconds
+    )
+
+
 def execute_devcon_publish(
     candidate: DevconPublishCandidate,
     *,
@@ -487,11 +502,26 @@ def execute_devcon_publish(
     confirmed: bool,
     api_key: str,
     adapter: DevconSessionPublishAdapter,
+    api_convergence_delays_seconds: Sequence[float] = (
+        _PUBLIC_API_CONVERGENCE_DELAYS_SECONDS
+    ),
+    sleeper: Callable[[float], None] = sleep,
 ) -> dict[str, object]:
     if not confirmed:
         raise DemoControllerError("demo_publish_human_confirmation_required")
     if candidate.digest != expected_digest:
         raise DemoControllerError("demo_publish_candidate_changed")
+    convergence_delays = tuple(api_convergence_delays_seconds)
+    if (
+        not convergence_delays
+        or len(convergence_delays) > 4
+        or any(
+            not isfinite(delay) or delay < 0 or delay > 120
+            for delay in convergence_delays
+        )
+        or sum(convergence_delays) > 195
+    ):
+        raise ValueError("demo_publish_api_convergence_bounds_invalid")
     remote = adapter.get_session(candidate.remote_session_id)
     if (
         remote.session_id != candidate.remote_session_id
@@ -504,21 +534,60 @@ def execute_devcon_publish(
         transcript_text=candidate.transcript_text,
         duration_seconds=candidate.duration_seconds,
     )
-    for _ in range(2):
-        read_back = adapter.get_session(candidate.remote_session_id)
+    try:
+        durable = adapter.get_durable_session(
+            event_id=candidate.event_id,
+            session_id=candidate.remote_session_id,
+        )
+    except DevconPublishError:
+        raise DemoControllerError(
+            "demo_publish_write_accepted_durable_git_unavailable"
+        ) from None
+    if not _session_matches_candidate(durable, candidate):
+        raise DemoControllerError(
+            "demo_publish_write_accepted_durable_git_mismatch"
+        )
+
+    public_api_observed = False
+    public_api_converged = False
+    for delay in convergence_delays:
+        if delay:
+            sleeper(delay)
+        try:
+            read_back = adapter.get_session(candidate.remote_session_id)
+        except DevconPublishError:
+            continue
+        public_api_observed = True
         if (
             read_back.session_id != candidate.remote_session_id
             or read_back.event_id != candidate.event_id
-            or read_back.transcript_text != candidate.transcript_text
-            or read_back.duration_seconds != candidate.duration_seconds
         ):
-            raise DemoControllerError("demo_publish_read_back_mismatch")
+            raise DemoControllerError("demo_publish_public_api_identity_mismatch")
+        if _session_matches_candidate(read_back, candidate):
+            public_api_converged = True
+            break
+
+    if public_api_converged:
+        publication_status = "published_durable_api_converged"
+        public_api_state = "converged"
+    elif public_api_observed:
+        publication_status = "published_durable_api_stale"
+        public_api_state = "stale"
+    else:
+        publication_status = "published_durable_api_unavailable"
+        public_api_state = "unavailable"
+
     return {
         "event": candidate.event_id,
         "target_session": candidate.remote_session_id,
         "fields": ("transcript_text", "duration"),
         "remote_identity_verified": True,
-        "read_back_verified": True,
+        "write_accepted": True,
+        "durable_persistence_verified": True,
+        "public_api_convergence_verified": public_api_converged,
+        "public_api_state": public_api_state,
+        "publication_status": publication_status,
+        "read_back_verified": public_api_converged,
         "durability_verified": True,
         "candidate_digest": candidate.digest,
     }

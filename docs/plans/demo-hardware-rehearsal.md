@@ -60,6 +60,19 @@ production or Event readiness.
 - The launcher now supplies the isolated external cublas runtime only to its process and owned
   children. A real silent-audio inference probe passed before readiness; no NVIDIA driver or global
   CUDA environment was modified.
+- On 2026-08-19, the explicitly confirmed guarded publication for Session
+  3356fcf7-7907-42c4-bac1-3301927616cd received HTTP 204. Upstream commit
+  6e90615077f1348cf0d96ef991947d142bdb4350 ([skip deploy] PUT
+  /sessions/a-dacc-vision-for-decentralized-ai) changed exactly
+  devcon-api/data/sessions/test-devcon-8/a-dacc-vision-for-decentralized-ai.json from
+  empty transcript/duration 0 to populated transcript/duration 640. The publication and Git
+  persistence therefore succeeded durably; transcript content is intentionally not recorded here.
+- The controller then reported demo_publish_read_back_mismatch because it treated immediate public
+  GET /sessions/:id as durability authority. Upstream applies publicCache(60) with
+  stale-while-revalidate=120, so that cached mismatch was public-API staleness, not publication
+  failure. The verification model was corrected without another PUT, compensation, or data
+  change.
+
 
 ## Desired behavior
 
