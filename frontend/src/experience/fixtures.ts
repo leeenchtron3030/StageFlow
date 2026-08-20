@@ -113,6 +113,7 @@ function stage(
     sourceImpact: "Local media observation continuing normally.",
     currentSession,
     programExpectations: [],
+    withdrawnProgramExpectations: [],
     media: currentSession?.media ?? media(0),
     ...options,
   };

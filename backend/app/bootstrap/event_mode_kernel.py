@@ -208,11 +208,12 @@ def verify_transcription_schema(dsn: str) -> None:
                 """
                 SELECT count(*) FROM stageflow.schema_migration
                 WHERE version IN (
-                    '0007_transcription_worker', '0008_demo_vertical_slice'
+                    '0007_transcription_worker', '0008_demo_vertical_slice',
+                    '0009_program_expectation_reconciliation'
                 )
                 """
             ).fetchone()
-            if row is None or row[0] != 2:
+            if row is None or row[0] != 3:
                 raise KernelSchemaMigrationRequiredError(
                     "transcription_schema_migration_required"
                 )

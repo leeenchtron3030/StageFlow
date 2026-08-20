@@ -66,6 +66,8 @@ export function DemoStartSessionControl({
   const selectedExpectation = programExpectations.find(
     (expectation) => selectedValue === `expectation:${expectation.id}`,
   );
+  const selectionInvalidated =
+    selectedValue.startsWith("expectation:") && selectedExpectation === undefined;
   const selection: DemoStartSessionSelection | undefined =
     selectedValue === "ad_hoc"
       ? { kind: "ad_hoc" }
@@ -87,6 +89,7 @@ export function DemoStartSessionControl({
         stageId,
         launchContext,
         selection,
+        currentExpectationIds: programExpectations.map((expectation) => expectation.id),
         authoritativeStart: new Date().toISOString(),
         confirm: (confirmation) => window.confirm(confirmation),
         fetcher: fetch,
@@ -96,7 +99,10 @@ export function DemoStartSessionControl({
           setMessage("Unavailable: configure an explicit Demo operator UUID.");
         } else if (result.reason === "launch_context_required") {
           setMessage("Unavailable: current Demo launcher context is not available.");
-        } else if (result.reason === "selection_required") {
+        } else if (
+          result.reason === "selection_required" ||
+          result.reason === "selection_stale"
+        ) {
           setMessage("Select one Program Expectation or explicitly choose Ad hoc.");
         }
         return;
@@ -191,7 +197,11 @@ export function DemoStartSessionControl({
         {!actorId ? <span>Commands disabled: explicit operator UUID is not configured.</span> : null}
         {!launchContext ? <span>Commands disabled: current launcher context is unavailable.</span> : null}
         {!selection && !hasCurrentSession ? (
-          <span>Select one Program Expectation or explicitly choose Ad hoc.</span>
+          <span>
+            {selectionInvalidated
+              ? "Program changed. Review and select a current expectation again."
+              : "Select one Program Expectation or explicitly choose Ad hoc."}
+          </span>
         ) : null}
         {message ? <span role="status">{message}</span> : null}
       </div>

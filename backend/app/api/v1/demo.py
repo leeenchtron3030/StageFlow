@@ -14,6 +14,7 @@ from app.contexts.editorial import (
     EditorialMomentNotFoundError,
     EditorialMomentStorageUnavailableError,
 )
+from app.contexts.events import ProgramExpectationReconciliation
 from app.contexts.production.event_mode_kernel import (
     KernelConflictError,
     KernelNotFoundError,
@@ -30,6 +31,7 @@ from app.demo.service import (
     ProcessTranscriptionRequest,
     ProcessTranscriptionResult,
 )
+from app.infrastructure.devcon import DevconReadError
 from app.infrastructure.postgres import PostgresWorkExecutionRepository
 from app.shared.ids import EntityId
 
@@ -39,6 +41,42 @@ _TRANSCRIPT_SEGMENT_LIMIT = 50
 _TRANSCRIPT_WORD_LIMIT = 50
 _OPERATION_LIMIT = 100
 
+
+class ProgramFieldChangeResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    field: str
+    previous: str | None
+    current: str | None
+
+
+class ProgramChangeResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    kind: str
+    expectation_id: str
+    expectation_key: str
+    title: str
+    external_session_id: str | None
+    fields: tuple[ProgramFieldChangeResponse, ...]
+
+
+class ProgramRefreshResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    provider: str
+    observed: int
+    added: int
+    changed: int
+    unchanged: int
+    withdrawn: int
+    restored: int
+    synchronized_at: datetime
+    current_expectation_count: int
+    changes: tuple[ProgramChangeResponse, ...]
+    changes_truncated: bool
+    evidence_kind: Literal["external"] = "external"
+    authority_notice: str = "Program evidence only; no Session authority changed."
 
 class ConfirmedCommand(BaseModel):
     model_config = ConfigDict(frozen=True)
@@ -269,6 +307,56 @@ def _translate_error(exc: Exception) -> HTTPException:
         return HTTPException(status_code=503, detail="postgresql_unavailable")
     return HTTPException(status_code=422, detail=str(exc))
 
+
+def _program_refresh_response(
+    result: ProgramExpectationReconciliation,
+) -> ProgramRefreshResponse:
+    return ProgramRefreshResponse(
+        provider=result.provider,
+        observed=result.observed,
+        added=result.added,
+        changed=result.changed,
+        unchanged=result.unchanged,
+        withdrawn=result.withdrawn,
+        restored=result.restored,
+        synchronized_at=result.synchronized_at,
+        current_expectation_count=len(result.expectations),
+        changes=tuple(
+            ProgramChangeResponse(
+                kind=change.kind.value,
+                expectation_id=change.expectation_id.value,
+                expectation_key=change.expectation_key,
+                title=change.title,
+                external_session_id=change.external_session_id,
+                fields=tuple(
+                    ProgramFieldChangeResponse(
+                        field=field.field,
+                        previous=field.previous,
+                        current=field.current,
+                    )
+                    for field in change.fields
+                ),
+            )
+            for change in result.changes
+        ),
+        changes_truncated=result.changes_truncated,
+    )
+
+
+@router.post("/program/refresh", response_model=ProgramRefreshResponse)
+def refresh_program(request: Request, response: Response) -> ProgramRefreshResponse:
+    response.headers["Cache-Control"] = "no-store, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    components = _components(request)
+    try:
+        return _program_refresh_response(components.sync_devcon_program())
+    except (DevconReadError, KernelStorageUnavailableError) as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="program_refresh_failed_using_last_successful_snapshot",
+        ) from exc
+    except (KernelNotFoundError, KernelConflictError) as exc:
+        raise _translate_error(exc) from exc
 
 @router.post("/sessions/start", response_model=SessionCommandResponse)
 def start_session(command: StartSessionCommand, request: Request) -> SessionCommandResponse:
@@ -567,6 +655,7 @@ __all__ = [
     "PackageReadyCommand",
     "ProcessTranscriptionCommand",
     "ProcessTranscriptionResponse",
+    "ProgramRefreshResponse",
     "SessionCommandResponse",
     "SessionWorkspaceResponse",
     "TranscriptEvidenceResponse",

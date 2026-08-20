@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Any, cast
 
@@ -18,6 +18,12 @@ from app.contexts.events import (
     EventStageBootstrapRequest,
     EventStageBootstrapResult,
     ProgramExpectation,
+    ProgramExpectationChange,
+    ProgramExpectationChangeKind,
+    ProgramExpectationFieldChange,
+    ProgramExpectationLifecycle,
+    ProgramExpectationReconciliation,
+    ProgramExpectationSnapshot,
     Stage,
 )
 from app.contexts.production.event_mode_kernel.contracts import (
@@ -45,6 +51,9 @@ from app.contexts.production.event_mode_kernel.contracts import (
     SessionPackageState,
     StageOperationalStatus,
     StartSessionRequest,
+)
+from app.contexts.production.event_mode_kernel.program_reconciliation import (
+    plan_program_reconciliation,
 )
 from app.contexts.production.event_mode_kernel.repository import (
     EventModeKernelRepository,
@@ -133,8 +142,59 @@ def _expectation(row: Row) -> ProgramExpectation:
         external_references=cast(dict[str, str], row["external_references"]),
         revision=cast(int, row["revision"]),
         recorded_at=cast(datetime, row["recorded_at"]),
+        lifecycle_state=ProgramExpectationLifecycle(cast(str, row["lifecycle_state"])),
+        synchronization_scope=cast(str | None, row["synchronization_scope"]),
+        last_observed_at=cast(datetime, row["last_observed_at"]),
+        lifecycle_changed_at=cast(datetime, row["lifecycle_changed_at"]),
     )
 
+
+def _expectation_revision(row: Row) -> ProgramExpectation:
+    revision_row = dict(row)
+    revision_row["revision"] = revision_row["expectation_revision"]
+    return _expectation(revision_row)
+
+
+def _program_change_document(change: ProgramExpectationChange) -> dict[str, object]:
+    return {
+        "kind": change.kind.value,
+        "expectation_id": change.expectation_id.value,
+        "expectation_key": change.expectation_key,
+        "title": change.title,
+        "external_session_id": change.external_session_id,
+        "fields": [
+            {
+                "field": field.field,
+                "previous": field.previous,
+                "current": field.current,
+            }
+            for field in change.fields
+        ],
+    }
+
+
+def _program_change(value: Mapping[str, object]) -> ProgramExpectationChange:
+    raw_fields = value.get("fields", ())
+    fields = cast(list[Mapping[str, object]], raw_fields)
+    return ProgramExpectationChange(
+        kind=ProgramExpectationChangeKind(str(value["kind"])),
+        expectation_id=EntityId(str(value["expectation_id"])),
+        expectation_key=str(value["expectation_key"]),
+        title=str(value["title"]),
+        external_session_id=(
+            None
+            if value.get("external_session_id") is None
+            else str(value["external_session_id"])
+        ),
+        fields=tuple(
+            ProgramExpectationFieldChange(
+                field=str(item["field"]),
+                previous=(None if item.get("previous") is None else str(item["previous"])),
+                current=(None if item.get("current") is None else str(item["current"])),
+            )
+            for item in fields
+        ),
+    )
 
 def _session(row: Row) -> Session:
     return Session(
@@ -732,6 +792,88 @@ class PostgresEventModeKernelRepository(EventModeKernelRepository):
             (stage for stage in self.list_stages(event_id) if stage.key == stage_key), None
         )
 
+    @staticmethod
+    def _write_program_expectation(
+        connection: Any,
+        expectation: ProgramExpectation,
+        *,
+        write_revision: bool,
+    ) -> None:
+        connection.execute(
+            """
+            INSERT INTO stageflow.program_expectation (
+                expectation_id, event_id, expectation_key, expected_stage_id,
+                title, speakers, planned_start, planned_end, external_references,
+                revision, recorded_at, lifecycle_state, synchronization_scope,
+                last_observed_at, lifecycle_changed_at
+            ) VALUES (
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+            )
+            ON CONFLICT (expectation_id) DO UPDATE SET
+                event_id = EXCLUDED.event_id,
+                expectation_key = EXCLUDED.expectation_key,
+                expected_stage_id = EXCLUDED.expected_stage_id,
+                title = EXCLUDED.title,
+                speakers = EXCLUDED.speakers,
+                planned_start = EXCLUDED.planned_start,
+                planned_end = EXCLUDED.planned_end,
+                external_references = EXCLUDED.external_references,
+                revision = EXCLUDED.revision,
+                recorded_at = EXCLUDED.recorded_at,
+                lifecycle_state = EXCLUDED.lifecycle_state,
+                synchronization_scope = EXCLUDED.synchronization_scope,
+                last_observed_at = EXCLUDED.last_observed_at,
+                lifecycle_changed_at = EXCLUDED.lifecycle_changed_at
+            """,
+            (
+                expectation.id.value,
+                expectation.event_id.value,
+                expectation.key,
+                None if expectation.stage_id is None else expectation.stage_id.value,
+                expectation.title,
+                Jsonb(list(expectation.speakers)),
+                expectation.planned_start,
+                expectation.planned_end,
+                Jsonb(dict(expectation.external_references)),
+                expectation.revision,
+                expectation.recorded_at,
+                expectation.lifecycle_state.value,
+                expectation.synchronization_scope,
+                expectation.last_observed_at,
+                expectation.lifecycle_changed_at,
+            ),
+        )
+        if not write_revision:
+            return
+        connection.execute(
+            """
+            INSERT INTO stageflow.program_expectation_revision (
+                revision_id, expectation_id, expectation_revision,
+                expected_stage_id, title, speakers, planned_start, planned_end,
+                external_references, recorded_at, lifecycle_state,
+                synchronization_scope, last_observed_at, lifecycle_changed_at
+            ) VALUES (
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+            )
+            """,
+            (
+                EntityId.new().value,
+                expectation.id.value,
+                expectation.revision,
+                None if expectation.stage_id is None else expectation.stage_id.value,
+                expectation.title,
+                Jsonb(list(expectation.speakers)),
+                expectation.planned_start,
+                expectation.planned_end,
+                Jsonb(dict(expectation.external_references)),
+                expectation.recorded_at,
+                expectation.lifecycle_state.value,
+                expectation.synchronization_scope,
+                expectation.last_observed_at,
+                expectation.lifecycle_changed_at,
+            ),
+        )
+
     def put_program_expectation(self, expectation: ProgramExpectation) -> ProgramExpectation:
         try:
             with self._connect() as connection:
@@ -742,68 +884,19 @@ class PostgresEventModeKernelRepository(EventModeKernelRepository):
                     """,
                     (expectation.event_id.value, expectation.key),
                 ).fetchone()
-                expectation_id = (
-                    expectation.id
-                    if row is None
-                    else EntityId(str(row["expectation_id"]))
+                if row is None:
+                    saved = replace(expectation, revision=1)
+                else:
+                    existing = _expectation(row)
+                    saved = replace(
+                        expectation,
+                        id=existing.id,
+                        revision=existing.revision + 1,
+                    )
+                self._write_program_expectation(
+                    connection, saved, write_revision=True
                 )
-                revision = 1 if row is None else cast(int, row["revision"]) + 1
-                connection.execute(
-                    """
-                    INSERT INTO stageflow.program_expectation (
-                        expectation_id, event_id, expectation_key, expected_stage_id,
-                        title, speakers, planned_start, planned_end, external_references,
-                        revision, recorded_at
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    ON CONFLICT (event_id, expectation_key) DO UPDATE SET
-                        expected_stage_id = EXCLUDED.expected_stage_id,
-                        title = EXCLUDED.title, speakers = EXCLUDED.speakers,
-                        planned_start = EXCLUDED.planned_start,
-                        planned_end = EXCLUDED.planned_end,
-                        external_references = EXCLUDED.external_references,
-                        revision = EXCLUDED.revision, recorded_at = EXCLUDED.recorded_at
-                    """,
-                    (
-                        expectation_id.value,
-                        expectation.event_id.value,
-                        expectation.key,
-                        None if expectation.stage_id is None else expectation.stage_id.value,
-                        expectation.title,
-                        Jsonb(list(expectation.speakers)),
-                        expectation.planned_start,
-                        expectation.planned_end,
-                        Jsonb(dict(expectation.external_references)),
-                        revision,
-                        expectation.recorded_at,
-                    ),
-                )
-                connection.execute(
-                    """
-                    INSERT INTO stageflow.program_expectation_revision (
-                        revision_id, expectation_id, expectation_revision,
-                        expected_stage_id, title, speakers, planned_start, planned_end,
-                        external_references, recorded_at
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    """,
-                    (
-                        EntityId.new().value,
-                        expectation_id.value,
-                        revision,
-                        None if expectation.stage_id is None else expectation.stage_id.value,
-                        expectation.title,
-                        Jsonb(list(expectation.speakers)),
-                        expectation.planned_start,
-                        expectation.planned_end,
-                        Jsonb(dict(expectation.external_references)),
-                        expectation.recorded_at,
-                    ),
-                )
-                saved = connection.execute(
-                    "SELECT * FROM stageflow.program_expectation WHERE expectation_id = %s",
-                    (expectation_id.value,),
-                ).fetchone()
-                assert saved is not None
-                return _expectation(saved)
+                return saved
         except psycopg.OperationalError as exc:
             raise KernelStorageUnavailableError("postgresql_unavailable") from exc
 
@@ -832,6 +925,161 @@ class PostgresEventModeKernelRepository(EventModeKernelRepository):
                     (event_id.value,),
                 ).fetchall()
                 return tuple(_expectation(row) for row in rows)
+        except psycopg.OperationalError as exc:
+            raise KernelStorageUnavailableError("postgresql_unavailable") from exc
+
+    def list_program_expectation_revisions(
+        self, expectation_id: EntityId
+    ) -> tuple[ProgramExpectation, ...]:
+        try:
+            with self._connect() as connection:
+                rows = connection.execute(
+                    """
+                    SELECT
+                        expectation.event_id,
+                        expectation.expectation_key,
+                        revision.expectation_id,
+                        revision.expectation_revision,
+                        revision.expected_stage_id,
+                        revision.title,
+                        revision.speakers,
+                        revision.planned_start,
+                        revision.planned_end,
+                        revision.external_references,
+                        revision.recorded_at,
+                        revision.lifecycle_state,
+                        revision.synchronization_scope,
+                        revision.last_observed_at,
+                        revision.lifecycle_changed_at
+                    FROM stageflow.program_expectation_revision revision
+                    JOIN stageflow.program_expectation expectation
+                      ON expectation.expectation_id = revision.expectation_id
+                    WHERE revision.expectation_id = %s
+                    ORDER BY revision.expectation_revision
+                    """,
+                    (expectation_id.value,),
+                ).fetchall()
+                return tuple(_expectation_revision(row) for row in rows)
+        except psycopg.OperationalError as exc:
+            raise KernelStorageUnavailableError("postgresql_unavailable") from exc
+
+    def reconcile_program_expectations(
+        self, snapshot: ProgramExpectationSnapshot
+    ) -> ProgramExpectationReconciliation:
+        try:
+            with self._connect() as connection:
+                stage = connection.execute(
+                    """
+                    SELECT event_id FROM stageflow.stage
+                    WHERE stage_id = %s FOR UPDATE
+                    """,
+                    (snapshot.stage_id.value,),
+                ).fetchone()
+                if stage is None or str(stage["event_id"]) != snapshot.event_id.value:
+                    raise KernelConflictError("program_snapshot_stage_event_mismatch")
+                rows = connection.execute(
+                    """
+                    SELECT * FROM stageflow.program_expectation
+                    WHERE event_id = %s FOR UPDATE
+                    """,
+                    (snapshot.event_id.value,),
+                ).fetchall()
+                plan = plan_program_reconciliation(
+                    (_expectation(row) for row in rows), snapshot
+                )
+                for mutation in plan.mutations:
+                    self._write_program_expectation(
+                        connection,
+                        mutation.expectation,
+                        write_revision=mutation.write_revision,
+                    )
+                result = plan.result
+                connection.execute(
+                    """
+                    INSERT INTO stageflow.program_expectation_sync_snapshot (
+                        event_id, expected_stage_id, synchronization_scope, provider,
+                        synchronized_at, observed, added, changed, unchanged,
+                        withdrawn, restored, change_summary, changes_truncated
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (event_id, expected_stage_id, synchronization_scope)
+                    DO UPDATE SET
+                        provider = EXCLUDED.provider,
+                        synchronized_at = EXCLUDED.synchronized_at,
+                        observed = EXCLUDED.observed,
+                        added = EXCLUDED.added,
+                        changed = EXCLUDED.changed,
+                        unchanged = EXCLUDED.unchanged,
+                        withdrawn = EXCLUDED.withdrawn,
+                        restored = EXCLUDED.restored,
+                        change_summary = EXCLUDED.change_summary,
+                        changes_truncated = EXCLUDED.changes_truncated
+                    """,
+                    (
+                        result.event_id.value,
+                        result.stage_id.value,
+                        result.synchronization_scope,
+                        result.provider,
+                        result.synchronized_at,
+                        result.observed,
+                        result.added,
+                        result.changed,
+                        result.unchanged,
+                        result.withdrawn,
+                        result.restored,
+                        Jsonb([_program_change_document(item) for item in result.changes]),
+                        result.changes_truncated,
+                    ),
+                )
+                return result
+        except psycopg.Error as exc:
+            raise KernelStorageUnavailableError(
+                "postgresql_reconciliation_failed"
+            ) from exc
+
+    def get_latest_program_reconciliation(
+        self, event_id: EntityId, stage_id: EntityId
+    ) -> ProgramExpectationReconciliation | None:
+        try:
+            with self._connect() as connection:
+                row = connection.execute(
+                    """
+                    SELECT * FROM stageflow.program_expectation_sync_snapshot
+                    WHERE event_id = %s AND expected_stage_id = %s
+                    ORDER BY synchronized_at DESC, synchronization_scope ASC
+                    LIMIT 1
+                    """,
+                    (event_id.value, stage_id.value),
+                ).fetchone()
+                if row is None:
+                    return None
+                expectations = connection.execute(
+                    """
+                    SELECT * FROM stageflow.program_expectation
+                    WHERE event_id = %s
+                      AND expected_stage_id = %s
+                      AND synchronization_scope = %s
+                      AND lifecycle_state = 'current'
+                    ORDER BY planned_start ASC NULLS LAST, expectation_key ASC
+                    """,
+                    (event_id.value, stage_id.value, row["synchronization_scope"]),
+                ).fetchall()
+                raw_changes = cast(list[Mapping[str, object]], row["change_summary"])
+                return ProgramExpectationReconciliation(
+                    event_id=event_id,
+                    stage_id=stage_id,
+                    provider=cast(str, row["provider"]),
+                    synchronization_scope=cast(str, row["synchronization_scope"]),
+                    synchronized_at=cast(datetime, row["synchronized_at"]),
+                    observed=cast(int, row["observed"]),
+                    added=cast(int, row["added"]),
+                    changed=cast(int, row["changed"]),
+                    unchanged=cast(int, row["unchanged"]),
+                    withdrawn=cast(int, row["withdrawn"]),
+                    restored=cast(int, row["restored"]),
+                    expectations=tuple(_expectation(item) for item in expectations),
+                    changes=tuple(_program_change(item) for item in raw_changes),
+                    changes_truncated=cast(bool, row["changes_truncated"]),
+                )
         except psycopg.OperationalError as exc:
             raise KernelStorageUnavailableError("postgresql_unavailable") from exc
 
@@ -906,7 +1154,8 @@ class PostgresEventModeKernelRepository(EventModeKernelRepository):
                 if request.program_expectation_id is not None:
                     expectation = connection.execute(
                         """
-                        SELECT event_id FROM stageflow.program_expectation
+                        SELECT event_id, lifecycle_state
+                        FROM stageflow.program_expectation
                         WHERE expectation_id = %s
                         """,
                         (request.program_expectation_id.value,),
@@ -916,6 +1165,8 @@ class PostgresEventModeKernelRepository(EventModeKernelRepository):
                         or str(expectation["event_id"]) != request.event_id.value
                     ):
                         raise KernelConflictError("program_expectation_event_mismatch")
+                    if expectation["lifecycle_state"] == "withdrawn":
+                        raise KernelConflictError("program_expectation_withdrawn")
                 connection.execute(
                     """
                     INSERT INTO stageflow.session (

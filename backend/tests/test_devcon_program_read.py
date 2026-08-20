@@ -121,6 +121,10 @@ def test_public_adapter_enforces_catalog_and_contract_bounds() -> None:
 
 
 class MutableProgramSource:
+    provider = "devcon"
+    event_id = "test-devcon-8"
+    room_id = "stage-1"
+
     def __init__(self, items: tuple[ExternalProgramItem, ...]) -> None:
         self.items = items
         self.available = True

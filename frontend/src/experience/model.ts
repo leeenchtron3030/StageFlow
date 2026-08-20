@@ -97,7 +97,32 @@ export interface ProgramExpectationView {
   plannedEnd?: string;
   provider?: string;
   externalSessionId?: string;
+  revision: number;
+  lifecycleState: "current" | "withdrawn";
+  lastObservedAt: string;
   evidenceKind: "external";
+}
+
+export interface ProgramChangeView {
+  kind: "added" | "changed" | "withdrawn" | "restored";
+  expectationId: string;
+  title: string;
+  externalSessionId?: string;
+  fields: Array<{ field: string; previous?: string; current?: string }>;
+}
+
+export interface ProgramSynchronizationView {
+  provider: string;
+  synchronizedAt: string;
+  observed: number;
+  added: number;
+  changed: number;
+  unchanged: number;
+  withdrawn: number;
+  restored: number;
+  currentExpectationCount: number;
+  changes: ProgramChangeView[];
+  changesTruncated: boolean;
 }
 
 export interface StageView {
@@ -110,6 +135,7 @@ export interface StageView {
   currentSession?: SessionView;
   previousSession?: SessionView;
   programExpectations: ProgramExpectationView[];
+  withdrawnProgramExpectations: ProgramExpectationView[];
   nextExpectation?: string;
   nextExpectationSpeakers?: string[];
   nextExpectationPlannedStart?: string;
@@ -184,6 +210,7 @@ export interface OperationalWorkspace {
   dataSource: DataSourceView;
   event: EventView;
   stages: StageView[];
+  programSynchronization?: ProgramSynchronizationView;
   sessions: SessionView[];
   mediaAssets: MediaAssetView[];
   attention: AttentionItemView[];

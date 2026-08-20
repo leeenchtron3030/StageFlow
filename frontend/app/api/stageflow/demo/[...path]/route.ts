@@ -14,6 +14,7 @@ const commandPaths = new Set([
   "sessions/package-ready",
   "moments/mark",
 ]);
+const programRefreshPaths = new Set(["program/refresh"]);
 const workspacePath = /^sessions\/[0-9a-f-]{36}\/workspace$/i;
 const maximumCommandBytes = 32 * 1024;
 const maximumResponseBytes = 12 * 1024 * 1024;
@@ -132,15 +133,48 @@ function recordAuthorityRequest(
   );
 }
 
+function recordProgramRefreshRequest(
+  request: NextRequest,
+  path: string,
+  launchContextValid: boolean,
+): void {
+  console.info(
+    "stageflow_demo_program_refresh_request=" +
+      JSON.stringify({
+        timestamp: new Date().toISOString(),
+        path: "/api/stageflow/demo/" + path,
+        launch_context_fingerprint: launchContextFingerprint(currentLaunchContext()),
+        producer_proxy_client_address: boundedClientAddress(request),
+        launch_context_valid: launchContextValid,
+      }),
+  );
+}
+
+function recordProtectedRequest(
+  request: NextRequest,
+  path: string,
+  body: string | undefined,
+  launchContextValid: boolean,
+  authorityCommand: boolean,
+): void {
+  if (authorityCommand) {
+    recordAuthorityRequest(request, path, body, launchContextValid);
+  } else {
+    recordProgramRefreshRequest(request, path, launchContextValid);
+  }
+}
+
 async function proxy(
   request: NextRequest,
   segments: string[],
   method: "GET" | "POST",
 ): Promise<Response> {
   const path = segments.join("/");
+  const authorityCommand = method === "POST" && commandPaths.has(path);
+  const programRefresh = method === "POST" && programRefreshPaths.has(path);
   if (
     (method === "GET" && !workspacePath.test(path)) ||
-    (method === "POST" && !commandPaths.has(path))
+    (method === "POST" && !authorityCommand && !programRefresh)
   ) {
     return Response.json(
       { detail: "demo_proxy_path_not_allowed" },
@@ -148,7 +182,7 @@ async function proxy(
     );
   }
   if (method === "POST" && !isSameOriginCommand(request)) {
-    recordAuthorityRequest(request, path, undefined, false);
+    recordProtectedRequest(request, path, undefined, false, authorityCommand);
     return Response.json(
       { detail: "demo_command_origin_not_allowed" },
       { status: 403, headers: noStoreHeaders() },
@@ -159,7 +193,7 @@ async function proxy(
   if (method === "POST") {
     const declaredLength = Number(request.headers.get("content-length") ?? "0");
     if (declaredLength > maximumCommandBytes) {
-      recordAuthorityRequest(request, path, undefined, false);
+      recordProtectedRequest(request, path, undefined, false, authorityCommand);
       return Response.json(
         { detail: "demo_command_too_large" },
         { status: 413, headers: noStoreHeaders() },
@@ -167,7 +201,7 @@ async function proxy(
     }
     body = await request.text();
     if (new TextEncoder().encode(body).byteLength > maximumCommandBytes) {
-      recordAuthorityRequest(request, path, undefined, false);
+      recordProtectedRequest(request, path, undefined, false, authorityCommand);
       return Response.json(
         { detail: "demo_command_too_large" },
         { status: 413, headers: noStoreHeaders() },
@@ -176,7 +210,7 @@ async function proxy(
     const launchContextValid = launchContextMatches(
       request.headers.get(demoLaunchContextHeader),
     );
-    recordAuthorityRequest(request, path, body, launchContextValid);
+    recordProtectedRequest(request, path, body, launchContextValid, authorityCommand);
     if (!launchContextValid) {
       return Response.json(
         { detail: "demo_launch_context_invalid" },

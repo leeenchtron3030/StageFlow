@@ -6,7 +6,10 @@ from fastapi import APIRouter, Request, Response
 from pydantic import BaseModel, ConfigDict
 
 from app.bootstrap.event_mode_kernel import KernelComponents, KernelStartupProgress
-from app.contexts.events import ProgramExpectation
+from app.contexts.events import (
+    ProgramExpectation,
+    ProgramExpectationReconciliation,
+)
 from app.contexts.production.event_mode_kernel.contracts import EventOperationalStatus
 from app.contexts.production.event_mode_kernel.repository import (
     KernelStorageUnavailableError,
@@ -127,8 +130,46 @@ class ProgramExpectationResponse(BaseModel):
     external_event_id: str | None
     external_session_id: str | None
     external_room_id: str | None
+    lifecycle_state: str
+    synchronization_scope: str | None
+    last_observed_at: datetime
+    lifecycle_changed_at: datetime
     evidence_kind: str = "external"
 
+
+class ProgramFieldChangeResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    field: str
+    previous: str | None
+    current: str | None
+
+
+class ProgramChangeResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    kind: str
+    expectation_id: str
+    expectation_key: str
+    title: str
+    external_session_id: str | None
+    fields: tuple[ProgramFieldChangeResponse, ...]
+
+
+class ProgramSynchronizationResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    provider: str
+    synchronized_at: datetime
+    observed: int
+    added: int
+    changed: int
+    unchanged: int
+    withdrawn: int
+    restored: int
+    current_expectation_count: int
+    changes: tuple[ProgramChangeResponse, ...]
+    changes_truncated: bool
 
 class KernelStatusResponse(BaseModel):
     model_config = ConfigDict(frozen=True)
@@ -149,6 +190,7 @@ class KernelStatusResponse(BaseModel):
     reconciliation_completed_at: datetime | None
     stages: tuple[StageStatusResponse, ...]
     program_expectations: tuple[ProgramExpectationResponse, ...] = ()
+    program_synchronization: ProgramSynchronizationResponse | None = None
     recent_media: tuple[MediaStatusResponse, ...] = ()
     boundary_proposals: tuple[BoundaryProposalResponse, ...] = ()
     attention_codes: tuple[str, ...]
@@ -163,6 +205,7 @@ def _response(
     runtime_composed: bool,
     runtime_profile: str,
     program_expectations: tuple[ProgramExpectation, ...],
+    program_reconciliation: ProgramExpectationReconciliation | None,
 ) -> KernelStatusResponse:
     reconciliation = status.latest_reconciliation
 
@@ -240,8 +283,46 @@ def _response(
                 external_event_id=item.external_references.get("devcon_event_id"),
                 external_session_id=item.external_references.get("devcon_session_id"),
                 external_room_id=item.external_references.get("devcon_room_id"),
+                lifecycle_state=item.lifecycle_state.value,
+                synchronization_scope=item.synchronization_scope,
+                last_observed_at=item.last_observed_at or item.recorded_at,
+                lifecycle_changed_at=item.lifecycle_changed_at or item.recorded_at,
             )
             for item in program_expectations
+        ),
+        program_synchronization=(
+            None
+            if program_reconciliation is None
+            else ProgramSynchronizationResponse(
+                provider=program_reconciliation.provider,
+                synchronized_at=program_reconciliation.synchronized_at,
+                observed=program_reconciliation.observed,
+                added=program_reconciliation.added,
+                changed=program_reconciliation.changed,
+                unchanged=program_reconciliation.unchanged,
+                withdrawn=program_reconciliation.withdrawn,
+                restored=program_reconciliation.restored,
+                current_expectation_count=len(program_reconciliation.expectations),
+                changes=tuple(
+                    ProgramChangeResponse(
+                        kind=change.kind.value,
+                        expectation_id=change.expectation_id.value,
+                        expectation_key=change.expectation_key,
+                        title=change.title,
+                        external_session_id=change.external_session_id,
+                        fields=tuple(
+                            ProgramFieldChangeResponse(
+                                field=field.field,
+                                previous=field.previous,
+                                current=field.current,
+                            )
+                            for field in change.fields
+                        ),
+                    )
+                    for change in program_reconciliation.changes
+                ),
+                changes_truncated=program_reconciliation.changes_truncated,
+            )
         ),
         stages=tuple(
             StageStatusResponse(
@@ -452,6 +533,13 @@ def kernel_status(request: Request, response: Response) -> KernelStatusResponse:
         runtime_profile=components.configuration.deployment.runtime_profile.value,
         program_expectations=components.repository.list_program_expectations(
             status.event_id
+        ),
+        program_reconciliation=(
+            None
+            if len(status.stages) != 1
+            else components.repository.get_latest_program_reconciliation(
+                status.event_id, status.stages[0].stage_id
+            )
         ),
     )
 

@@ -28,6 +28,7 @@ test("selected expectation confirms its title and submits its internal durable I
     actorId,
     stageId,
     launchContext,
+    currentExpectationIds: [expectationId],
     selection: {
       kind: "expectation",
       expectationId,
@@ -64,6 +65,7 @@ test("no selection fails closed without confirmation or authority POST", async (
     actorId,
     stageId,
     launchContext,
+    currentExpectationIds: [expectationId],
     authoritativeStart,
     confirm() {
       confirmations += 1;
@@ -88,6 +90,7 @@ test("explicit ad hoc choice confirms separately and omits expectation identity"
     actorId,
     stageId,
     launchContext,
+    currentExpectationIds: [expectationId],
     selection: { kind: "ad_hoc" },
     authoritativeStart,
     confirm(message) {
@@ -118,6 +121,7 @@ test("missing authority prerequisites and declined confirmation never POST", asy
       const result = await submitDemoStartSession({
         ...values,
         stageId,
+        currentExpectationIds: [expectationId],
         selection: { kind: "ad_hoc" },
         authoritativeStart,
         confirm: () => true,
@@ -137,6 +141,7 @@ test("missing authority prerequisites and declined confirmation never POST", asy
     actorId,
     stageId,
     launchContext,
+    currentExpectationIds: [expectationId],
     selection: { kind: "ad_hoc" },
     authoritativeStart,
     confirm: () => false,

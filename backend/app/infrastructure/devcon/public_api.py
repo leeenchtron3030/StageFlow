@@ -106,6 +106,18 @@ class DevconPublicProgramAdapter:
         self._configuration = configuration
         self._fetch_json = fetch_json
 
+    @property
+    def provider(self) -> str:
+        return "devcon"
+
+    @property
+    def event_id(self) -> str:
+        return self._configuration.event_id
+
+    @property
+    def room_id(self) -> str:
+        return self._configuration.room_id
+
     def fetch_program(self) -> tuple[ExternalProgramItem, ...]:
         offset = 0
         total: int | None = None

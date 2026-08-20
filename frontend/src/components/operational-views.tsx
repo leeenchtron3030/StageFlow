@@ -18,6 +18,7 @@ import {
 } from "@/experience/presentation.ts";
 
 import { DemoSessionWorkspace } from "./demo-session-workspace";
+import { DemoProgramRefreshControl } from "./demo-program-refresh-control";
 import { DemoStartSessionControl } from "./demo-start-session-control";
 import { AttentionPanel, WorkspaceTitle } from "./mission-control";
 
@@ -373,6 +374,13 @@ export function StageOperationalView({
           <span>Program Expectation is external evidence, not Session authority.</span>
         </div>
       </div>
+      <DemoProgramRefreshControl
+        currentExpectations={stage.programExpectations}
+        enabled={isDemo}
+        launchContext={demoLaunchContext}
+        synchronization={workspace.programSynchronization}
+        withdrawnExpectations={stage.withdrawnProgramExpectations}
+      />
       <DemoStartSessionControl
         actorId={demoActorId}
         enabled={isDemo}
