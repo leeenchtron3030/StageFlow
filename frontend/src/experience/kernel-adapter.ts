@@ -60,9 +60,33 @@ export interface KernelProgramExpectation {
   external_event_id: string | null;
   external_session_id: string | null;
   external_room_id: string | null;
+  lifecycle_state: "current" | "withdrawn";
+  synchronization_scope: string | null;
+  last_observed_at: string;
+  lifecycle_changed_at: string;
   evidence_kind: "external";
 }
 
+export interface KernelProgramSynchronization {
+  provider: string;
+  synchronized_at: string;
+  observed: number;
+  added: number;
+  changed: number;
+  unchanged: number;
+  withdrawn: number;
+  restored: number;
+  current_expectation_count: number;
+  changes: Array<{
+    kind: "added" | "changed" | "withdrawn" | "restored";
+    expectation_id: string;
+    expectation_key: string;
+    title: string;
+    external_session_id: string | null;
+    fields: Array<{ field: string; previous: string | null; current: string | null }>;
+  }>;
+  changes_truncated: boolean;
+}
 export interface KernelStatusPayload {
   configured: boolean;
   configuration_supplied: boolean;
@@ -80,6 +104,7 @@ export interface KernelStatusPayload {
   reconciliation_completed_at: string | null;
   stages: KernelStageStatus[];
   program_expectations?: KernelProgramExpectation[];
+  program_synchronization?: KernelProgramSynchronization | null;
   recent_media?: KernelMediaStatus[];
   attention_codes: string[];
   startup_error?: string | null;
@@ -406,6 +431,7 @@ function stageView(stage: KernelStageStatus): StageView {
       ? sessionFromProjection(priorProjection, stage)
       : undefined,
     programExpectations: [],
+    withdrawnProgramExpectations: [],
     media: mediaFromStage(stage),
     attentionLevel: state.level,
     attentionText: state.text,
@@ -605,6 +631,9 @@ function programExpectationView(
     plannedEnd: expectation.planned_end ?? undefined,
     provider: expectation.provider ?? undefined,
     externalSessionId: expectation.external_session_id ?? undefined,
+    revision: expectation.revision,
+    lifecycleState: expectation.lifecycle_state,
+    lastObservedAt: expectation.last_observed_at,
     evidenceKind: expectation.evidence_kind,
   };
 }
@@ -641,8 +670,13 @@ export function adaptKernelStatus(
       .filter((expectation) => expectation.stage_id === stage.id)
       .map((expectation) => programExpectationView(expectation, stage.id))
       .sort(compareProgramExpectations);
-    stage.programExpectations = expectations;
-    const nextExpectation = expectations[0];
+    stage.programExpectations = expectations.filter(
+      (expectation) => expectation.lifecycleState === "current",
+    );
+    stage.withdrawnProgramExpectations = expectations.filter(
+      (expectation) => expectation.lifecycleState === "withdrawn",
+    );
+    const nextExpectation = stage.programExpectations[0];
     if (nextExpectation) {
       stage.nextExpectation = nextExpectation.title;
       stage.nextExpectationSpeakers = nextExpectation.speakers;
@@ -697,6 +731,32 @@ export function adaptKernelStatus(
       stageCount: stages.length,
     },
     stages,
+    programSynchronization: payload.program_synchronization
+      ? {
+          provider: payload.program_synchronization.provider,
+          synchronizedAt: payload.program_synchronization.synchronized_at,
+          observed: payload.program_synchronization.observed,
+          added: payload.program_synchronization.added,
+          changed: payload.program_synchronization.changed,
+          unchanged: payload.program_synchronization.unchanged,
+          withdrawn: payload.program_synchronization.withdrawn,
+          restored: payload.program_synchronization.restored,
+          currentExpectationCount:
+            payload.program_synchronization.current_expectation_count,
+          changes: payload.program_synchronization.changes.map((change) => ({
+            kind: change.kind,
+            expectationId: change.expectation_id,
+            title: change.title,
+            externalSessionId: change.external_session_id ?? undefined,
+            fields: change.fields.map((field) => ({
+              field: field.field,
+              previous: field.previous ?? undefined,
+              current: field.current ?? undefined,
+            })),
+          })),
+          changesTruncated: payload.program_synchronization.changes_truncated,
+        }
+      : undefined,
     sessions: [...sessionMap.values()],
     mediaAssets,
     attention,

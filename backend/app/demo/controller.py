@@ -94,7 +94,7 @@ def verify_demo_database(
                 """
                 SELECT EXISTS (
                     SELECT 1 FROM stageflow.schema_migration
-                    WHERE version = '0008_demo_vertical_slice'
+                    WHERE version = '0009_program_expectation_reconciliation'
                 ) AS migration_present
                 """
             ).fetchone()

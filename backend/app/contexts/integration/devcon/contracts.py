@@ -36,6 +36,15 @@ class ExternalProgramItem:
 
 
 class ExternalProgramSource(Protocol):
+    @property
+    def provider(self) -> str: ...
+
+    @property
+    def event_id(self) -> str: ...
+
+    @property
+    def room_id(self) -> str: ...
+
     def fetch_program(self) -> tuple[ExternalProgramItem, ...]: ...
 
 

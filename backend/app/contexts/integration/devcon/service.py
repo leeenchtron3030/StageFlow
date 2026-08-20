@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-
-from app.contexts.events import ProgramExpectation
+from app.contexts.events import (
+    ProgramExpectation,
+    ProgramExpectationLifecycle,
+    ProgramExpectationReconciliation,
+    ProgramExpectationSnapshot,
+)
 from app.contexts.production.event_mode_kernel.repository import (
     EventModeKernelRepository,
     KernelConflictError,
@@ -13,12 +16,7 @@ from app.shared.time import Clock
 
 from .contracts import ExternalProgramSource
 
-
-@dataclass(frozen=True, slots=True)
-class ProgramSyncResult:
-    event_id: EntityId
-    stage_id: EntityId
-    expectations: tuple[ProgramExpectation, ...]
+ProgramSyncResult = ProgramExpectationReconciliation
 
 
 class DevconProgramSync:
@@ -33,9 +31,7 @@ class DevconProgramSync:
         self._source = source
         self._clock = clock
 
-    def synchronize(
-        self, *, event_id: EntityId, stage_id: EntityId
-    ) -> ProgramSyncResult:
+    def synchronize(self, *, event_id: EntityId, stage_id: EntityId) -> ProgramSyncResult:
         stage = next(
             (
                 candidate
@@ -49,36 +45,47 @@ class DevconProgramSync:
         if stage.event_id != event_id:
             raise KernelConflictError("demo_stage_event_mismatch")
 
-        recorded_at = self._clock.now()
-        synchronized: list[ProgramExpectation] = []
-        for item in self._source.fetch_program():
-            synchronized.append(
-                self._repository.put_program_expectation(
-                    ProgramExpectation(
-                        id=EntityId.new(),
-                        event_id=event_id,
-                        key=f"devcon:{item.event_id}:{item.session_id}",
-                        stage_id=stage_id,
-                        title=item.title,
-                        speakers=item.speakers,
-                        planned_start=item.planned_start,
-                        planned_end=item.planned_end,
-                        external_references={
-                            "provider": "devcon",
-                            "devcon_event_id": item.event_id,
-                            "devcon_session_id": item.session_id,
-                            "devcon_room_id": item.room_id,
-                            "devcon_room_name": item.room_name,
-                        },
-                        revision=1,
-                        recorded_at=recorded_at,
-                    )
+        fetched = self._source.fetch_program()
+        synchronized_at = self._clock.now()
+        scope = f"{self._source.provider}:{self._source.event_id}:{self._source.room_id}"
+        expectations: list[ProgramExpectation] = []
+        for item in fetched:
+            if item.event_id != self._source.event_id or item.room_id != self._source.room_id:
+                raise KernelConflictError("devcon_program_snapshot_scope_mismatch")
+            expectations.append(
+                ProgramExpectation(
+                    id=EntityId.new(),
+                    event_id=event_id,
+                    key=f"devcon:{item.event_id}:{item.session_id}",
+                    stage_id=stage_id,
+                    title=item.title,
+                    speakers=item.speakers,
+                    planned_start=item.planned_start,
+                    planned_end=item.planned_end,
+                    external_references={
+                        "provider": "devcon",
+                        "devcon_event_id": item.event_id,
+                        "devcon_session_id": item.session_id,
+                        "devcon_room_id": item.room_id,
+                        "devcon_room_name": item.room_name,
+                    },
+                    revision=1,
+                    recorded_at=synchronized_at,
+                    lifecycle_state=ProgramExpectationLifecycle.CURRENT,
+                    synchronization_scope=scope,
+                    last_observed_at=synchronized_at,
+                    lifecycle_changed_at=synchronized_at,
                 )
             )
-        return ProgramSyncResult(
-            event_id=event_id,
-            stage_id=stage_id,
-            expectations=tuple(synchronized),
+        return self._repository.reconcile_program_expectations(
+            ProgramExpectationSnapshot(
+                event_id=event_id,
+                stage_id=stage_id,
+                provider=self._source.provider,
+                synchronization_scope=scope,
+                observed_at=synchronized_at,
+                expectations=tuple(expectations),
+            )
         )
 
     def probe(self) -> int:

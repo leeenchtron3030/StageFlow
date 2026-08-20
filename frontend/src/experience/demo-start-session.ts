@@ -19,6 +19,7 @@ export type DemoStartSessionSubmissionResult =
         | "actor_required"
         | "launch_context_required"
         | "selection_required"
+        | "selection_stale"
         | "confirmation_declined";
     }
   | { status: "submitted"; response: Response };
@@ -28,6 +29,7 @@ export async function submitDemoStartSession({
   stageId,
   launchContext,
   selection,
+  currentExpectationIds,
   authoritativeStart,
   confirm,
   fetcher,
@@ -37,6 +39,7 @@ export async function submitDemoStartSession({
   stageId: string;
   launchContext?: string;
   selection?: DemoStartSessionSelection;
+  currentExpectationIds: readonly string[];
   authoritativeStart: string;
   confirm: (message: string) => boolean;
   fetcher: typeof fetch;
@@ -47,6 +50,12 @@ export async function submitDemoStartSession({
     return { status: "not_submitted", reason: "launch_context_required" };
   }
   if (!selection) return { status: "not_submitted", reason: "selection_required" };
+  if (
+    selection.kind === "expectation" &&
+    !currentExpectationIds.includes(selection.expectationId)
+  ) {
+    return { status: "not_submitted", reason: "selection_stale" };
+  }
 
   const confirmation =
     selection.kind === "expectation"

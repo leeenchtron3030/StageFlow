@@ -26,6 +26,14 @@ authorized by this document.
   Event/Stage, start/end, title, speakers, status, and versioned external references.
 - **Distinction:** It describes planned reality. It is not proof that activity occurred,
   not a realized Session, and not authority for actual Session Stage or boundaries.
+- **Lifecycle:** **Current** means observed in the latest successful full snapshot for the
+  exact configured provider synchronization scope. **Withdrawn** means previously observed
+  but absent from that successful snapshot. Withdrawn records remain durable external
+  evidence and cannot be selected for new Session realization; linked realized Sessions
+  remain unchanged.
+- **Scope limit:** Demo reconciliation is currently one Devcon Event/room to one Stage.
+  A future multi-Stage design must distinguish removal from the Business Event from a
+  move to another room before broadening reconciliation.
 - **Current aliases/legacy names:** `ScheduledActivity` is the existing schedule-adapter
   input contract; older documents use schedule item, scheduled session, or program item.
 - **Migration:** Preserve `ScheduledActivity` as an adapter contract. The Kernel stores

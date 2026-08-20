@@ -11,6 +11,9 @@ from app.contexts.events import (
     EventStageBootstrapRequest,
     EventStageBootstrapResult,
     ProgramExpectation,
+    ProgramExpectationLifecycle,
+    ProgramExpectationReconciliation,
+    ProgramExpectationSnapshot,
     Stage,
 )
 from app.shared.ids import EntityId
@@ -36,6 +39,7 @@ from .contracts import (
     SessionOperationalProjection,
     StartSessionRequest,
 )
+from .program_reconciliation import plan_program_reconciliation
 
 
 class KernelConflictError(RuntimeError):
@@ -73,6 +77,21 @@ class EventModeKernelRepository(ABC):
     def list_program_expectations(
         self, event_id: EntityId
     ) -> tuple[ProgramExpectation, ...]: ...
+
+    @abstractmethod
+    def list_program_expectation_revisions(
+        self, expectation_id: EntityId
+    ) -> tuple[ProgramExpectation, ...]: ...
+
+    @abstractmethod
+    def reconcile_program_expectations(
+        self, snapshot: ProgramExpectationSnapshot
+    ) -> ProgramExpectationReconciliation: ...
+
+    @abstractmethod
+    def get_latest_program_reconciliation(
+        self, event_id: EntityId, stage_id: EntityId
+    ) -> ProgramExpectationReconciliation | None: ...
 
     @abstractmethod
     def start_session(self, request: StartSessionRequest) -> Session: ...
@@ -189,6 +208,10 @@ class InMemoryEventModeKernelRepository(EventModeKernelRepository):
         self._stage_keys: dict[tuple[EntityId, str], EntityId] = {}
         self._expectations: dict[EntityId, ProgramExpectation] = {}
         self._expectation_keys: dict[tuple[EntityId, str], EntityId] = {}
+        self._expectation_history: dict[EntityId, list[ProgramExpectation]] = {}
+        self._program_reconciliations: dict[
+            tuple[EntityId, EntityId, str], ProgramExpectationReconciliation
+        ] = {}
         self._sessions: dict[EntityId, Session] = {}
         self._start_operations: dict[EntityId, tuple[StartSessionRequest, EntityId]] = {}
         self._bootstrap_operations: dict[EntityId, EventStageBootstrapResult] = {}
@@ -354,12 +377,14 @@ class InMemoryEventModeKernelRepository(EventModeKernelRepository):
             if existing_id is None:
                 self._expectations[expectation.id] = expectation
                 self._expectation_keys[key] = expectation.id
+                self._expectation_history[expectation.id] = [expectation]
                 return expectation
             existing = self._expectations[existing_id]
             if expectation.id != existing.id:
                 expectation = replace(expectation, id=existing.id)
             expectation = replace(expectation, revision=existing.revision + 1)
             self._expectations[existing.id] = expectation
+            self._expectation_history.setdefault(existing.id, [existing]).append(expectation)
             return expectation
 
     def get_program_expectation(self, expectation_id: EntityId) -> ProgramExpectation | None:
@@ -385,6 +410,59 @@ class InMemoryEventModeKernelRepository(EventModeKernelRepository):
                 )
             )
 
+    def list_program_expectation_revisions(
+        self, expectation_id: EntityId
+    ) -> tuple[ProgramExpectation, ...]:
+        with self._lock:
+            return tuple(self._expectation_history.get(expectation_id, ()))
+
+    def reconcile_program_expectations(
+        self, snapshot: ProgramExpectationSnapshot
+    ) -> ProgramExpectationReconciliation:
+        with self._lock:
+            stage = self._stages.get(snapshot.stage_id)
+            if stage is None or stage.event_id != snapshot.event_id:
+                raise KernelConflictError("program_snapshot_stage_event_mismatch")
+            plan = plan_program_reconciliation(
+                (
+                    item
+                    for item in self._expectations.values()
+                    if item.event_id == snapshot.event_id
+                ),
+                snapshot,
+            )
+            expectations = dict(self._expectations)
+            expectation_keys = dict(self._expectation_keys)
+            history = {
+                key: list(values) for key, values in self._expectation_history.items()
+            }
+            for mutation in plan.mutations:
+                item = mutation.expectation
+                expectations[item.id] = item
+                expectation_keys[(item.event_id, item.key)] = item.id
+                if mutation.write_revision:
+                    history.setdefault(item.id, []).append(item)
+            reconciliations = dict(self._program_reconciliations)
+            reconciliations[
+                (snapshot.event_id, snapshot.stage_id, snapshot.synchronization_scope)
+            ] = plan.result
+            self._expectations = expectations
+            self._expectation_keys = expectation_keys
+            self._expectation_history = history
+            self._program_reconciliations = reconciliations
+            return plan.result
+
+    def get_latest_program_reconciliation(
+        self, event_id: EntityId, stage_id: EntityId
+    ) -> ProgramExpectationReconciliation | None:
+        with self._lock:
+            matches = (
+                value
+                for (owner_id, owner_stage_id, _), value in self._program_reconciliations.items()
+                if owner_id == event_id and owner_stage_id == stage_id
+            )
+            return max(matches, key=lambda value: value.synchronized_at, default=None)
+
     def start_session(self, request: StartSessionRequest) -> Session:
         from .contracts import SessionActivityState, SessionPackageState
 
@@ -405,6 +483,8 @@ class InMemoryEventModeKernelRepository(EventModeKernelRepository):
                 expectation = self._expectations.get(request.program_expectation_id)
                 if expectation is None or expectation.event_id != request.event_id:
                     raise KernelConflictError("program_expectation_event_mismatch")
+                if expectation.lifecycle_state is ProgramExpectationLifecycle.WITHDRAWN:
+                    raise KernelConflictError("program_expectation_withdrawn")
             if any(
                 session.stage_id == request.stage_id
                 and session.activity_state is SessionActivityState.PRESENTATION_ACTIVE
