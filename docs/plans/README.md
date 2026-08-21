@@ -85,6 +85,8 @@ or architecture document unless those documents are explicitly updated.
 
 | Plan | Status | Owner | Related decision/finding |
 | --- | --- | --- | --- |
+| [Demo 2 Autonomous Event Node](demo2-autonomous-event-node.md) | In progress - Green bounded automation milestone | StageFlow Demo Operations / Production / Integration / Frontend | Explicit 2026-08-20 Demo 2 directive; ADR-0023-ADR-0025 |
+| [Demo Package Approval](demo-package-approval.md) | Completed - Green existing-authority UX qualified live read-only | StageFlow Demo Operations / Frontend | Explicit 2026-08-19 package approval directive; ADR-0023 |
 | [Demo Devcon post-publish verification correction](demo-devcon-post-publish-verification.md) | Completed - Green verification fix qualified without external write | StageFlow Demo Operations / Integration | Durable commit 6e906150; publicCache(60) convergence evidence |
 | [Demo Devcon publication contract correction](demo-devcon-publication-contract.md) | Completed - Green compatibility fix qualified locally and against upstream | StageFlow Demo Operations / Integration | Failed guarded PUT evidence; efdevcon/monorepo e797785 |
 | [Program Expectation snapshot reconciliation](program-expectation-reconciliation.md) | Completed - Green durable Current/Withdrawn reconciliation qualified | StageFlow Production / Integration / Frontend | Explicit 2026-08-19 Program reconciliation milestone |

@@ -102,6 +102,22 @@ The timer or operator action that starts a media cycle is a process-local trigge
 authoritative state. Each durable boundary is idempotent and a restarted process
 re-enters the same flow from PostgreSQL plus a new bounded source reconciliation.
 
+The Demo 2 Event Node implementation adds an optional, default-off lifespan coordinator
+for the existing `demo-single-stage` profile. When enabled, it runs the same bounded
+media cycle and Devcon Program GET reconciliation at configured cadences. A PostgreSQL
+session advisory lock keyed by deployment permits one owning coordinator; a second
+backend remains standby. The lock, process thread, and stop signal are runtime
+coordination only. PostgreSQL records, stable transcription Operation identity, and the
+existing deterministic policies remain authoritative. The coordinator has no Session,
+Moment, package, or publication command path, and Program refresh has no Devcon write
+path.
+
+A registered asset with an existing deterministic `unresolved` association is reevaluated
+only when the material Session input set changes, represented by durable Session identity
+and revision references. The same accepted structural and temporal policy runs again and
+the new decision is revisioned. Unchanged inputs create no revision. Existing human or
+conflict associations are never replaced by this lifecycle reconciliation.
+
 ### Startup and shutdown ownership
 
 The composition root should:

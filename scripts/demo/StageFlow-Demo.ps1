@@ -363,10 +363,18 @@ function Show-DemoStatus {
         ForEach-Object { "$($_.Name)=$($_.Value)" })
     "Operations: $($operationPairs -join ', ')"
     "Terminal failures: $(@($payload.operations.terminal_failures).Count)"
-    "Worker: $($payload.worker.state) available=$($payload.worker.available)"
+    "Worker: $($payload.worker.state) current=$($payload.worker.current) available=$($payload.worker.available) capacity=$($payload.worker.capacity) gpu_transcription=$($payload.worker.gpu_transcription)"
     "Transcription Evidence: complete=$($payload.transcript_evidence.complete) total=$($payload.transcript_evidence.count) (evidence only)"
     "Moments: $($payload.moments.count)"
-    "Devcon cached expectations: $($payload.devcon.cached_program_expectations)"
+    $automationProperty = $payload.PSObject.Properties["automation"]
+    if ($null -ne $automationProperty -and $null -ne $automationProperty.Value) {
+        $automation = $automationProperty.Value
+        "Automation: $($automation.state) owner=$($automation.owner)"
+        "Media reconciliation: cycles=$($automation.media_cycle_count) last=$($automation.media_last_success_at) failure=$($automation.media_last_failure_code)"
+        "Transcription enqueue: total=$($automation.transcription_operations_enqueued) failures=$($automation.transcription_enqueue_failures)"
+        "Program refresh: cycles=$($automation.program_refresh_count) last=$($automation.program_last_success_at) failure=$($automation.program_last_failure_code)"
+    }
+    "Devcon Program: current=$($payload.devcon.current) withdrawn=$($payload.devcon.withdrawn) status=$($payload.devcon.status) last=$($payload.devcon.last_successful_refresh)"
 }
 
 function Publish-Devcon {

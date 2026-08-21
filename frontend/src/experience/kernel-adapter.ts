@@ -87,12 +87,35 @@ export interface KernelProgramSynchronization {
   }>;
   changes_truncated: boolean;
 }
+export interface KernelAutomationStatus {
+  enabled: boolean;
+  state: string;
+  owner: boolean;
+  media_reconciliation_interval_seconds: number;
+  program_refresh_interval_seconds: number;
+  media_cycle_count: number;
+  media_last_attempt_at: string | null;
+  media_last_success_at: string | null;
+  media_last_failure_code: string | null;
+  media_candidates_seen: number;
+  media_assets_registered: number;
+  transcription_operations_enqueued: number;
+  transcription_enqueue_failures: number;
+  program_refresh_count: number;
+  program_last_attempt_at: string | null;
+  program_last_success_at: string | null;
+  program_last_failure_code: string | null;
+}
+
 export interface KernelStatusPayload {
   configured: boolean;
   configuration_supplied: boolean;
   configuration_valid: boolean | null;
   runtime_composed: boolean;
   runtime_profile?: string | null;
+  deployment_id?: string | null;
+  node_id?: string | null;
+  automation?: KernelAutomationStatus | null;
   event_id: string | null;
   event_key: string | null;
   event_name: string | null;
@@ -755,6 +778,34 @@ export function adaptKernelStatus(
             })),
           })),
           changesTruncated: payload.program_synchronization.changes_truncated,
+        }
+      : undefined,
+    automation: payload.automation
+      ? {
+          enabled: payload.automation.enabled,
+          state: payload.automation.state,
+          owner: payload.automation.owner,
+          mediaReconciliationIntervalSeconds:
+            payload.automation.media_reconciliation_interval_seconds,
+          programRefreshIntervalSeconds:
+            payload.automation.program_refresh_interval_seconds,
+          mediaCycleCount: payload.automation.media_cycle_count,
+          mediaLastAttemptAt: payload.automation.media_last_attempt_at ?? undefined,
+          mediaLastSuccessAt: payload.automation.media_last_success_at ?? undefined,
+          mediaLastFailureCode: payload.automation.media_last_failure_code ?? undefined,
+          mediaCandidatesSeen: payload.automation.media_candidates_seen,
+          mediaAssetsRegistered: payload.automation.media_assets_registered,
+          transcriptionOperationsEnqueued:
+            payload.automation.transcription_operations_enqueued,
+          transcriptionEnqueueFailures:
+            payload.automation.transcription_enqueue_failures,
+          programRefreshCount: payload.automation.program_refresh_count,
+          programLastAttemptAt:
+            payload.automation.program_last_attempt_at ?? undefined,
+          programLastSuccessAt:
+            payload.automation.program_last_success_at ?? undefined,
+          programLastFailureCode:
+            payload.automation.program_last_failure_code ?? undefined,
         }
       : undefined,
     sessions: [...sessionMap.values()],

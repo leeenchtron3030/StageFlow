@@ -130,6 +130,8 @@ class ProcessTranscriptionResponse(BaseModel):
     assets_registered: int
     transcription_operation_ids: tuple[str, ...]
     operation_states: tuple[str, ...]
+    operations_enqueued: int = 0
+    enqueue_failure_codes: tuple[str, ...] = ()
 
 
 class EditorialMomentResponse(BaseModel):
@@ -295,7 +297,11 @@ def _translate_error(exc: Exception) -> HTTPException:
         return HTTPException(status_code=409, detail=str(exc))
     if isinstance(
         exc,
-        (KernelStorageUnavailableError, EditorialMomentStorageUnavailableError),
+        (
+            KernelStorageUnavailableError,
+            EditorialMomentStorageUnavailableError,
+            WorkExecutionStorageUnavailableError,
+        ),
     ):
         return HTTPException(status_code=503, detail="postgresql_unavailable")
     return HTTPException(status_code=422, detail=str(exc))
@@ -404,8 +410,15 @@ def process_transcription(
                 item.id.value for item in result.operations
             ),
             operation_states=tuple(item.status.value for item in result.operations),
+            operations_enqueued=result.operations_enqueued,
+            enqueue_failure_codes=result.enqueue_failures,
         )
-    except (KernelNotFoundError, KernelConflictError, KernelStorageUnavailableError) as exc:
+    except (
+        KernelNotFoundError,
+        KernelConflictError,
+        KernelStorageUnavailableError,
+        WorkExecutionStorageUnavailableError,
+    ) as exc:
         raise _translate_error(exc) from exc
 
 
@@ -444,7 +457,11 @@ def approve_package(
             expected_package_revision=command.package_revision,
         )
         return _session_response(command.operation_id, session)
-    except (KernelNotFoundError, KernelConflictError) as exc:
+    except (
+        KernelNotFoundError,
+        KernelConflictError,
+        KernelStorageUnavailableError,
+    ) as exc:
         raise _translate_error(exc) from exc
 
 
@@ -645,6 +662,7 @@ def list_moments(session_id: UUID, request: Request) -> tuple[EditorialMomentRes
 
 
 __all__ = [
+    "ApprovePackageCommand",
     "EditorialMomentResponse",
     "EndPresentationCommand",
     "MarkMomentCommand",
