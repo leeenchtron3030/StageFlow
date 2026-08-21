@@ -131,6 +131,18 @@ the record's `persisted_at` and the successful result's `committed_at`. The repo
 does not read a clock. An exact replay returns the original result's `committed_at`, not
 the replay request's proposed `commit_at`.
 
+## Current status relative to the Durable Event-Mode Kernel
+
+This module remains exactly what ED-0046/ED-0047 defined it as: a contract-validation
+proof, not production persistence (see above). The later Durable Event-Mode Kernel
+(ADR-0022/ADR-0024) established a separate PostgreSQL-backed persistence path for actual
+Session/Recording authority; it did not build on or replace this module. Nothing outside
+this package's own test suite imports `operational_state_repository` — it is superseded
+foundation-era scaffolding, not a live gap awaiting a Postgres implementation. A prior
+due-diligence review flagged its in-memory-only state as a finding; that reading did not
+account for this module's own explicit "not production persistence" scope above. No
+Postgres backing is planned for this module.
+
 ## Mission boundary
 
 A committed `paused` Recording state does not pause a recorder. A committed `ending`
