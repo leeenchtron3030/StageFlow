@@ -1,11 +1,11 @@
 import { createHash, timingSafeEqual } from "node:crypto";
-
 import type { NextRequest } from "next/server";
 
 import { demoLaunchContextHeader } from "../../../../../src/experience/demo-launch-context.ts";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+export const stageflowApiSecretHeader = "x-stageflow-api-secret";
 
 const commandPaths = new Set([
   "sessions/start",
@@ -55,6 +55,12 @@ function isSameOriginCommand(request: NextRequest): boolean {
     fetchSite !== "cross-site"
   );
 }
+
+function currentApiSecret(): string | undefined {
+  const value = process.env.STAGEFLOW_API_SHARED_SECRET;
+  return value && value.length >= 32 ? value : undefined;
+}
+
 
 function currentLaunchContext(): string | undefined {
   const value = process.env.STAGEFLOW_DEMO_LAUNCH_CONTEXT;
@@ -220,6 +226,14 @@ async function proxy(
     }
   }
 
+  const apiSecret = currentApiSecret();
+  if (!apiSecret) {
+    return Response.json(
+      { detail: "demo_api_authentication_unavailable" },
+      { status: 503, headers: noStoreHeaders() },
+    );
+  }
+
   try {
     const upstream = await fetch(new URL(path, backendBase()), {
       method,
@@ -229,6 +243,7 @@ async function proxy(
       signal: AbortSignal.timeout(10_000),
       headers: {
         Accept: "application/json",
+        [stageflowApiSecretHeader]: apiSecret,
         ...(method === "POST" ? { "Content-Type": "application/json" } : {}),
       },
     });

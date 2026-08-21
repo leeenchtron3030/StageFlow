@@ -11,6 +11,8 @@ const originalBackend = process.env.STAGEFLOW_DEMO_API_BASE_URL;
 const originalLaunchContext = process.env.STAGEFLOW_DEMO_LAUNCH_CONTEXT;
 const originalConsoleInfo = console.info;
 const launchContext = "current-launch-context-0123456789abcdef";
+const apiSecret = "frontend-test-only-api-secret-0123456789";
+process.env.STAGEFLOW_API_SHARED_SECRET = apiSecret;
 const sessionId = "10000000-0000-4000-8000-000000000001";
 
 function context(...path: string[]) {
@@ -153,6 +155,7 @@ test("POST forwards an explicit current-launch Start Session and records bounded
     "http://127.0.0.1:8123/api/v1/demo/sessions/start",
   );
   const upstreamHeaders = new Headers(upstreamRequest?.headers);
+  assert.equal(upstreamHeaders.get("x-stageflow-api-secret"), apiSecret);
   assert.equal(upstreamHeaders.get(demoLaunchContextHeader), null);
   assert.equal(logMessages.length, 1);
   const attribution = JSON.parse(
@@ -299,5 +302,22 @@ test("authority header helper omits unavailable context and includes only the cu
   assert.deepEqual(demoAuthorityHeaders(launchContext), {
     "Content-Type": "application/json",
     [demoLaunchContextHeader]: launchContext,
+  });
+});
+
+test("proxy fails closed when the server-side API secret is absent", async () => {
+  delete process.env.STAGEFLOW_API_SHARED_SECRET;
+  globalThis.fetch = (async () => {
+    throw new Error("fetch must not run");
+  }) as typeof fetch;
+
+  const response = await GET(
+    new NextRequest(`http://stageflow.demo/api/stageflow/demo/sessions/${sessionId}/workspace`),
+    context("sessions", sessionId, "workspace"),
+  );
+
+  assert.equal(response.status, 503);
+  assert.deepEqual(await response.json(), {
+    detail: "demo_api_authentication_unavailable",
   });
 });

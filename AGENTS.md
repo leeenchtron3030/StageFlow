@@ -6,10 +6,11 @@ supplement them only when a directory has distinct, non-duplicative needs.
 ## Start here
 
 StageFlow is an observational intelligence system for live-event media. The repository
-currently implements a Python/FastAPI health shell, a static Next.js shell, and a broad
-set of backend Production-domain contracts, deterministic policies, explicit ports, and
-process-local coordinators. It does **not** yet implement a composed, durable,
-restart-safe event-media workflow.
+implements a Python/FastAPI application with a durable PostgreSQL Event-Mode Kernel, a
+durable transcription-worker substrate, bounded media discovery, advisory timing
+evidence, Demo application flows, and a Next.js producer/Demo interface. These are an
+operational foundation, not a production-event-readiness claim. Use the architecture
+index and current validation records for the precise implemented and qualified scope.
 
 Before architectural or domain work, read:
 
@@ -73,8 +74,9 @@ Repository whitespace check:
 git diff --check
 ```
 
-No repository-wide formatter or frontend test runner is currently configured. Do not
-claim that either ran, and do not introduce or bulk-run one without approved scope.
+No repository-wide formatter is currently configured. The frontend test runner is
+configured through `npm run test` and enforced in CI. Do not claim checks ran unless they
+actually ran, and do not introduce or bulk-run a formatter without approved scope.
 
 Run checks in proportion to the change. Report only commands actually run, their
 results, and any skipped checks with a reason. A passing contract suite is not evidence

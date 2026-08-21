@@ -11,6 +11,9 @@ from app.contexts.production.media_timing_evidence import (
     MediaTimingEvidenceStorageUnavailableError,
     project_media_timing_evidence,
 )
+from app.contexts.production.media_timing_evidence.projection import (
+    MediaTimingEvidenceProjection,
+)
 from app.shared.ids import EntityId
 
 router = APIRouter(prefix="/media-assets", tags=["media timing evidence"])
@@ -83,12 +86,7 @@ class MediaTimingEvidenceHistoryResponse(BaseModel):
     evidence: tuple[MediaTimingEvidenceResponse, ...]
 
 
-def _response(value: object) -> MediaTimingEvidenceResponse:
-    from app.contexts.production.media_timing_evidence.projection import (
-        MediaTimingEvidenceProjection,
-    )
-
-    assert isinstance(value, MediaTimingEvidenceProjection)
+def _response(value: MediaTimingEvidenceProjection) -> MediaTimingEvidenceResponse:
     return MediaTimingEvidenceResponse(
         evidence_id=value.evidence_id.value,
         asset_id=value.asset_id.value,

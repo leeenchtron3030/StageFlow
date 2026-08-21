@@ -71,17 +71,16 @@ Instead, it is an operational system that assists production teams in creating a
 
 Repository Structure
 
+```text
 PRODUCT_CONSTITUTION.md
 README.md
 CHANGELOG.md
 ROADMAP.md
-docs/
-architecture/
-reference/
-examples/
-mock_data/
-assets/
-scripts/
+backend/        Python/FastAPI application, migrations, qualification tools, and tests
+frontend/       Next.js producer and Demo user interfaces
+docs/           Architecture, ADRs, reviews, plans, and validation evidence
+scripts/        Preview, Demo, and validation launchers
+```
 
 ⸻
 
@@ -228,23 +227,23 @@ The long-term objective is not simply to create clips more quickly, but to redef
 
 Current Status
 
-Current repository phase:
+Current repository phase: Architecture Release AR-2.1
 
-Architecture Release AR-2.1
+The repository now includes a FastAPI application with a durable PostgreSQL Event-Mode
+Kernel, deterministic Production-domain contracts and policies, bounded local media
+discovery, durable advisory Media Timing Evidence, a durable transcription-worker
+substrate, and a Demo single-stage application flow. The Next.js frontend includes
+producer-facing and Demo workflows backed by fixture or Kernel data.
 
-Foundational backend contracts are being implemented through approved Engineering Directives. The current objective is to preserve a clear architecture in which runtime ingress remains small and explainable while reasoning stays traceable.
-
-Through ED-0053, the backend now includes a deployment-neutral Runtime, an explicit
-Software Agent lifecycle, one bounded injected media-candidate/observation collection
-boundary, and one synchronous bounded local-filesystem candidate-discovery adapter.
-Readiness execution, media asset assembly, transfer, queues, persistence, application
-composition, and background services remain future work.
+This is an operational foundation, not an event-readiness claim. Demo hardware rehearsal,
+real deployment qualification, and broader workflow composition remain active work; a
+passing local or CI contract suite does not establish production-event readiness.
 
 ⸻
 
 License
 
-To be determined.
+StageFlow is licensed under the [MIT License](LICENSE).
 
 ⸻
 

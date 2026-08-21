@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import datetime
@@ -63,6 +64,8 @@ from .media_collection_lifecycle import (
     normalize_cycle_reasons,
 )
 from .media_collection_validation import canonical_value
+
+_logger = logging.getLogger(__name__)
 
 _ID_NAMESPACE = UUID("62a92419-4fb3-5af8-aed5-ddc946e17a72")
 _OBSERVATION_ORDER = {
@@ -263,7 +266,12 @@ class MediaCandidateCollectionCoordinator:
                 reservation,
                 initial_snapshot,
             )
-        except Exception:
+        except Exception as error:
+            _logger.error(
+                "media_collection_cycle_failed cycle_id=%s exception_type=%s",
+                request.cycle_id.value,
+                type(error).__name__,
+            )
             return self._commit_unexpected_failure(
                 request,
                 reservation,
@@ -619,7 +627,16 @@ class MediaCandidateCollectionCoordinator:
             return None
         try:
             return port.get_current_snapshot(request.runtime_id)
-        except Exception:
+        except Exception as error:
+            _logger.error(
+                (
+                    "media_collection_agent_snapshot_failed cycle_id=%s "
+                    "runtime_id=%s exception_type=%s"
+                ),
+                request.cycle_id.value,
+                request.runtime_id.value,
+                type(error).__name__,
+            )
             return None
 
     def _permission(
@@ -902,6 +919,12 @@ class MediaCandidateCollectionCoordinator:
         try:
             return self._require_discovery_result(port.discover(request))
         except Exception as error:
+            _logger.error(
+                "media_collection_discovery_failed request_id=%s cycle_id=%s exception_type=%s",
+                request.discovery_request_id.value,
+                request.collection_cycle_id.value,
+                type(error).__name__,
+            )
             return MediaCandidateDiscoveryResult(
                 discovery_request_id=request.discovery_request_id,
                 cycle_id=request.collection_cycle_id,
@@ -1549,6 +1572,16 @@ class MediaCandidateCollectionCoordinator:
                 return self._require_observation_result(result)
             raise ValueError("Unsupported observation type.")
         except Exception as error:
+            _logger.error(
+                (
+                    "media_collection_observation_failed candidate_id=%s "
+                    "resource_id=%s observation_type=%s exception_type=%s"
+                ),
+                request.candidate_id.value,
+                request.resource_id.value,
+                request.observation_type.value,
+                type(error).__name__,
+            )
             return MediaObservationCollectionResult(
                 collection_request_id=request.collection_request_id,
                 cycle_id=request.collection_cycle_id,

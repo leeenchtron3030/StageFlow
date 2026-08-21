@@ -5,12 +5,20 @@ from datetime import datetime
 from fastapi import APIRouter, Request, Response
 from pydantic import BaseModel, ConfigDict
 
+from app.api.v1.response_models import (
+    ImmutableJsonMapping,
+    ProgramChangeResponse,
+    program_change_responses,
+)
 from app.bootstrap.event_mode_kernel import KernelComponents, KernelStartupProgress
 from app.contexts.events import (
     ProgramExpectation,
     ProgramExpectationReconciliation,
 )
-from app.contexts.production.event_mode_kernel.contracts import EventOperationalStatus
+from app.contexts.production.event_mode_kernel.contracts import (
+    EventOperationalStatus,
+    SessionOperationalProjection,
+)
 from app.contexts.production.event_mode_kernel.repository import (
     KernelStorageUnavailableError,
 )
@@ -91,7 +99,7 @@ class MediaStatusResponse(BaseModel):
     association_evidence_ids: tuple[str, ...]
     association_policy_id: str | None
     association_policy_version: str | None
-    association_input_references: tuple[dict[str, object], ...]
+    association_input_references: tuple[ImmutableJsonMapping, ...]
     association_actor_id: str | None
     association_decided_at: datetime | None
 
@@ -137,24 +145,6 @@ class ProgramExpectationResponse(BaseModel):
     evidence_kind: str = "external"
 
 
-class ProgramFieldChangeResponse(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    field: str
-    previous: str | None
-    current: str | None
-
-
-class ProgramChangeResponse(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    kind: str
-    expectation_id: str
-    expectation_key: str
-    title: str
-    external_session_id: str | None
-    fields: tuple[ProgramFieldChangeResponse, ...]
-
 
 class ProgramSynchronizationResponse(BaseModel):
     model_config = ConfigDict(frozen=True)
@@ -170,6 +160,7 @@ class ProgramSynchronizationResponse(BaseModel):
     current_expectation_count: int
     changes: tuple[ProgramChangeResponse, ...]
     changes_truncated: bool
+
 
 class KernelStatusResponse(BaseModel):
     model_config = ConfigDict(frozen=True)
@@ -197,6 +188,41 @@ class KernelStatusResponse(BaseModel):
     startup_error: str | None = None
 
 
+def _fallback_response(
+    *,
+    configured: bool,
+    configuration_supplied: bool,
+    configuration_valid: bool | None,
+    runtime_composed: bool,
+    runtime_profile: str | None,
+    event_key: str | None,
+    event_name: str | None,
+    database_available: bool,
+    attention_code: str,
+    startup_error: str | None = None,
+) -> KernelStatusResponse:
+    return KernelStatusResponse(
+        configured=configured,
+        configuration_supplied=configuration_supplied,
+        configuration_valid=configuration_valid,
+        runtime_composed=runtime_composed,
+        runtime_profile=runtime_profile,
+        event_id=None,
+        event_key=event_key,
+        event_name=event_name,
+        database_available=database_available,
+        ready=False,
+        recovering=False,
+        reconciliation_status=None,
+        reconciliation_started_at=None,
+        reconciliation_completed_at=None,
+        stages=(),
+        attention_codes=(attention_code,),
+        startup_error=startup_error,
+    )
+
+
+
 def _response(
     status: EventOperationalStatus,
     *,
@@ -209,12 +235,9 @@ def _response(
 ) -> KernelStatusResponse:
     reconciliation = status.latest_reconciliation
 
-    def session_response(item: object) -> AssemblingSessionResponse:
-        from app.contexts.production.event_mode_kernel.contracts import (
-            SessionOperationalProjection,
-        )
-
-        assert isinstance(item, SessionOperationalProjection)
+    def session_response(
+        item: SessionOperationalProjection,
+    ) -> AssemblingSessionResponse:
         return AssemblingSessionResponse(
             session_id=item.session_id.value,
             activity_state=item.activity_state.value,
@@ -303,24 +326,7 @@ def _response(
                 withdrawn=program_reconciliation.withdrawn,
                 restored=program_reconciliation.restored,
                 current_expectation_count=len(program_reconciliation.expectations),
-                changes=tuple(
-                    ProgramChangeResponse(
-                        kind=change.kind.value,
-                        expectation_id=change.expectation_id.value,
-                        expectation_key=change.expectation_key,
-                        title=change.title,
-                        external_session_id=change.external_session_id,
-                        fields=tuple(
-                            ProgramFieldChangeResponse(
-                                field=field.field,
-                                previous=field.previous,
-                                current=field.current,
-                            )
-                            for field in change.fields
-                        ),
-                    )
-                    for change in program_reconciliation.changes
-                ),
+                changes=program_change_responses(program_reconciliation.changes),
                 changes_truncated=program_reconciliation.changes_truncated,
             )
         ),
@@ -460,70 +466,48 @@ def kernel_status(request: Request, response: Response) -> KernelStatusResponse:
         configuration_valid = True
         database_available = True
         runtime_composed = components.runtime is not None
-    if components is None:
-        return KernelStatusResponse(
+    if not isinstance(components, KernelComponents):
+        return _fallback_response(
             configured=configuration_valid is True,
             configuration_supplied=configuration_supplied,
             configuration_valid=configuration_valid,
             runtime_composed=runtime_composed,
             runtime_profile=None,
-            event_id=None,
             event_key=None,
             event_name=None,
             database_available=database_available,
-            ready=False,
-            recovering=False,
-            reconciliation_status=None,
-            reconciliation_started_at=None,
-            reconciliation_completed_at=None,
-            stages=(),
-            attention_codes=(
-                "kernel_startup_failed" if startup_error else "kernel_not_configured",
+            attention_code=(
+                "kernel_startup_failed" if startup_error else "kernel_not_configured"
             ),
             startup_error=startup_error,
         )
-    assert isinstance(components, KernelComponents)
     try:
         status = components.status()
     except KernelStorageUnavailableError as exc:
         response.status_code = 503
-        return KernelStatusResponse(
+        return _fallback_response(
             configured=True,
             configuration_supplied=configuration_supplied,
             configuration_valid=configuration_valid,
             runtime_composed=runtime_composed,
             runtime_profile=components.configuration.deployment.runtime_profile.value,
-            event_id=None,
             event_key=components.event_key,
             event_name=components.configuration.deployment.event.name,
             database_available=False,
-            ready=False,
-            recovering=False,
-            reconciliation_status=None,
-            reconciliation_started_at=None,
-            reconciliation_completed_at=None,
-            stages=(),
-            attention_codes=("postgresql_unavailable",),
+            attention_code="postgresql_unavailable",
             startup_error=str(exc),
         )
     if status is None:
-        return KernelStatusResponse(
+        return _fallback_response(
             configured=True,
             configuration_supplied=configuration_supplied,
             configuration_valid=configuration_valid,
             runtime_composed=runtime_composed,
             runtime_profile=components.configuration.deployment.runtime_profile.value,
-            event_id=None,
             event_key=components.event_key,
             event_name=components.configuration.deployment.event.name,
             database_available=True,
-            ready=False,
-            recovering=False,
-            reconciliation_status=None,
-            reconciliation_started_at=None,
-            reconciliation_completed_at=None,
-            stages=(),
-            attention_codes=("explicit_event_stage_bootstrap_required",),
+            attention_code="explicit_event_stage_bootstrap_required",
         )
     return _response(
         status,

@@ -114,7 +114,11 @@ or architecture document unless those documents are explicitly updated.
 | [Local filesystem discovery race hardening](local-filesystem-discovery-race-hardening.md) | Completed — independent review accepted | StageFlow Backend | ABR-007; ED-0053 |
 | [CI quality-matrix enforcement](ci-quality-matrix-enforcement.md) | Completed — independent review accepted | StageFlow Engineering | ABR-015 |
 | [Durable Event-Mode Kernel](durable-event-mode-kernel.md) | Completed operational foundation — not a readiness claim | StageFlow Architecture / Backend | ADR-0019-ADR-0024; D-01-D-08 |
-| [Minimal shared-secret API authentication](api-shared-secret-authentication.md) | Approved | StageFlow Backend / Security | Due-diligence audit Blocker finding; ED-0055 |
-| [CI durability-test enablement and frontend test enforcement](ci-durability-and-frontend-enforcement.md) | Approved | StageFlow Engineering | Due-diligence audit Major finding; ED-0056; supersedes nothing in [CI quality-matrix enforcement](ci-quality-matrix-enforcement.md) (ABR-015) |
-| [Media candidate collection coordinator failure visibility](media-coordinator-failure-visibility.md) | Approved | StageFlow Backend / Operations | Due-diligence audit Major finding; ED-0057 |
-| [Governance and documentation reconciliation](governance-documentation-reconciliation.md) | Approved | StageFlow Engineering / Documentation | Due-diligence audit Major findings; ED-0058 |
+| [Minimal shared-secret API authentication](api-shared-secret-authentication.md) | Completed - Green security boundary | StageFlow Backend / Security | Due-diligence audit Blocker finding; ED-0055 |
+| [CI durability-test enablement and frontend test enforcement](ci-durability-and-frontend-enforcement.md) | Implementation complete; first hosted CI run and owner branch-protection action pending | StageFlow Engineering | Due-diligence audit Major finding; ED-0056 |
+| [Media candidate collection coordinator failure visibility](media-coordinator-failure-visibility.md) | Completed - Green observability correction | StageFlow Backend / Operations | Due-diligence audit Major finding; ED-0057 |
+| [Governance and documentation reconciliation](governance-documentation-reconciliation.md) | Completed - Green documentation reconciliation | StageFlow Engineering / Documentation | Due-diligence audit Major findings; ED-0058 |
+| [Stale environment example correction](stale-environment-example-correction.md) | Completed - Green documentation correction | StageFlow Engineering | ED-0059 |
+| [Cross-platform qualification harness gating](cross-platform-qualification-harness-gating.md) | Completed - Green qualification fix | StageFlow Validation | ED-0060 |
+| [Backend test coverage tooling](backend-test-coverage-tooling.md) | Completed - Green tooling addition | StageFlow Engineering | ED-0061 |
+| [API route code-quality residue cleanup](api-route-code-quality-cleanup.md) | Completed - Green API cleanup | StageFlow Backend | ED-0062 |

@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved
+Completed
 
 ## Execution authority
 
@@ -170,4 +170,13 @@ unaffected either way.
 
 ## Completion record
 
-_(To be filled in by whoever implements this plan.)_
+Implemented 2026-08-21.
+
+- Added router-level constant-time shared-secret authentication, fail-closed startup, and
+  explicit credential-free CORS allow-listing; health remains public.
+- Added server-side secret forwarding for the Demo proxy and explicitly server-only
+  Producer Kernel/MTE reads.
+- Backend auth/API tests passed as part of the full 1,796-pass suite; frontend tests passed
+  55/55, with typecheck, lint, and production build passing.
+- No schema, migration, or persisted-data change. Runtime configuration now requires
+  `STAGEFLOW_API_SHARED_SECRET` for backend startup.

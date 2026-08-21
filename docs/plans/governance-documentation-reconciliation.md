@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved
+Completed
 
 ## Execution authority
 
@@ -169,4 +169,10 @@ Revert the documentation changes. No code, schema, or data effect to reverse.
 
 ## Completion record
 
-_(To be filled in by whoever implements this plan.)_
+Implemented 2026-08-21.
+
+- Reconciled README and AGENTS orientation, populated CHANGELOG and ROADMAP, corrected
+  the MIT license and repository structure references, and retained the honest ED gap note.
+- Added all ED-0055 through ED-0062 plans to the plan index.
+- `git diff --check` passed after removing generated/trailing-whitespace artifacts.
+- Documentation only; no schema, dependency, runtime, or product-semantic effect.
