@@ -8,6 +8,10 @@ import {
   type DemoSessionWorkspace as DemoWorkspace,
 } from "@/experience/demo-api.ts";
 import { demoAuthorityHeaders } from "@/experience/demo-launch-context.ts";
+import {
+  submitDemoPackageApproval,
+  type DemoPackageApprovalSummary,
+} from "@/experience/demo-package-approval.ts";
 
 const apiRoot = "/api/stageflow/demo";
 
@@ -41,18 +45,28 @@ export function DemoSessionWorkspace({
   authoritativeEnd,
   initialActivityState,
   initialPackageState,
+  initialPackageRevision,
   initialRevision,
+  mediaAssociated,
+  mediaUnresolved,
+  mediaConflicting,
+  sessionTitle,
   enabled,
   launchContext,
 }: {
   sessionId: string;
   actorId?: string;
+  sessionTitle: string;
   authoritativeStart?: string;
   authoritativeEnd?: string;
   initialActivityState: string;
   initialPackageState: string;
   initialRevision: number;
+  initialPackageRevision: number;
   enabled: boolean;
+  mediaAssociated: number;
+  mediaUnresolved: number;
+  mediaConflicting: number;
   launchContext?: string;
 }) {
   const router = useRouter();
@@ -93,6 +107,75 @@ export function DemoSessionWorkspace({
   const activityState = workspace?.activity_state ?? initialActivityState;
   const packageState = workspace?.package_state ?? initialPackageState;
   const sessionRevision = workspace?.revision ?? initialRevision;
+
+  const packageRevision = workspace?.package_revision ?? initialPackageRevision;
+  const approvePackage = useCallback(async () => {
+    if (!workspace) {
+      setMessage("Unavailable: current package evidence has not loaded.");
+      return;
+    }
+    const summary: DemoPackageApprovalSummary = {
+      sessionTitle,
+      packageRevision,
+      mediaAssociated,
+      mediaUnresolved,
+      mediaConflicting,
+      transcriptionSucceeded: workspace.operations.filter(
+        (operation) => operation.status === "succeeded",
+      ).length,
+      transcriptionFailed: workspace.operations.filter(
+        (operation) => operation.status === "terminal_failed",
+      ).length,
+      transcriptEvidenceCount: workspace.transcript_evidence.length,
+      declaredMomentCount: workspace.moments.length,
+    };
+    setBusy("sessions/approve-package");
+    setMessage(undefined);
+    try {
+      const result = await submitDemoPackageApproval({
+        actorId,
+        launchContext,
+        sessionId,
+        activityState,
+        packageState,
+        summary,
+        confirm: window.confirm,
+        fetcher: window.fetch.bind(window),
+      });
+      if (result.status === "not_submitted") {
+        if (result.reason === "actor_required") {
+          setMessage("Unavailable: configure an explicit Demo operator UUID.");
+        } else if (result.reason === "launch_context_required") {
+          setMessage("Unavailable: current Demo launcher context is not available.");
+        } else if (result.reason === "authority_state_required") {
+          setMessage("Unavailable: the exact package revision is not ready for review.");
+        }
+        return;
+      }
+      if (!result.response.ok) throw new Error(await responseDetail(result.response));
+      setMessage("Package approval recorded durably.");
+      await load();
+      router.refresh();
+    } catch (error) {
+      setMessage(error instanceof Error ? readable(error.message) : "Package approval failed");
+    } finally {
+      setBusy(undefined);
+    }
+  }, [
+    activityState,
+    actorId,
+    launchContext,
+    load,
+    mediaAssociated,
+    mediaConflicting,
+    mediaUnresolved,
+    packageRevision,
+    packageState,
+    router,
+    sessionId,
+    sessionTitle,
+    workspace,
+  ]);
 
   const send = useCallback(
     async (path: string, confirmation: string, values: Record<string, unknown>) => {
@@ -204,6 +287,20 @@ export function DemoSessionWorkspace({
           type="button"
         >
           Package Ready
+        </button>
+        <button
+          disabled={
+            !actorId ||
+            !launchContext ||
+            busy !== undefined ||
+            !workspace ||
+            activityState !== "presentation_ended" ||
+            packageState !== "ready_for_review"
+          }
+          onClick={() => void approvePackage()}
+          type="button"
+        >
+          Approve Package
         </button>
         <button
           disabled={!actorId || !launchContext || busy !== undefined || !authoritativeStart}

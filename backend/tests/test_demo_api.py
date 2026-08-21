@@ -213,6 +213,100 @@ def test_demo_authority_controls_are_confirmed_and_observable() -> None:
         moment.json()["candidate_moment_id"]
     ]
 
+
+def test_package_approval_requires_reviewable_exact_revision_and_is_idempotent() -> None:
+    client, stage_id, _ = _client()
+    start = client.post(
+        "/demo/sessions/start",
+        json={
+            **_confirmed(30),
+            "stage_id": stage_id,
+            "authoritative_start": NOW.isoformat(),
+        },
+    )
+    session_id = start.json()["session_id"]
+    approval_operation = 34
+
+    active = client.post(
+        "/demo/sessions/approve-package",
+        json={
+            **_confirmed(approval_operation),
+            "session_id": session_id,
+            "package_revision": 1,
+        },
+    )
+    assert active.status_code == 409
+    assert active.json()["detail"] == "session_presentation_not_ended"
+
+    end = client.post(
+        "/demo/sessions/end-presentation",
+        json={
+            **_confirmed(31),
+            "session_id": session_id,
+            "boundary_at": NOW.isoformat(),
+            "reason": "producer ended presentation",
+        },
+    )
+    assert end.status_code == 200
+
+    assembling = client.post(
+        "/demo/sessions/approve-package",
+        json={
+            **_confirmed(approval_operation),
+            "session_id": session_id,
+            "package_revision": 1,
+        },
+    )
+    assert assembling.status_code == 409
+    assert assembling.json()["detail"] == "package_not_ready_for_completion"
+
+    package = client.post(
+        "/demo/sessions/package-ready",
+        json={
+            **_confirmed(32),
+            "session_id": session_id,
+            "reason": "producer reviewed package",
+        },
+    )
+    assert package.status_code == 200
+    package_revision = package.json()["package_revision"]
+
+    stale_revision = client.post(
+        "/demo/sessions/approve-package",
+        json={
+            **_confirmed(33),
+            "session_id": session_id,
+            "package_revision": package_revision + 1,
+        },
+    )
+    assert stale_revision.status_code == 409
+    assert stale_revision.json()["detail"] == "package_revision_conflict"
+
+    approval_command = {
+        **_confirmed(approval_operation),
+        "session_id": session_id,
+        "package_revision": package_revision,
+    }
+    approved = client.post("/demo/sessions/approve-package", json=approval_command)
+    replay = client.post("/demo/sessions/approve-package", json=approval_command)
+
+    assert approved.status_code == 200
+    assert approved.json()["package_state"] == "complete"
+    assert approved.json()["package_revision"] == package_revision
+    assert replay.status_code == 200
+    assert replay.json() == approved.json()
+
+    conflicting_reuse = client.post(
+        "/demo/sessions/approve-package",
+        json={
+            **approval_command,
+            "actor_id": "81000000-0000-0000-0000-000000000099",
+        },
+    )
+    assert conflicting_reuse.status_code == 409
+    assert conflicting_reuse.json()["detail"] == "human_command_operation_id_conflict"
+
+
 def test_transcription_evidence_workspace_is_bounded_no_store_and_redacted(
     monkeypatch: Any,
 ) -> None:

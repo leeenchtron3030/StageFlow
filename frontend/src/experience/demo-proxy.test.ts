@@ -212,6 +212,86 @@ test("POST fails closed for stale and absent launch contexts before forwarding",
   }
 });
 
+test("POST forwards package approval only through the current launch context", async () => {
+  process.env.STAGEFLOW_DEMO_API_BASE_URL = "http://127.0.0.1:8123/api/v1/demo";
+  process.env.STAGEFLOW_DEMO_LAUNCH_CONTEXT = launchContext;
+  console.info = () => undefined;
+  let upstreamUrl: string | undefined;
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    upstreamUrl = input.toString();
+    return Response.json({ session_id: sessionId, package_state: "complete" });
+  }) as typeof fetch;
+
+  const response = await POST(
+    new NextRequest("http://stageflow.demo/api/stageflow/demo/sessions/approve-package", {
+      method: "POST",
+      headers: {
+        ...demoAuthorityHeaders(launchContext),
+        origin: "http://stageflow.demo",
+        "sec-fetch-site": "same-origin",
+      },
+      body: JSON.stringify({
+        operation_id: "20000000-0000-4000-8000-000000000003",
+        session_id: sessionId,
+        package_revision: 1,
+      }),
+    }),
+    context("sessions", "approve-package"),
+  );
+
+  assert.equal(response.status, 200);
+  assert.equal(
+    upstreamUrl,
+    "http://127.0.0.1:8123/api/v1/demo/sessions/approve-package",
+  );
+});
+
+test("package approval fails closed for stale and missing launch contexts", async (t) => {
+  process.env.STAGEFLOW_DEMO_LAUNCH_CONTEXT = launchContext;
+  console.info = () => undefined;
+
+  for (const [name, presented] of [
+    ["stale", "prior-launch-context-0123456789abcdef"],
+    ["missing", undefined],
+  ] as const) {
+    await t.test(name, async () => {
+      let forwarded = false;
+      globalThis.fetch = (async () => {
+        forwarded = true;
+        throw new Error("fetch must not run");
+      }) as typeof fetch;
+      const headers: Record<string, string> = {
+        "content-type": "application/json",
+        origin: "http://stageflow.demo",
+        "sec-fetch-site": "same-origin",
+      };
+      if (presented) headers[demoLaunchContextHeader] = presented;
+
+      const response = await POST(
+        new NextRequest(
+          "http://stageflow.demo/api/stageflow/demo/sessions/approve-package",
+          {
+            method: "POST",
+            headers,
+            body: JSON.stringify({
+              operation_id: "20000000-0000-4000-8000-000000000004",
+              session_id: sessionId,
+              package_revision: 1,
+            }),
+          },
+        ),
+        context("sessions", "approve-package"),
+      );
+
+      assert.equal(response.status, 403);
+      assert.deepEqual(await response.json(), {
+        detail: "demo_launch_context_invalid",
+      });
+      assert.equal(forwarded, false);
+    });
+  }
+});
+
 test("authority header helper omits unavailable context and includes only the current value", () => {
   assert.deepEqual(demoAuthorityHeaders(undefined), {
     "Content-Type": "application/json",

@@ -614,31 +614,36 @@ class DurableEventModeKernel:
         actor_id: EntityId,
         approved: bool,
         reason: str,
+        expected_package_revision: int | None = None,
     ) -> Session:
         session = self.repository.get_session(session_id)
         if session is None:
             raise KernelNotFoundError("session_not_found")
         _require_presentation_ended(session)
+        package_revision = session.package_revision
+        digest_values: dict[str, object] = {
+            "session_id": session_id,
+            "actor_id": actor_id,
+            "approved": approved,
+            "reason": reason.strip(),
+        }
+        if expected_package_revision is not None:
+            if session.package_revision != expected_package_revision:
+                raise KernelConflictError("package_revision_conflict")
+            package_revision = expected_package_revision
+            digest_values["package_revision"] = expected_package_revision
         return self.repository.complete_session(
             CompletionDecision(
                 id=EntityId.new(),
                 session_id=session_id,
-                package_revision=session.package_revision,
+                package_revision=package_revision,
                 actor_id=actor_id,
                 approved=approved,
                 reason=reason,
                 decided_at=self.clock.now(),
                 operation_id=operation_id,
             ),
-            request_digest=_command_digest(
-                "package_completion",
-                {
-                    "session_id": session_id,
-                    "actor_id": actor_id,
-                    "approved": approved,
-                    "reason": reason.strip(),
-                },
-            ),
+            request_digest=_command_digest("package_completion", digest_values),
         )
 
     def begin_reconciliation(self, *, event_id: EntityId, scope: str) -> ReconciliationRun:

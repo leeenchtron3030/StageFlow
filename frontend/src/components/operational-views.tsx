@@ -500,9 +500,14 @@ export function SessionOperationalView({
         enabled={workspace.dataSource.runtimeProfile === "demo-single-stage"}
         launchContext={demoLaunchContext}
         initialActivityState={session.activityState}
+        initialPackageRevision={session.packageRevision}
         initialPackageState={session.packageState}
         initialRevision={session.sessionRevision}
+        mediaAssociated={session.media.associated}
+        mediaConflicting={session.media.conflicting}
+        mediaUnresolved={session.media.unresolved}
         sessionId={session.id}
+        sessionTitle={session.title}
       />
       {workspace.dataSource.runtimeProfile === "demo-single-stage" ? null : (
         <AuthorityControls workspace={workspace} />

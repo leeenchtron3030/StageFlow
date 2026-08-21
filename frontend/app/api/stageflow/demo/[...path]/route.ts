@@ -12,6 +12,7 @@ const commandPaths = new Set([
   "sessions/end-presentation",
   "sessions/process-transcription",
   "sessions/package-ready",
+  "sessions/approve-package",
   "moments/mark",
 ]);
 const programRefreshPaths = new Set(["program/refresh"]);
