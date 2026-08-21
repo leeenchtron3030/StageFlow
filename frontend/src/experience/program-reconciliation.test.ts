@@ -132,6 +132,25 @@ test("adapter renders four sorted Current items and keeps Withdrawn history sepa
       ],
       changes_truncated: false,
     },
+    automation: {
+      enabled: true,
+      state: "running",
+      owner: true,
+      media_reconciliation_interval_seconds: 5,
+      program_refresh_interval_seconds: 120,
+      media_cycle_count: 8,
+      media_last_attempt_at: "2026-08-19T18:00:55Z",
+      media_last_success_at: "2026-08-19T18:00:55Z",
+      media_last_failure_code: null,
+      media_candidates_seen: 2,
+      media_assets_registered: 1,
+      transcription_operations_enqueued: 1,
+      transcription_enqueue_failures: 0,
+      program_refresh_count: 3,
+      program_last_attempt_at: "2026-08-19T18:00:00Z",
+      program_last_success_at: "2026-08-19T18:00:00Z",
+      program_last_failure_code: null,
+    },
     attention_codes: [],
   };
 
@@ -148,4 +167,23 @@ test("adapter renders four sorted Current items and keeps Withdrawn history sepa
   assert.equal(workspace.stages[0].nextExpectation, "Program 2");
   assert.equal(workspace.programSynchronization?.withdrawn, 1);
   assert.equal(workspace.programSynchronization?.currentExpectationCount, 4);
+  assert.deepEqual(workspace.automation, {
+    enabled: true,
+    state: "running",
+    owner: true,
+    mediaReconciliationIntervalSeconds: 5,
+    programRefreshIntervalSeconds: 120,
+    mediaCycleCount: 8,
+    mediaLastAttemptAt: "2026-08-19T18:00:55Z",
+    mediaLastSuccessAt: "2026-08-19T18:00:55Z",
+    mediaLastFailureCode: undefined,
+    mediaCandidatesSeen: 2,
+    mediaAssetsRegistered: 1,
+    transcriptionOperationsEnqueued: 1,
+    transcriptionEnqueueFailures: 0,
+    programRefreshCount: 3,
+    programLastAttemptAt: "2026-08-19T18:00:00Z",
+    programLastSuccessAt: "2026-08-19T18:00:00Z",
+    programLastFailureCode: undefined,
+  });
 });

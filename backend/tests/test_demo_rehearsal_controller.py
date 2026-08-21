@@ -13,6 +13,7 @@ from app.demo.controller import (
     resolve_required_secret,
     summarize_demo_state,
     validate_database_identity,
+    worker_summary,
 )
 from app.infrastructure.devcon.session_publish import (
     DevconPublishError,
@@ -492,4 +493,85 @@ def test_operation_counts_are_copied_as_bounded_scalar_mapping() -> None:
     assert isinstance(operations, dict)
     assert operations["counts"] == {
         "terminal_failed": 2
+    }
+
+def test_summary_projects_bounded_automation_and_program_freshness() -> None:
+    kernel = _kernel()
+    kernel["automation"] = {
+        "enabled": True,
+        "state": "running",
+        "owner": True,
+        "media_cycle_count": 4,
+        "media_last_success_at": "2026-08-20T20:00:00Z",
+        "program_refresh_count": 2,
+        "program_last_success_at": "2026-08-20T19:59:00Z",
+        "program_last_failure_code": None,
+    }
+    kernel["automation"]["private_path"] = "C:/private/recordings"
+    kernel["automation"]["dsn"] = "postgresql://user:password@example.invalid/demo"
+    kernel["program_synchronization"] = {
+        "synchronized_at": "2026-08-20T19:59:00Z",
+    }
+    program = kernel["program_expectations"]
+    assert isinstance(program, list)
+    program[0]["lifecycle_state"] = "current"
+
+    summary = summarize_demo_state(kernel, _workspace())
+
+    automation = summary["automation"]
+    assert isinstance(automation, dict)
+    assert "private_path" not in automation
+    assert "dsn" not in automation
+    assert automation["state"] == "running"
+    assert summary["devcon"] == {
+        "cached_program_expectations": 1,
+        "current": 1,
+        "withdrawn": 0,
+        "provider": "devcon",
+        "last_successful_refresh": "2026-08-20T19:59:00Z",
+        "last_failure_code": None,
+        "status": "current",
+    }
+
+
+def testworker_summary_scopes_current_available_gpu_worker_to_live_event(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    class Result:
+        def fetchall(self) -> list[tuple[object, ...]]:
+            return [("razer-event-node", True, False, "available", 1, True, True)]
+
+    class Connection:
+        def __enter__(self) -> Connection:
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            del args
+
+        def execute(
+            self, statement: str, parameters: object = None
+        ) -> Result:
+            if "FROM stageflow.work_worker" in statement:
+                captured["parameters"] = parameters
+            return Result()
+
+    def connect(dsn: str) -> Connection:
+        del dsn
+        return Connection()
+
+    monkeypatch.setattr("app.demo.controller.psycopg.connect", connect)
+
+    summary = worker_summary("postgresql://redacted", "event-id", "deployment-id")
+
+    assert captured["parameters"] == ("deployment-id", "event-id")
+    assert summary == {
+        "state": "available",
+        "current": True,
+        "node": "razer-event-node",
+        "registered": 1,
+        "available": 1,
+        "capacity": 1,
+        "gpu_transcription": "ready",
     }

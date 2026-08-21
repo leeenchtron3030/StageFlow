@@ -101,3 +101,36 @@ explicitly captured by the invoking operator workflow. It does not bypass packag
 identity, credential, digest, durable Git, or public-convergence gates.
 
 This is Demo tooling, not a production publisher or a LAN-exposed Devcon write surface.
+
+## Demo 2 autonomous Event Node
+
+Demo 2 uses the same guarded launcher and `demo-single-stage` application stack. Copy
+`examples/demo2-autonomous-event-node.toml.example` to the controlled external Demo
+configuration location, set unique Event/deployment values and the external recordings
+path, and enable:
+
+```toml
+[autonomous_event_node]
+enabled = true
+media_reconciliation_interval_seconds = 5
+program_refresh_interval_seconds = 120
+```
+
+The setting is default-off, non-secret, and does not alter Demo 1. The backend lifespan
+owns one non-daemon coordinator thread. PostgreSQL advisory ownership prevents two
+backend processes for the same deployment from running cycles concurrently. Shutdown
+signals and joins that thread before readiness is cleared; process death releases the
+database lock, and the next owned process reconstructs freshness and work from durable
+state.
+
+Healthy automatic operation stays quiet in the Producer UI. `status` reports bounded
+cycle counts, last successful media/Program times, failure codes, enqueue totals, and
+worker currentness/capacity without paths, transcripts, credentials, or DSNs. `Process
+Media Now` and `Refresh Program` remain idempotent fallback/diagnostic actions. Automatic
+operation never starts or ends a Session, marks a Moment, changes package authority, or
+performs a Devcon PUT.
+
+Media registered before a safely eligible Session currently remains unresolved because
+the accepted Kernel does not reevaluate an existing deterministic association. The
+strict Demo 2 acceptance test records that gap; changing this lifecycle semantic requires
+the Yellow association-policy decision documented in the Demo 2 plan.

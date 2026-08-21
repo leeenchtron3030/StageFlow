@@ -26,6 +26,10 @@ from app.contexts.production.event_mode_kernel.contracts import (
 from app.contexts.production.event_mode_kernel.repository import (
     KernelStorageUnavailableError,
 )
+from app.demo.autonomous import (
+    AutonomousEventNodeCoordinator,
+    AutonomousEventNodeStatus,
+)
 
 router = APIRouter(prefix="/kernel", tags=["kernel"])
 
@@ -169,6 +173,26 @@ class ProgramSynchronizationResponse(BaseModel):
     changes: tuple[ProgramChangeResponse, ...]
     changes_truncated: bool
 
+class AutomationStatusResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    enabled: bool
+    state: str
+    owner: bool
+    media_reconciliation_interval_seconds: float
+    program_refresh_interval_seconds: float
+    media_cycle_count: int
+    media_last_attempt_at: datetime | None
+    media_last_success_at: datetime | None
+    media_last_failure_code: str | None
+    media_candidates_seen: int
+    media_assets_registered: int
+    transcription_operations_enqueued: int
+    transcription_enqueue_failures: int
+    program_refresh_count: int
+    program_last_attempt_at: datetime | None
+    program_last_success_at: datetime | None
+    program_last_failure_code: str | None
 
 class KernelStatusResponse(BaseModel):
     model_config = ConfigDict(frozen=True)
@@ -178,6 +202,9 @@ class KernelStatusResponse(BaseModel):
     configuration_valid: bool | None
     runtime_composed: bool
     runtime_profile: str | None
+    deployment_id: str | None = None
+    node_id: str | None = None
+    automation: AutomationStatusResponse | None = None
     event_id: str | None
     event_key: str | None
     event_name: str | None
@@ -238,9 +265,12 @@ def _response(
     configuration_valid: bool | None,
     runtime_composed: bool,
     runtime_profile: str,
+    deployment_id: str,
+    node_id: str,
     program_expectations: tuple[ProgramExpectation, ...],
     program_reconciliation: ProgramExpectationReconciliation | None,
     editorial_projections: tuple[EditorialSessionCandidateProjection, ...],
+    automation: AutonomousEventNodeStatus | None,
 ) -> KernelStatusResponse:
     reconciliation = status.latest_reconciliation
     editorial_by_session = {
@@ -305,6 +335,18 @@ def _response(
         configuration_valid=configuration_valid,
         runtime_composed=runtime_composed,
         runtime_profile=runtime_profile,
+        deployment_id=deployment_id,
+        node_id=node_id,
+        automation=(
+            None
+            if automation is None
+            else AutomationStatusResponse.model_validate(
+                {
+                    field: getattr(automation, field)
+                    for field in automation.__dataclass_fields__
+                }
+            )
+        ),
         event_id=status.event_id.value,
         event_key=status.event_key,
         event_name=status.event_name,
@@ -545,6 +587,12 @@ def kernel_status(request: Request, response: Response) -> KernelStatusResponse:
             for item in (*stage.assembling_sessions, *stage.recent_sessions)
         )
     )
+    coordinator = getattr(request.app.state, "autonomous_event_node", None)
+    automation = (
+        coordinator.status()
+        if isinstance(coordinator, AutonomousEventNodeCoordinator)
+        else None
+    )
     try:
         editorial_projections = (
             ()
@@ -557,6 +605,8 @@ def kernel_status(request: Request, response: Response) -> KernelStatusResponse:
             configuration_valid=configuration_valid,
             runtime_composed=runtime_composed,
             runtime_profile=components.configuration.deployment.runtime_profile.value,
+            deployment_id=components.configuration.deployment.deployment_id,
+            node_id=components.configuration.deployment.node_id,
             program_expectations=components.repository.list_program_expectations(
                 status.event_id
             ),
@@ -568,6 +618,7 @@ def kernel_status(request: Request, response: Response) -> KernelStatusResponse:
                 )
             ),
             editorial_projections=editorial_projections,
+            automation=automation,
         )
     except (KernelStorageUnavailableError, EditorialMomentStorageUnavailableError) as exc:
         response.status_code = 503
@@ -586,6 +637,7 @@ def kernel_status(request: Request, response: Response) -> KernelStatusResponse:
 
 
 __all__ = [
+    "AutomationStatusResponse",
     "BoundaryProposalResponse",
     "AssemblingSessionResponse",
     "KernelStatusResponse",

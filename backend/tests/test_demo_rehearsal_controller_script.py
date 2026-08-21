@@ -132,3 +132,14 @@ def test_lifecycle_state_handles_optional_operator_and_json_timestamps() -> None
     assert "$recordedStart.UtcDateTime.Ticks" in source
     assert 'Add-Member -NotePropertyName "stopped_at"' in source
     assert "$state.stopped_at =" not in source
+
+def test_status_surfaces_bounded_autonomy_program_and_worker_currentness() -> None:
+    source = _source()
+
+    assert '$payload.PSObject.Properties["automation"]' in source
+    assert '"Automation: $($automation.state) owner=$($automation.owner)"' in source
+    assert '"Media reconciliation: cycles=$($automation.media_cycle_count)' in source
+    assert '"Program refresh: cycles=$($automation.program_refresh_count)' in source
+    assert '"Devcon Program: current=$($payload.devcon.current) withdrawn=$($payload.devcon.withdrawn)' in source  # noqa: E501
+    assert 'current=$($payload.worker.current)' in source
+    assert 'gpu_transcription=$($payload.worker.gpu_transcription)' in source

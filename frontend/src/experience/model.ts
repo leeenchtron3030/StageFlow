@@ -111,6 +111,26 @@ export interface ProgramChangeView {
   fields: Array<{ field: string; previous?: string; current?: string }>;
 }
 
+export interface AutomationView {
+  enabled: boolean;
+  state: string;
+  owner: boolean;
+  mediaReconciliationIntervalSeconds: number;
+  programRefreshIntervalSeconds: number;
+  mediaCycleCount: number;
+  mediaLastAttemptAt?: string;
+  mediaLastSuccessAt?: string;
+  mediaLastFailureCode?: string;
+  mediaCandidatesSeen: number;
+  mediaAssetsRegistered: number;
+  transcriptionOperationsEnqueued: number;
+  transcriptionEnqueueFailures: number;
+  programRefreshCount: number;
+  programLastAttemptAt?: string;
+  programLastSuccessAt?: string;
+  programLastFailureCode?: string;
+}
+
 export interface ProgramSynchronizationView {
   provider: string;
   synchronizedAt: string;
@@ -211,6 +231,7 @@ export interface OperationalWorkspace {
   event: EventView;
   stages: StageView[];
   programSynchronization?: ProgramSynchronizationView;
+  automation?: AutomationView;
   sessions: SessionView[];
   mediaAssets: MediaAssetView[];
   attention: AttentionItemView[];

@@ -375,6 +375,7 @@ export function StageOperationalView({
         </div>
       </div>
       <DemoProgramRefreshControl
+        automation={workspace.automation}
         currentExpectations={stage.programExpectations}
         enabled={isDemo}
         launchContext={demoLaunchContext}

@@ -408,7 +408,9 @@ class DurableEventModeKernel:
             else self.asset_ingress_publisher.publish(registered, received_at=self.clock.now())
         )
         existing_association = self.repository.get_association(registered.id)
-        if existing_association is not None:
+        if existing_association is not None and not self._should_reevaluate_association(
+            registered, existing_association
+        ):
             return registered, existing_association, production_event_id
         association = self._automatic_association(
             registered,
@@ -416,6 +418,26 @@ class DurableEventModeKernel:
         )
         return registered, association, production_event_id
 
+    def _should_reevaluate_association(
+        self,
+        asset: RegisteredMediaAsset,
+        current: MediaAssociation,
+    ) -> bool:
+        if (
+            current.authority is not AssociationAuthority.DETERMINISTIC
+            or current.status is not AssociationStatus.UNRESOLVED
+        ):
+            return False
+        prior_session_inputs = {
+            (reference.record_id, reference.revision)
+            for reference in current.input_references
+            if reference.record_type == "session"
+        }
+        current_session_inputs = {
+            (session.id.value, session.revision)
+            for session in self.repository.list_sessions_for_stage(asset.stage_id)
+        }
+        return prior_session_inputs != current_session_inputs
     def _automatic_association(
         self,
         asset: RegisteredMediaAsset,
