@@ -114,3 +114,7 @@ or architecture document unless those documents are explicitly updated.
 | [Local filesystem discovery race hardening](local-filesystem-discovery-race-hardening.md) | Completed — independent review accepted | StageFlow Backend | ABR-007; ED-0053 |
 | [CI quality-matrix enforcement](ci-quality-matrix-enforcement.md) | Completed — independent review accepted | StageFlow Engineering | ABR-015 |
 | [Durable Event-Mode Kernel](durable-event-mode-kernel.md) | Completed operational foundation — not a readiness claim | StageFlow Architecture / Backend | ADR-0019-ADR-0024; D-01-D-08 |
+| [Minimal shared-secret API authentication](api-shared-secret-authentication.md) | Approved | StageFlow Backend / Security | Due-diligence audit Blocker finding; ED-0055 |
+| [CI durability-test enablement and frontend test enforcement](ci-durability-and-frontend-enforcement.md) | Approved | StageFlow Engineering | Due-diligence audit Major finding; ED-0056; supersedes nothing in [CI quality-matrix enforcement](ci-quality-matrix-enforcement.md) (ABR-015) |
+| [Media candidate collection coordinator failure visibility](media-coordinator-failure-visibility.md) | Approved | StageFlow Backend / Operations | Due-diligence audit Major finding; ED-0057 |
+| [Governance and documentation reconciliation](governance-documentation-reconciliation.md) | Approved | StageFlow Engineering / Documentation | Due-diligence audit Major findings; ED-0058 |
