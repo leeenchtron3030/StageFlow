@@ -8,7 +8,7 @@
     "build": "next build",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "node --test src/experience/presentation.test.ts src/experience/demo-proxy.test.ts src/experience/demo-start-session.test.ts src/experience/demo-program-refresh.test.ts src/experience/demo-program-refresh-proxy.test.ts src/experience/program-reconciliation.test.ts src/shared/ids/uuid-v4.test.ts"
+    "test": "node --test src/experience/presentation.test.ts src/experience/demo-proxy.test.ts src/experience/demo-start-session.test.ts src/experience/demo-package-approval.test.ts src/experience/demo-program-refresh.test.ts src/experience/demo-program-refresh-proxy.test.ts src/experience/program-reconciliation.test.ts src/shared/ids/uuid-v4.test.ts"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.101.2",

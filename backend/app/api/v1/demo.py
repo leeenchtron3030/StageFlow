@@ -108,6 +108,11 @@ class PackageReadyCommand(ConfirmedCommand):
     reason: Annotated[str, Field(min_length=1, max_length=200)]
 
 
+class ApprovePackageCommand(ConfirmedCommand):
+    session_id: UUID
+    package_revision: Annotated[int, Field(ge=1)]
+
+
 class MarkMomentCommand(ConfirmedCommand):
     session_id: UUID
     expected_session_revision: Annotated[int, Field(ge=1)]
@@ -450,6 +455,28 @@ def package_ready(
         raise _translate_error(exc) from exc
 
 
+@router.post("/sessions/approve-package", response_model=SessionCommandResponse)
+def approve_package(
+    command: ApprovePackageCommand, request: Request
+) -> SessionCommandResponse:
+    components = _components(request)
+    try:
+        session = components.kernel.complete_package(
+            operation_id=EntityId(str(command.operation_id)),
+            session_id=EntityId(str(command.session_id)),
+            actor_id=EntityId(str(command.actor_id)),
+            approved=True,
+            reason=(
+                "demo_operator_approved_package_revision_"
+                f"{command.package_revision}"
+            ),
+            expected_package_revision=command.package_revision,
+        )
+        return _session_response(command.operation_id, session)
+    except (KernelNotFoundError, KernelConflictError) as exc:
+        raise _translate_error(exc) from exc
+
+
 @router.post("/moments/mark", response_model=EditorialMomentResponse)
 def mark_moment(command: MarkMomentCommand, request: Request) -> EditorialMomentResponse:
     components = _components(request)
@@ -652,6 +679,7 @@ __all__ = [
     "EndPresentationCommand",
     "MarkMomentCommand",
     "OperationResponse",
+    "ApprovePackageCommand",
     "PackageReadyCommand",
     "ProcessTranscriptionCommand",
     "ProcessTranscriptionResponse",

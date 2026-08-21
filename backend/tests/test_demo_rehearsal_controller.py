@@ -440,11 +440,15 @@ def test_api_convergence_bounds_fail_before_any_remote_request() -> None:
     assert adapter.put_calls == []
 
 
-def test_publish_requires_package_approval() -> None:
+def test_publish_remains_blocked_before_approval_and_eligible_afterward() -> None:
     kernel = _kernel(sessions=[_session(package_state="ready_for_review")])
 
     with pytest.raises(DemoControllerError, match="package_not_approved"):
         build_devcon_publish_candidate(kernel, _workspace())
+
+    candidate = build_devcon_publish_candidate(_kernel(), _workspace())
+    assert candidate.event_id == "test-devcon-8"
+    assert candidate.remote_session_id == "a-dacc-vision-for-decentralized-ai"
 
 
 def test_publish_digest_prevents_stale_confirmation() -> None:
