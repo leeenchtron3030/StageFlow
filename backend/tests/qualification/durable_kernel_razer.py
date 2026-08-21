@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import subprocess
+import sys
 import time
 from ctypes import POINTER, Structure, byref, c_size_t, sizeof
 from ctypes.wintypes import BOOL, DWORD, HANDLE
@@ -462,6 +463,25 @@ def endurance(
     return result
 
 
+def endurance_for_platform(
+    config_path: Path,
+    result_path: Path,
+    duration_seconds: float,
+    *,
+    platform_name: str | None = None,
+) -> dict[str, Any]:
+    selected_platform = sys.platform if platform_name is None else platform_name
+    if selected_platform != "win32":
+        result: dict[str, Any] = {
+            "status": "skipped",
+            "reason": "unsupported_platform",
+            "required_platform": "win32",
+        }
+        _write_json(result_path, result)
+        return result
+    return endurance(config_path, result_path, duration_seconds)
+
+
 def proxy(root: Path, result_path: Path, duration_seconds: float) -> dict[str, Any]:
     root.mkdir(parents=True, exist_ok=True)
     block = os.urandom(8 * 1024 * 1024)
@@ -645,7 +665,7 @@ def main() -> None:
     elif args.command == "reconcile":
         result = reconcile(args.config, args.result)
     elif args.command == "endurance":
-        result = endurance(args.config, args.result, args.duration_seconds)
+        result = endurance_for_platform(args.config, args.result, args.duration_seconds)
     elif args.command == "postgresql-recovery-correction":
         result = postgresql_recovery_correction(
             args.config,

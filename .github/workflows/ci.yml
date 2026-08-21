@@ -17,6 +17,24 @@ jobs:
   backend:
     name: Backend / Python 3.13
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17.10
+        env:
+          POSTGRES_DB: stageflow_worker_test
+          POSTGRES_USER: stageflow_ci
+          POSTGRES_PASSWORD: stageflow_ci_only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U stageflow_ci -d stageflow_worker_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      STAGEFLOW_TEST_POSTGRES_DSN: >-
+        postgresql://stageflow_ci:stageflow_ci_only@127.0.0.1:5432/stageflow_worker_test
+
     defaults:
       run:
         working-directory: backend
@@ -37,7 +55,7 @@ jobs:
       - name: Install backend dependencies
         run: uv sync --dev --locked
       - name: Run backend tests
-        run: uv run pytest
+        run: uv run pytest --cov=app --cov-report=term-missing
       - name: Run Ruff
         run: uv run ruff check .
       - name: Run Pyright
@@ -62,6 +80,8 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - name: Install frontend dependencies
         run: npm ci
+      - name: Run frontend tests
+        run: npm run test
       - name: Build frontend
         run: npm run build
       - name: Run frontend lint

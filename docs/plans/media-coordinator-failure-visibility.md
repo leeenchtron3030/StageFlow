@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved
+Completed
 
 ## Execution authority
 
@@ -158,4 +158,12 @@ behavior change to reverse.
 
 ## Completion record
 
-_(To be filled in by whoever implements this plan.)_
+Implemented 2026-08-21.
+
+- Added ERROR records to every broad coordinator handler and both lifespan startup
+  failure paths while preserving existing return values and control flow.
+- Logs contain bounded operation/identity fields and exception type only. Raw exception
+  messages were deliberately omitted because they can contain paths or connection data;
+  this is a security-preserving deviation from the initial approach text.
+- Caplog coverage passed in the full 1,796-pass backend suite; Ruff and Pyright passed.
+- Existing `configure_logging()`/`logging.basicConfig()` wiring remains the process sink.

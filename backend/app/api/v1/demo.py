@@ -7,6 +7,11 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
+from app.api.v1.response_models import (
+    ImmutableIntMapping,
+    ProgramChangeResponse,
+    program_change_responses,
+)
 from app.bootstrap.event_mode_kernel import KernelComponents
 from app.contexts.editorial import (
     EditorialCandidateMoment,
@@ -24,6 +29,7 @@ from app.contexts.production.event_mode_kernel.contracts import (
     Session,
     StartSessionRequest,
 )
+from app.contexts.transcription_evidence import TranscriptEvidenceRevision
 from app.contexts.work_execution.repository import WorkExecutionStorageUnavailableError
 from app.core.config.deployment import RuntimeProfile
 from app.demo.service import (
@@ -41,24 +47,6 @@ _TRANSCRIPT_SEGMENT_LIMIT = 50
 _TRANSCRIPT_WORD_LIMIT = 50
 _OPERATION_LIMIT = 100
 
-
-class ProgramFieldChangeResponse(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    field: str
-    previous: str | None
-    current: str | None
-
-
-class ProgramChangeResponse(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    kind: str
-    expectation_id: str
-    expectation_key: str
-    title: str
-    external_session_id: str | None
-    fields: tuple[ProgramFieldChangeResponse, ...]
 
 
 class ProgramRefreshResponse(BaseModel):
@@ -231,7 +219,7 @@ class TranscriptEvidenceResponse(BaseModel):
 class WorkProjectionResponse(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    counts: dict[str, int]
+    counts: ImmutableIntMapping
     oldest_eligible_at: datetime | None
     active_lease_count: int
     attention_codes: tuple[str, ...]
@@ -326,24 +314,7 @@ def _program_refresh_response(
         restored=result.restored,
         synchronized_at=result.synchronized_at,
         current_expectation_count=len(result.expectations),
-        changes=tuple(
-            ProgramChangeResponse(
-                kind=change.kind.value,
-                expectation_id=change.expectation_id.value,
-                expectation_key=change.expectation_key,
-                title=change.title,
-                external_session_id=change.external_session_id,
-                fields=tuple(
-                    ProgramFieldChangeResponse(
-                        field=field.field,
-                        previous=field.previous,
-                        current=field.current,
-                    )
-                    for field in change.fields
-                ),
-            )
-            for change in result.changes
-        ),
+        changes=program_change_responses(result.changes),
         changes_truncated=result.changes_truncated,
     )
 
@@ -502,10 +473,9 @@ def mark_moment(command: MarkMomentCommand, request: Request) -> EditorialMoment
         raise _translate_error(exc) from exc
 
 
-def _transcript_response(evidence: object) -> TranscriptEvidenceResponse:
-    from app.contexts.transcription_evidence import TranscriptEvidenceRevision
-
-    assert isinstance(evidence, TranscriptEvidenceRevision)
+def _transcript_response(
+    evidence: TranscriptEvidenceRevision,
+) -> TranscriptEvidenceResponse:
     return TranscriptEvidenceResponse(
         evidence_id=evidence.id.value,
         operation_id=evidence.operation_id.value,

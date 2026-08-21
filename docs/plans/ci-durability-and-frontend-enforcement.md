@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved
+In progress
 
 ## Execution authority
 
@@ -151,4 +151,13 @@ reverse.
 
 ## Completion record
 
-_(To be filled in by whoever implements this plan.)_
+Implementation completed locally on 2026-08-21; hosted validation remains pending.
+
+- Backend CI now provisions an isolated PostgreSQL 17 service and sets the existing
+  `STAGEFLOW_TEST_POSTGRES_DSN`; frontend CI runs `npm run test`.
+- Documented check names: `Backend / Python 3.13` and `Frontend / Node 22`.
+- Local default backend suite passed 1,796 tests with five PostgreSQL tests skipped.
+  A separately configured local validation DSN failed authentication, so this does not
+  substitute for the required first hosted Actions run.
+- Remaining external actions: observe the hosted run and have the repository owner require
+  both documented checks in branch protection.

@@ -19,7 +19,11 @@ repository authority.
 
 ## Current workflow
 
-`ci.yml` runs backend pytest/Ruff/Pyright and frontend build/lint/typecheck on Linux.
-It does not run a frontend test suite because none is configured, and it does not claim
-Windows or event-operational validation. Deployment and release automation remain future
-work requiring separate authority.
+`ci.yml` runs backend pytest with an ephemeral PostgreSQL 17 service, prints an `app`
+coverage report without enforcing a coverage threshold, and runs Ruff/Pyright on Linux.
+The frontend job runs the existing Node test suite plus build/lint/typecheck. The exact
+status-check names for branch protection are `Backend / Python 3.13` and
+`Frontend / Node 22`.
+
+CI does not claim Windows, hardware, or event-operational validation. Deployment and
+release automation remain future work requiring separate authority.

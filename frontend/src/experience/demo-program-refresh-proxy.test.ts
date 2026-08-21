@@ -11,6 +11,8 @@ const originalBackend = process.env.STAGEFLOW_DEMO_API_BASE_URL;
 const originalLaunchContext = process.env.STAGEFLOW_DEMO_LAUNCH_CONTEXT;
 const originalConsoleInfo = console.info;
 const launchContext = "current-launch-context-0123456789abcdef";
+const apiSecret = "frontend-test-only-api-secret-0123456789";
+process.env.STAGEFLOW_API_SHARED_SECRET = apiSecret;
 
 function context() {
   return { params: Promise.resolve({ path: ["program", "refresh"] }) };

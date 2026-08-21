@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import timedelta
 
+import pytest
 from media_collection_fixtures import (
     RecordingDiscoveryPort,
     RecordingObservationPorts,
@@ -175,7 +176,9 @@ def test_conflicting_duplicate_observation_id_is_retained_as_conflict() -> None:
     )
 
 
-def test_discovery_exception_is_typed_failure_and_committed_once() -> None:
+def test_discovery_exception_is_typed_failure_and_committed_once(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     discovery = RecordingDiscoveryPort((), fail=True)
     coordinator, _, _, observations = make_coordinator(discovery=discovery)
 
@@ -185,6 +188,10 @@ def test_discovery_exception_is_typed_failure_and_committed_once() -> None:
     assert observations.calls == []
     assert result.discovery_results[0].outcome.value == "failed"
     assert coordinator.snapshot.coordinator_revision == 1
+    assert "media_collection_discovery_failed" in caplog.text
+    assert "exception_type=RuntimeError" in caplog.text
+    assert "synthetic discovery failure" not in caplog.text
+
 
 
 def test_one_observation_exception_does_not_stop_later_required_calls() -> None:

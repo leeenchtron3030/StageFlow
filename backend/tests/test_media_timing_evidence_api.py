@@ -23,13 +23,15 @@ from app.core.config.deployment import EffectiveKernelConfiguration
 from app.main import create_app
 from app.shared.ids import EntityId
 
+AUTH_HEADERS = {"X-StageFlow-API-Secret": "stageflow-test-only-shared-secret-0123456789"}
+
 
 class SyncHttpClient(Protocol):
     def get(self, url: str) -> Response: ...
 
 
 def test_mte_read_api_requires_composed_kernel() -> None:
-    client = cast(SyncHttpClient, TestClient(create_app()))
+    client = cast(SyncHttpClient, TestClient(create_app(), headers=AUTH_HEADERS))
 
     response = client.get(
         f"/api/v1/media-assets/{ASSET_ID.value}/timing-evidence"

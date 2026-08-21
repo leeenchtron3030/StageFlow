@@ -1,3 +1,4 @@
+import "server-only";
 import { getFixtureWorkspace } from "./fixtures.ts";
 import {
   adaptKernelStatus,
@@ -13,6 +14,14 @@ export interface WorkspaceRequest {
   scenario?: string;
   includeTimingEvidence?: boolean;
 }
+
+const stageflowApiSecretHeader = "x-stageflow-api-secret";
+
+function currentApiSecret(): string | undefined {
+  const value = process.env.STAGEFLOW_API_SHARED_SECRET;
+  return value && value.length >= 32 ? value : undefined;
+}
+
 
 function configuredMode(): "fixture" | "kernel" {
   const configured = process.env.STAGEFLOW_UI_DATA_MODE;
@@ -30,10 +39,16 @@ export async function loadWorkspace(
     process.env.STAGEFLOW_KERNEL_STATUS_URL ??
     "http://127.0.0.1:8000/api/v1/kernel/status";
   try {
+    const apiSecret = currentApiSecret();
+    if (!apiSecret) throw new Error("stageflow_api_authentication_unavailable");
+    const headers = {
+      Accept: "application/json",
+      [stageflowApiSecretHeader]: apiSecret,
+    };
     const response = await fetch(url, {
       cache: "no-store",
       signal: AbortSignal.timeout(2_500),
-      headers: { Accept: "application/json" },
+      headers,
     });
     const payload = (await response.json()) as KernelStatusPayload;
     if (!response.ok && response.status !== 503) {
@@ -55,7 +70,7 @@ export async function loadWorkspace(
             {
               cache: "no-store",
               signal: AbortSignal.timeout(2_500),
-              headers: { Accept: "application/json" },
+              headers,
             },
           );
           if (!response.ok) throw new Error(`MTE returned HTTP ${response.status}`);

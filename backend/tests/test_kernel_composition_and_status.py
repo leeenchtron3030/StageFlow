@@ -49,6 +49,7 @@ class FileInspector(Protocol):
 
 NOW = datetime(2026, 8, 8, 20, 0, tzinfo=UTC)
 _POSTGRES_DSN = os.getenv("STAGEFLOW_TEST_POSTGRES_DSN")
+AUTH_HEADERS = {"X-StageFlow-API-Secret": "stageflow-test-only-shared-secret-0123456789"}
 
 
 @dataclass(slots=True)
@@ -103,7 +104,7 @@ path = "{source_path.as_posix()}"
 
 
 def test_kernel_status_route_is_read_only_and_reports_unconfigured() -> None:
-    client = cast(SyncHttpClient, TestClient(create_app()))
+    client = cast(SyncHttpClient, TestClient(create_app(), headers=AUTH_HEADERS))
 
     response = client.get("/api/v1/kernel/status")
 
@@ -121,12 +122,13 @@ def test_kernel_status_route_is_read_only_and_reports_unconfigured() -> None:
 def test_kernel_status_retains_invalid_supplied_configuration(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     path = tmp_path / "invalid-kernel.toml"
     path.write_text('schema_version = "unsupported"', encoding="utf-8")
     monkeypatch.setenv("STAGEFLOW_KERNEL_CONFIG_PATH", str(path))
 
-    with TestClient(create_app()) as raw_client:
+    with TestClient(create_app(), headers=AUTH_HEADERS) as raw_client:
         client = cast(SyncHttpClient, raw_client)
         response = client.get("/api/v1/kernel/status")
 
@@ -139,6 +141,9 @@ def test_kernel_status_retains_invalid_supplied_configuration(
     assert payload["ready"] is False
     assert payload["attention_codes"] == ["kernel_startup_failed"]
     assert payload["startup_error"]
+    assert "stageflow_kernel_startup_failed" in caplog.text
+    assert "exception_type=ValidationError" in caplog.text
+    assert str(path) not in caplog.text
 
 
 def test_kernel_status_retains_valid_configuration_when_postgresql_is_unavailable(
@@ -159,7 +164,7 @@ def test_kernel_status_retains_valid_configuration_when_postgresql_is_unavailabl
 
     monkeypatch.setattr(kernel_bootstrap, "verify_kernel_schema", unavailable)
 
-    with TestClient(create_app()) as raw_client:
+    with TestClient(create_app(), headers=AUTH_HEADERS) as raw_client:
         client = cast(SyncHttpClient, raw_client)
         response = client.get("/api/v1/kernel/status")
 
@@ -277,7 +282,7 @@ def test_explicit_bootstrap_and_startup_reconciliation_use_observed_source_state
     source_path.rmdir()
     unavailable = components.reconcile_startup(ready.event_id)
     app = create_app()
-    with TestClient(app) as raw_client:
+    with TestClient(app, headers=AUTH_HEADERS) as raw_client:
         app.state.kernel = components
         client = cast(SyncHttpClient, raw_client)
         unavailable_response = client.get("/api/v1/kernel/status")
@@ -341,7 +346,7 @@ def test_kernel_status_reports_database_unavailability_as_structured_503(
 
     monkeypatch.setattr(KernelComponents, "status", unavailable)
     app = create_app()
-    with TestClient(app) as raw_client:
+    with TestClient(app, headers=AUTH_HEADERS) as raw_client:
         app.state.kernel = components
         client = cast(SyncHttpClient, raw_client)
         response = client.get("/api/v1/kernel/status")
@@ -405,7 +410,7 @@ def test_bounded_media_cycle_persists_observations_registers_and_associates(
     assert sum(item.observation_kind == "asset_resource_snapshot" for item in observations) == 2
     assert any(item.observation_kind == "asset_readiness_evaluation" for item in observations)
     app = create_app()
-    with TestClient(app) as raw_client:
+    with TestClient(app, headers=AUTH_HEADERS) as raw_client:
         app.state.kernel = components
         client = cast(SyncHttpClient, raw_client)
         response = client.get("/api/v1/kernel/status")
