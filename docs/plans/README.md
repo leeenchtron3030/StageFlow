@@ -126,3 +126,4 @@ or architecture document unless those documents are explicitly updated.
 | [Media candidate collection coordinator decomposition](media-coordinator-decomposition.md) | Approved | StageFlow Backend | Due-diligence audit Major finding; ED-0064 |
 | [Editorial Candidate Moment — Phase 1 human-declared slice](editorial-candidate-moment-phase1.md) | Approved | StageFlow Editorial / Backend | Post-Kernel capability layer Phase 1; ED-0067 |
 | [Producer Work Queue — Kernel-derived first slice](producer-work-queue-kernel-derived-slice.md) | Approved | StageFlow Production / Backend | Post-Kernel capability layer Work Queue; ED-0068 |
+| [Frontend dependency security remediation](frontend-dependency-security-remediation.md) | Approved | StageFlow Engineering / Frontend | Due-diligence audit + ED-0066 follow-up; ED-0069 |

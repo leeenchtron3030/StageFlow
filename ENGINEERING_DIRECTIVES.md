@@ -89,6 +89,8 @@ resumes the numbered convention.
 | ED-0067 | Editorial Candidate Moment — Phase 1 Human-Declared Slice | Approved | Extracts Phase 1 of the accepted [post-Kernel capability layer architecture](docs/architecture/post-kernel-capability-layer.md) into a bounded Green implementation plan: a new `editorial` bounded context, an idempotent `Mark Moment` application command, PostgreSQL migration `0010`, boundary-correction conflict surfacing, and bounded Producer projections, without any machine-origin candidate, review decision, Clip, worker, or automation authority. See [plan](docs/plans/editorial-candidate-moment-phase1.md). |
 | ED-0068 | Producer Work Queue — Kernel-Derived First Slice | Approved | Adds a bounded, paginated Work Queue read model covering Sessions in `package_ready_for_review`/`correction_required` and associations in `unresolved`/`conflict`, computed entirely from existing Kernel authority with no new migration or persisted state, independent of and safely parallel to ED-0067's in-progress `editorial` work. See [plan](docs/plans/producer-work-queue-kernel-derived-slice.md). |
 
+| ED-0069 | Frontend Dependency Security Remediation | Approved | Runs `npm audit fix` (no `--force`) to resolve 11 flagged vulnerabilities within `next`'s already-declared `^16.2.11` range, reconciles the `@emnapi/*` lockfile-integrity mismatch ED-0066 flagged so `npm sbom` runs cleanly, and reviews the pending `unrs-resolver` install script, without any dependency requiring a forced or breaking change. See [plan](docs/plans/frontend-dependency-security-remediation.md). |
+
 ## Process
 
 - A directive must name its scope, dependencies, owner, acceptance criteria, and out-of-scope items.
