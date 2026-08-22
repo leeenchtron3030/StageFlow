@@ -124,3 +124,4 @@ or architecture document unless those documents are explicitly updated.
 | [API route code-quality residue cleanup](api-route-code-quality-cleanup.md) | Completed - Green API cleanup | StageFlow Backend | ED-0062 |
 | [Demo 2 rebase and coordinator exception safety net](demo2-rebase-and-coordinator-safety-net.md) | Approved | StageFlow Demo Operations / Backend | PR #71 review; ED-0063 |
 | [Media candidate collection coordinator decomposition](media-coordinator-decomposition.md) | Approved | StageFlow Backend | Due-diligence audit Major finding; ED-0064 |
+| [Editorial Candidate Moment — Phase 1 human-declared slice](editorial-candidate-moment-phase1.md) | Approved | StageFlow Editorial / Backend | Post-Kernel capability layer Phase 1; ED-0067 |
