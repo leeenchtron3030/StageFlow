@@ -21,13 +21,14 @@ existing shell. That foundation is closure-validated but is not event-ready soft
 | Marketing user | No implemented workflow | Consumes approved clips, assembled outputs, metadata, and delivery state rather than raw candidate intelligence |
 | AI/media Event Worker | No implementation | Claims approved PostgreSQL-backed work for transcription, analysis, vision, proxy, or rendering without owning Session/media authority |
 | Recording/shared-storage system | Files may be inspected only by an explicit one-shot local discovery call | Remains source of media; StageFlow registers completed assets by reference |
-| Schedule/conference system | Adapter contracts only | Remains source of planned conference data and external identifiers |
+| Schedule/conference system | Optional bounded Devcon public-program read reconciles one configured Event/room into External Program Expectations | Remains source of planned conference data and external identifiers |
 | Transcript/vision providers | Adapter/interpreter contracts only | Optional providers behind adapters; unavailable service must not stop local event work |
-| Publishing/delivery destinations | No implementation | Provider-neutral durable operations with idempotency and reconciliation |
+| Publishing/delivery destinations | Guarded Demo controller can perform one explicitly confirmed Devcon transcript/duration enrichment write | Future provider-neutral durable operations with idempotency and reconciliation |
 
 An application caller can create a durable human-authorized Session and register media
-through the Kernel service. No actor can claim a Job, run transcription, publish
-editorial output, control a recorder, or deliver an output.
+through the Kernel service. The bounded Demo controller can explicitly publish approved
+transcript/duration enrichment to one matched Devcon Session under ADR-0028; it is not a
+general publication or delivery workflow and cannot control a recorder.
 
 ## Current runtime components
 
@@ -42,6 +43,7 @@ editorial output, control a recorder, or deliver an output.
 | Durable Kernel repository | Event/Stage, Program Expectation, Session, media registry/association, completion snapshots, reconciliation, human-command replay, and typed history | Normalized PostgreSQL current state plus typed append-only history |
 | Media Timing Evidence repository | Append/retrieve immutable asset-linked Observed facts, Derived intervals, qualification state, and exact application replay | Additive PostgreSQL revision/history authority; advisory only |
 | Durable Kernel service | Explicit bootstrap, idempotent human Session boundaries/assignment/completion, readiness/asset adapters, stable ingress, and provenance-bearing categorical association | Direct synchronous application boundary |
+| Devcon integration | Optional bounded public-program read/reconciliation plus one guarded human-confirmed transcript/duration enrichment write and separated durability/cache verification | Devcon remains external authority; network failure does not replace local Kernel state |
 | Evidence/reasoning/state policies | Deterministic transformation and transition contracts | Caller-invoked; no orchestrator or durable lineage store |
 | In-memory Operational State repository | Atomic accepted Recording/Session state, lineage, revision, and operation replay | Thread-safe and explicitly process-local |
 | StageFlow Runtime and Software Agent | Immutable deployment description and explicit synchronous lifecycle | Runtime graph is constructed after Event/Stage authority; lifecycle remains process-local |
@@ -101,8 +103,10 @@ There is no watcher, broker, worker, or uncontrolled loop.
 - The composed path performs `stat`/`lstat`/`scandir`-style inspection plus one bounded
   open/read access check. It does not decode media, watch, poll, recurse, transfer, alter,
   or delete source media.
-- No provider SDK, outbound HTTP client, FFmpeg, model execution, or delivery side effect
-  exists in production code.
+- No provider SDK is present. The bounded Devcon adapters use the standard-library HTTP
+  client for optional program GETs and the explicitly invoked guarded enrichment PUT;
+  they do not participate in the local event-critical media path. The selected local
+  transcription adapter uses separately documented model/media dependencies.
 - HTTP exposes process liveness, read-only Kernel operational status, and bounded
   asset-specific MTE history; authoritative
   mutation remains an application boundary rather than a public control API.

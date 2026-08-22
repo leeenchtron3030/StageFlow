@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved
+Completed
 
 ## Execution authority
 
@@ -135,14 +135,14 @@ Unchanged from ED-0057 — the same failures must remain visible after the split
 
 ## Acceptance criteria
 
-- [ ] The original file's line count and method count are meaningfully reduced (record
+- [x] The original file's line count and method count are meaningfully reduced (record
   the before/after numbers).
-- [ ] Every existing test for this module and its callers passes unchanged (no test
+- [x] Every existing test for this module and its callers passes unchanged (no test
   assertion modified to accommodate new behavior).
-- [ ] No public entry point's signature or behavior changed for callers outside
+- [x] No public entry point's signature or behavior changed for callers outside
   `media_collection`.
-- [ ] ED-0057's logging calls remain attached to the same logical operations post-split.
-- [ ] Full backend quality commands pass.
+- [x] ED-0057's logging calls remain attached to the same logical operations post-split.
+- [x] Full backend quality commands pass.
 
 ## Rollback or reversal
 
@@ -158,4 +158,22 @@ structure.
 
 ## Completion record
 
-_(To be filled in by whoever implements this plan.)_
+- Implemented in the ED-0063–ED-0066 working tree from main `271f0b7`.
+- Verified current baseline was 2,105 lines and 43 coordinator methods, rather than the
+  audit snapshot's 2,072 lines. After extraction the public coordinator is 1,496 lines
+  and 29 methods: 609 lines (29%) and 14 methods (33%) moved behind internal seams.
+- Added `_media_collection_state.py` for immutable coordinator/cycle state and
+  deterministic identity/ordering helpers, `_media_collection_plan_validator.py` for
+  Runtime/plan/dependency/Agent permission validation and checkpoints, and
+  `_media_collection_ports.py` for bounded port invocation, ED-0057 exception visibility,
+  and returned-contract normalization.
+- The original coordinator still owns the public API, exact cycle ordering,
+  candidate/observation merge semantics, conflict retention, replay, and atomic commit.
+  No package export or caller signature changed, and no test assertion was modified.
+- Incremental verification after extraction: 33 existing media-collection behavior and
+  architecture tests passed; scoped Ruff and Pyright passed. Final backend validation:
+  1,796 passed, 5 skipped; Ruff passed; Pyright reported 0 errors/0 warnings. One existing
+  Starlette/httpx deprecation warning remains.
+- No production behavior, dependency, schema, migration, runtime configuration, public
+  contract, or external side effect changed. Rollback is deletion of the three internal
+  modules plus restoration of the coordinator imports/method bodies.

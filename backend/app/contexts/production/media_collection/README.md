@@ -80,3 +80,13 @@ coordinator state, deduplication, observation calls, readiness policy, retry, or
 cycle. Its single-file or shallow-directory metadata inspection is read-only, bounded,
 symlink-safe, request-time anchored, and deterministic. ED-0052 continues to own cycle
 permission, orchestration, process-local accumulation, identity conflicts, and replay.
+
+## ED-0064 internal decomposition
+
+ED-0064 preserves the public coordinator and every ED-0052 behavior while separating
+three internal implementation concerns: immutable cycle-working state, runtime-plan and
+Agent-permission validation, and injected-port invocation/result normalization. The
+coordinator composes those internal collaborators and retains cycle orchestration,
+candidate/observation merging, conflict retention, and atomic commit ordering. The
+internal modules are not new public contracts and do not change retry, timing,
+observability, authority, or persistence behavior.
