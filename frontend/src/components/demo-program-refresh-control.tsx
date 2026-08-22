@@ -9,6 +9,7 @@ import {
   type ProgramRefreshResult,
 } from "@/experience/demo-program-refresh.ts";
 import type {
+  AutomationView,
   ProgramExpectationView,
   ProgramSynchronizationView,
 } from "@/experience/model.ts";
@@ -79,12 +80,14 @@ export function DemoProgramRefreshControl({
   enabled,
   launchContext,
   synchronization,
+  automation,
   currentExpectations,
   withdrawnExpectations,
 }: {
   enabled: boolean;
   launchContext?: string;
   synchronization?: ProgramSynchronizationView;
+  automation?: AutomationView;
   currentExpectations: ProgramExpectationView[];
   withdrawnExpectations: ProgramExpectationView[];
 }) {
@@ -135,8 +138,36 @@ export function DemoProgramRefreshControl({
       <dl className="definition-grid">
         <dt>Provider</dt><dd>Devcon</dd>
         <dt>Last successful refresh</dt>
-        <dd>{relativeRefreshTime(synchronization?.synchronizedAt)}</dd>
-        <dt>Current expectations</dt><dd>{currentExpectations.length}</dd>
+        <dd>
+          {relativeRefreshTime(
+            automation?.programLastSuccessAt ?? synchronization?.synchronizedAt,
+          )}
+        </dd>
+        <dt>Status</dt>
+        <dd>
+          {automation?.programLastFailureCode
+            ? "Refresh unavailable · cached Program active"
+            : automation?.enabled && automation.owner
+              ? "Automatic refresh running"
+              : automation?.enabled
+                ? `Automatic refresh · ${automation.state}`
+                : "Manual refresh"}
+        </dd>
+        <dt>Program</dt>
+        <dd>
+          {currentExpectations.length} Current · {withdrawnExpectations.length} Withdrawn
+        </dd>
+        {automation?.enabled ? (
+          <>
+            <dt>Media reconciliation</dt>
+            <dd>
+              {automation.owner ? "Running" : automation.state} · every{" "}
+              {automation.mediaReconciliationIntervalSeconds} sec
+            </dd>
+            <dt>Last media cycle</dt>
+            <dd>{relativeRefreshTime(automation.mediaLastSuccessAt)}</dd>
+          </>
+        ) : null}
       </dl>
       <button
         disabled={busy || !launchContext}

@@ -14,6 +14,7 @@ readiness.
 
 | Artifact | Purpose | Status |
 | --- | --- | --- |
+| [Demo 1 qualified fallback baseline](results/demo1-qualified-baseline-2026-08-20.md) | Frozen StageFlow/runtime/topology/Devcon/Program/manual-workflow record for Demo 2 fallback | **QUALIFIED FALLBACK** at `504b32567cf856082642697b6974859290c65020` |
 | [Real transcription engine evaluation](transcription-engine-evaluation.md) | Provider-neutral Windows/RTX matrix, metrics, PostgreSQL worker evidence, and scoped acceptance record | Accepted for Demo 1 and the first real local implementation; broader selection awaits representative event qualification |
 | [Real-Event Playback Validation and UX Calibration](../plans/real-event-playback-validation.md) | Current-Kernel direct/vMix replay runbook, measurements, UX calibration, and future reuse | Run 002 passed; Run 003 invalid; Run 004 partially qualified turnover |
 | [Run 004 qualification-tooling hardening](../plans/run-004-qualification-tooling-hardening.md) | Turnover authority guard, host-local lock, atomic evidence, incremental checkpoints, and runtime protection | Green qualification-only hardening validated and used by Run 004 |
@@ -21,6 +22,7 @@ readiness.
 | [vMix media timing evidence reconnaissance](vmix-media-timing-reconnaissance.md) | Sanitized read-only Run 004 container, stream, packet, and candidate-interval findings | Green reconnaissance complete; production authority not qualified |
 | [vMix media timing calibration experiment](vmix-media-timing-calibration.md) | Controlled experiment for measuring recorder timing against independent content markers | Harness self-check complete; controlled vMix execution not run |
 | [Recorder calibration harness](recorder-calibration-harness.md) | Deterministic marked-source generation, decoded content-boundary analysis, and controlled vMix runbook | Tooling implemented/self-checked; vMix qualification not run |
+| [Demo 2 Autonomous Event Node initial automated validation](results/demo2-autonomous-event-node-initial-automated-2026-08-20.md) | Coordinator, automatic media/Program, worker status, package approval, UX, launcher, privacy, and full-gate evidence | **PARTIAL — Yellow association decision and hardware rehearsal pending; Demo 1 remains fallback** |
 | [Recorder calibration harness self-check](results/recorder-calibration-harness-self-check.md) | Sanitized FFmpeg source/60s/30s/partial fixture evidence and limitations | Qualification-tool readiness PASS; recorder qualification NOT RUN |
 | [Media timing qualification probe](../../backend/tests/qualification/media_timing_probe.py) | Bounded local inspection with sanitized raw observations and explicitly unqualified derivations | Implemented qualification tooling; prohibited from authority use |
 | [Bounded real-event playback runner](../../backend/tests/qualification/real_event_playback.py) | Explicit validation-only commands, bounded cycle cadence, retained identities, atomic local results, and reconstruction | Implemented qualification tooling; not a watcher or public API |

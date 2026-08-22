@@ -261,13 +261,13 @@ export function DemoSessionWorkspace({
           onClick={() =>
             void send(
               "sessions/process-transcription",
-              "Run one bounded media cycle and enqueue local transcription for safely associated media?",
+              "Run one bounded media cycle now and reconcile local transcription for safely associated media? This is a fallback diagnostic action.",
               {},
             )
           }
           type="button"
         >
-          Process / Transcribe
+          Process Media Now
         </button>
         <button
           disabled={
@@ -381,7 +381,7 @@ export function DemoSessionWorkspace({
         )) : (
           <div className="operational-empty compact-empty">
             <strong>No Transcription Evidence yet</strong>
-            <span>Use Process / Transcribe after safely associated media is registered.</span>
+            <span>Automatic reconciliation handles routine media. Process Media Now is the idempotent fallback.</span>
           </div>
         )}
       </div>
