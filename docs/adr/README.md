@@ -98,6 +98,7 @@ new context and names every superseded ADR. Update this index and mark the older
 | [ADR-0025](ADR-0025-postgresql-durable-operations-and-workers.md) | PostgreSQL-backed Durable Operations, attempts, leases, and Worker coordination | Accepted | First transcription-worker substrate implemented under the bounded Green plan; real provider/model and automatic enqueue remain unselected |
 | [ADR-0026](ADR-0026-policy-scoped-automatic-authority.md) | Evidence-to-policy-to-authority evaluation with scoped activation and durable provenance | Proposed | Yellow decision; no implementation |
 | [ADR-0027](ADR-0027-media-timing-evidence.md) | Dedicated durable revisioned advisory Media Timing Evidence linked to Completed Media Asset | Accepted | MTE v1 implemented; recorder qualification and automatic authority remain Yellow |
+| [ADR-0028](ADR-0028-devcon-external-integration-boundary.md) | Bounded Devcon program-read and guarded human-confirmed enrichment-write boundary | Accepted | Retroactively documents the shipped Demo integration and its failure/verification semantics; no new external write |
 
 ## Unresolved ADR candidates
 
