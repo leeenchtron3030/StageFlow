@@ -14,8 +14,11 @@ from app.bootstrap.event_mode_kernel import KernelComponents
 from app.contexts.editorial import (
     DeclareEditorialMoment,
     EditorialCandidateMoment,
+    EditorialGenerationState,
     EditorialMomentConflictError,
     EditorialMomentService,
+    EditorialMomentStorageUnavailableError,
+    EditorialSessionCandidateProjection,
 )
 from app.contexts.events import EventStageBootstrapRequest, StageBootstrapDefinition
 from app.contexts.production.event_mode_kernel import (
@@ -84,6 +87,30 @@ class InMemoryMoments:
             for _, moment in self.by_operation.values()
             if moment.session_id == session_id
         )[:limit]
+
+    def projection_for_session(
+        self, session_id: EntityId
+    ) -> EditorialSessionCandidateProjection:
+        moments = self.list_for_session(session_id)
+        return EditorialSessionCandidateProjection(
+            session_id=session_id,
+            candidate_count=len(moments),
+            latest_candidate_activity_at=(
+                None if not moments else max(item.declared_at for item in moments)
+            ),
+            generation_state=EditorialGenerationState.HEALTHY,
+        )
+
+    def projections_for_sessions(
+        self, session_ids: tuple[EntityId, ...]
+    ) -> tuple[EditorialSessionCandidateProjection, ...]:
+        return tuple(self.projection_for_session(item) for item in session_ids)
+
+    def revalidate_session_locations(
+        self, session_id: EntityId, *, evaluated_at: datetime
+    ) -> tuple[EditorialCandidateMoment, ...]:
+        del evaluated_at
+        return self.list_for_session(session_id)
 
 
 def _client() -> tuple[SyncHttpClient, str, KernelComponents]:
@@ -212,6 +239,50 @@ def test_demo_authority_controls_are_confirmed_and_observable() -> None:
     assert [item["candidate_moment_id"] for item in listed.json()] == [
         moment.json()["candidate_moment_id"]
     ]
+
+
+def test_end_presentation_surfaces_editorial_revalidation_failure_after_kernel_commit(
+    monkeypatch: Any,
+) -> None:
+    client, stage_id, components = _client()
+    start = client.post(
+        '/demo/sessions/start',
+        json={
+            **_confirmed(15),
+            'stage_id': stage_id,
+            'authoritative_start': NOW.isoformat(),
+        },
+    )
+    session_id = start.json()['session_id']
+    assert components.editorial_moments is not None
+
+    def unavailable(
+        candidate_session_id: EntityId, *, evaluated_at: datetime
+    ) -> tuple[EditorialCandidateMoment, ...]:
+        del candidate_session_id, evaluated_at
+        raise EditorialMomentStorageUnavailableError('postgresql_unavailable')
+
+    monkeypatch.setattr(
+        components.editorial_moments.repository,
+        'revalidate_session_locations',
+        unavailable,
+    )
+
+    response = client.post(
+        '/demo/sessions/end-presentation',
+        json={
+            **_confirmed(16),
+            'session_id': session_id,
+            'boundary_at': NOW.isoformat(),
+            'reason': 'producer ended presentation',
+        },
+    )
+
+    assert response.status_code == 503
+    assert response.json()['detail'] == 'postgresql_unavailable'
+    persisted = components.repository.get_session(EntityId(session_id))
+    assert persisted is not None
+    assert persisted.activity_state.value == 'presentation_ended'
 
 
 def test_package_approval_requires_reviewable_exact_revision_and_is_idempotent() -> None:

@@ -191,10 +191,10 @@ transfer, queue, persistence, network, service, or downstream semantic/state beh
 | `backend/` | Python FastAPI backend workspace. | ED-0002 | Managed with `uv`; contains no StageFlow business logic in ED-0002. |
 | `backend/app/` | Backend application package root. | ED-0002 | Contains API, context, shared, core, and bootstrap packages. |
 | `backend/app/api/` | HTTP interface layer. | ED-0002 | Exposes only the versioned health endpoint in ED-0002. |
-| `backend/app/api/v1/` | Version 1 API routes. | ED-0002 | Contains `GET /api/v1/health`. |
+| `backend/app/api/v1/` | Version 1 API routes. | ED-0002 / ED-0055 / ED-0067 | Contains public health plus authenticated Kernel, transcription, Demo, and Editorial Candidate Moment endpoints. |
 | `backend/app/bootstrap/` | Reserved backend composition package. | ED-0002 | No bootstrap behavior beyond app creation in ED-0002. |
 | `backend/app/contexts/` | StageFlow bounded context package root. | ED-0002 | Context package boundaries only; no domain behavior. |
-| `backend/app/contexts/editorial/` | Editorial context package boundary. | ED-0002 | Empty package boundary. |
+| `backend/app/contexts/editorial/` | Editorial Candidate Moment bounded context. | ED-0002 / Demo 1 / ED-0067 | Owns immutable candidate contracts, human declaration workflow, bounded reads, projections, and Session-boundary revalidation. |
 | `backend/app/contexts/events/` | Event Management context package boundary. | ED-0002 | Empty package boundary. |
 | `backend/app/contexts/identity/` | Identity & Access context package boundary. | ED-0002 | Empty package boundary. |
 | `backend/app/contexts/integration/` | Integration context package boundary. | ED-0002 | Empty package boundary. |
@@ -399,7 +399,7 @@ transfer, queue, persistence, network, service, or downstream semantic/state beh
 | `ARCHITECTURE_DECISIONS.md` | Preserved monolithic Architecture Decision Records. | ED-0001 / AR-2.1 | Contains ADR-0001 through ADR-0018; newer ADRs are indexed under `docs/adr/`. |
 | `CHANGELOG.md` | Future release and change history. | Existing repository work | Preserved by ED-0001. |
 | `CONTRIBUTING.md` | Initial contributor guide and engineering process expectations. | ED-0001 | Establishes specification-first contribution rules. |
-| `ENGINEERING_DIRECTIVES.md` | Engineering Directive index. | ED-0001 through ED-0053 | Registers approved and implemented directives through ED-0053. |
+| `ENGINEERING_DIRECTIVES.md` | Engineering Directive index. | ED-0001 through ED-0067 | Registers approved and implemented directives through ED-0067. |
 | `IMPLEMENTATION_PLAN.md` | High-level staged implementation plan. | ED-0001 | Governance only; no implementation detail. |
 | `LICENSE` | Repository license. | ED-0001 | MIT License. |
 | `PRODUCT_CONSTITUTION.md` | Canonical product constitution. | Existing architecture work | Preserved by ED-0001. |
@@ -420,15 +420,26 @@ transfer, queue, persistence, network, service, or downstream semantic/state beh
 | `backend/app/api/__init__.py` | API package marker. | ED-0002 | No business logic. |
 | `backend/app/api/README.md` | API package guide. | ED-0002 | Documents HTTP interface boundary. |
 | `backend/app/api/v1/__init__.py` | API v1 package marker. | ED-0002 | No business logic. |
-| `backend/app/api/v1/README.md` | API v1 package guide. | ED-0002 | Documents the ED-0002 health-only scope. |
+| `backend/app/api/v1/README.md` | API v1 package guide. | ED-0002 / ED-0055 / ED-0067 | Documents public health, shared-secret protection, and the implemented Kernel, transcription, Demo, and Editorial route surfaces. |
 | `backend/app/api/v1/health.py` | Health route. | ED-0002 | Exposes `GET /api/v1/health`. |
-| `backend/app/api/v1/router.py` | API v1 router composition. | ED-0002 | Includes only the health router. |
+| `backend/app/api/v1/editorial.py` | Canonical Editorial Candidate Moment HTTP adapter. | ED-0067 | Exposes authenticated explicit human declaration and bounded per-Session reads. |
+| `backend/app/api/v1/router.py` | API v1 router composition. | ED-0002 / ED-0055 / ED-0067 | Keeps health public and composes protected Kernel, transcription, Demo, and Editorial routers. |
 | `backend/app/bootstrap/__init__.py` | Bootstrap package marker. | ED-0002 | Reserved for future composition. |
 | `backend/app/bootstrap/README.md` | Bootstrap package guide. | ED-0002 | Documents reserved scope. |
 | `backend/app/core/config/settings.py` | Minimal configuration loader. | ED-0002 | Loads service metadata only. |
 | `backend/app/core/health/service.py` | Minimal health response model and function. | ED-0002 | No dependency checks. |
 | `backend/app/core/lifecycle/lifespan.py` | FastAPI lifespan hook. | ED-0002 | Sets process readiness only. |
 | `backend/app/core/logging/configure.py` | Minimal logging configuration. | ED-0002 | Standard logging only. |
+| `backend/app/contexts/editorial/README.md` | Editorial bounded-context guide. | ED-0067 | Documents implemented declarations, location conflicts, projections, compatibility, and exclusions. |
+| `backend/app/contexts/editorial/__init__.py` | Editorial package exports. | ED-0067 | Exports canonical contracts, repository protocol, service, projections, and compatibility aliases. |
+| `backend/app/contexts/editorial/contracts.py` | Editorial Candidate Moment contracts. | ED-0067 | Defines immutable provenance, review, location, conflict, candidate, and projection contracts. |
+| `backend/app/contexts/editorial/moments.py` | Legacy Editorial import surface. | Demo 1 / ED-0067 | Re-exports canonical ED-0067 contracts and service for backward compatibility. |
+| `backend/app/contexts/editorial/repository.py` | Editorial repository boundary. | ED-0067 | Defines persistence and bounded projection operations without database dependencies. |
+| `backend/app/contexts/editorial/service.py` | Editorial application service. | ED-0067 | Implements declared-only Mark Moment semantics, replay checks, bounded reads, and boundary revalidation orchestration. |
+| `backend/app/infrastructure/postgres/editorial_moment_repository.py` | PostgreSQL Editorial repository. | Demo 1 / ED-0067 | Persists immutable declarations and append-only Session location evaluations with bounded projections. |
+| `backend/app/infrastructure/postgres/sql/0010_editorial_candidate_moment_forward.sql` | Editorial location-history forward migration. | ED-0067 | Adds append-only candidate location evaluations while preserving the existing declaration table. |
+| `backend/app/infrastructure/postgres/sql/0010_editorial_candidate_moment_reverse.sql` | Editorial location-history reverse migration. | ED-0067 | Removes only ED-0067 location history and its migration-ledger entry. |
+| `backend/tests/test_editorial_candidate_moment_phase1.py` | ED-0067 behavior and PostgreSQL proof. | ED-0067 | Covers contracts, replay, concurrency, restart reconstruction, boundary conflicts, API bounds, and migration reversal. |
 | `backend/app/contexts/production/evidence/__init__.py` | Production evidence package exports. | ED-0007 / ED-0032 / ED-0045 | Exports Evidence semantics plus authoritative context, source, conflict, resolution, and compatibility helpers. |
 | `backend/app/contexts/production/evidence/README.md` | Production Evidence package guide. | ED-0007 / ED-0032 / ED-0035 / ED-0045 | Documents Evidence semantics, authoritative first-class context, structured conflicts, builder/policy/acceptance propagation, and every retained metadata compatibility key and removal condition. |
 | `backend/app/contexts/production/evidence/evidence_concern.py` | Evidence concern categories. | ED-0032 | First-class operational questions Evidence can relate to without becoming conclusions. |
@@ -868,9 +879,11 @@ transfer, queue, persistence, network, service, or downstream semantic/state beh
 | `docs/04.6_Integration_Architecture.md` | Integration Architecture specification. | Existing architecture work / AR-2.1 | AR-2.1 clarifies adapters emit Production Events and Observation Interpreters produce objective Observations before reasoning. |
 | `docs/05_Reasoning_Model.md` | Reasoning Model architecture reference. | AR-1.4 / AR-2.0 / AR-2.1 | AR-2.1 consolidates the Perception Layer between Production Events and Objective Observations. |
 | `docs/architecture/README.md` | Current architecture documentation index and authority/precedence process. | Architecture baseline disposition D-10 | Defines current, accepted, future, open, legacy, and superseded status vocabulary. |
-| `docs/architecture/principles.md` | Accepted architecture principles and current alignment. | Architecture baseline disposition | Records only accepted principles and their implications/non-goals. |
-| `docs/architecture/system-context.md` | Current runtime map and accepted future boundaries. | Architecture baseline disposition | Does not portray proposed persistence, workers, providers, or workflows as implemented. |
-| `docs/architecture/domain-glossary.md` | Qualified canonical terminology and unresolved vocabulary. | Architecture baseline disposition ABR-013 | Does not authorize a broad code rename. |
+| `docs/architecture/principles.md` | Accepted architecture principles and current alignment. | Architecture baseline disposition / ED-0067 | Records accepted principles and the implemented immutable Editorial candidate behavior. |
+| `docs/architecture/system-context.md` | Current runtime map and accepted future boundaries. | Architecture baseline disposition / ED-0067 | Includes the bounded human-declared Editorial slice without portraying future generation or review workflows as implemented. |
+| `docs/architecture/domain-glossary.md` | Qualified canonical terminology and unresolved vocabulary. | Architecture baseline disposition ABR-013 / ED-0067 | Defines the implemented Editorial Candidate Moment while preserving broader terminology controls. |
+| `docs/architecture/persistence.md` | Current durable storage and migration architecture. | Architecture baseline disposition / ED-0067 | Records the existing candidate declaration table and ED-0067 append-only location evaluation history. |
+| `docs/architecture/post-kernel-capability-layer.md` | Post-Kernel capability sequence and status. | ED-0067 | Records Editorial Candidate Moment Phase 1 as implemented and later candidate-generation/review capabilities as future work. |
 | `docs/architecture/session-lifecycle.md` | Current Session-related contracts and accepted lifecycle direction. | Architecture baseline disposition D-01/D-06 | Leaves creation, reconciliation, and detailed late-media policy open. |
 | `docs/architecture/segment-lifecycle.md` | Current media contracts and accepted candidate-to-asset lifecycle. | Architecture baseline disposition D-05 | Preserves discovery, observation, readiness, registration, and Session association boundaries. |
 | `docs/adr/README.md` | ADR process and index. | Architecture baseline disposition | Indexes historical, new accepted, and unresolved ADR candidates. |
@@ -889,5 +902,7 @@ transfer, queue, persistence, network, service, or downstream semantic/state beh
 | `docs/reviews/architecture-baseline-review.md` | Repository-wide architecture and consistency evidence at `e75b1a4`. | Architecture baseline review | Analysis artifact; not decision authority by itself. |
 | `docs/reviews/architecture-baseline-disposition.md` | Authoritative disposition of the architecture baseline review. | Project architecture disposition | Records accepted, qualified, deferred, protected, and open outcomes. |
 | `docs/reviews/README.md` | Review/disposition process and index. | Architecture baseline disposition | Defines evidence, naming, authority, and supersession rules. |
-| `docs/plans/README.md` | Implementation-plan process and index. | Architecture baseline disposition | Defines plan triggers, statuses, approval, deviations, and completion history. |
+| `docs/plans/README.md` | Implementation-plan process and index. | Architecture baseline disposition / ED-0067 | Defines plan governance and records the completed ED-0067 plan. |
+| `docs/plans/editorial-candidate-moment-phase1.md` | Completed Editorial Candidate Moment Phase 1 plan. | ED-0067 | Records Green authority, acceptance evidence, compatibility reconciliation, validation, and completion. |
+| `docs/plans/post-kernel-capability-layer.md` | Approved post-Kernel capability plan. | Post-Kernel capability architecture / ED-0067 | Records ED-0067 as the completed first slice and preserves later slices as planned. |
 | `docs/plans/TEMPLATE.md` | Reusable implementation-plan template. | Architecture baseline disposition | Covers scope, migration, failure/recovery, observability, tests, rollback, and completion. |

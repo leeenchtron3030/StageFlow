@@ -64,6 +64,13 @@ current utilization derives from valid leases rather than a durable utilization 
 The schema does not select a provider/model, enqueue automatically, or change Session,
 media, package, Editorial, recorder-profile, or AI authority.
 
+`0008_demo_vertical_slice` introduced the immutable human-declared Editorial Candidate
+Moment declaration record and command replay used by Demo 1.
+`0010_editorial_candidate_moment` adds only append-only Session-boundary location
+evaluations, preserving the declaration record while making contained, partially
+excluded, and excluded locations restart-safe and queryable. It does not alter Kernel
+Session tables or add review, Clip, worker, model, or automatic authority.
+
 Registration is at least once and idempotent. It does not claim exactly-once delivery.
 Only a newly created ingress record is eligible for the included dispatcher path; an
 exact replay does not repeat that caller-visible dispatch path. The asset-registration
@@ -91,8 +98,10 @@ table. `0002_event_mode_kernel_forward.sql`, `0003_kernel_projections_forward.sq
 `0005_kernel_follow_up_closure_forward.sql` and
 `0006_media_timing_evidence_forward.sql` add bounded Production-owned objects.
 `0007_transcription_worker_forward.sql` adds the bounded first Work Execution and
-Transcript Evidence objects. Reversal removes `0007`, `0006`, `0005`, `0004`,
-`0003`, then `0002` and their ledger rows while preserving ingress and the shared
+Transcript Evidence objects. `0008` adds the Demo declaration base, `0009` adds Program
+Expectation reconciliation, and `0010` adds Editorial location history. Reversal removes
+`0010` before its `0008` dependency, then removes `0009`, `0008`, `0007`, `0006`,
+`0005`, `0004`, `0003`, then `0002` and their ledger rows while preserving ingress and the shared
 schema. The `0005` reverse removes only membership tagged as its legacy reconstruction
 before dropping its additive columns.
 Reversal is an explicit operator action for an isolated database and is never automatic.

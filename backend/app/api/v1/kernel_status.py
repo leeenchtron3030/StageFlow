@@ -11,6 +11,10 @@ from app.api.v1.response_models import (
     program_change_responses,
 )
 from app.bootstrap.event_mode_kernel import KernelComponents, KernelStartupProgress
+from app.contexts.editorial import (
+    EditorialMomentStorageUnavailableError,
+    EditorialSessionCandidateProjection,
+)
 from app.contexts.events import (
     ProgramExpectation,
     ProgramExpectationReconciliation,
@@ -44,6 +48,10 @@ class AssemblingSessionResponse(BaseModel):
     completion_decision_id: str | None
     completion_actor_id: str | None
     completion_decided_at: datetime | None
+    editorial_candidate_count: int | None
+    editorial_latest_candidate_activity_at: datetime | None
+    editorial_generation_state: str
+    editorial_location_conflict_count: int | None
 
 
 class StageStatusResponse(BaseModel):
@@ -232,12 +240,17 @@ def _response(
     runtime_profile: str,
     program_expectations: tuple[ProgramExpectation, ...],
     program_reconciliation: ProgramExpectationReconciliation | None,
+    editorial_projections: tuple[EditorialSessionCandidateProjection, ...],
 ) -> KernelStatusResponse:
     reconciliation = status.latest_reconciliation
+    editorial_by_session = {
+        item.session_id: item for item in editorial_projections
+    }
 
     def session_response(
         item: SessionOperationalProjection,
     ) -> AssemblingSessionResponse:
+        editorial = editorial_by_session.get(item.session_id)
         return AssemblingSessionResponse(
             session_id=item.session_id.value,
             activity_state=item.activity_state.value,
@@ -268,6 +281,22 @@ def _response(
                 else item.completion_actor_id.value
             ),
             completion_decided_at=item.completion_decided_at,
+            editorial_candidate_count=(
+                None if editorial is None else editorial.candidate_count
+            ),
+            editorial_latest_candidate_activity_at=(
+                None
+                if editorial is None
+                else editorial.latest_candidate_activity_at
+            ),
+            editorial_generation_state=(
+                "unknown"
+                if editorial is None
+                else editorial.generation_state.value
+            ),
+            editorial_location_conflict_count=(
+                None if editorial is None else editorial.location_conflict_count
+            ),
         )
 
     return KernelStatusResponse(
@@ -509,23 +538,51 @@ def kernel_status(request: Request, response: Response) -> KernelStatusResponse:
             database_available=True,
             attention_code="explicit_event_stage_bootstrap_required",
         )
-    return _response(
-        status,
-        configuration_supplied=configuration_supplied,
-        configuration_valid=configuration_valid,
-        runtime_composed=runtime_composed,
-        runtime_profile=components.configuration.deployment.runtime_profile.value,
-        program_expectations=components.repository.list_program_expectations(
-            status.event_id
-        ),
-        program_reconciliation=(
-            None
-            if len(status.stages) != 1
-            else components.repository.get_latest_program_reconciliation(
-                status.event_id, status.stages[0].stage_id
-            )
-        ),
+    session_ids = tuple(
+        dict.fromkeys(
+            item.session_id
+            for stage in status.stages
+            for item in (*stage.assembling_sessions, *stage.recent_sessions)
+        )
     )
+    try:
+        editorial_projections = (
+            ()
+            if components.editorial_moments is None
+            else components.editorial_moments.projections_for_sessions(session_ids)
+        )
+        return _response(
+            status,
+            configuration_supplied=configuration_supplied,
+            configuration_valid=configuration_valid,
+            runtime_composed=runtime_composed,
+            runtime_profile=components.configuration.deployment.runtime_profile.value,
+            program_expectations=components.repository.list_program_expectations(
+                status.event_id
+            ),
+            program_reconciliation=(
+                None
+                if len(status.stages) != 1
+                else components.repository.get_latest_program_reconciliation(
+                    status.event_id, status.stages[0].stage_id
+                )
+            ),
+            editorial_projections=editorial_projections,
+        )
+    except (KernelStorageUnavailableError, EditorialMomentStorageUnavailableError) as exc:
+        response.status_code = 503
+        return _fallback_response(
+            configured=True,
+            configuration_supplied=configuration_supplied,
+            configuration_valid=configuration_valid,
+            runtime_composed=runtime_composed,
+            runtime_profile=components.configuration.deployment.runtime_profile.value,
+            event_key=components.event_key,
+            event_name=components.configuration.deployment.event.name,
+            database_available=False,
+            attention_code="postgresql_unavailable",
+            startup_error=str(exc),
+        )
 
 
 __all__ = [

@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved
+Completed
 
 ## Execution authority
 
@@ -235,35 +235,61 @@ any read model that surfaces it, without requiring a raw diff against Session hi
 
 ## Acceptance criteria
 
-- [ ] `EditorialCandidateMoment` contract exists, is immutable, and uses the four-value
+- [x] `EditorialCandidateMoment` contract exists, is immutable, and uses the four-value
   epistemic-origin vocabulary while only `declared` is producible by this slice's command.
-- [ ] `mark_moment` is idempotent by operation ID with exact/conflicting-replay and
+- [x] `mark_moment` is idempotent by operation ID with exact/conflicting-replay and
   stale-Session-revision behavior matching existing Kernel command conventions.
-- [ ] Candidates persist in PostgreSQL with append-only history; no in-memory
+- [x] Candidates persist in PostgreSQL with append-only history; no in-memory
   authoritative fallback exists.
-- [ ] A Session boundary correction that excludes or partially excludes a candidate's
+- [x] A Session boundary correction that excludes or partially excludes a candidate's
   location produces an explicit conflict, never a silent move or delete.
-- [ ] Bounded Producer projection exposes count, latest activity, and `healthy`/`unknown`
+- [x] Bounded Producer projection exposes count, latest activity, and `healthy`/`unknown`
   generation state per Session.
-- [ ] The new API route is included behind the existing ED-0055 shared-secret dependency.
-- [ ] No existing Kernel contract, repository, migration, or route changed behavior.
-- [ ] Full backend suite, Ruff, and Pyright pass; `git diff --check` passes.
-- [ ] `docs/plans/post-kernel-capability-layer.md`'s Phase 1 extraction acceptance
+- [x] The new API route is included behind the existing ED-0055 shared-secret dependency.
+- [x] No existing Kernel contract, repository, migration, or route contract changed;
+  the Demo boundary route additively composes Editorial revalidation after the unchanged
+  Kernel correction.
+- [x] Full backend suite, Ruff, and Pyright pass; `git diff --check` passes.
+- [x] `docs/plans/post-kernel-capability-layer.md`'s Phase 1 extraction acceptance
   criterion is marked complete and linked to this plan.
 
 ## Rollback or reversal
 
-Run the `0010` reversal migration (drops only the new Editorial schema objects), remove
-the new `editorial` package, API route, and router inclusion, and revert the Producer
-projection addition. No Kernel data, schema, or migration is touched by rollback.
+Run the `0010` reversal migration (drops only the new location-history table), remove
+the canonical Editorial additions while retaining the Demo 1 declaration compatibility
+surface, remove the new API route/router inclusion, and revert the Producer projection
+addition. No Kernel data, schema, or migration is touched by rollback.
 
 ## Open questions
 
-- Exact home for the Producer-facing projection fields (extend `KernelStatusResponse` in
-  `kernel_status.py` vs. a new bounded read endpoint) should be decided during
-  implementation by following whichever existing pattern is the closer fit — not
-  prescribed here to avoid over-constraining a detail that doesn't affect acceptance.
+- **Resolved:** per-Session count/latest/generation/conflict fields extend the existing
+  bounded Kernel status Session projection, while the canonical Editorial router owns
+  bounded candidate-list detail. Both reuse the same repository projection.
 
 ## Completion record
 
-_(To be filled in by whoever implements this plan.)_
+- **Implemented revision:** ED-0067 feature-branch working revision on
+  `codex/ed-0067-editorial-candidate-moment`.
+- **Files and migrations actually changed:** canonical Editorial contracts, repository
+  protocol, service, compatibility exports, PostgreSQL adapter, migration 0010
+  forward/reverse and runner wiring, bootstrap boundary revalidation, authenticated
+  Editorial API, Demo compatibility response, Kernel status projection, focused tests,
+  and directly affected architecture/package/index documentation.
+- **Commands and tests actually run:** focused Editorial/Demo/auth/status pytest plus
+  Ruff/Pyright; isolated PostgreSQL replay, concurrency, restart, location-conflict, and
+  0010 reverse/reapply qualification; full backend `uv run pytest -p no:cacheprovider`,
+  `uv run ruff check .`, and `uv run pyright`; final `git diff --check` and diff review.
+- **Results and warnings:** 1,803 backend tests passed, 5 skipped, with one existing
+  Starlette/httpx deprecation warning; Ruff passed; Pyright reported zero errors and
+  warnings. Migration 0010 reversed and reapplied successfully while preserving the
+  migration-0008 candidate table.
+- **Execution authority used:** Green autonomous ED-0067 scope.
+- **Approved deviation:** the plan's verified baseline said no Editorial package/table
+  existed, but Demo 1 had already shipped a smaller declaration slice in migration 0008.
+  Implementation preserves that immutable authority and compatibility API, promotes it
+  into canonical bounded-context modules, and uses 0010 only for a new append-only
+  location-evaluation table rather than creating a parallel Candidate aggregate.
+- **Rollback status:** qualified on the isolated PostgreSQL database; 0010 reversal drops
+  only location history and leaves Kernel tables plus the 0008 declaration base intact.
+- **Remaining work:** Editorial review decisions, Editorial Clip creation, machine-origin
+  candidates, ranking/queue behavior, workers/models, and automation remain later phases.

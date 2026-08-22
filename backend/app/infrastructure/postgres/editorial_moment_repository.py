@@ -1,14 +1,20 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, cast
 
 import psycopg
 from psycopg.rows import dict_row
 
-from app.contexts.editorial.moments import (
+from app.contexts.editorial.contracts import (
     DeclareEditorialMoment,
     EditorialCandidateMoment,
+    EditorialCandidateOrigin,
+    EditorialGenerationState,
+    EditorialLocationConflictReason,
+    EditorialSessionCandidateProjection,
+)
+from app.contexts.editorial.repository import (
     EditorialMomentConflictError,
     EditorialMomentNotFoundError,
     EditorialMomentStorageUnavailableError,
@@ -16,6 +22,20 @@ from app.contexts.editorial.moments import (
 from app.shared.ids import EntityId
 
 type Row = dict[str, Any]
+
+_MOMENT_SELECT = """
+    SELECT moment.*,
+           location.evaluated_at AS location_evaluated_at,
+           location.location_conflict_reason
+    FROM stageflow.editorial_candidate_moment AS moment
+    LEFT JOIN LATERAL (
+        SELECT evaluated_at, location_conflict_reason
+        FROM stageflow.editorial_candidate_moment_location_history
+        WHERE candidate_moment_id = moment.candidate_moment_id
+        ORDER BY evaluated_session_revision DESC, evaluated_at DESC
+        LIMIT 1
+    ) AS location ON TRUE
+"""
 
 
 class PostgresEditorialMomentRepository:
@@ -63,10 +83,7 @@ class PostgresEditorialMomentRepository:
                         )
                     moment_id = EntityId(str(replay["result_id"]))
                     existing = connection.execute(
-                        """
-                        SELECT * FROM stageflow.editorial_candidate_moment
-                        WHERE candidate_moment_id = %s
-                        """,
+                        _MOMENT_SELECT + " WHERE moment.candidate_moment_id = %s",
                         (moment_id.value,),
                     ).fetchone()
                     assert existing is not None
@@ -136,13 +153,136 @@ class PostgresEditorialMomentRepository:
         try:
             with self._connect() as connection:
                 rows = connection.execute(
+                    _MOMENT_SELECT
+                    + """
+                    WHERE moment.session_id = %s
+                    ORDER BY moment.timeline_start_microseconds,
+                             moment.candidate_moment_id
+                    LIMIT %s
+                    """,
+                    (session_id.value, limit),
+                ).fetchall()
+                return tuple(_moment(row) for row in rows)
+        except psycopg.OperationalError as exc:
+            raise EditorialMomentStorageUnavailableError(
+                "postgresql_unavailable"
+            ) from exc
+
+    def projection_for_session(
+        self, session_id: EntityId
+    ) -> EditorialSessionCandidateProjection:
+        return self.projections_for_sessions((session_id,))[0]
+
+    def projections_for_sessions(
+        self, session_ids: tuple[EntityId, ...]
+    ) -> tuple[EditorialSessionCandidateProjection, ...]:
+        if not session_ids:
+            return ()
+        if len(session_ids) > 500:
+            raise ValueError("at most 500 Session projections may be requested")
+        try:
+            with self._connect() as connection:
+                rows = connection.execute(
+                    """
+                    WITH requested AS (
+                        SELECT session_id, ordinal
+                        FROM unnest(%s::uuid[]) WITH ORDINALITY
+                            AS value(session_id, ordinal)
+                    )
+                    SELECT requested.session_id,
+                           count(moment.candidate_moment_id) AS candidate_count,
+                           max(
+                               greatest(
+                                   moment.declared_at,
+                                   coalesce(location.evaluated_at, moment.declared_at)
+                               )
+                           ) AS latest_candidate_activity_at,
+                           count(moment.candidate_moment_id) FILTER (
+                               WHERE location.location_conflict_reason IS NOT NULL
+                           ) AS location_conflict_count
+                    FROM requested
+                    LEFT JOIN stageflow.editorial_candidate_moment AS moment
+                        ON moment.session_id = requested.session_id
+                    LEFT JOIN LATERAL (
+                        SELECT evaluated_at, location_conflict_reason
+                        FROM stageflow.editorial_candidate_moment_location_history
+                        WHERE candidate_moment_id = moment.candidate_moment_id
+                        ORDER BY evaluated_session_revision DESC, evaluated_at DESC
+                        LIMIT 1
+                    ) AS location ON TRUE
+                    GROUP BY requested.session_id, requested.ordinal
+                    ORDER BY requested.ordinal
+                    """,
+                    ([item.value for item in session_ids],),
+                ).fetchall()
+                return tuple(
+                    EditorialSessionCandidateProjection(
+                        session_id=EntityId(str(row["session_id"])),
+                        candidate_count=int(row["candidate_count"]),
+                        latest_candidate_activity_at=cast(
+                            datetime | None, row["latest_candidate_activity_at"]
+                        ),
+                        generation_state=EditorialGenerationState.HEALTHY,
+                        location_conflict_count=int(row["location_conflict_count"]),
+                    )
+                    for row in rows
+                )
+        except psycopg.OperationalError as exc:
+            raise EditorialMomentStorageUnavailableError(
+                "postgresql_unavailable"
+            ) from exc
+
+    def revalidate_session_locations(
+        self, session_id: EntityId, *, evaluated_at: datetime
+    ) -> tuple[EditorialCandidateMoment, ...]:
+        try:
+            with self._connect() as connection:
+                session = connection.execute(
+                    "SELECT * FROM stageflow.session WHERE session_id = %s FOR SHARE",
+                    (session_id.value,),
+                ).fetchone()
+                if session is None:
+                    raise EditorialMomentNotFoundError("session_not_found")
+                candidates = connection.execute(
                     """
                     SELECT * FROM stageflow.editorial_candidate_moment
                     WHERE session_id = %s
                     ORDER BY timeline_start_microseconds, candidate_moment_id
-                    LIMIT %s
                     """,
-                    (session_id.value, limit),
+                    (session_id.value,),
+                ).fetchall()
+                for candidate in candidates:
+                    reason = _location_conflict_reason(candidate, session)
+                    connection.execute(
+                        """
+                        INSERT INTO stageflow.editorial_candidate_moment_location_history (
+                            location_evaluation_id, candidate_moment_id,
+                            evaluated_session_revision, session_authoritative_start,
+                            session_authoritative_end, location_conflict_reason,
+                            evaluated_at
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+                        ON CONFLICT (
+                            candidate_moment_id, evaluated_session_revision
+                        ) DO NOTHING
+                        """,
+                        (
+                            EntityId.new().value,
+                            str(candidate["candidate_moment_id"]),
+                            int(session["revision"]),
+                            cast(datetime, session["authoritative_start"]),
+                            cast(datetime | None, session["authoritative_end"]),
+                            None if reason is None else reason.value,
+                            evaluated_at,
+                        ),
+                    )
+                rows = connection.execute(
+                    _MOMENT_SELECT
+                    + """
+                    WHERE moment.session_id = %s
+                    ORDER BY moment.timeline_start_microseconds,
+                             moment.candidate_moment_id
+                    """,
+                    (session_id.value,),
                 ).fetchall()
                 return tuple(_moment(row) for row in rows)
         except psycopg.OperationalError as exc:
@@ -165,10 +305,46 @@ def _moment(row: Row) -> EditorialCandidateMoment:
         note=cast(str | None, row["note"]),
         declared_at=cast(datetime, row["declared_at"]),
         revision=int(row["revision"]),
-        origin=str(row["origin"]),
-        epistemic_kind=str(row["epistemic_kind"]),
+        origin=EditorialCandidateOrigin(str(row["origin"])),
+        epistemic_kind=EditorialCandidateOrigin(str(row["epistemic_kind"])),
         reason_code=str(row["reason_code"]),
+        updated_at=cast(datetime | None, row.get("location_evaluated_at")),
+        location_conflict_reason=(
+            None
+            if row.get("location_conflict_reason") is None
+            else EditorialLocationConflictReason(
+                str(row["location_conflict_reason"])
+            )
+        ),
     )
+
+
+def _location_conflict_reason(
+    candidate: Row, session: Row
+) -> EditorialLocationConflictReason | None:
+    basis_start = cast(datetime, candidate["session_authoritative_start"])
+    start = basis_start + timedelta(
+        microseconds=int(candidate["timeline_start_microseconds"])
+    )
+    timeline_end = cast(int | None, candidate["timeline_end_microseconds"])
+    end = basis_start + timedelta(
+        microseconds=(
+            int(candidate["timeline_start_microseconds"])
+            if timeline_end is None
+            else timeline_end
+        )
+    )
+    authoritative_start = cast(datetime, session["authoritative_start"])
+    authoritative_end = cast(datetime | None, session["authoritative_end"])
+    if end < authoritative_start or (
+        authoritative_end is not None and start > authoritative_end
+    ):
+        return EditorialLocationConflictReason.EXCLUDED
+    if start < authoritative_start or (
+        authoritative_end is not None and end > authoritative_end
+    ):
+        return EditorialLocationConflictReason.PARTIALLY_EXCLUDED
+    return None
 
 
 __all__ = ["PostgresEditorialMomentRepository"]
