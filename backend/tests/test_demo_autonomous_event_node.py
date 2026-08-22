@@ -526,6 +526,59 @@ def test_coordinator_start_is_exactly_once_and_stop_is_bounded(
     assert coordinator.status().state == "stopped"
 
 
+def test_unexpected_cycle_failure_degrades_without_killing_owned_loop(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    components, _, _, _ = _components(tmp_path)
+    coordinator = AutonomousEventNodeCoordinator(components)
+    program_attempts = 0
+
+    class FakeStop:
+        stopped = False
+
+        def is_set(self) -> bool:
+            return self.stopped
+
+        def set(self) -> None:
+            self.stopped = True
+
+        def wait(self, timeout: float) -> None:
+            assert timeout >= 0
+
+    class FakeConnection:
+        def execute(self, query: str) -> None:
+            assert query == "SELECT 1"
+
+    fake_stop = FakeStop()
+
+    def run_program_refresh() -> None:
+        nonlocal program_attempts
+        program_attempts += 1
+        if program_attempts == 1:
+            raise LookupError("unanticipated provider wrapper failure")
+        fake_stop.set()
+
+    monkeypatch.setattr(coordinator, "_stop", fake_stop)
+    monkeypatch.setattr(
+        "app.demo.autonomous.time.monotonic",
+        iter(range(0, 10_000, 120)).__next__,
+    )
+    monkeypatch.setattr(coordinator, "run_program_refresh", run_program_refresh)
+    monkeypatch.setattr(coordinator, "run_media_cycle", lambda: None)
+
+    with caplog.at_level("ERROR", logger="app.demo.autonomous"):
+        coordinator._run_owned(FakeConnection())  # type: ignore[arg-type]
+
+    status = coordinator.status()
+    assert program_attempts == 2
+    assert status.state == "degraded"
+    assert status.program_last_failure_code == "unexpected_cycle_failure"
+    assert "cycle_kind=program_refresh" in caplog.text
+    assert "exception_type=LookupError" in caplog.text
+
+
 def test_default_configuration_keeps_automation_disabled(tmp_path: Path) -> None:
     source_path = tmp_path / "recordings"
     source_path.mkdir()
