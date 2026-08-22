@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import threading
 import time
 from dataclasses import dataclass
@@ -15,6 +16,8 @@ from app.contexts.production.event_mode_kernel.repository import (
 from app.contexts.work_execution import WorkExecutionStorageUnavailableError
 from app.demo.service import DemoApplication, ReconcileMediaRequest
 from app.infrastructure.devcon import DevconReadError
+
+_logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -193,17 +196,47 @@ class AutonomousEventNodeCoordinator:
             connection.execute("SELECT 1")
             now = time.monotonic()
             if now >= next_program:
-                self.run_program_refresh()
-                next_program = (
-                    time.monotonic()
-                    + self.configuration.program_refresh_interval_seconds
-                )
+                try:
+                    self.run_program_refresh()
+                except Exception as error:
+                    _logger.exception(
+                        (
+                            "autonomous_event_node_cycle_failed cycle_kind=%s "
+                            "exception_type=%s"
+                        ),
+                        "program_refresh",
+                        type(error).__name__,
+                    )
+                    self._update(
+                        state="degraded",
+                        program_last_failure_code="unexpected_cycle_failure",
+                    )
+                finally:
+                    next_program = (
+                        time.monotonic()
+                        + self.configuration.program_refresh_interval_seconds
+                    )
             if now >= next_media:
-                self.run_media_cycle()
-                next_media = (
-                    time.monotonic()
-                    + self.configuration.media_reconciliation_interval_seconds
-                )
+                try:
+                    self.run_media_cycle()
+                except Exception as error:
+                    _logger.exception(
+                        (
+                            "autonomous_event_node_cycle_failed cycle_kind=%s "
+                            "exception_type=%s"
+                        ),
+                        "media_reconciliation",
+                        type(error).__name__,
+                    )
+                    self._update(
+                        state="degraded",
+                        media_last_failure_code="unexpected_cycle_failure",
+                    )
+                finally:
+                    next_media = (
+                        time.monotonic()
+                        + self.configuration.media_reconciliation_interval_seconds
+                    )
             wait_seconds = max(
                 0.0,
                 min(next_media, next_program) - time.monotonic(),
