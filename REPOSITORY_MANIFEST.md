@@ -420,7 +420,7 @@ transfer, queue, persistence, network, service, or downstream semantic/state beh
 | `backend/app/api/__init__.py` | API package marker. | ED-0002 | No business logic. |
 | `backend/app/api/README.md` | API package guide. | ED-0002 | Documents HTTP interface boundary. |
 | `backend/app/api/v1/__init__.py` | API v1 package marker. | ED-0002 | No business logic. |
-| `backend/app/api/v1/README.md` | API v1 package guide. | ED-0002 / ED-0055 / ED-0067 | Documents public health, shared-secret protection, and the implemented Kernel, transcription, Demo, and Editorial route surfaces. |
+| `backend/app/api/v1/README.md` | API v1 package guide. | ED-0002 / ED-0055 / ED-0067 | Documents public health, shared-secret protection, implemented route surfaces, and canonical Editorial versus transitional Demo Moment compatibility. |
 | `backend/app/api/v1/health.py` | Health route. | ED-0002 | Exposes `GET /api/v1/health`. |
 | `backend/app/api/v1/editorial.py` | Canonical Editorial Candidate Moment HTTP adapter. | ED-0067 | Exposes authenticated explicit human declaration and bounded per-Session reads. |
 | `backend/app/api/v1/router.py` | API v1 router composition. | ED-0002 / ED-0055 / ED-0067 | Keeps health public and composes protected Kernel, transcription, Demo, and Editorial routers. |
@@ -901,6 +901,7 @@ transfer, queue, persistence, network, service, or downstream semantic/state beh
 | `docs/reviews/ED-0041_DIRECTIVE_ROADMAP.md` | Prioritized post-review directive roadmap. | ED-0041 | Separates pre-ED-0042 blockers, ED-0042 constraints, targeted follow-ups, deferred improvements, and intentionally unchanged patterns. |
 | `docs/reviews/architecture-baseline-review.md` | Repository-wide architecture and consistency evidence at `e75b1a4`. | Architecture baseline review | Analysis artifact; not decision authority by itself. |
 | `docs/reviews/architecture-baseline-disposition.md` | Authoritative disposition of the architecture baseline review. | Project architecture disposition | Records accepted, qualified, deferred, protected, and open outcomes. |
+| `docs/reviews/consistency-closure-ed-0063-ed-0067.md` | ED-0063–ED-0067 repository-state closure and PR #79 review. | User-authorized consistency closure | Records exact PR SHAs, ED-0067 historical correction, severity findings, compatibility direction, PR #71 gate, ED-0064–ED-0066 publication state, validation, and deferred risks without changing architecture. |
 | `docs/reviews/README.md` | Review/disposition process and index. | Architecture baseline disposition | Defines evidence, naming, authority, and supersession rules. |
 | `docs/plans/README.md` | Implementation-plan process and index. | Architecture baseline disposition / ED-0067 | Defines plan governance and records the completed ED-0067 plan. |
 | `docs/plans/editorial-candidate-moment-phase1.md` | Completed Editorial Candidate Moment Phase 1 plan. | ED-0067 | Records Green authority, acceptance evidence, compatibility reconciliation, validation, and completion. |

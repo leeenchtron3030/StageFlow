@@ -32,13 +32,20 @@ Completed
 
 ## Problem statement
 
-The Kernel preserves Session/media/package authority but has no durable way for a human to
-mark "this moment on the Session timeline may be worth editorial attention" and have that
-survive a restart, a later Session boundary correction, or concurrent Producer use. Nothing
-downstream (Editorial review, Clip creation, machine candidate generation) can be built
-until this durable, human-declared foundation exists.
+The original plan framed the problem as if the Kernel-era repository had no durable way
+for a human to mark a Session-timeline moment. That planning premise was inaccurate.
+Demo 1 had already shipped an end-to-end, PostgreSQL-backed human Mark Moment path.
 
-## Verified current behavior
+The actual gap was that this authority still lived in a Demo-oriented module/API shape
+and lacked append-only Session-boundary location evaluation plus bounded Producer
+projections. ED-0067 therefore needed to preserve and promote the existing declaration
+authority, not create a second Editorial aggregate.
+
+## Planning-time investigation and corrective record
+
+The following bullets preserve what the plan established correctly and make the planning
+miss explicit rather than rewriting history to imply the original investigation was
+accurate:
 
 - `backend/app/contexts/production/event_mode_kernel/`: `contracts.py`, `repository.py`,
   `service.py` establish this repo's bounded-context pattern (typed frozen contracts +
@@ -57,8 +64,15 @@ until this durable, human-declared foundation exists.
 - `backend/app/api/v1/` routes are thin FastAPI routers (`demo.py`, `kernel_status.py`)
   that call into application services; `router.py` applies the ED-0055 shared-secret
   dependency at include level. Any new Editorial route must be included the same way.
-- No `backend/app/contexts/editorial/` package, no Editorial migration, and no `Mark
-  Moment` command currently exist.
+- **Incorrect planning-time conclusion:** the plan stated that no
+  `backend/app/contexts/editorial/` package, Editorial migration, or `Mark Moment`
+  command existed. Repository-grounded implementation found that Demo 1 already
+  contained the `editorial` package, migration `0008_demo_vertical_slice`'s durable
+  `editorial_candidate_moment` table, the PostgreSQL declaration repository/service,
+  `/demo/moments/*` API wiring, idempotent human-command replay, and tests.
+- **Actual missing scope:** canonical bounded-context contracts/repository/service
+  modules, append-only Session-boundary location-evaluation history, authenticated
+  `/editorial/*` exposure, and bounded per-Session projections.
 
 ## Desired behavior
 
@@ -70,6 +84,10 @@ activity/generation-state projections. No review, approval, Clip, model, or work
 capability is introduced by this slice.
 
 ## In scope
+
+The bullets below preserve the original intended capability shape. During implementation,
+the declaration portions were satisfied by refactoring and retaining Demo 1 authority;
+only the genuinely missing history/projection surface was added as new durable behavior.
 
 - `backend/app/contexts/editorial/contracts.py`: frozen, immutable `EditorialCandidateMoment`
   contract per the architecture's "smallest coherent candidate" field list, restricted to
@@ -190,12 +208,12 @@ capability is introduced by this slice.
 
 ## Data or migration considerations
 
-New, additive migration only (`0010`). No existing table altered. Candidate declarations
-are append-only; a "current" view derives from the latest non-superseded record per
-candidate. Reversal drops only the new Editorial tables/schema objects and must not touch
-any Kernel table, migration, or data. Foreign-key references to Session ID should not
-cascade-delete Kernel data and should not be enforced in a way that could block a Kernel
-migration reversal — verify this explicitly before finalizing the forward SQL.
+Migration `0010` is additive only and alters no existing table. It does not create the
+candidate declaration authority: migration `0008_demo_vertical_slice` already owns the
+immutable human declaration record. Migration `0010` adds only append-only location
+evaluations keyed by candidate and Session revision. Reversal drops that history table
+and its ledger entry while preserving the `0008` declaration table and every Kernel
+table. The runner reverses `0010` before its `0008` dependency.
 
 ## Failure and recovery considerations
 
@@ -246,6 +264,11 @@ any read model that surfaces it, without requiring a raw diff against Session hi
 - [x] Bounded Producer projection exposes count, latest activity, and `healthy`/`unknown`
   generation state per Session.
 - [x] The new API route is included behind the existing ED-0055 shared-secret dependency.
+- [x] Demo 1's existing human declaration aggregate, idempotency authority, imports, and
+  `/demo/moments/*` routes are preserved; no duplicate aggregate or replacement
+  declaration authority was introduced.
+- [x] The original planning miss and the repository-grounded correction remain explicit
+  in this historical plan.
 - [x] No existing Kernel contract, repository, migration, or route contract changed;
   the Demo boundary route additively composes Editorial revalidation after the unchanged
   Kernel correction.
@@ -268,8 +291,9 @@ addition. No Kernel data, schema, or migration is touched by rollback.
 
 ## Completion record
 
-- **Implemented revision:** ED-0067 feature-branch working revision on
-  `codex/ed-0067-editorial-candidate-moment`.
+- **Implemented revision:** `ccb1283242b6563c3b890574ecde895951b71ec5` on
+  `codex/ed-0067-editorial-candidate-moment`; the later consistency-closure commit
+  corrects repository memory without changing that implementation.
 - **Files and migrations actually changed:** canonical Editorial contracts, repository
   protocol, service, compatibility exports, PostgreSQL adapter, migration 0010
   forward/reverse and runner wiring, bootstrap boundary revalidation, authenticated
@@ -284,11 +308,19 @@ addition. No Kernel data, schema, or migration is touched by rollback.
   warnings. Migration 0010 reversed and reapplied successfully while preserving the
   migration-0008 candidate table.
 - **Execution authority used:** Green autonomous ED-0067 scope.
-- **Approved deviation:** the plan's verified baseline said no Editorial package/table
-  existed, but Demo 1 had already shipped a smaller declaration slice in migration 0008.
-  Implementation preserves that immutable authority and compatibility API, promotes it
-  into canonical bounded-context modules, and uses 0010 only for a new append-only
-  location-evaluation table rather than creating a parallel Candidate aggregate.
+- **Planning-quality correction / implemented deviation:** the original investigation
+  incorrectly concluded that no Editorial package, Candidate Moment migration, or Mark
+  Moment command existed. Repository-grounded implementation discovered Demo 1's
+  durable human-declared Candidate Moment behavior and API wiring. ED-0067 preserved
+  that authority, refactored it into the bounded contracts/repository/service shape,
+  retained backward-compatible Demo imports/routes, and added only the genuinely
+  missing append-only Session-boundary location-evaluation history and bounded
+  projections. No duplicate Editorial aggregate was introduced and no existing human
+  declaration authority was replaced. This is recorded as a planning miss, not concealed
+  as if the original baseline had been accurate.
+- **Independent closure review:** the exact PR #79 base-to-head diff and related PR
+  state are recorded in
+  [the ED-0063–ED-0067 consistency closure](../reviews/consistency-closure-ed-0063-ed-0067.md).
 - **Rollback status:** qualified on the isolated PostgreSQL database; 0010 reversal drops
   only location history and leaves Kernel tables plus the 0008 declaration base intact.
 - **Remaining work:** Editorial review decisions, Editorial Clip creation, machine-origin

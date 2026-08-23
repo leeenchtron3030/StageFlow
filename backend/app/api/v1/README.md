@@ -29,6 +29,18 @@ omits operation digests, credentials, paths, filenames, and raw provider diagnos
 
 All operational routers are included behind the ED-0055 shared-secret dependency.
 
+## Editorial route compatibility
+
+`/api/v1/editorial/*` is the canonical long-term bounded-context surface for Editorial
+Candidate Moment commands and reads. The existing `/api/v1/demo/moments/*` routes are
+deliberate transitional compatibility and Demo-oriented exposure over the same
+application service and PostgreSQL authority; they do not represent a second aggregate
+or independent declaration workflow.
+
+Bounded future cleanup: when the Demo compatibility contract permits, use a separately
+approved API-cleanup task to deprecate and eventually remove the duplicate Demo exposure.
+No route is removed, renamed, or behaviorally changed by the ED-0069 consistency closure.
+
 ## Out of Scope
 
 - Per-operator identity, sessions, or role-based authorization.
