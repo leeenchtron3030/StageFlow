@@ -127,3 +127,4 @@ or architecture document unless those documents are explicitly updated.
 | [Editorial Candidate Moment — Phase 1 human-declared slice](editorial-candidate-moment-phase1.md) | Completed | StageFlow Editorial / Backend | Post-Kernel capability layer Phase 1; ED-0067 |
 | [Producer Work Queue — Kernel-derived first slice](producer-work-queue-kernel-derived-slice.md) | Approved | StageFlow Production / Backend | Post-Kernel capability layer Work Queue; ED-0068 |
 | [Frontend dependency security remediation](frontend-dependency-security-remediation.md) | Approved | StageFlow Engineering / Frontend | Due-diligence audit + ED-0066 follow-up; ED-0069 |
+| [Repository consistency closure](repository-consistency-closure.md) | Completed - Green repository reconciliation | StageFlow Engineering / Governance | 2026-08-22 ChatGPT Virtual Technical Producer review; ED-0070 |
