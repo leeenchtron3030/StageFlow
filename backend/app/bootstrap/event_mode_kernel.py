@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
+from datetime import datetime
 
 import psycopg
 
@@ -9,7 +10,10 @@ from app.contexts.editorial import EditorialMomentService
 from app.contexts.events import EventStageBootstrapRequest, StageBootstrapDefinition
 from app.contexts.integration.devcon import DevconProgramSync, ProgramSyncResult
 from app.contexts.production.event_mode_kernel import DurableEventModeKernel
-from app.contexts.production.event_mode_kernel.contracts import EventOperationalStatus
+from app.contexts.production.event_mode_kernel.contracts import (
+    EventOperationalStatus,
+    Session,
+)
 from app.contexts.production.event_mode_kernel.repository import (
     EventModeKernelRepository,
     KernelStorageUnavailableError,
@@ -156,6 +160,28 @@ class KernelComponents:
             stage_id=stages[0].id,
         )
 
+    def correct_session_boundary(
+        self,
+        *,
+        operation_id: EntityId,
+        session_id: EntityId,
+        boundary_kind: str,
+        boundary_at: datetime,
+        actor_id: EntityId,
+        reason: str,
+    ) -> Session:
+        session = self.kernel.correct_session_boundary(
+            operation_id=operation_id,
+            session_id=session_id,
+            boundary_kind=boundary_kind,
+            boundary_at=boundary_at,
+            actor_id=actor_id,
+            reason=reason,
+        )
+        if self.editorial_moments is not None:
+            self.editorial_moments.revalidate_session_boundary(session.id)
+        return session
+
     def reconcile_postgresql_recovery(self) -> EventOperationalStatus | None:
         event = self.repository.get_event_by_key(self.event_key)
         if event is None:
@@ -221,6 +247,26 @@ def verify_transcription_schema(dsn: str) -> None:
         raise KernelDatabaseUnavailableError("postgresql_unavailable") from exc
 
 
+def verify_editorial_schema(dsn: str) -> None:
+    try:
+        with psycopg.connect(dsn) as connection:
+            row = connection.execute(
+                """
+                SELECT count(*) FROM stageflow.schema_migration
+                WHERE version IN (
+                    '0008_demo_vertical_slice',
+                    '0010_editorial_candidate_moment'
+                )
+                """
+            ).fetchone()
+            if row is None or row[0] != 2:
+                raise KernelSchemaMigrationRequiredError(
+                    "editorial_schema_migration_required"
+                )
+    except psycopg.OperationalError as exc:
+        raise KernelDatabaseUnavailableError("postgresql_unavailable") from exc
+
+
 def build_kernel_components(
     configuration: EffectiveKernelConfiguration,
     *,
@@ -277,6 +323,7 @@ def load_kernel_components_from_environment(
     startup.configuration_valid = True
     try:
         verify_kernel_schema(configuration.postgres_dsn)
+        verify_editorial_schema(configuration.postgres_dsn)
         if (
             configuration.deployment.runtime_profile
             is RuntimeProfile.DEMO_SINGLE_STAGE
@@ -314,6 +361,7 @@ __all__ = [
     "KernelComponents",
     "build_kernel_components",
     "load_kernel_components_from_environment",
+    "verify_editorial_schema",
     "verify_kernel_schema",
     "verify_transcription_schema",
 ]

@@ -43,6 +43,7 @@ def test_health_stays_public_while_all_operational_routers_require_secret(
     assert client.get("/api/v1/health").status_code == 200
     for path in (
         "/api/v1/kernel/status",
+        "/api/v1/editorial/sessions/10000000-0000-4000-8000-000000000001/moments",
         "/api/v1/media-assets/10000000-0000-4000-8000-000000000001/timing-evidence",
     ):
         assert client.get(path).status_code == 401

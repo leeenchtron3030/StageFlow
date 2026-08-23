@@ -366,8 +366,9 @@ Required later validation:
   separate bounded plan.
 - [ ] ADR-0026 is accepted or rejected before automatic-authority implementation.
 - [ ] Packaging Asset identity is approved before Assembly persistence.
-- [ ] Phase 1 is extracted into a Green implementation-ready plan with exact schema,
-  migration, acceptance tests, and rollback.
+- [x] Phase 1 is extracted into the Green implementation-ready and completed
+  [Editorial Candidate Moment Phase 1 plan](editorial-candidate-moment-phase1.md), with
+  exact schema, migration, acceptance tests, and rollback.
 
 ## Rollback or reversal
 

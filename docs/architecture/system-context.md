@@ -8,8 +8,9 @@ verification and Green follow-up closure
 StageFlow is intended to observe live-event recorded media and supporting production
 signals, preserve explainable reasoning and human authority, and eventually coordinate
 durable production, editorial, packaging, and delivery workflows. At the current
-baseline, it includes a bounded durable Event/Stage/Session/media Kernel behind the
-existing shell. That foundation is closure-validated but is not event-ready software.
+baseline, it includes a bounded durable Event/Stage/Session/media Kernel and the first
+human-declared Editorial Candidate Moment slice behind the existing shell. That
+foundation is closure-validated but is not event-ready software.
 
 ## External actors and systems
 
@@ -17,7 +18,7 @@ existing shell. That foundation is closure-validated but is not event-ready soft
 | --- | --- | --- |
 | Developer/operator | Loads validated Kernel configuration, explicitly bootstraps Event/Stages, and invokes application commands | Uses a future authenticated setup/control surface |
 | Technical producer/event operations | Reads Kernel Event/Stage/Session/media/recovery status through an API; no UI | Uses future Mission Control and bounded Work Queue workflows from a worker-independent client |
-| Editorial reviewer | No implemented workflow | Reviews explainable Editorial Candidate Moments and creates human-approved Editorial Clips |
+| Editorial reviewer | Can read bounded declared, unreviewed Candidate Moment state; no review-decision workflow | Reviews explainable Editorial Candidate Moments and creates human-approved Editorial Clips |
 | Marketing user | No implemented workflow | Consumes approved clips, assembled outputs, metadata, and delivery state rather than raw candidate intelligence |
 | AI/media Event Worker | No implementation | Claims approved PostgreSQL-backed work for transcription, analysis, vision, proxy, or rendering without owning Session/media authority |
 | Recording/shared-storage system | Files may be inspected only by an explicit one-shot local discovery call | Remains source of media; StageFlow registers completed assets by reference |
@@ -25,10 +26,12 @@ existing shell. That foundation is closure-validated but is not event-ready soft
 | Transcript/vision providers | Adapter/interpreter contracts only | Optional providers behind adapters; unavailable service must not stop local event work |
 | Publishing/delivery destinations | Guarded Demo controller can perform one explicitly confirmed Devcon transcript/duration enrichment write | Future provider-neutral durable operations with idempotency and reconciliation |
 
-An application caller can create a durable human-authorized Session and register media
-through the Kernel service. The bounded Demo controller can explicitly publish approved
-transcript/duration enrichment to one matched Devcon Session under ADR-0028; it is not a
-general publication or delivery workflow and cannot control a recorder.
+An application caller can create a durable human-authorized Session, register media
+through the Kernel service, and declare an unreviewed Editorial Candidate Moment. The
+bounded Demo controller can explicitly publish approved transcript/duration enrichment
+to one matched Devcon Session under ADR-0028; it is not a general publication or
+delivery workflow and cannot control a recorder. No actor can create an Editorial review
+decision or Clip, publish editorial output, or deliver an output through this slice.
 
 ## Current runtime components
 
@@ -44,6 +47,7 @@ general publication or delivery workflow and cannot control a recorder.
 | Media Timing Evidence repository | Append/retrieve immutable asset-linked Observed facts, Derived intervals, qualification state, and exact application replay | Additive PostgreSQL revision/history authority; advisory only |
 | Durable Kernel service | Explicit bootstrap, idempotent human Session boundaries/assignment/completion, readiness/asset adapters, stable ingress, and provenance-bearing categorical association | Direct synchronous application boundary |
 | Devcon integration | Optional bounded public-program read/reconciliation plus one guarded human-confirmed transcript/duration enrichment write and separated durability/cache verification | Devcon remains external authority; network failure does not replace local Kernel state |
+| Editorial Candidate Moment repository/service | Idempotent declared Candidate creation, bounded per-Session reads, and append-only boundary-conflict evaluation | PostgreSQL declaration and location-history authority; no in-memory runtime fallback |
 | Evidence/reasoning/state policies | Deterministic transformation and transition contracts | Caller-invoked; no orchestrator or durable lineage store |
 | In-memory Operational State repository | Atomic accepted Recording/Session state, lineage, revision, and operation replay | Thread-safe and explicitly process-local |
 | StageFlow Runtime and Software Agent | Immutable deployment description and explicit synchronous lifecycle | Runtime graph is constructed after Event/Stage authority; lifecycle remains process-local |
@@ -96,6 +100,8 @@ There is no watcher, broker, worker, or uncontrolled loop.
 
 - PostgreSQL ingress and normalized Kernel tables, repositories, typed history, and
   explicit forward/reversal migrations exist. No queue, worker, lease, or outbox exists.
+- PostgreSQL also preserves immutable human-declared Editorial Candidate Moments and
+  append-only Session-boundary location evaluations through migrations 0008 and 0010.
 - Loss of PostgreSQL invalidates reconciliation freshness for the live process; restored
   reachability remains recovering/not ready until a fresh bounded reconciliation succeeds.
 - Operational State, Agent history, collection history, and operation replay are in
@@ -106,10 +112,12 @@ There is no watcher, broker, worker, or uncontrolled loop.
 - No provider SDK is present. The bounded Devcon adapters use the standard-library HTTP
   client for optional program GETs and the explicitly invoked guarded enrichment PUT;
   they do not participate in the local event-critical media path. The selected local
-  transcription adapter uses separately documented model/media dependencies.
-- HTTP exposes process liveness, read-only Kernel operational status, and bounded
-  asset-specific MTE history; authoritative
-  mutation remains an application boundary rather than a public control API.
+  transcription adapter uses separately documented model/media dependencies. No FFmpeg,
+  model execution, or delivery side effect exists in the Editorial Candidate Moment slice.
+- HTTP exposes process liveness, read-only Kernel operational status, bounded
+  asset-specific MTE history, and an authenticated idempotent `Mark Moment` command plus
+  bounded Editorial reads; authoritative mutation remains an application boundary rather
+  than a public control API. Review, Clip, and publication authority remain absent.
 
 ## Known deployment assumptions
 
