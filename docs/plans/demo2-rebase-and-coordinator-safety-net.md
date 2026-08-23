@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved
+Implementation complete locally; remote branch update pending explicit force-push approval
 
 ## Execution authority
 
@@ -156,16 +156,16 @@ An unexpected cycle failure must be visible in the coordinator's status projecti
 
 ## Acceptance criteria
 
-- [ ] `codex/demo2-autonomous-event-node` merges cleanly against current `main` with no
+- [ ] Remote `codex/demo2-autonomous-event-node` merges cleanly against current `main` with no
   conflicts.
-- [ ] Exactly one implementation of Package Approval exists post-rebase (main's).
-- [ ] All of Demo 2's unique, previously-reviewed functionality (association
+- [x] Exactly one implementation of Package Approval exists post-rebase (main's).
+- [x] All of Demo 2's unique, previously-reviewed functionality (association
   reevaluation, autonomous coordinator, worker/deployment projection, package approval
   integration) is preserved unchanged.
-- [ ] An unexpected exception type in a coordinator cycle no longer kills the background
+- [x] An unexpected exception type in a coordinator cycle no longer kills the background
   thread; status reports `degraded` and the coordinator keeps attempting cycles.
-- [ ] PR #71 remains in draft status after this work.
-- [ ] Full backend/frontend suites, Ruff, Pyright pass.
+- [x] PR #71 remains in draft status after this work.
+- [x] Full backend/frontend suites, Ruff, Pyright pass.
 
 ## Rollback or reversal
 
@@ -179,4 +179,26 @@ None blocking.
 
 ## Completion record
 
-_(To be filled in by whoever implements this plan.)_
+- Local implementation: branch `codex/demo2-autonomous-event-node` rebased from
+  `2280ed0` onto `main` `271f0b7`, producing rebased Demo 2 commit `eccb666`; ED-0063's
+  safety net is local commit `9c176d4`.
+- Conflict deviation: current main produced four conflicts rather than the plan's two.
+  `demo.py` and `service.py` retained main's canonical Package Approval implementation
+  plus Demo 2's unique storage/association behavior. `kernel_status.py` retained Demo 2's
+  automation projection, and `lifespan.py` retained both ED-0055 shared-secret startup
+  enforcement/logging and Demo 2 coordinator composition.
+- Safety behavior: unexpected program/media cycle exceptions are logged with cycle kind
+  and exception type, set the applicable bounded `unexpected_cycle_failure` code, mark
+  status degraded, advance the schedule in `finally`, and leave the owned loop alive.
+- Verification: local merge base equals `main` `271f0b7`; `git merge-tree --write-tree`
+  completed without conflict; Package Approval has one command, API handler, and service
+  implementation. Full backend: 1,808 passed, 5 skipped; Ruff passed; Pyright reported
+  0 errors/0 warnings. Frontend: 55 passed; ESLint, TypeScript, and Next production build
+  passed. One existing Starlette/httpx deprecation warning remains.
+- GitHub read-only verification on 2026-08-21 confirmed PR #71 is open and draft. Its
+  remote head is still `2280ed0` and GitHub still reports it non-mergeable because the
+  rebased commits have deliberately not been force-pushed. Updating that existing remote
+  branch is the sole unmet acceptance item and is a Red action requiring explicit
+  force-push authorization. No PR metadata, comment, branch, or review was changed.
+- No schema, migration, dependency, runtime-configuration, authority-semantic, or live
+  external-action change was made.

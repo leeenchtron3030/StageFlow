@@ -1,12 +1,10 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, replace
+from collections.abc import Sequence
+from dataclasses import replace
 from datetime import datetime
 from threading import RLock
-from types import MappingProxyType
-from uuid import UUID, uuid5
 
 from app.contexts.production.asset_readiness import (
     AssetFinalizationObservation,
@@ -18,26 +16,30 @@ from app.contexts.production.asset_readiness import (
     AssetWriteStateObservation,
 )
 from app.contexts.production.runtime import (
-    RuntimeCapabilityKind,
-    RuntimeCapabilitySupportStatus,
-    RuntimeCollectionPlan,
     RuntimeCollectionTarget,
     RuntimeConfiguration,
-    RuntimeConfigurationValidity,
     RuntimeObservationCapability,
     RuntimeObservationType,
-    RuntimeProfile,
-    RuntimeReadinessPolicySelection,
     StageFlowRuntime,
-    validate_runtime,
 )
 from app.contexts.production.software_agent_runtime import (
     AgentRuntimeExecutionPermission,
-    AgentRuntimeLifecycleState,
     AgentRuntimeSnapshot,
 )
 from app.shared.ids import EntityId
 
+from ._media_collection_plan_validator import MediaCollectionPlanValidator
+from ._media_collection_ports import MediaCollectionPortGateway
+from ._media_collection_state import (
+    ActiveReservation,
+    CandidateCycleFacts,
+    CoordinatorState,
+    CycleWork,
+    OperationRecord,
+    PlanContext,
+    derived_id,
+    immutable_mapping,
+)
 from .media_collection_contracts import (
     DiscoveredMediaCandidate,
     MediaCandidateConflict,
@@ -67,103 +69,6 @@ from .media_collection_validation import canonical_value
 
 _logger = logging.getLogger(__name__)
 
-_ID_NAMESPACE = UUID("62a92419-4fb3-5af8-aed5-ddc946e17a72")
-_OBSERVATION_ORDER = {
-    RuntimeObservationType.RESOURCE_PRESENCE: 0,
-    RuntimeObservationType.RESOURCE_SNAPSHOT: 1,
-    RuntimeObservationType.FINALIZATION: 2,
-    RuntimeObservationType.WRITE_STATE: 3,
-    RuntimeObservationType.READ_ACCESS: 4,
-}
-_OBSERVATION_CLASSES: Mapping[RuntimeObservationType, type[object]] = {
-    RuntimeObservationType.RESOURCE_PRESENCE: AssetResourcePresenceObservation,
-    RuntimeObservationType.RESOURCE_SNAPSHOT: AssetResourceSnapshot,
-    RuntimeObservationType.FINALIZATION: AssetFinalizationObservation,
-    RuntimeObservationType.WRITE_STATE: AssetWriteStateObservation,
-    RuntimeObservationType.READ_ACCESS: AssetReadAccessObservation,
-}
-
-
-def _mapping[T](value: Mapping[str, T]) -> Mapping[str, T]:
-    return MappingProxyType(dict(value))
-
-
-def _derived_id(*parts: object) -> EntityId:
-    return EntityId(str(uuid5(_ID_NAMESPACE, ":".join(str(part) for part in parts))))
-
-
-@dataclass(frozen=True, slots=True)
-class _PlanContext:
-    plan: RuntimeCollectionPlan
-    selection: RuntimeReadinessPolicySelection
-    discovery_capability_id: EntityId
-    observation_capabilities: tuple[RuntimeObservationCapability, ...]
-    required_observation_capability_ids: frozenset[EntityId]
-
-
-@dataclass(frozen=True, slots=True)
-class _ActiveReservation:
-    request: MediaCollectionCycleRequest
-    fingerprint: str
-    previous_snapshot: MediaCollectionCoordinatorSnapshot
-
-
-@dataclass(frozen=True, slots=True)
-class _OperationRecord:
-    fingerprint: str
-    result: MediaCollectionCycleResult
-
-
-@dataclass(frozen=True, slots=True)
-class _CoordinatorState:
-    snapshot: MediaCollectionCoordinatorSnapshot
-    candidate_records: Mapping[str, MediaCandidateRecord]
-    proposed_asset_index: Mapping[str, str]
-    resource_index: Mapping[str, str]
-    observation_bundles: Mapping[str, AssetReadinessObservationBundle]
-    conflicts: Mapping[str, MediaCandidateConflict]
-    completed_cycle_results: Mapping[str, _OperationRecord]
-    operation_fingerprints: Mapping[str, str]
-    cycle_history: tuple[MediaCollectionCycleResult, ...]
-    active_cycle_reservation: _ActiveReservation | None
-
-
-@dataclass(slots=True)
-class _CandidateCycleFacts:
-    attempted: int = 0
-    valid_or_empty: int = 0
-    retained: int = 0
-    deferred: bool = False
-    blocked: bool = False
-    failed: bool = False
-
-
-@dataclass(slots=True)
-class _CycleWork:
-    records: dict[str, MediaCandidateRecord]
-    proposed_index: dict[str, str]
-    resource_index: dict[str, str]
-    bundles: dict[str, AssetReadinessObservationBundle]
-    conflicts: dict[str, MediaCandidateConflict]
-    discovery_results: list[MediaCandidateDiscoveryResult]
-    observation_results: list[MediaObservationCollectionResult]
-    affected: set[EntityId]
-    new: set[EntityId]
-    known: set[EntityId]
-    conflicted: set[EntityId]
-    deferred: set[EntityId]
-    reasons: list[MediaCollectionCycleReasonCode]
-    candidate_facts: dict[str, _CandidateCycleFacts]
-    explicit_times: list[datetime]
-    considered: int = 0
-    observation_calls: int = 0
-    retained_observations: int = 0
-    candidate_budget_exhausted: bool = False
-    observation_budget_exhausted: bool = False
-    interrupted: bool = False
-    partial: bool = False
-
-
 class MediaCandidateCollectionCoordinator:
     """Synchronous, bounded orchestration over supplied candidate/observation ports."""
 
@@ -179,6 +84,16 @@ class MediaCandidateCollectionCoordinator:
         self._runtime = runtime
         self._dependencies = dependencies
         self._allow_development_profile = allow_development_profile
+        self._ports = MediaCollectionPortGateway(
+            runtime=runtime,
+            dependencies=dependencies,
+        )
+        self._plan_validator = MediaCollectionPlanValidator(
+            runtime=runtime,
+            dependencies=dependencies,
+            ports=self._ports,
+            allow_development_profile=allow_development_profile,
+        )
         self._lock = RLock()
         snapshot = MediaCollectionCoordinatorSnapshot(
             coordinator_id=coordinator_id,
@@ -193,15 +108,15 @@ class MediaCandidateCollectionCoordinator:
             latest_cycle_id=None,
             latest_cycle_outcome=None,
         )
-        self._state = _CoordinatorState(
+        self._state = CoordinatorState(
             snapshot=snapshot,
-            candidate_records=_mapping({}),
-            proposed_asset_index=_mapping({}),
-            resource_index=_mapping({}),
-            observation_bundles=_mapping({}),
-            conflicts=_mapping({}),
-            completed_cycle_results=_mapping({}),
-            operation_fingerprints=_mapping({}),
+            candidate_records=immutable_mapping({}),
+            proposed_asset_index=immutable_mapping({}),
+            resource_index=immutable_mapping({}),
+            observation_bundles=immutable_mapping({}),
+            conflicts=immutable_mapping({}),
+            completed_cycle_results=immutable_mapping({}),
+            operation_fingerprints=immutable_mapping({}),
             cycle_history=(),
             active_cycle_reservation=None,
         )
@@ -225,22 +140,24 @@ class MediaCandidateCollectionCoordinator:
             immediate = self._initial_rejection(request, fingerprint)
             if immediate is not None:
                 return immediate
-            context, outcome, reasons = self._validate_plan(request)
+            context, outcome, reasons = self._plan_validator.validate_plan(request)
             if context is None:
                 return self._rejection(request, outcome, reasons)
 
-        initial_snapshot = self._read_agent_snapshot(request)
+        initial_snapshot = self._plan_validator.read_agent_snapshot(request)
         if initial_snapshot is None:
             return self._rejection(
                 request,
                 MediaCollectionCycleOutcome.INVALID_DEPENDENCY,
                 (MediaCollectionCycleReasonCode.REQUIRED_PORT_MISSING,),
             )
-        permitted, permission_reasons = self._permission(initial_snapshot, request)
+        permitted, permission_reasons = self._plan_validator.permission(
+            initial_snapshot, request
+        )
         if not permitted:
             return self._rejection(
                 request,
-                self._identity_or_permission_outcome(initial_snapshot),
+                self._plan_validator.identity_or_permission_outcome(initial_snapshot),
                 permission_reasons,
                 starting_agent_snapshot=initial_snapshot,
                 final_agent_snapshot=initial_snapshot,
@@ -252,7 +169,7 @@ class MediaCandidateCollectionCoordinator:
                 return immediate
             previous = self._state.snapshot
             active_snapshot = replace(previous, active_cycle_id=request.cycle_id)
-            reservation = _ActiveReservation(request, fingerprint, previous)
+            reservation = ActiveReservation(request, fingerprint, previous)
             self._state = replace(
                 self._state,
                 snapshot=active_snapshot,
@@ -422,267 +339,6 @@ class MediaCandidateCollectionCoordinator:
             )
         return None
 
-    def _validate_plan(
-        self,
-        request: MediaCollectionCycleRequest,
-    ) -> tuple[
-        _PlanContext | None,
-        MediaCollectionCycleOutcome,
-        tuple[MediaCollectionCycleReasonCode, ...],
-    ]:
-        runtime = self._runtime
-        configuration = runtime.configuration
-        if request.runtime_id != runtime.identity.runtime_id:
-            return (
-                None,
-                MediaCollectionCycleOutcome.INVALID_RUNTIME,
-                (MediaCollectionCycleReasonCode.RUNTIME_ID_MISMATCH,),
-            )
-        if request.configuration_id != configuration.id:
-            return (
-                None,
-                MediaCollectionCycleOutcome.INVALID_CONFIGURATION,
-                (MediaCollectionCycleReasonCode.CONFIGURATION_ID_MISMATCH,),
-            )
-        if runtime.profile not in (RuntimeProfile.AGENT, RuntimeProfile.DEVELOPMENT):
-            return (
-                None,
-                MediaCollectionCycleOutcome.INVALID_RUNTIME,
-                (MediaCollectionCycleReasonCode.RUNTIME_VALIDATION_FAILED,),
-            )
-        if runtime.profile is RuntimeProfile.DEVELOPMENT and not self._allow_development_profile:
-            return (
-                None,
-                MediaCollectionCycleOutcome.INVALID_RUNTIME,
-                (MediaCollectionCycleReasonCode.RUNTIME_VALIDATION_FAILED,),
-            )
-        validation = validate_runtime(runtime)
-        if validation.outcome not in (
-            RuntimeConfigurationValidity.VALID,
-            RuntimeConfigurationValidity.VALID_WITH_LIMITATIONS,
-        ):
-            return (
-                None,
-                MediaCollectionCycleOutcome.INVALID_CONFIGURATION,
-                (MediaCollectionCycleReasonCode.RUNTIME_VALIDATION_FAILED,),
-            )
-        if (
-            runtime.capability_set != configuration.capability_set
-            or runtime.resource_policy != configuration.resource_policy
-            or runtime.event_mode != configuration.event_mode
-            or runtime.collection_plans != configuration.collection_plans
-            or runtime.readiness_policy_selections != configuration.readiness_policy_selections
-            or runtime.asset_assembly_plans != configuration.asset_assembly_plans
-        ):
-            return (
-                None,
-                MediaCollectionCycleOutcome.INVALID_CONFIGURATION,
-                (MediaCollectionCycleReasonCode.RUNTIME_VALIDATION_FAILED,),
-            )
-        plan = next(
-            (
-                plan
-                for plan in configuration.collection_plans
-                if plan.id == request.collection_plan_id
-            ),
-            None,
-        )
-        if plan is None:
-            return (
-                None,
-                MediaCollectionCycleOutcome.INVALID_PLAN,
-                (MediaCollectionCycleReasonCode.COLLECTION_PLAN_MISSING,),
-            )
-        if not plan.enabled:
-            return (
-                None,
-                MediaCollectionCycleOutcome.INVALID_PLAN,
-                (MediaCollectionCycleReasonCode.COLLECTION_PLAN_DISABLED,),
-            )
-        selection = next(
-            (
-                value
-                for value in configuration.readiness_policy_selections
-                if value.id == plan.readiness_policy_selection_id
-            ),
-            None,
-        )
-        if selection is None:
-            return (
-                None,
-                MediaCollectionCycleOutcome.INVALID_PLAN,
-                (MediaCollectionCycleReasonCode.READINESS_SELECTION_MISMATCH,),
-            )
-        discovery_capability = next(
-            (
-                capability
-                for capability in configuration.capability_set.capabilities
-                if capability.kind is RuntimeCapabilityKind.CANDIDATE_DISCOVERY
-                and capability.support_status
-                in (
-                    RuntimeCapabilitySupportStatus.SUPPORTED,
-                    RuntimeCapabilitySupportStatus.DEGRADED,
-                )
-            ),
-            None,
-        )
-        if discovery_capability is None:
-            return (
-                None,
-                MediaCollectionCycleOutcome.INVALID_PLAN,
-                (MediaCollectionCycleReasonCode.CAPABILITY_MISSING,),
-            )
-        observation_by_id = {
-            capability.id: capability
-            for capability in configuration.capability_set.observation_capabilities
-        }
-        selected: list[RuntimeObservationCapability] = []
-        for capability_id in plan.observation_capability_ids:
-            capability = observation_by_id.get(capability_id)
-            if capability is None:
-                return (
-                    None,
-                    MediaCollectionCycleOutcome.INVALID_PLAN,
-                    (MediaCollectionCycleReasonCode.CAPABILITY_MISSING,),
-                )
-            selected.append(capability)
-        target_types = {
-            item for target in plan.targets for item in target.enabled_observation_types
-        }
-        if any(capability.observation_type not in target_types for capability in selected):
-            return (
-                None,
-                MediaCollectionCycleOutcome.INVALID_PLAN,
-                (MediaCollectionCycleReasonCode.COLLECTION_TARGET_INVALID,),
-            )
-        source_ids = {source.id for source in configuration.capability_set.source_capabilities}
-        if any(target.source_capability_id not in source_ids for target in plan.targets):
-            return (
-                None,
-                MediaCollectionCycleOutcome.INVALID_PLAN,
-                (MediaCollectionCycleReasonCode.COLLECTION_TARGET_INVALID,),
-            )
-        if (
-            plan.resource_policy_id != configuration.resource_policy.id
-            or plan.event_mode_id != configuration.event_mode.id
-        ):
-            return (
-                None,
-                MediaCollectionCycleOutcome.INVALID_PLAN,
-                (MediaCollectionCycleReasonCode.EVENT_MODE_INCOMPATIBLE,),
-            )
-        required_ids = frozenset(
-            capability.id
-            for capability in selected
-            if capability.runtime_capability_id in selection.required_capability_ids
-        )
-        missing = self._missing_ports(selected)
-        if missing:
-            return (
-                None,
-                MediaCollectionCycleOutcome.INVALID_DEPENDENCY,
-                (MediaCollectionCycleReasonCode.REQUIRED_PORT_MISSING,),
-            )
-        return (
-            _PlanContext(
-                plan=plan,
-                selection=selection,
-                discovery_capability_id=discovery_capability.id,
-                observation_capabilities=tuple(
-                    sorted(
-                        selected,
-                        key=lambda value: (
-                            value.id not in required_ids,
-                            _OBSERVATION_ORDER[value.observation_type],
-                            value.id.value,
-                        ),
-                    )
-                ),
-                required_observation_capability_ids=required_ids,
-            ),
-            MediaCollectionCycleOutcome.COMPLETED,
-            (MediaCollectionCycleReasonCode.RUNTIME_VALIDATION_PASSED,),
-        )
-
-    def _missing_ports(
-        self,
-        capabilities: Sequence[RuntimeObservationCapability],
-    ) -> tuple[str, ...]:
-        missing: list[str] = []
-        if self._dependencies.agent_execution_state_port is None:
-            missing.append("agent_execution_state_port")
-        if self._dependencies.media_candidate_discovery_port is None:
-            missing.append("media_candidate_discovery_port")
-        for capability in capabilities:
-            if self._observation_port(capability.observation_type) is None:
-                missing.append(capability.observation_type.value)
-        return tuple(sorted(set(missing)))
-
-    def _read_agent_snapshot(
-        self,
-        request: MediaCollectionCycleRequest,
-    ) -> AgentRuntimeSnapshot | None:
-        port = self._dependencies.agent_execution_state_port
-        if port is None:
-            return None
-        try:
-            return port.get_current_snapshot(request.runtime_id)
-        except Exception as error:
-            _logger.error(
-                (
-                    "media_collection_agent_snapshot_failed cycle_id=%s "
-                    "runtime_id=%s exception_type=%s"
-                ),
-                request.cycle_id.value,
-                request.runtime_id.value,
-                type(error).__name__,
-            )
-            return None
-
-    def _permission(
-        self,
-        snapshot: AgentRuntimeSnapshot,
-        request: MediaCollectionCycleRequest,
-    ) -> tuple[bool, tuple[MediaCollectionCycleReasonCode, ...]]:
-        if snapshot.runtime_id != request.runtime_id:
-            return False, (MediaCollectionCycleReasonCode.RUNTIME_ID_MISMATCH,)
-        if snapshot.configuration_id != request.configuration_id:
-            return False, (MediaCollectionCycleReasonCode.CONFIGURATION_ID_MISMATCH,)
-        if snapshot.deployment_profile != self._runtime.profile:
-            return False, (MediaCollectionCycleReasonCode.RUNTIME_ID_MISMATCH,)
-        if snapshot.cancellation is not None:
-            return False, (MediaCollectionCycleReasonCode.AGENT_CANCELLED,)
-        if snapshot.lifecycle_state is AgentRuntimeLifecycleState.RUNNING:
-            if snapshot.execution_permission is AgentRuntimeExecutionPermission.NORMAL:
-                return True, (MediaCollectionCycleReasonCode.AGENT_RUNNING_NORMAL,)
-        elif snapshot.lifecycle_state is AgentRuntimeLifecycleState.YIELDING:
-            if snapshot.execution_permission is AgentRuntimeExecutionPermission.REDUCED:
-                if request.permit_reduced_execution:
-                    return True, (MediaCollectionCycleReasonCode.AGENT_YIELDING_REDUCED,)
-                return False, (MediaCollectionCycleReasonCode.AGENT_PERMISSION_ABSENT,)
-        elif snapshot.lifecycle_state is AgentRuntimeLifecycleState.STOPPING:
-            return False, (MediaCollectionCycleReasonCode.AGENT_STOPPING,)
-        elif snapshot.lifecycle_state is AgentRuntimeLifecycleState.STOPPED:
-            return False, (MediaCollectionCycleReasonCode.AGENT_STOPPED,)
-        elif snapshot.lifecycle_state is AgentRuntimeLifecycleState.FAILED:
-            return False, (MediaCollectionCycleReasonCode.AGENT_FAILED,)
-        elif snapshot.lifecycle_state is AgentRuntimeLifecycleState.DISABLED:
-            return False, (MediaCollectionCycleReasonCode.AGENT_DISABLED,)
-        if snapshot.execution_permission is AgentRuntimeExecutionPermission.ESSENTIAL_ONLY:
-            return False, (MediaCollectionCycleReasonCode.ESSENTIAL_ONLY_UNDEFINED,)
-        return False, (MediaCollectionCycleReasonCode.AGENT_PERMISSION_ABSENT,)
-
-    def _identity_or_permission_outcome(
-        self,
-        snapshot: AgentRuntimeSnapshot,
-    ) -> MediaCollectionCycleOutcome:
-        if (
-            snapshot.runtime_id != self._runtime.identity.runtime_id
-            or snapshot.configuration_id != self._runtime.configuration.id
-            or snapshot.deployment_profile != self._runtime.profile
-        ):
-            return MediaCollectionCycleOutcome.INVALID_RUNTIME
-        return MediaCollectionCycleOutcome.PERMISSION_DENIED
 
     def _rejection(
         self,
@@ -726,13 +382,13 @@ class MediaCandidateCollectionCoordinator:
     def _execute_reserved_cycle(
         self,
         request: MediaCollectionCycleRequest,
-        context: _PlanContext,
-        reservation: _ActiveReservation,
+        context: PlanContext,
+        reservation: ActiveReservation,
         initial_snapshot: AgentRuntimeSnapshot,
     ) -> MediaCollectionCycleResult:
         with self._lock:
             state = self._state
-            work = _CycleWork(
+            work = CycleWork(
                 records=dict(state.candidate_records),
                 proposed_index=dict(state.proposed_asset_index),
                 resource_index=dict(state.resource_index),
@@ -747,7 +403,7 @@ class MediaCandidateCollectionCoordinator:
                 deferred=set(),
                 reasons=[
                     MediaCollectionCycleReasonCode.RUNTIME_VALIDATION_PASSED,
-                    *self._permission(initial_snapshot, request)[1],
+                    *self._plan_validator.permission(initial_snapshot, request)[1],
                 ],
                 candidate_facts={},
                 explicit_times=[request.requested_at],
@@ -760,17 +416,19 @@ class MediaCandidateCollectionCoordinator:
                 work.candidate_budget_exhausted = True
                 work.reasons.append(MediaCollectionCycleReasonCode.CANDIDATE_LIMIT_REACHED)
                 break
-            checkpoint, permitted = self._checkpoint(request)
+            checkpoint, permitted = self._plan_validator.checkpoint(request)
             if not permitted:
                 current_snapshot = checkpoint or current_snapshot
                 work.interrupted = True
-                work.reasons.extend(self._interruption_reasons(checkpoint, request))
+                work.reasons.extend(
+                    self._plan_validator.interruption_reasons(checkpoint, request)
+                )
                 break
             assert checkpoint is not None
             current_snapshot = checkpoint
             remaining = request.maximum_total_candidates - work.considered
             discovery_request = MediaCandidateDiscoveryRequest(
-                discovery_request_id=_derived_id(
+                discovery_request_id=derived_id(
                     self._coordinator_id.value,
                     request.cycle_id.value,
                     "discovery-request",
@@ -790,8 +448,8 @@ class MediaCandidateCollectionCoordinator:
                 resource_policy_id=context.plan.resource_policy_id,
                 target_reference=target.opaque_location_reference,
             )
-            result = self._invoke_discovery(discovery_request)
-            normalized, valid_discoveries = self._normalize_discovery_result(
+            result = self._ports.invoke_discovery(discovery_request)
+            normalized, valid_discoveries = self._ports.normalize_discovery_result(
                 discovery_request,
                 result,
                 target,
@@ -817,11 +475,13 @@ class MediaCandidateCollectionCoordinator:
             work.considered += len(valid_discoveries)
             self._record_discovery_outcome(work, normalized)
 
-            checkpoint, permitted = self._checkpoint(request)
+            checkpoint, permitted = self._plan_validator.checkpoint(request)
             if not permitted:
                 current_snapshot = checkpoint or current_snapshot
                 work.interrupted = True
-                work.reasons.extend(self._interruption_reasons(checkpoint, request))
+                work.reasons.extend(
+                    self._plan_validator.interruption_reasons(checkpoint, request)
+                )
                 break
             assert checkpoint is not None
             current_snapshot = checkpoint
@@ -864,10 +524,12 @@ class MediaCandidateCollectionCoordinator:
                 current_snapshot,
             )
 
-        final_snapshot, final_permitted = self._checkpoint(request)
+        final_snapshot, final_permitted = self._plan_validator.checkpoint(request)
         if not final_permitted:
             work.interrupted = True
-            work.reasons.extend(self._interruption_reasons(final_snapshot, request))
+            work.reasons.extend(
+                self._plan_validator.interruption_reasons(final_snapshot, request)
+            )
             final_snapshot = final_snapshot or current_snapshot
         assert final_snapshot is not None
         self._finalize_candidate_records(work, context, request)
@@ -879,151 +541,10 @@ class MediaCandidateCollectionCoordinator:
             work,
         )
 
-    def _checkpoint(
-        self,
-        request: MediaCollectionCycleRequest,
-    ) -> tuple[AgentRuntimeSnapshot | None, bool]:
-        snapshot = self._read_agent_snapshot(request)
-        if snapshot is None:
-            return None, False
-        permitted, _ = self._permission(snapshot, request)
-        return snapshot, permitted
-
-    def _interruption_reasons(
-        self,
-        snapshot: AgentRuntimeSnapshot | None,
-        request: MediaCollectionCycleRequest,
-    ) -> tuple[MediaCollectionCycleReasonCode, ...]:
-        permission_reasons = () if snapshot is None else self._permission(snapshot, request)[1]
-        return (
-            *permission_reasons,
-            MediaCollectionCycleReasonCode.AGENT_LIFECYCLE_CHANGED,
-            MediaCollectionCycleReasonCode.CYCLE_INTERRUPTED,
-        )
-
-    def _invoke_discovery(
-        self,
-        request: MediaCandidateDiscoveryRequest,
-    ) -> MediaCandidateDiscoveryResult:
-        port = self._dependencies.media_candidate_discovery_port
-        if port is None:
-            return MediaCandidateDiscoveryResult(
-                discovery_request_id=request.discovery_request_id,
-                cycle_id=request.collection_cycle_id,
-                port_id=_derived_id("missing-discovery-port"),
-                outcome=MediaCandidateDiscoveryOutcome.FAILED,
-                reasons=("required discovery port is absent",),
-                started_at=request.requested_at,
-                completed_at=request.requested_at,
-            )
-        try:
-            return self._require_discovery_result(port.discover(request))
-        except Exception as error:
-            _logger.error(
-                "media_collection_discovery_failed request_id=%s cycle_id=%s exception_type=%s",
-                request.discovery_request_id.value,
-                request.collection_cycle_id.value,
-                type(error).__name__,
-            )
-            return MediaCandidateDiscoveryResult(
-                discovery_request_id=request.discovery_request_id,
-                cycle_id=request.collection_cycle_id,
-                port_id=_derived_id("failed-discovery-port"),
-                outcome=MediaCandidateDiscoveryOutcome.FAILED,
-                reasons=(f"discovery_port_exception:{type(error).__name__}",),
-                started_at=request.requested_at,
-                completed_at=request.requested_at,
-            )
-
-    def _require_discovery_result(
-        self,
-        result: object,
-    ) -> MediaCandidateDiscoveryResult:
-        if not isinstance(result, MediaCandidateDiscoveryResult):
-            raise TypeError("Discovery port returned an unsupported result type.")
-        return result
-
-    def _normalize_discovery_result(
-        self,
-        request: MediaCandidateDiscoveryRequest,
-        result: MediaCandidateDiscoveryResult,
-        target: RuntimeCollectionTarget,
-    ) -> tuple[MediaCandidateDiscoveryResult, list[DiscoveredMediaCandidate]]:
-        conflicting_discovery_ids = result.conflicting_discovery_ids
-        valid = (
-            result.discovery_request_id == request.discovery_request_id
-            and result.cycle_id == request.collection_cycle_id
-            and not result.conflicting_discovery_ids
-        )
-        candidates: list[DiscoveredMediaCandidate] = []
-        for discovered in result.discovered_candidates:
-            candidate = discovered.candidate
-            resource = candidate.primary_resource
-            wrapper_valid = (
-                discovered.discovery_request_id == request.discovery_request_id
-                and discovered.cycle_id == request.collection_cycle_id
-                and discovered.collection_plan_id == request.collection_plan_id
-                and discovered.collection_target_id == request.collection_target_id
-                and discovered.discovery_port_id == result.port_id
-            )
-            candidate_valid = (
-                candidate.source_runtime_id == request.runtime_id
-                and candidate.runtime_profile.value == self._runtime.profile.value
-                and (
-                    candidate.source_host_id is None
-                    or candidate.source_host_id == target.source_host_id
-                )
-                and (
-                    resource.source_host_id is None
-                    or resource.source_host_id == target.source_host_id
-                )
-                and (
-                    target.source_volume_id is None
-                    or resource.source_volume_id is None
-                    or resource.source_volume_id == target.source_volume_id
-                )
-                and (
-                    candidate.context.stage_id is None
-                    or target.configured_stage_id is None
-                    or candidate.context.stage_id == target.configured_stage_id
-                )
-                and (
-                    candidate.context.recording_block_id is None
-                    or target.configured_recording_block_id is None
-                    or candidate.context.recording_block_id == target.configured_recording_block_id
-                )
-            )
-            if wrapper_valid and candidate_valid:
-                candidates.append(discovered)
-            else:
-                valid = False
-        count_exceeded = len(candidates) > request.maximum_candidate_count
-        if count_exceeded:
-            valid = False
-        if result.outcome is MediaCandidateDiscoveryOutcome.DISCOVERED and not candidates:
-            valid = False
-        if result.outcome is MediaCandidateDiscoveryOutcome.NO_CANDIDATES and candidates:
-            valid = False
-        if not valid:
-            result = replace(
-                result,
-                outcome=MediaCandidateDiscoveryOutcome.INVALID_RESULT,
-                reasons=(*result.reasons, "discovery result violated request identity or limit"),
-                limitations=(
-                    *result.limitations,
-                    *(("candidate_limit_exceeded",) if count_exceeded else ()),
-                ),
-            )
-            object.__setattr__(
-                result,
-                "conflicting_discovery_ids",
-                conflicting_discovery_ids,
-            )
-        return result, candidates
 
     def _retain_discovery_result_conflicts(
         self,
-        work: _CycleWork,
+        work: CycleWork,
         result: MediaCandidateDiscoveryResult,
         target: RuntimeCollectionTarget,
     ) -> None:
@@ -1070,7 +591,7 @@ class MediaCandidateCollectionCoordinator:
 
     def _record_discovery_outcome(
         self,
-        work: _CycleWork,
+        work: CycleWork,
         result: MediaCandidateDiscoveryResult,
     ) -> None:
         outcome_reason = {
@@ -1111,7 +632,7 @@ class MediaCandidateCollectionCoordinator:
 
     def _merge_discovery(
         self,
-        work: _CycleWork,
+        work: CycleWork,
         discovered: DiscoveredMediaCandidate,
         request: MediaCollectionCycleRequest,
     ) -> None:
@@ -1168,7 +689,7 @@ class MediaCandidateCollectionCoordinator:
             work.known.add(candidate.id)
             work.affected.add(candidate.id)
             work.reasons.append(MediaCollectionCycleReasonCode.CANDIDATE_ALREADY_KNOWN)
-            work.candidate_facts.setdefault(key, _CandidateCycleFacts())
+            work.candidate_facts.setdefault(key, CandidateCycleFacts())
             return
 
         conflicting_candidates: set[EntityId] = set()
@@ -1242,7 +763,7 @@ class MediaCandidateCollectionCoordinator:
                 work.conflicted.add(value)
         work.new.add(candidate.id)
         work.affected.add(candidate.id)
-        work.candidate_facts[key] = _CandidateCycleFacts()
+        work.candidate_facts[key] = CandidateCycleFacts()
 
     def _make_conflict(
         self,
@@ -1267,7 +788,7 @@ class MediaCandidateCollectionCoordinator:
             )
         )
         return MediaCandidateConflict(
-            id=_derived_id(self._coordinator_id.value, "conflict", code.value, identity),
+            id=derived_id(self._coordinator_id.value, "conflict", code.value, identity),
             candidate_ids=candidate_ids,
             proposed_asset_ids=proposed_asset_ids,
             resource_ids=resource_ids,
@@ -1279,7 +800,7 @@ class MediaCandidateCollectionCoordinator:
 
     def _retain_conflict(
         self,
-        work: _CycleWork,
+        work: CycleWork,
         conflict: MediaCandidateConflict,
         existing_candidate_ids: Sequence[EntityId],
     ) -> None:
@@ -1300,8 +821,8 @@ class MediaCandidateCollectionCoordinator:
     def _collect_observations(
         self,
         request: MediaCollectionCycleRequest,
-        context: _PlanContext,
-        work: _CycleWork,
+        context: PlanContext,
+        work: CycleWork,
         candidate_ids: Sequence[EntityId],
         current_snapshot: AgentRuntimeSnapshot,
     ) -> AgentRuntimeSnapshot:
@@ -1336,14 +857,16 @@ class MediaCandidateCollectionCoordinator:
                 )
                 if not selected:
                     continue
-                checkpoint, permitted = self._checkpoint(request)
+                checkpoint, permitted = self._plan_validator.checkpoint(request)
                 if not permitted:
                     current_snapshot = checkpoint or current_snapshot
                     work.interrupted = True
                     work.deferred.update(candidate_ids)
                     for deferred_id in candidate_ids:
                         work.candidate_facts[deferred_id.value].deferred = True
-                    work.reasons.extend(self._interruption_reasons(checkpoint, request))
+                    work.reasons.extend(
+                        self._plan_validator.interruption_reasons(checkpoint, request)
+                    )
                     return current_snapshot
                 assert checkpoint is not None
                 if (
@@ -1384,14 +907,16 @@ class MediaCandidateCollectionCoordinator:
                             MediaCollectionCycleReasonCode.OBSERVATION_CALL_LIMIT_REACHED
                         )
                         return current_snapshot
-                    checkpoint, permitted = self._checkpoint(request)
+                    checkpoint, permitted = self._plan_validator.checkpoint(request)
                     if not permitted:
                         current_snapshot = checkpoint or current_snapshot
                         work.interrupted = True
                         work.deferred.update(candidate_ids)
                         for deferred_id in candidate_ids:
                             work.candidate_facts[deferred_id.value].deferred = True
-                        work.reasons.extend(self._interruption_reasons(checkpoint, request))
+                        work.reasons.extend(
+                            self._plan_validator.interruption_reasons(checkpoint, request)
+                        )
                         return current_snapshot
                     assert checkpoint is not None
                     if (
@@ -1425,7 +950,7 @@ class MediaCandidateCollectionCoordinator:
                         work.partial = True
                         continue
                     observation_request = MediaObservationCollectionRequest(
-                        collection_request_id=_derived_id(
+                        collection_request_id=derived_id(
                             self._coordinator_id.value,
                             request.cycle_id.value,
                             "observation-request",
@@ -1447,10 +972,10 @@ class MediaCandidateCollectionCoordinator:
                         required=required_phase,
                         source_capability_ids=(target.source_capability_id,),
                     )
-                    result = self._invoke_observation(observation_request)
+                    result = self._ports.invoke_observation(observation_request)
                     work.observation_calls += 1
                     work.candidate_facts[candidate_id.value].attempted += 1
-                    normalized, observations = self._normalize_observation_result(
+                    normalized, observations = self._ports.normalize_observation_result(
                         observation_request,
                         result,
                     )
@@ -1503,7 +1028,7 @@ class MediaCandidateCollectionCoordinator:
         reason: str,
     ) -> MediaObservationCollectionResult:
         return MediaObservationCollectionResult(
-            collection_request_id=_derived_id(
+            collection_request_id=derived_id(
                 self._coordinator_id.value,
                 request.cycle_id.value,
                 "deferred-observation",
@@ -1521,144 +1046,10 @@ class MediaCandidateCollectionCoordinator:
             completed_at=request.requested_at,
         )
 
-    def _observation_port(self, observation_type: RuntimeObservationType) -> object | None:
-        if observation_type is RuntimeObservationType.RESOURCE_SNAPSHOT:
-            return self._dependencies.resource_snapshot_collection_port
-        if observation_type is RuntimeObservationType.FINALIZATION:
-            return self._dependencies.finalization_observation_collection_port
-        if observation_type is RuntimeObservationType.WRITE_STATE:
-            return self._dependencies.write_state_observation_collection_port
-        if observation_type is RuntimeObservationType.READ_ACCESS:
-            return self._dependencies.read_access_observation_collection_port
-        if observation_type is RuntimeObservationType.RESOURCE_PRESENCE:
-            return self._dependencies.resource_presence_observation_collection_port
-        return None
-
-    def _invoke_observation(
-        self,
-        request: MediaObservationCollectionRequest,
-    ) -> MediaObservationCollectionResult:
-        port = self._observation_port(request.observation_type)
-        try:
-            if request.observation_type is RuntimeObservationType.RESOURCE_SNAPSHOT:
-                collector = self._dependencies.resource_snapshot_collection_port
-                if collector is None:
-                    raise RuntimeError("Resource snapshot port is absent.")
-                result: object = collector.collect_resource_snapshot(request)
-                return self._require_observation_result(result)
-            if request.observation_type is RuntimeObservationType.FINALIZATION:
-                collector = self._dependencies.finalization_observation_collection_port
-                if collector is None:
-                    raise RuntimeError("Finalization port is absent.")
-                result = collector.collect_finalization_observation(request)
-                return self._require_observation_result(result)
-            if request.observation_type is RuntimeObservationType.WRITE_STATE:
-                collector = self._dependencies.write_state_observation_collection_port
-                if collector is None:
-                    raise RuntimeError("Write-state port is absent.")
-                result = collector.collect_write_state_observation(request)
-                return self._require_observation_result(result)
-            if request.observation_type is RuntimeObservationType.READ_ACCESS:
-                collector = self._dependencies.read_access_observation_collection_port
-                if collector is None:
-                    raise RuntimeError("Read-access port is absent.")
-                result = collector.collect_read_access_observation(request)
-                return self._require_observation_result(result)
-            if request.observation_type is RuntimeObservationType.RESOURCE_PRESENCE:
-                collector = self._dependencies.resource_presence_observation_collection_port
-                if collector is None:
-                    raise RuntimeError("Resource-presence port is absent.")
-                result = collector.collect_resource_presence_observation(request)
-                return self._require_observation_result(result)
-            raise ValueError("Unsupported observation type.")
-        except Exception as error:
-            _logger.error(
-                (
-                    "media_collection_observation_failed candidate_id=%s "
-                    "resource_id=%s observation_type=%s exception_type=%s"
-                ),
-                request.candidate_id.value,
-                request.resource_id.value,
-                request.observation_type.value,
-                type(error).__name__,
-            )
-            return MediaObservationCollectionResult(
-                collection_request_id=request.collection_request_id,
-                cycle_id=request.collection_cycle_id,
-                candidate_id=request.candidate_id,
-                resource_id=request.resource_id,
-                observation_type=request.observation_type,
-                port_id=(
-                    _derived_id("missing-observation-port", request.observation_type.value)
-                    if port is None
-                    else request.observation_capability_id
-                ),
-                outcome=MediaObservationCollectionOutcome.FAILED,
-                reasons=(f"observation_port_exception:{type(error).__name__}",),
-                started_at=request.requested_at,
-                completed_at=request.requested_at,
-            )
-
-    def _require_observation_result(
-        self,
-        result: object,
-    ) -> MediaObservationCollectionResult:
-        if not isinstance(result, MediaObservationCollectionResult):
-            raise TypeError("Observation port returned an unsupported result type.")
-        return result
-
-    def _normalize_observation_result(
-        self,
-        request: MediaObservationCollectionRequest,
-        result: MediaObservationCollectionResult,
-    ) -> tuple[MediaObservationCollectionResult, tuple[AssetReadinessObservation, ...]]:
-        conflicting_observation_ids = result.conflicting_observation_ids
-        valid = (
-            result.collection_request_id == request.collection_request_id
-            and result.cycle_id == request.collection_cycle_id
-            and result.candidate_id == request.candidate_id
-            and result.resource_id == request.resource_id
-            and result.observation_type is request.observation_type
-        )
-        expected_class = _OBSERVATION_CLASSES[request.observation_type]
-        observations: list[AssetReadinessObservation] = []
-        conflicting_values = set(result.conflicting_observation_ids)
-        for observation in result.observations:
-            observation_valid = (
-                isinstance(observation, expected_class)
-                and observation.candidate_id == request.candidate_id
-                and observation.resource_id == request.resource_id
-                and (
-                    observation.source_runtime_id is None
-                    or observation.source_runtime_id == request.runtime_id
-                )
-            )
-            if not observation_valid:
-                valid = False
-            elif observation.id not in conflicting_values:
-                observations.append(observation)
-        if conflicting_values:
-            valid = False
-        if result.outcome is MediaObservationCollectionOutcome.COLLECTED and not observations:
-            valid = False
-        if result.outcome is MediaObservationCollectionOutcome.NO_OBSERVATION and observations:
-            valid = False
-        if not valid:
-            result = replace(
-                result,
-                outcome=MediaObservationCollectionOutcome.INVALID_RESULT,
-                reasons=(*result.reasons, "observation result violated request identity"),
-            )
-            object.__setattr__(
-                result,
-                "conflicting_observation_ids",
-                conflicting_observation_ids,
-            )
-        return result, tuple(observations)
 
     def _merge_observation_result(
         self,
-        work: _CycleWork,
+        work: CycleWork,
         candidate_id: EntityId,
         capability: RuntimeObservationCapability,
         required: bool,
@@ -1817,7 +1208,7 @@ class MediaCandidateCollectionCoordinator:
         created_at: datetime,
     ) -> AssetReadinessObservationBundle:
         return AssetReadinessObservationBundle(
-            id=_derived_id(
+            id=derived_id(
                 self._coordinator_id.value,
                 "observation-bundle",
                 record.candidate.id.value,
@@ -1846,8 +1237,8 @@ class MediaCandidateCollectionCoordinator:
 
     def _finalize_candidate_records(
         self,
-        work: _CycleWork,
-        context: _PlanContext,
+        work: CycleWork,
+        context: PlanContext,
         request: MediaCollectionCycleRequest,
     ) -> None:
         all_required_types = {
@@ -1873,7 +1264,7 @@ class MediaCandidateCollectionCoordinator:
                 supplied_types.update(
                     self._observation_type(value) for value in bundle.all_observations
                 )
-            facts = work.candidate_facts.get(candidate_id.value, _CandidateCycleFacts())
+            facts = work.candidate_facts.get(candidate_id.value, CandidateCycleFacts())
             if candidate_id in work.conflicted or record.conflict_ids:
                 status = MediaCandidateCollectionStatus.CONFLICTED
             elif facts.attempted == 0:
@@ -1914,10 +1305,10 @@ class MediaCandidateCollectionCoordinator:
     def _commit_work(
         self,
         request: MediaCollectionCycleRequest,
-        reservation: _ActiveReservation,
+        reservation: ActiveReservation,
         initial_snapshot: AgentRuntimeSnapshot,
         final_snapshot: AgentRuntimeSnapshot,
-        work: _CycleWork,
+        work: CycleWork,
     ) -> MediaCollectionCycleResult:
         if work.interrupted:
             outcome = MediaCollectionCycleOutcome.INTERRUPTED
@@ -2012,21 +1403,21 @@ class MediaCandidateCollectionCoordinator:
                 completed_at=completed_at,
             )
             completed = dict(self._state.completed_cycle_results)
-            completed[request.operation_id.value] = _OperationRecord(
+            completed[request.operation_id.value] = OperationRecord(
                 reservation.fingerprint,
                 result,
             )
             fingerprints = dict(self._state.operation_fingerprints)
             fingerprints[request.operation_id.value] = reservation.fingerprint
-            self._state = _CoordinatorState(
+            self._state = CoordinatorState(
                 snapshot=current,
-                candidate_records=_mapping(work.records),
-                proposed_asset_index=_mapping(work.proposed_index),
-                resource_index=_mapping(work.resource_index),
-                observation_bundles=_mapping(work.bundles),
-                conflicts=_mapping(work.conflicts),
-                completed_cycle_results=_mapping(completed),
-                operation_fingerprints=_mapping(fingerprints),
+                candidate_records=immutable_mapping(work.records),
+                proposed_asset_index=immutable_mapping(work.proposed_index),
+                resource_index=immutable_mapping(work.resource_index),
+                observation_bundles=immutable_mapping(work.bundles),
+                conflicts=immutable_mapping(work.conflicts),
+                completed_cycle_results=immutable_mapping(completed),
+                operation_fingerprints=immutable_mapping(fingerprints),
                 cycle_history=(*self._state.cycle_history, result),
                 active_cycle_reservation=None,
             )
@@ -2035,7 +1426,7 @@ class MediaCandidateCollectionCoordinator:
     def _commit_unexpected_failure(
         self,
         request: MediaCollectionCycleRequest,
-        reservation: _ActiveReservation,
+        reservation: ActiveReservation,
         initial_snapshot: AgentRuntimeSnapshot,
     ) -> MediaCollectionCycleResult:
         with self._lock:
@@ -2085,7 +1476,7 @@ class MediaCandidateCollectionCoordinator:
                 completed_at=request.requested_at,
             )
             completed = dict(self._state.completed_cycle_results)
-            completed[request.operation_id.value] = _OperationRecord(
+            completed[request.operation_id.value] = OperationRecord(
                 reservation.fingerprint,
                 result,
             )
@@ -2094,8 +1485,8 @@ class MediaCandidateCollectionCoordinator:
             self._state = replace(
                 self._state,
                 snapshot=current,
-                completed_cycle_results=_mapping(completed),
-                operation_fingerprints=_mapping(fingerprints),
+                completed_cycle_results=immutable_mapping(completed),
+                operation_fingerprints=immutable_mapping(fingerprints),
                 cycle_history=(*self._state.cycle_history, result),
                 active_cycle_reservation=None,
             )
