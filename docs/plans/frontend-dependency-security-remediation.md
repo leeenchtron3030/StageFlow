@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved
+Completed
 
 ## Execution authority
 
@@ -150,14 +150,14 @@ Not applicable.
 
 ## Acceptance criteria
 
-- [ ] `npm audit` reports zero vulnerabilities, or every remaining one is explicitly
+- [x] `npm audit` reports zero vulnerabilities, or every remaining one is explicitly
   documented with the reason it wasn't forced.
-- [ ] `npm sbom --package-lock-only` succeeds (the `ESBOMPROBLEMS` lockfile-integrity
+- [x] `npm sbom --package-lock-only` succeeds (the `ESBOMPROBLEMS` lockfile-integrity
   issue ED-0066 flagged is resolved).
-- [ ] The `unrs-resolver` pending install-script notice is explicitly reviewed and either
+- [x] The `unrs-resolver` pending install-script notice is explicitly reviewed and either
   approved or documented as deliberately pending.
-- [ ] Full frontend quality suite (test/lint/typecheck/build) passes.
-- [ ] No `package.json` version constraint widened beyond what was already declared,
+- [x] Full frontend quality suite (test/lint/typecheck/build) passes.
+- [x] No `package.json` version constraint widened beyond what was already declared,
   except where genuinely required and documented.
 
 ## Rollback or reversal
@@ -172,4 +172,23 @@ or runtime configuration to reverse.
 
 ## Completion record
 
-_(To be filled in by whoever implements this plan.)_
+- `npm audit fix` ran without `--force`: Next.js resolved from 16.2.11 to 16.3.2
+  within the existing `^16.2.11` declaration, with the documented compatible
+  transitive remediations. `npm audit` now reports zero vulnerabilities.
+- The optional lock graph now satisfies Tailwind's `@emnapi/core ^1.11.1` and
+  `@emnapi/wasi-threads ^1.2.2` requirements while nesting the exact 1.10.0/1.2.1
+  versions required by `@unrs/resolver-binding-wasm32-wasi`.
+  `npm sbom --package-lock-only --sbom-format cyclonedx` succeeds without
+  `ESBOMPROBLEMS`; the checked-in reproducible
+  `docs/security/sbom/frontend.cdx.json` artifact was regenerated and validated.
+- `unrs-resolver@1.12.2`'s postinstall and its `napi-postinstall` helper were read.
+  The script remains deliberately pending because its fallback can invoke npm or
+  download a native binding when an optional platform binding is absent; the current
+  binding and all quality checks work without granting that network-capable fallback.
+  `npm audit signatures` verified 586 packages and reported 117 attestations.
+- A clean `npm ci` installed 586 packages and audited 587 with zero vulnerabilities.
+  `npm.cmd test` passed 55 tests; lint, typecheck, and the Next.js 16.3.2 production
+  build passed. The build updated the tracked generated `next-env.d.ts` references for
+  the new Next.js version.
+- `package.json` is unchanged. No production application source, backend dependency,
+  schema, migration, runtime configuration, or external service changed.

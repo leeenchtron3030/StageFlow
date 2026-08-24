@@ -126,12 +126,34 @@ license, security-patching, offline, platform, lockfile, and qualification conse
   attribution obligations.
 - Backend owner: establish PyAV wheel/FFmpeg build provenance before distributing the
   transcription group; choose one option above through an approved plan.
-- Frontend owner: repair or regenerate the npm lock graph so npm's own SBOM command passes,
-  without opportunistically upgrading unrelated dependencies.
+- Frontend owner: completed by ED-0069 on 2026-08-23. The repaired npm lock graph now
+  passes npm's own SBOM command after the authorized audit remediation.
 - Release owner: retain notices/source-offer/relinking materials required for the exact
   platform artifacts actually distributed.
 - Engineering: regenerate and diff these artifacts after every accepted dependency or
   lockfile change.
+
+## ED-0069 frontend remediation closure
+
+ED-0069 ran `npm audit fix` without `--force`, staying within the existing
+`next ^16.2.11` declaration. The lockfile now resolves Next.js 16.3.2 and its remediated
+transitive dependency set; `npm audit` reports zero vulnerabilities.
+
+The optional WASI graph now hoists `@emnapi/core@1.11.1` and
+`@emnapi/wasi-threads@1.2.2` for `@tailwindcss/oxide-wasm32-wasi`, while retaining
+`@unrs/resolver-binding-wasm32-wasi`'s exact older requirements in its nested lockfile
+scope. `npm sbom --package-lock-only --sbom-format cyclonedx` completes without
+`ESBOMPROBLEMS`. The checked-in reproducible
+`docs/security/sbom/frontend.cdx.json` was regenerated and validated from the repaired
+lockfile.
+
+`unrs-resolver@1.12.2` and all packages examined by `npm audit signatures` have
+verified registry signatures; npm reported 586 verified packages and 117 attestations.
+Its postinstall remains deliberately unapproved. The reviewed script delegates to
+`napi-postinstall`, which may run a nested npm install or download a native binding when
+the platform binding is absent. The supported Windows binding is already present and the
+clean install plus full quality suite passes without granting that extra network-capable
+fallback. This is a package-specific decision, not a blanket script policy.
 
 ## Commands executed
 
