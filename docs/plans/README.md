@@ -115,7 +115,7 @@ or architecture document unless those documents are explicitly updated.
 | [CI quality-matrix enforcement](ci-quality-matrix-enforcement.md) | Completed — independent review accepted | StageFlow Engineering | ABR-015 |
 | [Durable Event-Mode Kernel](durable-event-mode-kernel.md) | Completed operational foundation — not a readiness claim | StageFlow Architecture / Backend | ADR-0019-ADR-0024; D-01-D-08 |
 | [Minimal shared-secret API authentication](api-shared-secret-authentication.md) | Completed - Green security boundary | StageFlow Backend / Security | Due-diligence audit Blocker finding; ED-0055 |
-| [CI durability-test enablement and frontend test enforcement](ci-durability-and-frontend-enforcement.md) | Implementation complete; first hosted CI run and owner branch-protection action pending | StageFlow Engineering | Due-diligence audit Major finding; ED-0056 |
+| [CI durability-test enablement and frontend test enforcement](ci-durability-and-frontend-enforcement.md) | Completed - hosted CI verified; owner branch-protection action pending | StageFlow Engineering | Due-diligence audit Major finding; ED-0056 |
 | [Media candidate collection coordinator failure visibility](media-coordinator-failure-visibility.md) | Completed - Green observability correction | StageFlow Backend / Operations | Due-diligence audit Major finding; ED-0057 |
 | [Governance and documentation reconciliation](governance-documentation-reconciliation.md) | Completed - Green documentation reconciliation | StageFlow Engineering / Documentation | Due-diligence audit Major findings; ED-0058 |
 | [Stale environment example correction](stale-environment-example-correction.md) | Completed - Green documentation correction | StageFlow Engineering | ED-0059 |
