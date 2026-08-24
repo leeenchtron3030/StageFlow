@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved
+Completed
 
 ## Execution authority
 
@@ -173,13 +173,13 @@ limit returns) must be explicit, not silent.
 
 ## Acceptance criteria
 
-- [ ] Bounded queries correctly identify Sessions in `READY_FOR_REVIEW`/
+- [x] Bounded queries correctly identify Sessions in `READY_FOR_REVIEW`/
   `CORRECTION_REQUIRED` and associations in `UNRESOLVED`/`CONFLICT`, scoped to one Event.
-- [ ] The Work Queue API route is paginated, ordered deterministically, bounded by an
+- [x] The Work Queue API route is paginated, ordered deterministically, bounded by an
   explicit limit, and included behind the existing ED-0055 shared-secret dependency.
-- [ ] No new persisted table or migration is introduced.
-- [ ] No existing Kernel repository method, contract, or route changed behavior.
-- [ ] Full backend suite, Ruff, and Pyright pass; `git diff --check` passes.
+- [x] No new persisted table or migration is introduced.
+- [x] No existing Kernel repository method, contract, or route changed behavior.
+- [x] Full backend suite, Ruff, and Pyright pass; `git diff --check` passes.
 
 ## Rollback or reversal
 
@@ -195,4 +195,23 @@ reverse — this slice never persists anything new.
 
 ## Completion record
 
-_(To be filled in by whoever implements this plan.)_
+- Implemented immutable Work Queue subject/position contracts and pure Session/
+  association mappings for exactly the four authorized decision types. Projection IDs
+  derive from authoritative subject IDs; ordering is operational priority, subject
+  update time, then projection ID.
+- Added bounded keyset queries to both Kernel repository implementations. PostgreSQL
+  uses one Event-scoped union over existing `session`, `media_association`,
+  `completed_media_asset_registry`, and `stage` tables; no table, migration, or
+  persisted queue state was added.
+- Added authenticated
+  `GET /api/v1/producer/events/{event_id}/work-queue` with a maximum limit of 100,
+  opaque continuation cursor, explicit truncation, current subject revision/context,
+  reason codes, and stable action references.
+- Added behavior tests for the four qualifying transitions, disappearance after
+  authoritative resolution, Event isolation, authentication, deterministic pagination,
+  invalid cursors, and the real PostgreSQL query.
+- Validation: focused suite 4 passed; full backend suite 1,807 passed and 5 skipped;
+  Ruff passed; Pyright reported 0 errors; `git diff --check` passed. The only test
+  warning was the existing FastAPI TestClient/httpx deprecation warning.
+- No dependency, schema, migration, runtime-configuration, external-service, or
+  authority-semantic change was made.
