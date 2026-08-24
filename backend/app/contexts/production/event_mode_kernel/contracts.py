@@ -64,6 +64,18 @@ class AssociationAuthority(StrEnum):
     HUMAN = "human"
 
 
+class ProducerWorkDecisionType(StrEnum):
+    PACKAGE_READY_FOR_REVIEW = "package_ready_for_review"
+    PACKAGE_CORRECTION_REQUIRED = "package_correction_required"
+    ASSOCIATION_UNRESOLVED = "association_unresolved"
+    ASSOCIATION_CONFLICT = "association_conflict"
+
+
+class ProducerWorkSubjectKind(StrEnum):
+    SESSION_PACKAGE = "session_package"
+    MEDIA_ASSOCIATION = "media_association"
+
+
 class HumanCommandKind(StrEnum):
     SESSION_START = "session_start"
     SESSION_BOUNDARY_CORRECTION = "session_boundary_correction"
@@ -350,6 +362,67 @@ class MediaAssociation:
         if self.revision < 1:
             raise ValueError("Association revision must be positive.")
         require_aware_datetime(self.decided_at, "decided_at")
+
+
+@dataclass(frozen=True, slots=True)
+class ProducerWorkQueuePosition:
+    priority: int
+    updated_at: datetime
+    projection_id: str
+
+    def __post_init__(self) -> None:
+        if self.priority < 1:
+            raise ValueError("Work Queue priority must be positive.")
+        require_aware_datetime(self.updated_at, "updated_at")
+        object.__setattr__(
+            self, "projection_id", _text(self.projection_id, "projection_id")
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ProducerWorkQueueSubject:
+    projection_id: str
+    decision_type: ProducerWorkDecisionType
+    subject_kind: ProducerWorkSubjectKind
+    subject_id: EntityId
+    subject_revision: int
+    event_id: EntityId
+    stage_id: EntityId
+    session_id: EntityId | None
+    priority: int
+    reason_codes: Sequence[str]
+    action_reference: str
+    created_at: datetime
+    updated_at: datetime
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self, "projection_id", _text(self.projection_id, "projection_id")
+        )
+        object.__setattr__(
+            self, "action_reference", _text(self.action_reference, "action_reference")
+        )
+        object.__setattr__(
+            self,
+            "reason_codes",
+            tuple(sorted({_text(value, "reason_code") for value in self.reason_codes})),
+        )
+        if self.subject_revision < 1:
+            raise ValueError("Work Queue subject revision must be positive.")
+        if self.priority < 1:
+            raise ValueError("Work Queue priority must be positive.")
+        require_aware_datetime(self.created_at, "created_at")
+        require_aware_datetime(self.updated_at, "updated_at")
+        if self.updated_at < self.created_at:
+            raise ValueError("Work Queue update cannot precede subject creation.")
+
+    @property
+    def position(self) -> ProducerWorkQueuePosition:
+        return ProducerWorkQueuePosition(
+            priority=self.priority,
+            updated_at=self.updated_at,
+            projection_id=self.projection_id,
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -649,6 +722,10 @@ __all__ = [
     "MediaOperationalProjection",
     "MediaRegistrationState",
     "PackageReadyDecision",
+    "ProducerWorkDecisionType",
+    "ProducerWorkQueuePosition",
+    "ProducerWorkQueueSubject",
+    "ProducerWorkSubjectKind",
     "ReconciliationRun",
     "ReconciliationStatus",
     "RegisteredMediaAsset",

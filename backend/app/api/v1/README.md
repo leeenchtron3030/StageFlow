@@ -9,7 +9,10 @@ This package contains version 1 HTTP routes.
 The API currently exposes:
 
 - `GET /api/v1/health` for process liveness; and
-- `GET /api/v1/kernel/status` for the bounded, read-only Producer Kernel projection.
+- `GET /api/v1/kernel/status` for the bounded, read-only Producer Kernel projection;
+- `GET /api/v1/producer/events/{event_id}/work-queue` for the bounded, keyset-paginated
+  Producer decisions derived from authoritative Session package and media-association
+  state;
 - `GET /api/v1/media-assets/{asset_id}/timing-evidence` for sanitized, revision-preserving
   advisory Media Timing Evidence linked to one registered Completed Media Asset.
 - `POST /api/v1/editorial/moments/mark` for idempotent human declaration of one
@@ -23,6 +26,9 @@ boundary proposals, and attention codes without exposing DSNs or configured sour
 Its bounded Session entries include Editorial candidate activity when the Editorial
 repository is available and report `unknown` rather than fabricating worker state when it
 is not.
+The Producer Work Queue contains only package-ready, package-correction, unresolved
+association, and conflicting-association items. It introduces no queue table or mutable
+task authority; each item references the current Kernel subject and revision.
 The MTE history projection separates Observed facts from Derived candidate intervals and
 includes provider/tool/profile, qualification, limitations, and `advisory_only` use. It
 omits operation digests, credentials, paths, filenames, and raw provider diagnostics.

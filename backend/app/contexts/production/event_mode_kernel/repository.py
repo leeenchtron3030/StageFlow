@@ -30,6 +30,8 @@ from .contracts import (
     MediaOperationalProjection,
     MediaRegistrationState,
     PackageReadyDecision,
+    ProducerWorkQueuePosition,
+    ProducerWorkQueueSubject,
     ReconciliationRun,
     ReconciliationStatus,
     RegisteredMediaAsset,
@@ -40,6 +42,11 @@ from .contracts import (
     StartSessionRequest,
 )
 from .program_reconciliation import plan_program_reconciliation
+from .work_queue import (
+    association_work_queue_subject,
+    session_work_queue_subject,
+    work_queue_sort_key,
+)
 
 
 class KernelConflictError(RuntimeError):
@@ -156,6 +163,15 @@ class EventModeKernelRepository(ABC):
 
     @abstractmethod
     def get_association(self, asset_id: EntityId) -> MediaAssociation | None: ...
+
+    @abstractmethod
+    def list_producer_work_queue(
+        self,
+        event_id: EntityId,
+        *,
+        after: ProducerWorkQueuePosition | None = None,
+        limit: int = 50,
+    ) -> tuple[ProducerWorkQueueSubject, ...]: ...
 
     @abstractmethod
     def set_package_state(self, session_id: EntityId, state: str, at: datetime) -> Session: ...
@@ -846,6 +862,50 @@ class InMemoryEventModeKernelRepository(EventModeKernelRepository):
     def get_association(self, asset_id: EntityId) -> MediaAssociation | None:
         with self._lock:
             return self._associations.get(asset_id)
+
+    def list_producer_work_queue(
+        self,
+        event_id: EntityId,
+        *,
+        after: ProducerWorkQueuePosition | None = None,
+        limit: int = 50,
+    ) -> tuple[ProducerWorkQueueSubject, ...]:
+        if limit < 1 or limit > 101:
+            raise ValueError("limit must be between 1 and 101")
+        with self._lock:
+            subjects = [
+                subject
+                for session in self._sessions.values()
+                if session.event_id == event_id
+                if (subject := session_work_queue_subject(session)) is not None
+            ]
+            for association in self._associations.values():
+                asset = self._assets.get(association.asset_id)
+                if asset is None:
+                    continue
+                stage = self._stages.get(asset.stage_id)
+                if stage is None or stage.event_id != event_id:
+                    continue
+                subject = association_work_queue_subject(
+                    association,
+                    asset,
+                    event_id=event_id,
+                )
+                if subject is not None:
+                    subjects.append(subject)
+            subjects.sort(key=work_queue_sort_key)
+            if after is not None:
+                position = (
+                    after.priority,
+                    after.updated_at,
+                    after.projection_id,
+                )
+                subjects = [
+                    subject
+                    for subject in subjects
+                    if work_queue_sort_key(subject) > position
+                ]
+            return tuple(subjects[:limit])
 
     def set_package_state(self, session_id: EntityId, state: str, at: datetime) -> Session:
         from .contracts import SessionPackageState
