@@ -1941,8 +1941,8 @@
       "type": "library",
       "name": "core",
       "group": "@emnapi",
-      "version": "1.10.0",
-      "bom-ref": "stageflow-frontend@0.1.0|@emnapi/core@1.10.0",
+      "version": "1.11.1",
+      "bom-ref": "stageflow-frontend@0.1.0|@emnapi/core@1.11.1",
       "scope": "optional",
       "licenses": [
         {
@@ -1952,15 +1952,15 @@
           }
         }
       ],
-      "purl": "pkg:npm/%40emnapi/core@1.10.0",
+      "purl": "pkg:npm/%40emnapi/core@1.11.1",
       "externalReferences": [
         {
-          "url": "https://registry.npmjs.org/@emnapi/core/-/core-1.10.0.tgz",
+          "url": "https://registry.npmjs.org/@emnapi/core/-/core-1.11.1.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "caae8e909e29f360807cf974bbd99079b40728f26463b5ab22e936d3971362761efa4d99f18061d7516b6d11bf1fa8a18aba9c69c3a09760483bca323102de5f"
+              "content": "452bdb4261f374accdb0b61aff01eb6dcdca378b182ca01d3d9c6a88cd87013aaffd2064dbf10d487a6f5c668b38c72c032cf4a68106aa49a62981b739688911"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -2017,8 +2017,8 @@
       "type": "library",
       "name": "wasi-threads",
       "group": "@emnapi",
-      "version": "1.2.1",
-      "bom-ref": "stageflow-frontend@0.1.0|@emnapi/wasi-threads@1.2.1",
+      "version": "1.2.2",
+      "bom-ref": "stageflow-frontend@0.1.0|@emnapi/wasi-threads@1.2.2",
       "scope": "optional",
       "licenses": [
         {
@@ -2028,15 +2028,15 @@
           }
         }
       ],
-      "purl": "pkg:npm/%40emnapi/wasi-threads@1.2.1",
+      "purl": "pkg:npm/%40emnapi/wasi-threads@1.2.2",
       "externalReferences": [
         {
-          "url": "https://registry.npmjs.org/@emnapi/wasi-threads/-/wasi-threads-1.2.1.tgz",
+          "url": "https://registry.npmjs.org/@emnapi/wasi-threads/-/wasi-threads-1.2.2.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "b93208ece605fbf31eb3f32b708398a79c8eb5230b056488a0b3e9720c22a6888a6e58ba937db6b5ca05b31a082313c3a96d35490180824a38133662d8136fdb"
+              "content": "73de6a39790777274d2a1b1c05379ba840b5095019a72a8e7d57c1cd0d6a833ca5de07de95d5232208036c86600cab072e09ec33e8a01fb4c9fde01ab1a56e30"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -2251,8 +2251,8 @@
         {
           "type": "library",
           "name": "brace-expansion",
-          "version": "1.1.15",
-          "bom-ref": "stageflow-frontend@0.1.0|@eslint/config-array@0.21.2|brace-expansion@1.1.15",
+          "version": "1.1.18",
+          "bom-ref": "stageflow-frontend@0.1.0|@eslint/config-array@0.21.2|brace-expansion@1.1.18",
           "licenses": [
             {
               "license": {
@@ -2261,15 +2261,15 @@
               }
             }
           ],
-          "purl": "pkg:npm/brace-expansion@1.1.15",
+          "purl": "pkg:npm/brace-expansion@1.1.18",
           "externalReferences": [
             {
-              "url": "https://registry.npmjs.org/brace-expansion/-/brace-expansion-1.1.15.tgz",
+              "url": "https://registry.npmjs.org/brace-expansion/-/brace-expansion-1.1.18.tgz",
               "type": "distribution",
               "hashes": [
                 {
                   "alg": "SHA-512",
-                  "content": "1303820c47b1e2ab83dfb5e1a8cde89b0b4ca098ebfff8ac519cf5268a543569acfb8676562c8cfe4d5821178fa6854d9d0844367c6d1632dac4d1eb4fbc4852"
+                  "content": "11d7a9fd7f5f1aa54d9b328156c0d820eb43fb3d6db9ecd5ef42c18dd0acb7d4eabbbea5b27bd1899ea84e27359fefc12305fa4031803bde0f3783764800efb7"
                 }
               ],
               "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -2484,8 +2484,8 @@
         {
           "type": "library",
           "name": "brace-expansion",
-          "version": "1.1.15",
-          "bom-ref": "stageflow-frontend@0.1.0|@eslint/eslintrc@3.3.5|brace-expansion@1.1.15",
+          "version": "1.1.18",
+          "bom-ref": "stageflow-frontend@0.1.0|@eslint/eslintrc@3.3.5|brace-expansion@1.1.18",
           "licenses": [
             {
               "license": {
@@ -2494,15 +2494,15 @@
               }
             }
           ],
-          "purl": "pkg:npm/brace-expansion@1.1.15",
+          "purl": "pkg:npm/brace-expansion@1.1.18",
           "externalReferences": [
             {
-              "url": "https://registry.npmjs.org/brace-expansion/-/brace-expansion-1.1.15.tgz",
+              "url": "https://registry.npmjs.org/brace-expansion/-/brace-expansion-1.1.18.tgz",
               "type": "distribution",
               "hashes": [
                 {
                   "alg": "SHA-512",
-                  "content": "1303820c47b1e2ab83dfb5e1a8cde89b0b4ca098ebfff8ac519cf5268a543569acfb8676562c8cfe4d5821178fa6854d9d0844367c6d1632dac4d1eb4fbc4852"
+                  "content": "11d7a9fd7f5f1aa54d9b328156c0d820eb43fb3d6db9ecd5ef42c18dd0acb7d4eabbbea5b27bd1899ea84e27359fefc12305fa4031803bde0f3783764800efb7"
                 }
               ],
               "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -2718,8 +2718,8 @@
       "type": "library",
       "name": "node-server",
       "group": "@hono",
-      "version": "1.19.14",
-      "bom-ref": "stageflow-frontend@0.1.0|@hono/node-server@1.19.14",
+      "version": "1.19.17",
+      "bom-ref": "stageflow-frontend@0.1.0|@hono/node-server@1.19.17",
       "licenses": [
         {
           "license": {
@@ -2728,15 +2728,15 @@
           }
         }
       ],
-      "purl": "pkg:npm/%40hono/node-server@1.19.14",
+      "purl": "pkg:npm/%40hono/node-server@1.19.17",
       "externalReferences": [
         {
-          "url": "https://registry.npmjs.org/@hono/node-server/-/node-server-1.19.14.tgz",
+          "url": "https://registry.npmjs.org/@hono/node-server/-/node-server-1.19.17.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "1b0b6f82d5f19d6b2e717bdb41791182a92c887d9079ddfb1fdc47668704e6c03737c3bc3bcffc140dee725417c5757373d5c166e10e30aefeaf4d85992a47b7"
+              "content": "7529de4b9aa189ab995860c278ae28ebde5777d9d4363be249908c42b8f5d1e7adafc5259f5b9c9fa6dba6138ce94ca700c32d348cd9352a4bf6f9c0489c2b3d"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -2988,8 +2988,8 @@
       "type": "library",
       "name": "sharp-darwin-arm64",
       "group": "@img",
-      "version": "0.34.5",
-      "bom-ref": "stageflow-frontend@0.1.0|@img/sharp-darwin-arm64@0.34.5",
+      "version": "0.35.3",
+      "bom-ref": "stageflow-frontend@0.1.0|@img/sharp-darwin-arm64@0.35.3",
       "scope": "optional",
       "licenses": [
         {
@@ -2999,15 +2999,15 @@
           }
         }
       ],
-      "purl": "pkg:npm/%40img/sharp-darwin-arm64@0.34.5",
+      "purl": "pkg:npm/%40img/sharp-darwin-arm64@0.35.3",
       "externalReferences": [
         {
-          "url": "https://registry.npmjs.org/@img/sharp-darwin-arm64/-/sharp-darwin-arm64-0.34.5.tgz",
+          "url": "https://registry.npmjs.org/@img/sharp-darwin-arm64/-/sharp-darwin-arm64-0.35.3.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "8a6b50dd63095db318e1fc5bfcd769e87053355b5609423459da1bca17867f9f9a77ac57f152033bcbb6c44e2a73f7ebd3c08a1bfedd0ec785b67e8cea0febdf"
+              "content": "44c9c55fb610b0ca21ee559f70ce0d1071f29815ffacbb8a34f54cf385c4f4e34f71a4820e013b087207a5280f70edb1711b61801cb51df34edf5f66c2120092"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -3024,8 +3024,8 @@
       "type": "library",
       "name": "sharp-darwin-x64",
       "group": "@img",
-      "version": "0.34.5",
-      "bom-ref": "stageflow-frontend@0.1.0|@img/sharp-darwin-x64@0.34.5",
+      "version": "0.35.3",
+      "bom-ref": "stageflow-frontend@0.1.0|@img/sharp-darwin-x64@0.35.3",
       "scope": "optional",
       "licenses": [
         {
@@ -3035,15 +3035,15 @@
           }
         }
       ],
-      "purl": "pkg:npm/%40img/sharp-darwin-x64@0.34.5",
+      "purl": "pkg:npm/%40img/sharp-darwin-x64@0.35.3",
       "externalReferences": [
         {
-          "url": "https://registry.npmjs.org/@img/sharp-darwin-x64/-/sharp-darwin-x64-0.34.5.tgz",
+          "url": "https://registry.npmjs.org/@img/sharp-darwin-x64/-/sharp-darwin-x64-0.35.3.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "60d105005ff8290fcf796d0dfabf9a555b28218d3fab1c62905d9259da7e351926301ef2f4b059015a90e328460a6fc7dc7dbbd0e4b292a99030a2c184124313"
+              "content": "5e8fb9b8506d2cdd012aa89e4f1885cc53d00149416db1f98812b2457ff3d49adb9d8b074df2899d47cbf3ea764cf5ebd695ea6a8e1e78be11975e38b83a4af7"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -3058,10 +3058,46 @@
     },
     {
       "type": "library",
+      "name": "sharp-freebsd-wasm32",
+      "group": "@img",
+      "version": "0.35.3",
+      "bom-ref": "stageflow-frontend@0.1.0|@img/sharp-freebsd-wasm32@0.35.3",
+      "scope": "optional",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/%40img/sharp-freebsd-wasm32@0.35.3",
+      "externalReferences": [
+        {
+          "url": "https://registry.npmjs.org/@img/sharp-freebsd-wasm32/-/sharp-freebsd-wasm32-0.35.3.tgz",
+          "type": "distribution",
+          "hashes": [
+            {
+              "alg": "SHA-512",
+              "content": "954c5ca96223db0310f41af03639e072bd60594af9c606864e1051a8f3da9480b69faec2aa3d6e3e1f0d9c0fd984083c8546ca97e9151cac20508c1ee9960fae"
+            }
+          ],
+          "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/@img/sharp-freebsd-wasm32"
+        }
+      ]
+    },
+    {
+      "type": "library",
       "name": "sharp-libvips-darwin-arm64",
       "group": "@img",
-      "version": "1.2.4",
-      "bom-ref": "stageflow-frontend@0.1.0|@img/sharp-libvips-darwin-arm64@1.2.4",
+      "version": "1.3.2",
+      "bom-ref": "stageflow-frontend@0.1.0|@img/sharp-libvips-darwin-arm64@1.3.2",
       "scope": "optional",
       "licenses": [
         {
@@ -3071,15 +3107,15 @@
           }
         }
       ],
-      "purl": "pkg:npm/%40img/sharp-libvips-darwin-arm64@1.2.4",
+      "purl": "pkg:npm/%40img/sharp-libvips-darwin-arm64@1.3.2",
       "externalReferences": [
         {
-          "url": "https://registry.npmjs.org/@img/sharp-libvips-darwin-arm64/-/sharp-libvips-darwin-arm64-1.2.4.tgz",
+          "url": "https://registry.npmjs.org/@img/sharp-libvips-darwin-arm64/-/sharp-libvips-darwin-arm64-1.3.2.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "cea8e3a3b45ab457c5a0fd0c910e758dfb856419d5136a5189ac9d289d46feb1d9be7b2b1c039c4002c88bdb00e5ca39c5e9d0753ba00afb5bd5cb9fefc55fe2"
+              "content": "f49eb2a591694018f862778f1a8abf4b7f30ea7cfebea8395992eb2c663862e49e99d32ae3b18c2c13cee36333c1d1b0a60fda819ef1cd97051dae3cc65cb07e"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -3096,8 +3132,8 @@
       "type": "library",
       "name": "sharp-libvips-darwin-x64",
       "group": "@img",
-      "version": "1.2.4",
-      "bom-ref": "stageflow-frontend@0.1.0|@img/sharp-libvips-darwin-x64@1.2.4",
+      "version": "1.3.2",
+      "bom-ref": "stageflow-frontend@0.1.0|@img/sharp-libvips-darwin-x64@1.3.2",
       "scope": "optional",
       "licenses": [
         {
@@ -3107,15 +3143,15 @@
           }
         }
       ],
-      "purl": "pkg:npm/%40img/sharp-libvips-darwin-x64@1.2.4",
+      "purl": "pkg:npm/%40img/sharp-libvips-darwin-x64@1.3.2",
       "externalReferences": [
         {
-          "url": "https://registry.npmjs.org/@img/sharp-libvips-darwin-x64/-/sharp-libvips-darwin-x64-1.2.4.tgz",
+          "url": "https://registry.npmjs.org/@img/sharp-libvips-darwin-x64/-/sharp-libvips-darwin-x64-1.3.2.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "d4839de717d58651b05fecd7bf637dde4d3230e36f52500dca56c9c357936a1f0afc9b698b5e4a0be59289a5ff9c199b9b61f144cd606749d27634acad96c62a"
+              "content": "9b6a56d67e9c9ecf556ae6cdc2c67e737091623c4d416809e603e59cbd676c1729901bc59ba48214de68d29b051c8f30f67d7534a84591e1039ecf7cb62a9b13"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -3132,8 +3168,8 @@
       "type": "library",
       "name": "sharp-libvips-linux-arm",
       "group": "@img",
-      "version": "1.2.4",
-      "bom-ref": "stageflow-frontend@0.1.0|@img/sharp-libvips-linux-arm@1.2.4",
+      "version": "1.3.2",
+      "bom-ref": "stageflow-frontend@0.1.0|@img/sharp-libvips-linux-arm@1.3.2",
       "scope": "optional",
       "licenses": [
         {
@@ -3143,15 +3179,15 @@
           }
         }
       ],
-      "purl": "pkg:npm/%40img/sharp-libvips-linux-arm@1.2.4",
+      "purl": "pkg:npm/%40img/sharp-libvips-linux-arm@1.3.2",
       "externalReferences": [
         {
-          "url": "https://registry.npmjs.org/@img/sharp-libvips-linux-arm/-/sharp-libvips-linux-arm-1.2.4.tgz",
+          "url": "https://registry.npmjs.org/@img/sharp-libvips-linux-arm/-/sharp-libvips-linux-arm-1.3.2.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "6c523bc5c28510b762342568bfc7b8e086b8bb66f203e9775edb008fe43cb5f0b03ba050f220e88d876fa0f32ab0a0e4ba83a8f97e87640d2cd2ad7500d310f0"
+              "content": "d5e30bcf2f7623827aae68b89804fcc82dc7c4eb678b21842e5cc66cd30b2dea9ed39d9a84543487a2c5abe961e43b0321d6158880ecb74f1a6ef49b70474b5d"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -3168,8 +3204,8 @@
       "type": "library",
       "name": "sharp-libvips-linux-arm64",
       "group": "@img",
-      "version": "1.2.4",
-      "bom-ref": "stageflow-frontend@0.1.0|@img/sharp-libvips-linux-arm64@1.2.4",
+      "version": "1.3.2",
+      "bom-ref": "stageflow-frontend@0.1.0|@img/sharp-libvips-linux-arm64@1.3.2",
       "scope": "optional",
       "licenses": [
         {
@@ -3179,15 +3215,15 @@
           }
         }
       ],
-      "purl": "pkg:npm/%40img/sharp-libvips-linux-arm64@1.2.4",
+      "purl": "pkg:npm/%40img/sharp-libvips-linux-arm64@1.3.2",
       "externalReferences": [
         {
-          "url": "https://registry.npmjs.org/@img/sharp-libvips-linux-arm64/-/sharp-libvips-linux-arm64-1.2.4.tgz",
+          "url": "https://registry.npmjs.org/@img/sharp-libvips-linux-arm64/-/sharp-libvips-linux-arm64-1.3.2.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "7b17235fc0dfb08709d74c752b3af845c59ed5e742f4faae0d144fc776150af42ff94e69ed88a7dacdf67edce2917a236f53c815cffd32ddbcff2fa2464964af"
+              "content": "76a5521729c2a31e02fc9f244f5e95ed2205027b3422380bc24bd84fba7c2d0566279392e5bead23d2067e5c537ae052fffcd77852146f0b79770c72675edc9c"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -3204,8 +3240,8 @@
       "type": "library",
       "name": "sharp-libvips-linux-ppc64",
       "group": "@img",
-      "version": "1.2.4",
-      "bom-ref": "stageflow-frontend@0.1.0|@img/sharp-libvips-linux-ppc64@1.2.4",
+      "version": "1.3.2",
+      "bom-ref": "stageflow-frontend@0.1.0|@img/sharp-libvips-linux-ppc64@1.3.2",
       "scope": "optional",
       "licenses": [
         {
@@ -3215,15 +3251,15 @@
           }
         }
       ],
-      "purl": "pkg:npm/%40img/sharp-libvips-linux-ppc64@1.2.4",
+      "purl": "pkg:npm/%40img/sharp-libvips-linux-ppc64@1.3.2",
       "externalReferences": [
         {
-          "url": "https://registry.npmjs.org/@img/sharp-libvips-linux-ppc64/-/sharp-libvips-linux-ppc64-1.2.4.tgz",
+          "url": "https://registry.npmjs.org/@img/sharp-libvips-linux-ppc64/-/sharp-libvips-linux-ppc64-1.3.2.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "14cbaf1a28cb0d81ba956f9bfd4bf28a5516bb9032bbedebd9dd52f27a2d886088c9853fefa7a283551f326919eefc203abccace541b152b907e09bb19850fa4"
+              "content": "df3d0d1c3c43ea7e48f60734e54d5e5b5032466f86ce7ceade768caed84f36a13aa18ca4728816d25fe37e925d8d89ee365f11ef223da4d6c4d578947b2ab403"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -3240,8 +3276,8 @@
       "type": "library",
       "name": "sharp-libvips-linux-riscv64",
       "group": "@img",
-      "version": "1.2.4",
-      "bom-ref": "stageflow-frontend@0.1.0|@img/sharp-libvips-linux-riscv64@1.2.4",
+      "version": "1.3.2",
+      "bom-ref": "stageflow-frontend@0.1.0|@img/sharp-libvips-linux-riscv64@1.3.2",
       "scope": "optional",
       "licenses": [
         {
@@ -3251,15 +3287,15 @@
           }
         }
       ],
-      "purl": "pkg:npm/%40img/sharp-libvips-linux-riscv64@1.2.4",
+      "purl": "pkg:npm/%40img/sharp-libvips-linux-riscv64@1.3.2",
       "externalReferences": [
         {
-          "url": "https://registry.npmjs.org/@img/sharp-libvips-linux-riscv64/-/sharp-libvips-linux-riscv64-1.2.4.tgz",
+          "url": "https://registry.npmjs.org/@img/sharp-libvips-linux-riscv64/-/sharp-libvips-linux-riscv64-1.3.2.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "a150db711e33502d1c7bcdad7ae6d29bec7a1138b1b4a64187fa9b44420e708ddc50bcc3c9bd7c4abfd6732c7b35141e4333a21d335b6451755303d2dac73218"
+              "content": "6ec6f8ac8f8d95d18eb17b9e8f6afc39d492f3ecd70d56825b1c96adcbfa9277933a58001ed640051cc1042c1db0f883f742789b2349b87a60ea4036d08996ff"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -3276,8 +3312,8 @@
       "type": "library",
       "name": "sharp-libvips-linux-s390x",
       "group": "@img",
-      "version": "1.2.4",
-      "bom-ref": "stageflow-frontend@0.1.0|@img/sharp-libvips-linux-s390x@1.2.4",
+      "version": "1.3.2",
+      "bom-ref": "stageflow-frontend@0.1.0|@img/sharp-libvips-linux-s390x@1.3.2",
       "scope": "optional",
       "licenses": [
         {
@@ -3287,15 +3323,15 @@
           }
         }
       ],
-      "purl": "pkg:npm/%40img/sharp-libvips-linux-s390x@1.2.4",
+      "purl": "pkg:npm/%40img/sharp-libvips-linux-s390x@1.3.2",
       "externalReferences": [
         {
-          "url": "https://registry.npmjs.org/@img/sharp-libvips-linux-s390x/-/sharp-libvips-linux-s390x-1.2.4.tgz",
+          "url": "https://registry.npmjs.org/@img/sharp-libvips-linux-s390x/-/sharp-libvips-linux-s390x-1.3.2.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "aa6a7d56bce03e0328199c8fbeb407aa4d36bb28c0d3f42b4cedba4ea93a978655d0c3d6216e8b4e4a8e228bfe275c84bbb31b150683a7077024a85b26fb91c5"
+              "content": "fc006c8728fc802a7222b3579c79f82e8ac32741c79b55615cf065c59f3302d7d53c069269f5cf1a7fac5122118b0692072d269858d28e25c8e6691cc1d0a129"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -3312,8 +3348,8 @@
       "type": "library",
       "name": "sharp-libvips-linux-x64",
       "group": "@img",
-      "version": "1.2.4",
-      "bom-ref": "stageflow-frontend@0.1.0|@img/sharp-libvips-linux-x64@1.2.4",
+      "version": "1.3.2",
+      "bom-ref": "stageflow-frontend@0.1.0|@img/sharp-libvips-linux-x64@1.3.2",
       "scope": "optional",
       "licenses": [
         {
@@ -3323,15 +3359,15 @@
           }
         }
       ],
-      "purl": "pkg:npm/%40img/sharp-libvips-linux-x64@1.2.4",
+      "purl": "pkg:npm/%40img/sharp-libvips-linux-x64@1.3.2",
       "externalReferences": [
         {
-          "url": "https://registry.npmjs.org/@img/sharp-libvips-linux-x64/-/sharp-libvips-linux-x64-1.2.4.tgz",
+          "url": "https://registry.npmjs.org/@img/sharp-libvips-linux-x64/-/sharp-libvips-linux-x64-1.3.2.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "b49c6288bb261dcf40c756f3de868e6015114d718844338306a86f7951e89eb1c9f7ffa4f3da9b2e5d1b7099ecf9ee2de2bbda341c5a119b05b527c076ab8faf"
+              "content": "2133c4b607df189d12e86f5d472c3fdfaead250a8545c1d63c7842f92b6983767c00432b0eb4ebda585dcf87ff63f1cc6d187fffb679981cc4a55762eb639cdf"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -3348,8 +3384,8 @@
       "type": "library",
       "name": "sharp-libvips-linuxmusl-arm64",
       "group": "@img",
-      "version": "1.2.4",
-      "bom-ref": "stageflow-frontend@0.1.0|@img/sharp-libvips-linuxmusl-arm64@1.2.4",
+      "version": "1.3.2",
+      "bom-ref": "stageflow-frontend@0.1.0|@img/sharp-libvips-linuxmusl-arm64@1.3.2",
       "scope": "optional",
       "licenses": [
         {
@@ -3359,15 +3395,15 @@
           }
         }
       ],
-      "purl": "pkg:npm/%40img/sharp-libvips-linuxmusl-arm64@1.2.4",
+      "purl": "pkg:npm/%40img/sharp-libvips-linuxmusl-arm64@1.3.2",
       "externalReferences": [
         {
-          "url": "https://registry.npmjs.org/@img/sharp-libvips-linuxmusl-arm64/-/sharp-libvips-linuxmusl-arm64-1.2.4.tgz",
+          "url": "https://registry.npmjs.org/@img/sharp-libvips-linuxmusl-arm64/-/sharp-libvips-linuxmusl-arm64-1.3.2.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "155407bb0c75208b8da30f5001b614cc9f849fc29c566f4b939fae1944091da66630409998e962c7d1e71fb9f54d1917312d291b1209a2421507d4aea991865f"
+              "content": "cc4f447625335268399834f96b5ae4e5f609e8658f9684f05816034b5e276aa1ec2fe11a3290e3d405a7a4b821deed1808e46fd93b79d30adcae962a90ff7b2b"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -3384,8 +3420,8 @@
       "type": "library",
       "name": "sharp-libvips-linuxmusl-x64",
       "group": "@img",
-      "version": "1.2.4",
-      "bom-ref": "stageflow-frontend@0.1.0|@img/sharp-libvips-linuxmusl-x64@1.2.4",
+      "version": "1.3.2",
+      "bom-ref": "stageflow-frontend@0.1.0|@img/sharp-libvips-linuxmusl-x64@1.3.2",
       "scope": "optional",
       "licenses": [
         {
@@ -3395,15 +3431,15 @@
           }
         }
       ],
-      "purl": "pkg:npm/%40img/sharp-libvips-linuxmusl-x64@1.2.4",
+      "purl": "pkg:npm/%40img/sharp-libvips-linuxmusl-x64@1.3.2",
       "externalReferences": [
         {
-          "url": "https://registry.npmjs.org/@img/sharp-libvips-linuxmusl-x64/-/sharp-libvips-linuxmusl-x64-1.2.4.tgz",
+          "url": "https://registry.npmjs.org/@img/sharp-libvips-linuxmusl-x64/-/sharp-libvips-linuxmusl-x64-1.3.2.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "f8ba72064ecbe386485f0cff5587e095a5ffa24c5ecc449ce94c434a8ca8d8ab3a27173863bb068e9814f6ce0f320aa08e3d60642ca54e278d6a6a80d4c17b0e"
+              "content": "9b496b2e252dfa50589c216bf2a57feb9c8c47813f73bff07fbf08e5e29376411a90502567d425cc433740886103055e5212c01cb702abb6bb56cceafe814d65"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -3420,8 +3456,8 @@
       "type": "library",
       "name": "sharp-linux-arm",
       "group": "@img",
-      "version": "0.34.5",
-      "bom-ref": "stageflow-frontend@0.1.0|@img/sharp-linux-arm@0.34.5",
+      "version": "0.35.3",
+      "bom-ref": "stageflow-frontend@0.1.0|@img/sharp-linux-arm@0.35.3",
       "scope": "optional",
       "licenses": [
         {
@@ -3431,15 +3467,15 @@
           }
         }
       ],
-      "purl": "pkg:npm/%40img/sharp-linux-arm@0.34.5",
+      "purl": "pkg:npm/%40img/sharp-linux-arm@0.35.3",
       "externalReferences": [
         {
-          "url": "https://registry.npmjs.org/@img/sharp-linux-arm/-/sharp-linux-arm-0.34.5.tgz",
+          "url": "https://registry.npmjs.org/@img/sharp-linux-arm/-/sharp-linux-arm-0.35.3.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "f5d2eab2fc2d835bae5c11992acc5e9bde7de7eba3bf4b09e958bcc1c4c0352169c15fc638d6ade5e0a4cd0a3fd4eeb3448921d26ffcfb9063ad1afb8c351267"
+              "content": "69f7d55824cba28cbc4d2c5b0f1daa933b8379a58b355040f8ffff14d062ac7b17a4fd9fb81864e40b9ba18527ac39f3a177acf06163a53c7448114e09183e14"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -3456,8 +3492,8 @@
       "type": "library",
       "name": "sharp-linux-arm64",
       "group": "@img",
-      "version": "0.34.5",
-      "bom-ref": "stageflow-frontend@0.1.0|@img/sharp-linux-arm64@0.34.5",
+      "version": "0.35.3",
+      "bom-ref": "stageflow-frontend@0.1.0|@img/sharp-linux-arm64@0.35.3",
       "scope": "optional",
       "licenses": [
         {
@@ -3467,15 +3503,15 @@
           }
         }
       ],
-      "purl": "pkg:npm/%40img/sharp-linux-arm64@0.34.5",
+      "purl": "pkg:npm/%40img/sharp-linux-arm64@0.35.3",
       "externalReferences": [
         {
-          "url": "https://registry.npmjs.org/@img/sharp-linux-arm64/-/sharp-linux-arm64-0.34.5.tgz",
+          "url": "https://registry.npmjs.org/@img/sharp-linux-arm64/-/sharp-linux-arm64-0.35.3.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "6ca433689458fdb90f397c8ac79115ba9eea91aa231021ba34b62cc2092d3998da5de71201e096899c308857f7fd8f8ed47adaba2137155b06c4583c736e2b66"
+              "content": "420283b291cf9eb53e190e795cf846c32842f1a70b54e392c80be8d6855f166ac85cb903366196cc07c3678c4af28480d6a050ac02dc1d7d06e546678bf4ae15"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -3492,8 +3528,8 @@
       "type": "library",
       "name": "sharp-linux-ppc64",
       "group": "@img",
-      "version": "0.34.5",
-      "bom-ref": "stageflow-frontend@0.1.0|@img/sharp-linux-ppc64@0.34.5",
+      "version": "0.35.3",
+      "bom-ref": "stageflow-frontend@0.1.0|@img/sharp-linux-ppc64@0.35.3",
       "scope": "optional",
       "licenses": [
         {
@@ -3503,15 +3539,15 @@
           }
         }
       ],
-      "purl": "pkg:npm/%40img/sharp-linux-ppc64@0.34.5",
+      "purl": "pkg:npm/%40img/sharp-linux-ppc64@0.35.3",
       "externalReferences": [
         {
-          "url": "https://registry.npmjs.org/@img/sharp-linux-ppc64/-/sharp-linux-ppc64-0.34.5.tgz",
+          "url": "https://registry.npmjs.org/@img/sharp-linux-ppc64/-/sharp-linux-ppc64-0.35.3.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "ef3ce7c0d6aa5ba62db1fac618303a05190848a000135268d107693585cd307bb6fb4753acf7e54cb364a5cf25ecc50fe4cd7a649714bf2b15596acc79f66ab8"
+              "content": "b0c77cac3c66a4b3b0bffecde38925163383e4350eec52dd8e25c3234868c5869fec0af6eb6750204928b04f7c6e9b3ee473cbb69fc4bcda9ea90b4ec9c3ff20"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -3528,8 +3564,8 @@
       "type": "library",
       "name": "sharp-linux-riscv64",
       "group": "@img",
-      "version": "0.34.5",
-      "bom-ref": "stageflow-frontend@0.1.0|@img/sharp-linux-riscv64@0.34.5",
+      "version": "0.35.3",
+      "bom-ref": "stageflow-frontend@0.1.0|@img/sharp-linux-riscv64@0.35.3",
       "scope": "optional",
       "licenses": [
         {
@@ -3539,15 +3575,15 @@
           }
         }
       ],
-      "purl": "pkg:npm/%40img/sharp-linux-riscv64@0.34.5",
+      "purl": "pkg:npm/%40img/sharp-linux-riscv64@0.35.3",
       "externalReferences": [
         {
-          "url": "https://registry.npmjs.org/@img/sharp-linux-riscv64/-/sharp-linux-riscv64-0.34.5.tgz",
+          "url": "https://registry.npmjs.org/@img/sharp-linux-riscv64/-/sharp-linux-riscv64-0.35.3.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "e75809b8b3d329aee98983da56cf06981ca8eff53bffb4d93aaf9c9d72481d929abc844700fefb7b73761c49777608aa743ff0d3251f8899c823becfb830c577"
+              "content": "d04a1befcca39583df2f9bcc356016e7997747d63a0504bf80e7ded1970ff66133f68861292b788a6d616b28a49d781ff005ab16a32f25c2887662e611eef279"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -3564,8 +3600,8 @@
       "type": "library",
       "name": "sharp-linux-s390x",
       "group": "@img",
-      "version": "0.34.5",
-      "bom-ref": "stageflow-frontend@0.1.0|@img/sharp-linux-s390x@0.34.5",
+      "version": "0.35.3",
+      "bom-ref": "stageflow-frontend@0.1.0|@img/sharp-linux-s390x@0.35.3",
       "scope": "optional",
       "licenses": [
         {
@@ -3575,15 +3611,15 @@
           }
         }
       ],
-      "purl": "pkg:npm/%40img/sharp-linux-s390x@0.34.5",
+      "purl": "pkg:npm/%40img/sharp-linux-s390x@0.35.3",
       "externalReferences": [
         {
-          "url": "https://registry.npmjs.org/@img/sharp-linux-s390x/-/sharp-linux-s390x-0.34.5.tgz",
+          "url": "https://registry.npmjs.org/@img/sharp-linux-s390x/-/sharp-linux-s390x-0.35.3.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "9d0b429343dd29f868dde0b932b6d0a22809da07750a075d50c91a6d48feac17afb3cb59d9c50b3b1e3a13ba325fed385867c006023098c0b456a89e4e24788e"
+              "content": "2a00314340f1a4d3aad6b1b6b797204e04a1245192b94ed73b8e5ca82fb53553ae6673fab6581946e49839f36ea46907203d28ddc24eb30e0355e269328bdc1b"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -3600,8 +3636,8 @@
       "type": "library",
       "name": "sharp-linux-x64",
       "group": "@img",
-      "version": "0.34.5",
-      "bom-ref": "stageflow-frontend@0.1.0|@img/sharp-linux-x64@0.34.5",
+      "version": "0.35.3",
+      "bom-ref": "stageflow-frontend@0.1.0|@img/sharp-linux-x64@0.35.3",
       "scope": "optional",
       "licenses": [
         {
@@ -3611,15 +3647,15 @@
           }
         }
       ],
-      "purl": "pkg:npm/%40img/sharp-linux-x64@0.34.5",
+      "purl": "pkg:npm/%40img/sharp-linux-x64@0.35.3",
       "externalReferences": [
         {
-          "url": "https://registry.npmjs.org/@img/sharp-linux-x64/-/sharp-linux-x64-0.34.5.tgz",
+          "url": "https://registry.npmjs.org/@img/sharp-linux-x64/-/sharp-linux-x64-0.35.3.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "304cddf073cac55c557a7c006be2513f0102ed0163a0f5ae4b93599c1b7a077a6eec41b619ed22775a0b1d9a4f25d9f73902be0500e2c3dcd2b621c14c941041"
+              "content": "f29aafc6e6cbd8f19d8653f2e862eacc360c523c9198a03028760a8b1a5d2580542bb3c9d02d36f5776c9e91487604591baf1f66219d1d559c28fbed88f07870"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -3636,8 +3672,8 @@
       "type": "library",
       "name": "sharp-linuxmusl-arm64",
       "group": "@img",
-      "version": "0.34.5",
-      "bom-ref": "stageflow-frontend@0.1.0|@img/sharp-linuxmusl-arm64@0.34.5",
+      "version": "0.35.3",
+      "bom-ref": "stageflow-frontend@0.1.0|@img/sharp-linuxmusl-arm64@0.35.3",
       "scope": "optional",
       "licenses": [
         {
@@ -3647,15 +3683,15 @@
           }
         }
       ],
-      "purl": "pkg:npm/%40img/sharp-linuxmusl-arm64@0.34.5",
+      "purl": "pkg:npm/%40img/sharp-linuxmusl-arm64@0.35.3",
       "externalReferences": [
         {
-          "url": "https://registry.npmjs.org/@img/sharp-linuxmusl-arm64/-/sharp-linuxmusl-arm64-0.34.5.tgz",
+          "url": "https://registry.npmjs.org/@img/sharp-linuxmusl-arm64/-/sharp-linuxmusl-arm64-0.35.3.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "7e9ac947a1ad46c32de8ac9fab8e08b0285565e18df7b8130f7df5c1e4757b1d5cd6bca90c400137a4e6db16b5c04ea561be437449e4d373593ea03b21ddb5ca"
+              "content": "573d22423cf37125f71c26dfc057c2486ffd48222ac8ed261f6b17ca21da0187c1934711b025974724185f4a2f08afcf01005b4f343476c3d01e1e4c0052f9f7"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -3672,8 +3708,8 @@
       "type": "library",
       "name": "sharp-linuxmusl-x64",
       "group": "@img",
-      "version": "0.34.5",
-      "bom-ref": "stageflow-frontend@0.1.0|@img/sharp-linuxmusl-x64@0.34.5",
+      "version": "0.35.3",
+      "bom-ref": "stageflow-frontend@0.1.0|@img/sharp-linuxmusl-x64@0.35.3",
       "scope": "optional",
       "licenses": [
         {
@@ -3683,15 +3719,15 @@
           }
         }
       ],
-      "purl": "pkg:npm/%40img/sharp-linuxmusl-x64@0.34.5",
+      "purl": "pkg:npm/%40img/sharp-linuxmusl-x64@0.35.3",
       "externalReferences": [
         {
-          "url": "https://registry.npmjs.org/@img/sharp-linuxmusl-x64/-/sharp-linuxmusl-x64-0.34.5.tgz",
+          "url": "https://registry.npmjs.org/@img/sharp-linuxmusl-x64/-/sharp-linuxmusl-x64-0.35.3.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "260f30353d4c53322f841171562aab1215831b3ab29a8dec57bcfb66c6966d93432d7449668446ae3ba5a7ad1862d578c1f63c54829c5a2763a2394b716addf1"
+              "content": "e8ed4d3ca703563f5011d83b1f1e78f445fc534ae9eb25d0111aabbbac9137b7c6067df652f2112549569e4fbcc430a21bbea15d505b5fcd8d67f64aaf47ae22"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -3708,8 +3744,8 @@
       "type": "library",
       "name": "sharp-wasm32",
       "group": "@img",
-      "version": "0.34.5",
-      "bom-ref": "stageflow-frontend@0.1.0|@img/sharp-wasm32@0.34.5",
+      "version": "0.35.3",
+      "bom-ref": "stageflow-frontend@0.1.0|@img/sharp-wasm32@0.35.3",
       "scope": "optional",
       "licenses": [
         {
@@ -3717,15 +3753,15 @@
           "acknowledgement": "declared"
         }
       ],
-      "purl": "pkg:npm/%40img/sharp-wasm32@0.34.5",
+      "purl": "pkg:npm/%40img/sharp-wasm32@0.35.3",
       "externalReferences": [
         {
-          "url": "https://registry.npmjs.org/@img/sharp-wasm32/-/sharp-wasm32-0.34.5.tgz",
+          "url": "https://registry.npmjs.org/@img/sharp-wasm32/-/sharp-wasm32-0.35.3.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "39d5931225646363c7c2a91b048f1fac5c504057a41da492914209930cdc95665eeb83b55f8525523aaaa8b68f6d4a4c39093a141bbf1ed9465cd6e522cd21bb"
+              "content": "719d1791c606a47664a96ea20a4a93726502d020fd0e10f977fa9e6656647d1067e869c79e26572d4a39fbdc70f08bfbe9813a2d014df5834194a4447021bbeb"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -3740,10 +3776,46 @@
     },
     {
       "type": "library",
+      "name": "sharp-webcontainers-wasm32",
+      "group": "@img",
+      "version": "0.35.3",
+      "bom-ref": "stageflow-frontend@0.1.0|@img/sharp-webcontainers-wasm32@0.35.3",
+      "scope": "optional",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/%40img/sharp-webcontainers-wasm32@0.35.3",
+      "externalReferences": [
+        {
+          "url": "https://registry.npmjs.org/@img/sharp-webcontainers-wasm32/-/sharp-webcontainers-wasm32-0.35.3.tgz",
+          "type": "distribution",
+          "hashes": [
+            {
+              "alg": "SHA-512",
+              "content": "dab9eaedb5f7373791d93e185a0cfcaa21b88774d274c7bebcdd62417a4995e489dd2339cd0f05cb64b2c9701695bc69119d98f99e2ed4178f8091186d2cbcd1"
+            }
+          ],
+          "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/@img/sharp-webcontainers-wasm32"
+        }
+      ]
+    },
+    {
+      "type": "library",
       "name": "sharp-win32-arm64",
       "group": "@img",
-      "version": "0.34.5",
-      "bom-ref": "stageflow-frontend@0.1.0|@img/sharp-win32-arm64@0.34.5",
+      "version": "0.35.3",
+      "bom-ref": "stageflow-frontend@0.1.0|@img/sharp-win32-arm64@0.35.3",
       "scope": "optional",
       "licenses": [
         {
@@ -3751,15 +3823,15 @@
           "acknowledgement": "declared"
         }
       ],
-      "purl": "pkg:npm/%40img/sharp-win32-arm64@0.34.5",
+      "purl": "pkg:npm/%40img/sharp-win32-arm64@0.35.3",
       "externalReferences": [
         {
-          "url": "https://registry.npmjs.org/@img/sharp-win32-arm64/-/sharp-win32-arm64-0.34.5.tgz",
+          "url": "https://registry.npmjs.org/@img/sharp-win32-arm64/-/sharp-win32-arm64-0.35.3.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "590dc08160966126f6cadf881bc9a70ba25d93d5a1b3b3b4831a616e5b0bbdd852a524ed9aeebd646d4691be8dbafc6c3400b088f57a70d499373b7428fb30ee"
+              "content": "e1b3f015d31b782e0943c2fc2cec96a7a9ec1dc6e83f97f1929ea23ce5f3d95838f51e364ee32cdb08642793803f8fd4974df9a8ecf2d0079c385f553ac727e3"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -3776,8 +3848,8 @@
       "type": "library",
       "name": "sharp-win32-ia32",
       "group": "@img",
-      "version": "0.34.5",
-      "bom-ref": "stageflow-frontend@0.1.0|@img/sharp-win32-ia32@0.34.5",
+      "version": "0.35.3",
+      "bom-ref": "stageflow-frontend@0.1.0|@img/sharp-win32-ia32@0.35.3",
       "scope": "optional",
       "licenses": [
         {
@@ -3785,15 +3857,15 @@
           "acknowledgement": "declared"
         }
       ],
-      "purl": "pkg:npm/%40img/sharp-win32-ia32@0.34.5",
+      "purl": "pkg:npm/%40img/sharp-win32-ia32@0.35.3",
       "externalReferences": [
         {
-          "url": "https://registry.npmjs.org/@img/sharp-win32-ia32/-/sharp-win32-ia32-0.34.5.tgz",
+          "url": "https://registry.npmjs.org/@img/sharp-win32-ia32/-/sharp-win32-ia32-0.35.3.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "155f66ffb3667829921c30f98f8fb8a4d23c0a9dda5be26f2e85dc4d4a3422aca349f01927c7485268a3c75a9a26c22253e1e8b30eb13392a28c05912424a036"
+              "content": "af9de65ec04dea51540e2493efae12be0c1474702a338acf0220f30267f87cba01e97feb91fc93acb0a0ebe835ef0249882981dc96201ee5257425942111525f"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -3810,8 +3882,8 @@
       "type": "library",
       "name": "sharp-win32-x64",
       "group": "@img",
-      "version": "0.34.5",
-      "bom-ref": "stageflow-frontend@0.1.0|@img/sharp-win32-x64@0.34.5",
+      "version": "0.35.3",
+      "bom-ref": "stageflow-frontend@0.1.0|@img/sharp-win32-x64@0.35.3",
       "scope": "optional",
       "licenses": [
         {
@@ -3819,15 +3891,15 @@
           "acknowledgement": "declared"
         }
       ],
-      "purl": "pkg:npm/%40img/sharp-win32-x64@0.34.5",
+      "purl": "pkg:npm/%40img/sharp-win32-x64@0.35.3",
       "externalReferences": [
         {
-          "url": "https://registry.npmjs.org/@img/sharp-win32-x64/-/sharp-win32-x64-0.34.5.tgz",
+          "url": "https://registry.npmjs.org/@img/sharp-win32-x64/-/sharp-win32-x64-0.35.3.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "fb6f5832ca98dbff5e144896f777aa5a7b8b71672e7e8c177b0c123484fa53065d5140ab337a058cc587fd9ebf4cc99be219457a799f0156e959eba9da3af20b"
+              "content": "0f8cb5bcd799ac820908dfae1da595b47f3a07e682add31862389ccbda571ef6c665e1982cb49ddf0755b82dfb171557954d4046c93ce1e2967d631719812abc"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -4196,8 +4268,8 @@
       "type": "library",
       "name": "env",
       "group": "@next",
-      "version": "16.2.11",
-      "bom-ref": "stageflow-frontend@0.1.0|@next/env@16.2.11",
+      "version": "16.3.2",
+      "bom-ref": "stageflow-frontend@0.1.0|@next/env@16.3.2",
       "licenses": [
         {
           "license": {
@@ -4206,15 +4278,15 @@
           }
         }
       ],
-      "purl": "pkg:npm/%40next/env@16.2.11",
+      "purl": "pkg:npm/%40next/env@16.3.2",
       "externalReferences": [
         {
-          "url": "https://registry.npmjs.org/@next/env/-/env-16.2.11.tgz",
+          "url": "https://registry.npmjs.org/@next/env/-/env-16.3.2.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "d1da39037049da0c56af464231c0fa0615be7b9f798f2c5d4e5deb5d34ba94eb43f1e92d3225ba08ef843f0b7511c6b50c19e6f74affec676229604ac47fbe0c"
+              "content": "f24e18a06f1c33b2d69647f318d6024416c53657ab9cb88cc38b346ed565f829a65aa9f7569632a40ef6ff915e6f55167717bab47aabe4a1cfe29e18e26f65b8"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -4270,8 +4342,8 @@
       "type": "library",
       "name": "swc-darwin-arm64",
       "group": "@next",
-      "version": "16.2.11",
-      "bom-ref": "stageflow-frontend@0.1.0|@next/swc-darwin-arm64@16.2.11",
+      "version": "16.3.2",
+      "bom-ref": "stageflow-frontend@0.1.0|@next/swc-darwin-arm64@16.3.2",
       "scope": "optional",
       "licenses": [
         {
@@ -4281,15 +4353,15 @@
           }
         }
       ],
-      "purl": "pkg:npm/%40next/swc-darwin-arm64@16.2.11",
+      "purl": "pkg:npm/%40next/swc-darwin-arm64@16.3.2",
       "externalReferences": [
         {
-          "url": "https://registry.npmjs.org/@next/swc-darwin-arm64/-/swc-darwin-arm64-16.2.11.tgz",
+          "url": "https://registry.npmjs.org/@next/swc-darwin-arm64/-/swc-darwin-arm64-16.3.2.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "c2bc8be298ca983c06bf6a31ebe1990c5c6f9ad4912ea029051f242f58f8faf841ed9e6f242ff30275e9891f5791fce5d004bc58b327b2e195fd4288ebbfebaf"
+              "content": "89be4b966f776022a82960e1e99687aba4164ee399d9b4644a75303265fc76c4483a404d2f5bd59528942927e2c4f2fd49287da6fba4cea6a393f925927e6faa"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -4306,8 +4378,8 @@
       "type": "library",
       "name": "swc-darwin-x64",
       "group": "@next",
-      "version": "16.2.11",
-      "bom-ref": "stageflow-frontend@0.1.0|@next/swc-darwin-x64@16.2.11",
+      "version": "16.3.2",
+      "bom-ref": "stageflow-frontend@0.1.0|@next/swc-darwin-x64@16.3.2",
       "scope": "optional",
       "licenses": [
         {
@@ -4317,15 +4389,15 @@
           }
         }
       ],
-      "purl": "pkg:npm/%40next/swc-darwin-x64@16.2.11",
+      "purl": "pkg:npm/%40next/swc-darwin-x64@16.3.2",
       "externalReferences": [
         {
-          "url": "https://registry.npmjs.org/@next/swc-darwin-x64/-/swc-darwin-x64-16.2.11.tgz",
+          "url": "https://registry.npmjs.org/@next/swc-darwin-x64/-/swc-darwin-x64-16.3.2.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "6999768f87ff7cbca342f3a1bf439ef5468c0101e8958a4a85cb6ca18ce9952ba628928f52682371feb9e39681b72b0b4dcbbdf784d111dd3ea5280d138a219a"
+              "content": "a9df7c7d7dbe2399d82438a85b6a3b9d28e8c4ce4abd675e0de7ccf348a089ae3e0bfa92204847e0c85313e84effba8a33b5b7eff32af9d396a7c51e3d2c8b1f"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -4342,8 +4414,8 @@
       "type": "library",
       "name": "swc-linux-arm64-gnu",
       "group": "@next",
-      "version": "16.2.11",
-      "bom-ref": "stageflow-frontend@0.1.0|@next/swc-linux-arm64-gnu@16.2.11",
+      "version": "16.3.2",
+      "bom-ref": "stageflow-frontend@0.1.0|@next/swc-linux-arm64-gnu@16.3.2",
       "scope": "optional",
       "licenses": [
         {
@@ -4353,15 +4425,15 @@
           }
         }
       ],
-      "purl": "pkg:npm/%40next/swc-linux-arm64-gnu@16.2.11",
+      "purl": "pkg:npm/%40next/swc-linux-arm64-gnu@16.3.2",
       "externalReferences": [
         {
-          "url": "https://registry.npmjs.org/@next/swc-linux-arm64-gnu/-/swc-linux-arm64-gnu-16.2.11.tgz",
+          "url": "https://registry.npmjs.org/@next/swc-linux-arm64-gnu/-/swc-linux-arm64-gnu-16.3.2.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "e6312b8b21271ff2d6172dbb2f6646d1768b97210922386c22612c892f4fe7adcf284569d8156ea6cff17ceb9c22bb2f567b69d75a0d719c231ef6833d8541e6"
+              "content": "beab206fa1403b372b09c72c2d788ab40cb9b7c1333beb8e6b3b85692910c5e634b4d38d1b7be91d8cbca7205a7dc23948d14f4dec9aaddeb24ebe92ccd1a8d8"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -4378,8 +4450,8 @@
       "type": "library",
       "name": "swc-linux-arm64-musl",
       "group": "@next",
-      "version": "16.2.11",
-      "bom-ref": "stageflow-frontend@0.1.0|@next/swc-linux-arm64-musl@16.2.11",
+      "version": "16.3.2",
+      "bom-ref": "stageflow-frontend@0.1.0|@next/swc-linux-arm64-musl@16.3.2",
       "scope": "optional",
       "licenses": [
         {
@@ -4389,15 +4461,15 @@
           }
         }
       ],
-      "purl": "pkg:npm/%40next/swc-linux-arm64-musl@16.2.11",
+      "purl": "pkg:npm/%40next/swc-linux-arm64-musl@16.3.2",
       "externalReferences": [
         {
-          "url": "https://registry.npmjs.org/@next/swc-linux-arm64-musl/-/swc-linux-arm64-musl-16.2.11.tgz",
+          "url": "https://registry.npmjs.org/@next/swc-linux-arm64-musl/-/swc-linux-arm64-musl-16.3.2.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "7888dca71d9f9e71524a46436d3c72ef82a7a245170e37e82c296959e95f8072dfeb6d5a4eab308705d0ec6903e4ae6ba65ad2e8b67f063fa656ebf396e04e12"
+              "content": "c487b57ae8df1d40765dcc4719d771272bba4c944f8c2e4da48910601ff7d844a4b795644322008e62d14b7f1cface9063eaa3b58ff829aad50f35d1b83ee565"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -4414,8 +4486,8 @@
       "type": "library",
       "name": "swc-linux-x64-gnu",
       "group": "@next",
-      "version": "16.2.11",
-      "bom-ref": "stageflow-frontend@0.1.0|@next/swc-linux-x64-gnu@16.2.11",
+      "version": "16.3.2",
+      "bom-ref": "stageflow-frontend@0.1.0|@next/swc-linux-x64-gnu@16.3.2",
       "scope": "optional",
       "licenses": [
         {
@@ -4425,15 +4497,15 @@
           }
         }
       ],
-      "purl": "pkg:npm/%40next/swc-linux-x64-gnu@16.2.11",
+      "purl": "pkg:npm/%40next/swc-linux-x64-gnu@16.3.2",
       "externalReferences": [
         {
-          "url": "https://registry.npmjs.org/@next/swc-linux-x64-gnu/-/swc-linux-x64-gnu-16.2.11.tgz",
+          "url": "https://registry.npmjs.org/@next/swc-linux-x64-gnu/-/swc-linux-x64-gnu-16.3.2.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "f16833a5a58cb38eaa253f64895e3b7237bce8bd31fccbbdb7cfc6c23fa99db816deb11355f0a769270f8e5614c0d49ca4ea3375c20c1d6980bee6495289d1db"
+              "content": "15ed120368fc5f49267376af7ae1c3ed492d3b7004dbe987dcb82e3fad2f19bcfbbb4cfe32b0d76de6f989915803047b133cf35c9d9893debac3d9864c532a7c"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -4450,8 +4522,8 @@
       "type": "library",
       "name": "swc-linux-x64-musl",
       "group": "@next",
-      "version": "16.2.11",
-      "bom-ref": "stageflow-frontend@0.1.0|@next/swc-linux-x64-musl@16.2.11",
+      "version": "16.3.2",
+      "bom-ref": "stageflow-frontend@0.1.0|@next/swc-linux-x64-musl@16.3.2",
       "scope": "optional",
       "licenses": [
         {
@@ -4461,15 +4533,15 @@
           }
         }
       ],
-      "purl": "pkg:npm/%40next/swc-linux-x64-musl@16.2.11",
+      "purl": "pkg:npm/%40next/swc-linux-x64-musl@16.3.2",
       "externalReferences": [
         {
-          "url": "https://registry.npmjs.org/@next/swc-linux-x64-musl/-/swc-linux-x64-musl-16.2.11.tgz",
+          "url": "https://registry.npmjs.org/@next/swc-linux-x64-musl/-/swc-linux-x64-musl-16.3.2.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "2375203ddb3b1b86589d36ff1fee46046b944f60e1024ea3d262fa038b3add18c5b3be3007684e58fd2f6b1b0afb7349ada131b7779810f43f52d4f4c7feb837"
+              "content": "4c5062a5bfa0c9eb08ff655ee3356eee41a5b4158dfd1e3ae86e7fd60b6dda51027dcdb61b5a63913c6eebc43d68570e69789119341fbc36d04057bb99883189"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -4486,8 +4558,8 @@
       "type": "library",
       "name": "swc-win32-arm64-msvc",
       "group": "@next",
-      "version": "16.2.11",
-      "bom-ref": "stageflow-frontend@0.1.0|@next/swc-win32-arm64-msvc@16.2.11",
+      "version": "16.3.2",
+      "bom-ref": "stageflow-frontend@0.1.0|@next/swc-win32-arm64-msvc@16.3.2",
       "scope": "optional",
       "licenses": [
         {
@@ -4497,15 +4569,15 @@
           }
         }
       ],
-      "purl": "pkg:npm/%40next/swc-win32-arm64-msvc@16.2.11",
+      "purl": "pkg:npm/%40next/swc-win32-arm64-msvc@16.3.2",
       "externalReferences": [
         {
-          "url": "https://registry.npmjs.org/@next/swc-win32-arm64-msvc/-/swc-win32-arm64-msvc-16.2.11.tgz",
+          "url": "https://registry.npmjs.org/@next/swc-win32-arm64-msvc/-/swc-win32-arm64-msvc-16.3.2.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "9fcf428ed7138678ebc2024c022239c5bab02d8e75cefc02f6d4a502b9959dd0092d8565f53f5401d9645d3999bc4fbe89da177bc29d82542584d45d529d5cea"
+              "content": "ad5b669cda41608a2c0e7283ffde9d2b116c267c279f5591186fc78a849ef170a6da4b121cdaddd91ebe8528ef4c1c5e30d849f6961ebbff747160759d02ee34"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -4522,8 +4594,8 @@
       "type": "library",
       "name": "swc-win32-x64-msvc",
       "group": "@next",
-      "version": "16.2.11",
-      "bom-ref": "stageflow-frontend@0.1.0|@next/swc-win32-x64-msvc@16.2.11",
+      "version": "16.3.2",
+      "bom-ref": "stageflow-frontend@0.1.0|@next/swc-win32-x64-msvc@16.3.2",
       "scope": "optional",
       "licenses": [
         {
@@ -4533,15 +4605,15 @@
           }
         }
       ],
-      "purl": "pkg:npm/%40next/swc-win32-x64-msvc@16.2.11",
+      "purl": "pkg:npm/%40next/swc-win32-x64-msvc@16.3.2",
       "externalReferences": [
         {
-          "url": "https://registry.npmjs.org/@next/swc-win32-x64-msvc/-/swc-win32-x64-msvc-16.2.11.tgz",
+          "url": "https://registry.npmjs.org/@next/swc-win32-x64-msvc/-/swc-win32-x64-msvc-16.3.2.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "99df022cd8204b50f1f69520029ce9b39b807fe37c18df71cb0ce6371f6f1c05a8f781ed070082aa44a7848add7d07bcdc3873f0b7e8ff6d0d6f56716a5d3ddb"
+              "content": "1f8636a36fc9707bbc2edc330f90977c7870c70cfc81fb31d875c3130e3a32d7afe711e712607b1cdb59b66ae2c3945e50e8d1b5c0eaa3b5d26d4d35153f4d94"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -4831,8 +4903,8 @@
       "type": "library",
       "name": "helpers",
       "group": "@swc",
-      "version": "0.5.15",
-      "bom-ref": "stageflow-frontend@0.1.0|@swc/helpers@0.5.15",
+      "version": "0.5.23",
+      "bom-ref": "stageflow-frontend@0.1.0|@swc/helpers@0.5.23",
       "licenses": [
         {
           "license": {
@@ -4841,15 +4913,15 @@
           }
         }
       ],
-      "purl": "pkg:npm/%40swc/helpers@0.5.15",
+      "purl": "pkg:npm/%40swc/helpers@0.5.23",
       "externalReferences": [
         {
-          "url": "https://registry.npmjs.org/@swc/helpers/-/helpers-0.5.15.tgz",
+          "url": "https://registry.npmjs.org/@swc/helpers/-/helpers-0.5.23.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "250e53b8c8b8e4ec22e3f048300241a12428389bb5da83a4fe0003aa57142fd24474707cbf28d44acc6a78d5e79971e360a322d96718b5ecc610486a508fc4da"
+              "content": "e654ac30e4d751178f8250dfbee01052a9067a4f47836924b0e61acb69b4f9747ef9bd8d5982ffe2c5b2baf54122cf282a725ac64762f7085a2ffb2a375dda7f"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -7191,6 +7263,46 @@
       "components": [
         {
           "type": "library",
+          "name": "core",
+          "group": "@emnapi",
+          "version": "1.10.0",
+          "bom-ref": "stageflow-frontend@0.1.0|@unrs/resolver-binding-wasm32-wasi@1.12.2|@emnapi/core@1.10.0",
+          "scope": "optional",
+          "licenses": [
+            {
+              "license": {
+                "id": "MIT",
+                "acknowledgement": "declared"
+              }
+            }
+          ],
+          "purl": "pkg:npm/%40emnapi/core@1.10.0",
+          "externalReferences": [
+            {
+              "url": "https://registry.npmjs.org/@emnapi/core/-/core-1.10.0.tgz",
+              "type": "distribution",
+              "hashes": [
+                {
+                  "alg": "SHA-512",
+                  "content": "caae8e909e29f360807cf974bbd99079b40728f26463b5ab22e936d3971362761efa4d99f18061d7516b6d11bf1fa8a18aba9c69c3a09760483bca323102de5f"
+                }
+              ],
+              "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
+            }
+          ],
+          "properties": [
+            {
+              "name": "cdx:npm:package:development",
+              "value": "true"
+            },
+            {
+              "name": "cdx:npm:package:path",
+              "value": "node_modules/@unrs/resolver-binding-wasm32-wasi/node_modules/@emnapi/core"
+            }
+          ]
+        },
+        {
+          "type": "library",
           "name": "runtime",
           "group": "@emnapi",
           "version": "1.10.0",
@@ -7226,6 +7338,46 @@
             {
               "name": "cdx:npm:package:path",
               "value": "node_modules/@unrs/resolver-binding-wasm32-wasi/node_modules/@emnapi/runtime"
+            }
+          ]
+        },
+        {
+          "type": "library",
+          "name": "wasi-threads",
+          "group": "@emnapi",
+          "version": "1.2.1",
+          "bom-ref": "stageflow-frontend@0.1.0|@unrs/resolver-binding-wasm32-wasi@1.12.2|@emnapi/wasi-threads@1.2.1",
+          "scope": "optional",
+          "licenses": [
+            {
+              "license": {
+                "id": "MIT",
+                "acknowledgement": "declared"
+              }
+            }
+          ],
+          "purl": "pkg:npm/%40emnapi/wasi-threads@1.2.1",
+          "externalReferences": [
+            {
+              "url": "https://registry.npmjs.org/@emnapi/wasi-threads/-/wasi-threads-1.2.1.tgz",
+              "type": "distribution",
+              "hashes": [
+                {
+                  "alg": "SHA-512",
+                  "content": "b93208ece605fbf31eb3f32b708398a79c8eb5230b056488a0b3e9720c22a6888a6e58ba937db6b5ca05b31a082313c3a96d35490180824a38133662d8136fdb"
+                }
+              ],
+              "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
+            }
+          ],
+          "properties": [
+            {
+              "name": "cdx:npm:package:development",
+              "value": "true"
+            },
+            {
+              "name": "cdx:npm:package:path",
+              "value": "node_modules/@unrs/resolver-binding-wasm32-wasi/node_modules/@emnapi/wasi-threads"
             }
           ]
         }
@@ -8532,8 +8684,8 @@
     {
       "type": "library",
       "name": "brace-expansion",
-      "version": "5.0.7",
-      "bom-ref": "stageflow-frontend@0.1.0|brace-expansion@5.0.7",
+      "version": "5.0.9",
+      "bom-ref": "stageflow-frontend@0.1.0|brace-expansion@5.0.9",
       "licenses": [
         {
           "license": {
@@ -8542,15 +8694,15 @@
           }
         }
       ],
-      "purl": "pkg:npm/brace-expansion@5.0.7",
+      "purl": "pkg:npm/brace-expansion@5.0.9",
       "externalReferences": [
         {
-          "url": "https://registry.npmjs.org/brace-expansion/-/brace-expansion-5.0.7.tgz",
+          "url": "https://registry.npmjs.org/brace-expansion/-/brace-expansion-5.0.9.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "ee8172ef4dddc5f637fcd2f10b57e1d925024341fdae6018fb91290d57d78d44d3b3e1c4c11da761aa8bbfe196713b2e9b0c4f7e2cfa0b308d9305f0054c2a08"
+              "content": "49c43822ebc8105d533253fb66dfaf8c9ffff7394f6f64837315b13376e4f2ceade8619d27b28ed5d09c4e274e3c929e3d6df42c4ff6713ef00b23e1a3dfd6c6"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -11490,8 +11642,8 @@
         {
           "type": "library",
           "name": "brace-expansion",
-          "version": "1.1.15",
-          "bom-ref": "stageflow-frontend@0.1.0|eslint-config-next@16.2.10|brace-expansion@1.1.15",
+          "version": "1.1.18",
+          "bom-ref": "stageflow-frontend@0.1.0|eslint-config-next@16.2.10|brace-expansion@1.1.18",
           "licenses": [
             {
               "license": {
@@ -11500,15 +11652,15 @@
               }
             }
           ],
-          "purl": "pkg:npm/brace-expansion@1.1.15",
+          "purl": "pkg:npm/brace-expansion@1.1.18",
           "externalReferences": [
             {
-              "url": "https://registry.npmjs.org/brace-expansion/-/brace-expansion-1.1.15.tgz",
+              "url": "https://registry.npmjs.org/brace-expansion/-/brace-expansion-1.1.18.tgz",
               "type": "distribution",
               "hashes": [
                 {
                   "alg": "SHA-512",
-                  "content": "1303820c47b1e2ab83dfb5e1a8cde89b0b4ca098ebfff8ac519cf5268a543569acfb8676562c8cfe4d5821178fa6854d9d0844367c6d1632dac4d1eb4fbc4852"
+                  "content": "11d7a9fd7f5f1aa54d9b328156c0d820eb43fb3d6db9ecd5ef42c18dd0acb7d4eabbbea5b27bd1899ea84e27359fefc12305fa4031803bde0f3783764800efb7"
                 }
               ],
               "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -12220,8 +12372,8 @@
         {
           "type": "library",
           "name": "brace-expansion",
-          "version": "1.1.15",
-          "bom-ref": "stageflow-frontend@0.1.0|eslint@9.39.4|brace-expansion@1.1.15",
+          "version": "1.1.18",
+          "bom-ref": "stageflow-frontend@0.1.0|eslint@9.39.4|brace-expansion@1.1.18",
           "licenses": [
             {
               "license": {
@@ -12230,15 +12382,15 @@
               }
             }
           ],
-          "purl": "pkg:npm/brace-expansion@1.1.15",
+          "purl": "pkg:npm/brace-expansion@1.1.18",
           "externalReferences": [
             {
-              "url": "https://registry.npmjs.org/brace-expansion/-/brace-expansion-1.1.15.tgz",
+              "url": "https://registry.npmjs.org/brace-expansion/-/brace-expansion-1.1.18.tgz",
               "type": "distribution",
               "hashes": [
                 {
                   "alg": "SHA-512",
-                  "content": "1303820c47b1e2ab83dfb5e1a8cde89b0b4ca098ebfff8ac519cf5268a543569acfb8676562c8cfe4d5821178fa6854d9d0844367c6d1632dac4d1eb4fbc4852"
+                  "content": "11d7a9fd7f5f1aa54d9b328156c0d820eb43fb3d6db9ecd5ef42c18dd0acb7d4eabbbea5b27bd1899ea84e27359fefc12305fa4031803bde0f3783764800efb7"
                 }
               ],
               "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -13062,8 +13214,8 @@
     {
       "type": "library",
       "name": "fast-uri",
-      "version": "3.1.3",
-      "bom-ref": "stageflow-frontend@0.1.0|fast-uri@3.1.3",
+      "version": "3.1.6",
+      "bom-ref": "stageflow-frontend@0.1.0|fast-uri@3.1.6",
       "licenses": [
         {
           "license": {
@@ -13072,15 +13224,15 @@
           }
         }
       ],
-      "purl": "pkg:npm/fast-uri@3.1.3",
+      "purl": "pkg:npm/fast-uri@3.1.6",
       "externalReferences": [
         {
-          "url": "https://registry.npmjs.org/fast-uri/-/fast-uri-3.1.3.tgz",
+          "url": "https://registry.npmjs.org/fast-uri/-/fast-uri-3.1.6.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "8bbd0bc0659476e5eace270a5d6b21a28abeb162f52b7594539aca64d1bfd22ddad4e4a85f71ea847e566d6c139aa59fa2be2ead46a418f89141c95e4594f03a"
+              "content": "ec871a975bc510caf4a276d5cc40c8ade336d88e24856f9fcf240fc2f005581a758b076c852651b0be238d1bcf1bd24fd6e8aa30746da3e614e91dbf0b30f3e5"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -14582,8 +14734,8 @@
     {
       "type": "library",
       "name": "hono",
-      "version": "4.12.28",
-      "bom-ref": "stageflow-frontend@0.1.0|hono@4.12.28",
+      "version": "4.13.3",
+      "bom-ref": "stageflow-frontend@0.1.0|hono@4.13.3",
       "licenses": [
         {
           "license": {
@@ -14592,15 +14744,15 @@
           }
         }
       ],
-      "purl": "pkg:npm/hono@4.12.28",
+      "purl": "pkg:npm/hono@4.13.3",
       "externalReferences": [
         {
-          "url": "https://registry.npmjs.org/hono/-/hono-4.12.28.tgz",
+          "url": "https://registry.npmjs.org/hono/-/hono-4.13.3.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "63052f569485ee6d7239b9453eb5371dba3c5e13e1781a22c9f1ae208eb3d7d2e73abe89a439f2ca9ecb14dadf579eb04bcb69bed0451912121cdd36a4374b38"
+              "content": "afc00eda6607a0bc521e481a7cd782fc15f26f6bd64710f78de9b84ecfa9b5abfca131b91484627c08ee2449992386d2bef7369ecd06c662188999c7a8dde633"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -14924,8 +15076,8 @@
     {
       "type": "library",
       "name": "ip-address",
-      "version": "10.2.0",
-      "bom-ref": "stageflow-frontend@0.1.0|ip-address@10.2.0",
+      "version": "10.5.0",
+      "bom-ref": "stageflow-frontend@0.1.0|ip-address@10.5.0",
       "licenses": [
         {
           "license": {
@@ -14934,15 +15086,15 @@
           }
         }
       ],
-      "purl": "pkg:npm/ip-address@10.2.0",
+      "purl": "pkg:npm/ip-address@10.5.0",
       "externalReferences": [
         {
-          "url": "https://registry.npmjs.org/ip-address/-/ip-address-10.2.0.tgz",
+          "url": "https://registry.npmjs.org/ip-address/-/ip-address-10.5.0.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "ffe4ba8f813d007bd6f5258c48463d5dfcbae8ee4f5af544274f0ed32e491b210a429a236f42b418aa73fefe4727f1b4be2dc3dac8c62bbf35d7da1765e134a8"
+              "content": "4794a754b26681862f7f6176660c120677a5cf91b8ab9031202dbbec60df51a35bad928d00d7010bb447a9861e3e5b337f8901a2556425ab86d198c71c5879e6"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -16750,8 +16902,8 @@
     {
       "type": "library",
       "name": "js-yaml",
-      "version": "4.3.0",
-      "bom-ref": "stageflow-frontend@0.1.0|js-yaml@4.3.0",
+      "version": "4.3.1",
+      "bom-ref": "stageflow-frontend@0.1.0|js-yaml@4.3.1",
       "licenses": [
         {
           "license": {
@@ -16760,15 +16912,15 @@
           }
         }
       ],
-      "purl": "pkg:npm/js-yaml@4.3.0",
+      "purl": "pkg:npm/js-yaml@4.3.1",
       "externalReferences": [
         {
-          "url": "https://registry.npmjs.org/js-yaml/-/js-yaml-4.3.0.tgz",
+          "url": "https://registry.npmjs.org/js-yaml/-/js-yaml-4.3.1.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "d6d77bf3c6809e7679aaced5d90211975a308ed6296cab7be3d637c5abaa420c0820617fc575b3d70313101c793b72cade55cb56ea973dd3f18f6068147696f5"
+              "content": "098e9cac6ab7d77317f06930bc1eedce0a7df6f8d0c58d7efb9cb5d3f04a37f1947c7a9668e19030d66406fa92cec64a5a4fe28f01e55b3ce42ee96c18786359"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -18587,8 +18739,8 @@
     {
       "type": "library",
       "name": "nanoid",
-      "version": "3.3.15",
-      "bom-ref": "stageflow-frontend@0.1.0|nanoid@3.3.15",
+      "version": "3.3.18",
+      "bom-ref": "stageflow-frontend@0.1.0|nanoid@3.3.18",
       "licenses": [
         {
           "license": {
@@ -18597,15 +18749,15 @@
           }
         }
       ],
-      "purl": "pkg:npm/nanoid@3.3.15",
+      "purl": "pkg:npm/nanoid@3.3.18",
       "externalReferences": [
         {
-          "url": "https://registry.npmjs.org/nanoid/-/nanoid-3.3.15.tgz",
+          "url": "https://registry.npmjs.org/nanoid/-/nanoid-3.3.18.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "cbb5b282fffb9843afc53b8440307c4ad5dd3110567f5911fed961033051505901da37dc2ce0313bf48798e3b6ce0cf5a5580adbdfe4caea67d39f7f6c21dd8c"
+              "content": "0d38383096c631691f8ba55915d36ddbf71a31b432e0ebbe3a9fe1250bc611672755fa00d5003ec7344a033c3d8c3ebe19538e798aff98872e0d276e83a17afb"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -18735,8 +18887,8 @@
     {
       "type": "library",
       "name": "next",
-      "version": "16.2.11",
-      "bom-ref": "stageflow-frontend@0.1.0|next@16.2.11",
+      "version": "16.3.2",
+      "bom-ref": "stageflow-frontend@0.1.0|next@16.3.2",
       "licenses": [
         {
           "license": {
@@ -18745,15 +18897,15 @@
           }
         }
       ],
-      "purl": "pkg:npm/next@16.2.11",
+      "purl": "pkg:npm/next@16.3.2",
       "externalReferences": [
         {
-          "url": "https://registry.npmjs.org/next/-/next-16.2.11.tgz",
+          "url": "https://registry.npmjs.org/next/-/next-16.3.2.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "077dfdcdaa9bc8af1c9b186802f2eb730a1a6f008fd70cf6d734b37eac6a5c07a64eed815e71fbb509df72094abf5be731420305cf87b61ed738342b89366245"
+              "content": "fd909ab9b532d7b2e57754a23d6c6e3db0a4da286a03117640d41a3d97846846fbb75239f2a86c24dd7cec3ec07e96a91c0a943d71f47ffb61b5d5bd75681616"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -18763,42 +18915,6 @@
         {
           "name": "cdx:npm:package:path",
           "value": "node_modules/next"
-        }
-      ],
-      "components": [
-        {
-          "type": "library",
-          "name": "postcss",
-          "version": "8.4.31",
-          "bom-ref": "stageflow-frontend@0.1.0|next@16.2.11|postcss@8.4.31",
-          "licenses": [
-            {
-              "license": {
-                "id": "MIT",
-                "acknowledgement": "declared"
-              }
-            }
-          ],
-          "purl": "pkg:npm/postcss@8.4.31",
-          "externalReferences": [
-            {
-              "url": "https://registry.npmjs.org/postcss/-/postcss-8.4.31.tgz",
-              "type": "distribution",
-              "hashes": [
-                {
-                  "alg": "SHA-512",
-                  "content": "3d2d3c21ba226bd9adb3fdb2815dde2e96398219d471f2d5fc45d3396d44daa63124a186054b4d8cdefa1581e732cdfa4660119f8d5b0b40199a7fab474395a5"
-                }
-              ],
-              "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
-            }
-          ],
-          "properties": [
-            {
-              "name": "cdx:npm:package:path",
-              "value": "node_modules/next/node_modules/postcss"
-            }
-          ]
         }
       ]
     },
@@ -20557,8 +20673,8 @@
     {
       "type": "library",
       "name": "postcss",
-      "version": "8.5.16",
-      "bom-ref": "stageflow-frontend@0.1.0|postcss@8.5.16",
+      "version": "8.5.23",
+      "bom-ref": "stageflow-frontend@0.1.0|postcss@8.5.23",
       "licenses": [
         {
           "license": {
@@ -20567,25 +20683,21 @@
           }
         }
       ],
-      "purl": "pkg:npm/postcss@8.5.16",
+      "purl": "pkg:npm/postcss@8.5.23",
       "externalReferences": [
         {
-          "url": "https://registry.npmjs.org/postcss/-/postcss-8.5.16.tgz",
+          "url": "https://registry.npmjs.org/postcss/-/postcss-8.5.23.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "beec22965be28a57ca66c8345468f947f630c1c1f1e122ec20e23fecaea64245b1fa5e5c5074e38f983401ab1305cc97b1b7d382bc2c50d99551be71570c8fc2"
+              "content": "839d39f3acebe1b666c0589395f94cbbc1346c34dbe48e607abb60c002a6b1d5254d022166dba7cd4943d564b3c1c5563e8015a6cac0eaf95f083ee85ef47082"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
         }
       ],
       "properties": [
-        {
-          "name": "cdx:npm:package:development",
-          "value": "true"
-        },
         {
           "name": "cdx:npm:package:path",
           "value": "node_modules/postcss"
@@ -22295,8 +22407,8 @@
     {
       "type": "library",
       "name": "sharp",
-      "version": "0.34.5",
-      "bom-ref": "stageflow-frontend@0.1.0|sharp@0.34.5",
+      "version": "0.35.3",
+      "bom-ref": "stageflow-frontend@0.1.0|sharp@0.35.3",
       "scope": "optional",
       "licenses": [
         {
@@ -22306,15 +22418,15 @@
           }
         }
       ],
-      "purl": "pkg:npm/sharp@0.34.5",
+      "purl": "pkg:npm/sharp@0.35.3",
       "externalReferences": [
         {
-          "url": "https://registry.npmjs.org/sharp/-/sharp-0.34.5.tgz",
+          "url": "https://registry.npmjs.org/sharp/-/sharp-0.35.3.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "3aef48e45b7d58d7026d7ad4f5c3203c17022bc2e2c0ba9c6f2c16dede280d5dfb9f5a73a6e34bb1888057c78e0e78dbb509520f067671411e433e04e781e5b6"
+              "content": "7a3d33547b991870a20015dc3717988694673cd3c072f6c6f1131d0408430312ca9024554a92b7232bbba9bab0dc9333a23d1111e33a7f7b492ed570974d36dd"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -22331,7 +22443,7 @@
           "type": "library",
           "name": "semver",
           "version": "7.8.5",
-          "bom-ref": "stageflow-frontend@0.1.0|sharp@0.34.5|semver@7.8.5",
+          "bom-ref": "stageflow-frontend@0.1.0|sharp@0.35.3|semver@7.8.5",
           "scope": "optional",
           "licenses": [
             {
@@ -24529,8 +24641,8 @@
     {
       "type": "library",
       "name": "undici",
-      "version": "7.28.0",
-      "bom-ref": "stageflow-frontend@0.1.0|undici@7.28.0",
+      "version": "7.29.0",
+      "bom-ref": "stageflow-frontend@0.1.0|undici@7.29.0",
       "licenses": [
         {
           "license": {
@@ -24539,15 +24651,15 @@
           }
         }
       ],
-      "purl": "pkg:npm/undici@7.28.0",
+      "purl": "pkg:npm/undici@7.29.0",
       "externalReferences": [
         {
-          "url": "https://registry.npmjs.org/undici/-/undici-7.28.0.tgz",
+          "url": "https://registry.npmjs.org/undici/-/undici-7.29.0.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "711658ad30f05b39e59d188f8e08001b16576a7b72e8cf115757dff169b82d65c1a7bfc81bcbf90e73a6ef80ed501a7d38e3692bbe5894f9c88d0a97d1d043b4"
+              "content": "203c5f95e2e699b4ac91f5925004e23759df9f6ac3baf9cc3aa6f909647dda221fa2303451dfae94e000110e7b2cfafdad69acade5327f9970c9aa3eec634d57"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -25484,7 +25596,7 @@
         "stageflow-frontend@0.1.0|@types/react@19.2.17",
         "stageflow-frontend@0.1.0|eslint-config-next@16.2.10",
         "stageflow-frontend@0.1.0|eslint@9.39.4",
-        "stageflow-frontend@0.1.0|next@16.2.11",
+        "stageflow-frontend@0.1.0|next@16.3.2",
         "stageflow-frontend@0.1.0|react-dom@19.2.7",
         "stageflow-frontend@0.1.0|react-hook-form@7.81.0",
         "stageflow-frontend@0.1.0|react@19.2.7",
@@ -25728,7 +25840,7 @@
         "stageflow-frontend@0.1.0|ignore@5.3.2",
         "stageflow-frontend@0.1.0|object-treeify@1.1.33",
         "stageflow-frontend@0.1.0|systeminformation@5.31.13",
-        "stageflow-frontend@0.1.0|undici@7.28.0",
+        "stageflow-frontend@0.1.0|undici@7.29.0",
         "stageflow-frontend@0.1.0|yocto-spinner@1.2.1"
       ]
     },
@@ -25812,9 +25924,9 @@
       "ref": "stageflow-frontend@0.1.0|@dotenvx/primitives@0.8.0"
     },
     {
-      "ref": "stageflow-frontend@0.1.0|@emnapi/core@1.10.0",
+      "ref": "stageflow-frontend@0.1.0|@emnapi/core@1.11.1",
       "dependsOn": [
-        "stageflow-frontend@0.1.0|@emnapi/wasi-threads@1.2.1",
+        "stageflow-frontend@0.1.0|@emnapi/wasi-threads@1.2.2",
         "stageflow-frontend@0.1.0|tslib@2.8.1"
       ]
     },
@@ -25825,7 +25937,7 @@
       ]
     },
     {
-      "ref": "stageflow-frontend@0.1.0|@emnapi/wasi-threads@1.2.1",
+      "ref": "stageflow-frontend@0.1.0|@emnapi/wasi-threads@1.2.2",
       "dependsOn": [
         "stageflow-frontend@0.1.0|tslib@2.8.1"
       ]
@@ -25855,7 +25967,7 @@
       "ref": "stageflow-frontend@0.1.0|@eslint/config-array@0.21.2|balanced-match@1.0.2"
     },
     {
-      "ref": "stageflow-frontend@0.1.0|@eslint/config-array@0.21.2|brace-expansion@1.1.15",
+      "ref": "stageflow-frontend@0.1.0|@eslint/config-array@0.21.2|brace-expansion@1.1.18",
       "dependsOn": [
         "stageflow-frontend@0.1.0|@eslint/config-array@0.21.2|balanced-match@1.0.2",
         "stageflow-frontend@0.1.0|concat-map@0.0.1"
@@ -25864,7 +25976,7 @@
     {
       "ref": "stageflow-frontend@0.1.0|@eslint/config-array@0.21.2|minimatch@3.1.5",
       "dependsOn": [
-        "stageflow-frontend@0.1.0|@eslint/config-array@0.21.2|brace-expansion@1.1.15"
+        "stageflow-frontend@0.1.0|@eslint/config-array@0.21.2|brace-expansion@1.1.18"
       ]
     },
     {
@@ -25889,7 +26001,7 @@
         "stageflow-frontend@0.1.0|espree@10.4.0",
         "stageflow-frontend@0.1.0|ignore@5.3.2",
         "stageflow-frontend@0.1.0|import-fresh@3.3.1",
-        "stageflow-frontend@0.1.0|js-yaml@4.3.0",
+        "stageflow-frontend@0.1.0|js-yaml@4.3.1",
         "stageflow-frontend@0.1.0|strip-json-comments@3.1.1"
       ]
     },
@@ -25897,7 +26009,7 @@
       "ref": "stageflow-frontend@0.1.0|@eslint/eslintrc@3.3.5|balanced-match@1.0.2"
     },
     {
-      "ref": "stageflow-frontend@0.1.0|@eslint/eslintrc@3.3.5|brace-expansion@1.1.15",
+      "ref": "stageflow-frontend@0.1.0|@eslint/eslintrc@3.3.5|brace-expansion@1.1.18",
       "dependsOn": [
         "stageflow-frontend@0.1.0|@eslint/eslintrc@3.3.5|balanced-match@1.0.2",
         "stageflow-frontend@0.1.0|concat-map@0.0.1"
@@ -25909,7 +26021,7 @@
     {
       "ref": "stageflow-frontend@0.1.0|@eslint/eslintrc@3.3.5|minimatch@3.1.5",
       "dependsOn": [
-        "stageflow-frontend@0.1.0|@eslint/eslintrc@3.3.5|brace-expansion@1.1.15"
+        "stageflow-frontend@0.1.0|@eslint/eslintrc@3.3.5|brace-expansion@1.1.18"
       ]
     },
     {
@@ -25926,9 +26038,9 @@
       ]
     },
     {
-      "ref": "stageflow-frontend@0.1.0|@hono/node-server@1.19.14",
+      "ref": "stageflow-frontend@0.1.0|@hono/node-server@1.19.17",
       "dependsOn": [
-        "stageflow-frontend@0.1.0|hono@4.12.28"
+        "stageflow-frontend@0.1.0|hono@4.13.3"
       ]
     },
     {
@@ -25958,109 +26070,121 @@
       "ref": "stageflow-frontend@0.1.0|@img/colour@1.1.0"
     },
     {
-      "ref": "stageflow-frontend@0.1.0|@img/sharp-darwin-arm64@0.34.5",
+      "ref": "stageflow-frontend@0.1.0|@img/sharp-darwin-arm64@0.35.3",
       "dependsOn": [
-        "stageflow-frontend@0.1.0|@img/sharp-libvips-darwin-arm64@1.2.4"
+        "stageflow-frontend@0.1.0|@img/sharp-libvips-darwin-arm64@1.3.2"
       ]
     },
     {
-      "ref": "stageflow-frontend@0.1.0|@img/sharp-darwin-x64@0.34.5",
+      "ref": "stageflow-frontend@0.1.0|@img/sharp-darwin-x64@0.35.3",
       "dependsOn": [
-        "stageflow-frontend@0.1.0|@img/sharp-libvips-darwin-x64@1.2.4"
+        "stageflow-frontend@0.1.0|@img/sharp-libvips-darwin-x64@1.3.2"
       ]
     },
     {
-      "ref": "stageflow-frontend@0.1.0|@img/sharp-libvips-darwin-arm64@1.2.4"
-    },
-    {
-      "ref": "stageflow-frontend@0.1.0|@img/sharp-libvips-darwin-x64@1.2.4"
-    },
-    {
-      "ref": "stageflow-frontend@0.1.0|@img/sharp-libvips-linux-arm@1.2.4"
-    },
-    {
-      "ref": "stageflow-frontend@0.1.0|@img/sharp-libvips-linux-arm64@1.2.4"
-    },
-    {
-      "ref": "stageflow-frontend@0.1.0|@img/sharp-libvips-linux-ppc64@1.2.4"
-    },
-    {
-      "ref": "stageflow-frontend@0.1.0|@img/sharp-libvips-linux-riscv64@1.2.4"
-    },
-    {
-      "ref": "stageflow-frontend@0.1.0|@img/sharp-libvips-linux-s390x@1.2.4"
-    },
-    {
-      "ref": "stageflow-frontend@0.1.0|@img/sharp-libvips-linux-x64@1.2.4"
-    },
-    {
-      "ref": "stageflow-frontend@0.1.0|@img/sharp-libvips-linuxmusl-arm64@1.2.4"
-    },
-    {
-      "ref": "stageflow-frontend@0.1.0|@img/sharp-libvips-linuxmusl-x64@1.2.4"
-    },
-    {
-      "ref": "stageflow-frontend@0.1.0|@img/sharp-linux-arm@0.34.5",
+      "ref": "stageflow-frontend@0.1.0|@img/sharp-freebsd-wasm32@0.35.3",
       "dependsOn": [
-        "stageflow-frontend@0.1.0|@img/sharp-libvips-linux-arm@1.2.4"
+        "stageflow-frontend@0.1.0|@img/sharp-wasm32@0.35.3"
       ]
     },
     {
-      "ref": "stageflow-frontend@0.1.0|@img/sharp-linux-arm64@0.34.5",
+      "ref": "stageflow-frontend@0.1.0|@img/sharp-libvips-darwin-arm64@1.3.2"
+    },
+    {
+      "ref": "stageflow-frontend@0.1.0|@img/sharp-libvips-darwin-x64@1.3.2"
+    },
+    {
+      "ref": "stageflow-frontend@0.1.0|@img/sharp-libvips-linux-arm@1.3.2"
+    },
+    {
+      "ref": "stageflow-frontend@0.1.0|@img/sharp-libvips-linux-arm64@1.3.2"
+    },
+    {
+      "ref": "stageflow-frontend@0.1.0|@img/sharp-libvips-linux-ppc64@1.3.2"
+    },
+    {
+      "ref": "stageflow-frontend@0.1.0|@img/sharp-libvips-linux-riscv64@1.3.2"
+    },
+    {
+      "ref": "stageflow-frontend@0.1.0|@img/sharp-libvips-linux-s390x@1.3.2"
+    },
+    {
+      "ref": "stageflow-frontend@0.1.0|@img/sharp-libvips-linux-x64@1.3.2"
+    },
+    {
+      "ref": "stageflow-frontend@0.1.0|@img/sharp-libvips-linuxmusl-arm64@1.3.2"
+    },
+    {
+      "ref": "stageflow-frontend@0.1.0|@img/sharp-libvips-linuxmusl-x64@1.3.2"
+    },
+    {
+      "ref": "stageflow-frontend@0.1.0|@img/sharp-linux-arm@0.35.3",
       "dependsOn": [
-        "stageflow-frontend@0.1.0|@img/sharp-libvips-linux-arm64@1.2.4"
+        "stageflow-frontend@0.1.0|@img/sharp-libvips-linux-arm@1.3.2"
       ]
     },
     {
-      "ref": "stageflow-frontend@0.1.0|@img/sharp-linux-ppc64@0.34.5",
+      "ref": "stageflow-frontend@0.1.0|@img/sharp-linux-arm64@0.35.3",
       "dependsOn": [
-        "stageflow-frontend@0.1.0|@img/sharp-libvips-linux-ppc64@1.2.4"
+        "stageflow-frontend@0.1.0|@img/sharp-libvips-linux-arm64@1.3.2"
       ]
     },
     {
-      "ref": "stageflow-frontend@0.1.0|@img/sharp-linux-riscv64@0.34.5",
+      "ref": "stageflow-frontend@0.1.0|@img/sharp-linux-ppc64@0.35.3",
       "dependsOn": [
-        "stageflow-frontend@0.1.0|@img/sharp-libvips-linux-riscv64@1.2.4"
+        "stageflow-frontend@0.1.0|@img/sharp-libvips-linux-ppc64@1.3.2"
       ]
     },
     {
-      "ref": "stageflow-frontend@0.1.0|@img/sharp-linux-s390x@0.34.5",
+      "ref": "stageflow-frontend@0.1.0|@img/sharp-linux-riscv64@0.35.3",
       "dependsOn": [
-        "stageflow-frontend@0.1.0|@img/sharp-libvips-linux-s390x@1.2.4"
+        "stageflow-frontend@0.1.0|@img/sharp-libvips-linux-riscv64@1.3.2"
       ]
     },
     {
-      "ref": "stageflow-frontend@0.1.0|@img/sharp-linux-x64@0.34.5",
+      "ref": "stageflow-frontend@0.1.0|@img/sharp-linux-s390x@0.35.3",
       "dependsOn": [
-        "stageflow-frontend@0.1.0|@img/sharp-libvips-linux-x64@1.2.4"
+        "stageflow-frontend@0.1.0|@img/sharp-libvips-linux-s390x@1.3.2"
       ]
     },
     {
-      "ref": "stageflow-frontend@0.1.0|@img/sharp-linuxmusl-arm64@0.34.5",
+      "ref": "stageflow-frontend@0.1.0|@img/sharp-linux-x64@0.35.3",
       "dependsOn": [
-        "stageflow-frontend@0.1.0|@img/sharp-libvips-linuxmusl-arm64@1.2.4"
+        "stageflow-frontend@0.1.0|@img/sharp-libvips-linux-x64@1.3.2"
       ]
     },
     {
-      "ref": "stageflow-frontend@0.1.0|@img/sharp-linuxmusl-x64@0.34.5",
+      "ref": "stageflow-frontend@0.1.0|@img/sharp-linuxmusl-arm64@0.35.3",
       "dependsOn": [
-        "stageflow-frontend@0.1.0|@img/sharp-libvips-linuxmusl-x64@1.2.4"
+        "stageflow-frontend@0.1.0|@img/sharp-libvips-linuxmusl-arm64@1.3.2"
       ]
     },
     {
-      "ref": "stageflow-frontend@0.1.0|@img/sharp-wasm32@0.34.5",
+      "ref": "stageflow-frontend@0.1.0|@img/sharp-linuxmusl-x64@0.35.3",
+      "dependsOn": [
+        "stageflow-frontend@0.1.0|@img/sharp-libvips-linuxmusl-x64@1.3.2"
+      ]
+    },
+    {
+      "ref": "stageflow-frontend@0.1.0|@img/sharp-wasm32@0.35.3",
       "dependsOn": [
         "stageflow-frontend@0.1.0|@emnapi/runtime@1.11.2"
       ]
     },
     {
-      "ref": "stageflow-frontend@0.1.0|@img/sharp-win32-arm64@0.34.5"
+      "ref": "stageflow-frontend@0.1.0|@img/sharp-webcontainers-wasm32@0.35.3",
+      "dependsOn": [
+        "stageflow-frontend@0.1.0|@img/sharp-wasm32@0.35.3"
+      ]
     },
     {
-      "ref": "stageflow-frontend@0.1.0|@img/sharp-win32-ia32@0.34.5"
+      "ref": "stageflow-frontend@0.1.0|@img/sharp-win32-arm64@0.35.3"
     },
     {
-      "ref": "stageflow-frontend@0.1.0|@img/sharp-win32-x64@0.34.5"
+      "ref": "stageflow-frontend@0.1.0|@img/sharp-win32-ia32@0.35.3"
+    },
+    {
+      "ref": "stageflow-frontend@0.1.0|@img/sharp-win32-x64@0.35.3"
     },
     {
       "ref": "stageflow-frontend@0.1.0|@jridgewell/gen-mapping@0.3.13",
@@ -26092,7 +26216,7 @@
     {
       "ref": "stageflow-frontend@0.1.0|@modelcontextprotocol/sdk@1.29.0",
       "dependsOn": [
-        "stageflow-frontend@0.1.0|@hono/node-server@1.19.14",
+        "stageflow-frontend@0.1.0|@hono/node-server@1.19.17",
         "stageflow-frontend@0.1.0|@modelcontextprotocol/sdk@1.29.0|ajv@8.20.0",
         "stageflow-frontend@0.1.0|ajv-formats@3.0.1",
         "stageflow-frontend@0.1.0|content-type@1.0.5",
@@ -26102,7 +26226,7 @@
         "stageflow-frontend@0.1.0|eventsource@3.0.7",
         "stageflow-frontend@0.1.0|express-rate-limit@8.5.2",
         "stageflow-frontend@0.1.0|express@5.2.1",
-        "stageflow-frontend@0.1.0|hono@4.12.28",
+        "stageflow-frontend@0.1.0|hono@4.13.3",
         "stageflow-frontend@0.1.0|jose@6.2.3",
         "stageflow-frontend@0.1.0|json-schema-typed@8.0.2",
         "stageflow-frontend@0.1.0|pkce-challenge@5.0.1",
@@ -26116,7 +26240,7 @@
       "dependsOn": [
         "stageflow-frontend@0.1.0|@modelcontextprotocol/sdk@1.29.0|json-schema-traverse@1.0.0",
         "stageflow-frontend@0.1.0|fast-deep-equal@3.1.3",
-        "stageflow-frontend@0.1.0|fast-uri@3.1.3",
+        "stageflow-frontend@0.1.0|fast-uri@3.1.6",
         "stageflow-frontend@0.1.0|require-from-string@2.0.2"
       ]
     },
@@ -26126,13 +26250,13 @@
     {
       "ref": "stageflow-frontend@0.1.0|@napi-rs/wasm-runtime@1.1.6",
       "dependsOn": [
-        "stageflow-frontend@0.1.0|@emnapi/core@1.10.0",
+        "stageflow-frontend@0.1.0|@emnapi/core@1.11.1",
         "stageflow-frontend@0.1.0|@emnapi/runtime@1.11.2",
         "stageflow-frontend@0.1.0|@tybys/wasm-util@0.10.3"
       ]
     },
     {
-      "ref": "stageflow-frontend@0.1.0|@next/env@16.2.11"
+      "ref": "stageflow-frontend@0.1.0|@next/env@16.3.2"
     },
     {
       "ref": "stageflow-frontend@0.1.0|@next/eslint-plugin-next@16.2.10",
@@ -26141,28 +26265,28 @@
       ]
     },
     {
-      "ref": "stageflow-frontend@0.1.0|@next/swc-darwin-arm64@16.2.11"
+      "ref": "stageflow-frontend@0.1.0|@next/swc-darwin-arm64@16.3.2"
     },
     {
-      "ref": "stageflow-frontend@0.1.0|@next/swc-darwin-x64@16.2.11"
+      "ref": "stageflow-frontend@0.1.0|@next/swc-darwin-x64@16.3.2"
     },
     {
-      "ref": "stageflow-frontend@0.1.0|@next/swc-linux-arm64-gnu@16.2.11"
+      "ref": "stageflow-frontend@0.1.0|@next/swc-linux-arm64-gnu@16.3.2"
     },
     {
-      "ref": "stageflow-frontend@0.1.0|@next/swc-linux-arm64-musl@16.2.11"
+      "ref": "stageflow-frontend@0.1.0|@next/swc-linux-arm64-musl@16.3.2"
     },
     {
-      "ref": "stageflow-frontend@0.1.0|@next/swc-linux-x64-gnu@16.2.11"
+      "ref": "stageflow-frontend@0.1.0|@next/swc-linux-x64-gnu@16.3.2"
     },
     {
-      "ref": "stageflow-frontend@0.1.0|@next/swc-linux-x64-musl@16.2.11"
+      "ref": "stageflow-frontend@0.1.0|@next/swc-linux-x64-musl@16.3.2"
     },
     {
-      "ref": "stageflow-frontend@0.1.0|@next/swc-win32-arm64-msvc@16.2.11"
+      "ref": "stageflow-frontend@0.1.0|@next/swc-win32-arm64-msvc@16.3.2"
     },
     {
-      "ref": "stageflow-frontend@0.1.0|@next/swc-win32-x64-msvc@16.2.11"
+      "ref": "stageflow-frontend@0.1.0|@next/swc-win32-x64-msvc@16.3.2"
     },
     {
       "ref": "stageflow-frontend@0.1.0|@nodelib/fs.scandir@2.1.5",
@@ -26194,7 +26318,7 @@
       "ref": "stageflow-frontend@0.1.0|@sindresorhus/merge-streams@4.0.0"
     },
     {
-      "ref": "stageflow-frontend@0.1.0|@swc/helpers@0.5.15",
+      "ref": "stageflow-frontend@0.1.0|@swc/helpers@0.5.23",
       "dependsOn": [
         "stageflow-frontend@0.1.0|tslib@2.8.1"
       ]
@@ -26241,9 +26365,9 @@
     {
       "ref": "stageflow-frontend@0.1.0|@tailwindcss/oxide-wasm32-wasi@4.3.2",
       "dependsOn": [
-        "stageflow-frontend@0.1.0|@emnapi/core@1.10.0",
+        "stageflow-frontend@0.1.0|@emnapi/core@1.11.1",
         "stageflow-frontend@0.1.0|@emnapi/runtime@1.11.2",
-        "stageflow-frontend@0.1.0|@emnapi/wasi-threads@1.2.1",
+        "stageflow-frontend@0.1.0|@emnapi/wasi-threads@1.2.2",
         "stageflow-frontend@0.1.0|@napi-rs/wasm-runtime@1.1.6",
         "stageflow-frontend@0.1.0|@tybys/wasm-util@0.10.3",
         "stageflow-frontend@0.1.0|tslib@2.8.1"
@@ -26278,7 +26402,7 @@
         "stageflow-frontend@0.1.0|@alloc/quick-lru@5.2.0",
         "stageflow-frontend@0.1.0|@tailwindcss/node@4.3.2",
         "stageflow-frontend@0.1.0|@tailwindcss/oxide@4.3.2",
-        "stageflow-frontend@0.1.0|postcss@8.5.16",
+        "stageflow-frontend@0.1.0|postcss@8.5.23",
         "stageflow-frontend@0.1.0|tailwindcss@4.3.2"
       ]
     },
@@ -26513,13 +26637,26 @@
     {
       "ref": "stageflow-frontend@0.1.0|@unrs/resolver-binding-wasm32-wasi@1.12.2",
       "dependsOn": [
-        "stageflow-frontend@0.1.0|@emnapi/core@1.10.0",
         "stageflow-frontend@0.1.0|@napi-rs/wasm-runtime@1.1.6",
+        "stageflow-frontend@0.1.0|@unrs/resolver-binding-wasm32-wasi@1.12.2|@emnapi/core@1.10.0",
         "stageflow-frontend@0.1.0|@unrs/resolver-binding-wasm32-wasi@1.12.2|@emnapi/runtime@1.10.0"
       ]
     },
     {
+      "ref": "stageflow-frontend@0.1.0|@unrs/resolver-binding-wasm32-wasi@1.12.2|@emnapi/core@1.10.0",
+      "dependsOn": [
+        "stageflow-frontend@0.1.0|@unrs/resolver-binding-wasm32-wasi@1.12.2|@emnapi/wasi-threads@1.2.1",
+        "stageflow-frontend@0.1.0|tslib@2.8.1"
+      ]
+    },
+    {
       "ref": "stageflow-frontend@0.1.0|@unrs/resolver-binding-wasm32-wasi@1.12.2|@emnapi/runtime@1.10.0",
+      "dependsOn": [
+        "stageflow-frontend@0.1.0|tslib@2.8.1"
+      ]
+    },
+    {
+      "ref": "stageflow-frontend@0.1.0|@unrs/resolver-binding-wasm32-wasi@1.12.2|@emnapi/wasi-threads@1.2.1",
       "dependsOn": [
         "stageflow-frontend@0.1.0|tslib@2.8.1"
       ]
@@ -26560,7 +26697,7 @@
       "dependsOn": [
         "stageflow-frontend@0.1.0|ajv-formats@3.0.1|json-schema-traverse@1.0.0",
         "stageflow-frontend@0.1.0|fast-deep-equal@3.1.3",
-        "stageflow-frontend@0.1.0|fast-uri@3.1.3",
+        "stageflow-frontend@0.1.0|fast-uri@3.1.6",
         "stageflow-frontend@0.1.0|require-from-string@2.0.2"
       ]
     },
@@ -26728,7 +26865,7 @@
       "ref": "stageflow-frontend@0.1.0|body-parser@2.3.0|content-type@2.0.0"
     },
     {
-      "ref": "stageflow-frontend@0.1.0|brace-expansion@5.0.7",
+      "ref": "stageflow-frontend@0.1.0|brace-expansion@5.0.9",
       "dependsOn": [
         "stageflow-frontend@0.1.0|balanced-match@4.0.4"
       ]
@@ -26846,7 +26983,7 @@
       "dependsOn": [
         "stageflow-frontend@0.1.0|conf@10.2.0|json-schema-traverse@1.0.0",
         "stageflow-frontend@0.1.0|fast-deep-equal@3.1.3",
-        "stageflow-frontend@0.1.0|fast-uri@3.1.3",
+        "stageflow-frontend@0.1.0|fast-uri@3.1.6",
         "stageflow-frontend@0.1.0|require-from-string@2.0.2"
       ]
     },
@@ -26886,7 +27023,7 @@
       "dependsOn": [
         "stageflow-frontend@0.1.0|env-paths@2.2.1",
         "stageflow-frontend@0.1.0|import-fresh@3.3.1",
-        "stageflow-frontend@0.1.0|js-yaml@4.3.0",
+        "stageflow-frontend@0.1.0|js-yaml@4.3.1",
         "stageflow-frontend@0.1.0|parse-json@5.2.0",
         "stageflow-frontend@0.1.0|typescript@6.0.3"
       ]
@@ -27205,7 +27342,7 @@
       "ref": "stageflow-frontend@0.1.0|eslint-config-next@16.2.10|balanced-match@1.0.2"
     },
     {
-      "ref": "stageflow-frontend@0.1.0|eslint-config-next@16.2.10|brace-expansion@1.1.15",
+      "ref": "stageflow-frontend@0.1.0|eslint-config-next@16.2.10|brace-expansion@1.1.18",
       "dependsOn": [
         "stageflow-frontend@0.1.0|concat-map@0.0.1",
         "stageflow-frontend@0.1.0|eslint-config-next@16.2.10|balanced-match@1.0.2"
@@ -27313,7 +27450,7 @@
     {
       "ref": "stageflow-frontend@0.1.0|eslint-config-next@16.2.10|minimatch@3.1.5",
       "dependsOn": [
-        "stageflow-frontend@0.1.0|eslint-config-next@16.2.10|brace-expansion@1.1.15"
+        "stageflow-frontend@0.1.0|eslint-config-next@16.2.10|brace-expansion@1.1.18"
       ]
     },
     {
@@ -27416,7 +27553,7 @@
       "ref": "stageflow-frontend@0.1.0|eslint@9.39.4|balanced-match@1.0.2"
     },
     {
-      "ref": "stageflow-frontend@0.1.0|eslint@9.39.4|brace-expansion@1.1.15",
+      "ref": "stageflow-frontend@0.1.0|eslint@9.39.4|brace-expansion@1.1.18",
       "dependsOn": [
         "stageflow-frontend@0.1.0|concat-map@0.0.1",
         "stageflow-frontend@0.1.0|eslint@9.39.4|balanced-match@1.0.2"
@@ -27435,7 +27572,7 @@
     {
       "ref": "stageflow-frontend@0.1.0|eslint@9.39.4|minimatch@3.1.5",
       "dependsOn": [
-        "stageflow-frontend@0.1.0|eslint@9.39.4|brace-expansion@1.1.15"
+        "stageflow-frontend@0.1.0|eslint@9.39.4|brace-expansion@1.1.18"
       ]
     },
     {
@@ -27503,7 +27640,7 @@
       "ref": "stageflow-frontend@0.1.0|express-rate-limit@8.5.2",
       "dependsOn": [
         "stageflow-frontend@0.1.0|express@5.2.1",
-        "stageflow-frontend@0.1.0|ip-address@10.2.0"
+        "stageflow-frontend@0.1.0|ip-address@10.5.0"
       ]
     },
     {
@@ -27565,7 +27702,7 @@
       "ref": "stageflow-frontend@0.1.0|fast-levenshtein@2.0.6"
     },
     {
-      "ref": "stageflow-frontend@0.1.0|fast-uri@3.1.3"
+      "ref": "stageflow-frontend@0.1.0|fast-uri@3.1.6"
     },
     {
       "ref": "stageflow-frontend@0.1.0|fastq@1.20.1",
@@ -27782,7 +27919,7 @@
       ]
     },
     {
-      "ref": "stageflow-frontend@0.1.0|hono@4.12.28"
+      "ref": "stageflow-frontend@0.1.0|hono@4.13.3"
     },
     {
       "ref": "stageflow-frontend@0.1.0|http-errors@2.0.1",
@@ -27828,7 +27965,7 @@
       ]
     },
     {
-      "ref": "stageflow-frontend@0.1.0|ip-address@10.2.0"
+      "ref": "stageflow-frontend@0.1.0|ip-address@10.5.0"
     },
     {
       "ref": "stageflow-frontend@0.1.0|ipaddr.js@1.9.1"
@@ -28068,7 +28205,7 @@
       "ref": "stageflow-frontend@0.1.0|js-tokens@4.0.0"
     },
     {
-      "ref": "stageflow-frontend@0.1.0|js-yaml@4.3.0",
+      "ref": "stageflow-frontend@0.1.0|js-yaml@4.3.1",
       "dependsOn": [
         "stageflow-frontend@0.1.0|argparse@2.0.1"
       ]
@@ -28265,7 +28402,7 @@
     {
       "ref": "stageflow-frontend@0.1.0|minimatch@10.2.5",
       "dependsOn": [
-        "stageflow-frontend@0.1.0|brace-expansion@5.0.7"
+        "stageflow-frontend@0.1.0|brace-expansion@5.0.9"
       ]
     },
     {
@@ -28275,7 +28412,7 @@
       "ref": "stageflow-frontend@0.1.0|ms@2.1.3"
     },
     {
-      "ref": "stageflow-frontend@0.1.0|nanoid@3.3.15"
+      "ref": "stageflow-frontend@0.1.0|nanoid@3.3.18"
     },
     {
       "ref": "stageflow-frontend@0.1.0|napi-postinstall@0.3.4"
@@ -28287,33 +28424,25 @@
       "ref": "stageflow-frontend@0.1.0|negotiator@1.0.0"
     },
     {
-      "ref": "stageflow-frontend@0.1.0|next@16.2.11",
+      "ref": "stageflow-frontend@0.1.0|next@16.3.2",
       "dependsOn": [
-        "stageflow-frontend@0.1.0|@next/env@16.2.11",
-        "stageflow-frontend@0.1.0|@next/swc-darwin-arm64@16.2.11",
-        "stageflow-frontend@0.1.0|@next/swc-darwin-x64@16.2.11",
-        "stageflow-frontend@0.1.0|@next/swc-linux-arm64-gnu@16.2.11",
-        "stageflow-frontend@0.1.0|@next/swc-linux-arm64-musl@16.2.11",
-        "stageflow-frontend@0.1.0|@next/swc-linux-x64-gnu@16.2.11",
-        "stageflow-frontend@0.1.0|@next/swc-linux-x64-musl@16.2.11",
-        "stageflow-frontend@0.1.0|@next/swc-win32-arm64-msvc@16.2.11",
-        "stageflow-frontend@0.1.0|@next/swc-win32-x64-msvc@16.2.11",
-        "stageflow-frontend@0.1.0|@swc/helpers@0.5.15",
+        "stageflow-frontend@0.1.0|@next/env@16.3.2",
+        "stageflow-frontend@0.1.0|@next/swc-darwin-arm64@16.3.2",
+        "stageflow-frontend@0.1.0|@next/swc-darwin-x64@16.3.2",
+        "stageflow-frontend@0.1.0|@next/swc-linux-arm64-gnu@16.3.2",
+        "stageflow-frontend@0.1.0|@next/swc-linux-arm64-musl@16.3.2",
+        "stageflow-frontend@0.1.0|@next/swc-linux-x64-gnu@16.3.2",
+        "stageflow-frontend@0.1.0|@next/swc-linux-x64-musl@16.3.2",
+        "stageflow-frontend@0.1.0|@next/swc-win32-arm64-msvc@16.3.2",
+        "stageflow-frontend@0.1.0|@next/swc-win32-x64-msvc@16.3.2",
+        "stageflow-frontend@0.1.0|@swc/helpers@0.5.23",
         "stageflow-frontend@0.1.0|baseline-browser-mapping@2.10.42",
         "stageflow-frontend@0.1.0|caniuse-lite@1.0.30001802",
-        "stageflow-frontend@0.1.0|next@16.2.11|postcss@8.4.31",
+        "stageflow-frontend@0.1.0|postcss@8.5.23",
         "stageflow-frontend@0.1.0|react-dom@19.2.7",
         "stageflow-frontend@0.1.0|react@19.2.7",
-        "stageflow-frontend@0.1.0|sharp@0.34.5",
+        "stageflow-frontend@0.1.0|sharp@0.35.3",
         "stageflow-frontend@0.1.0|styled-jsx@5.1.6"
-      ]
-    },
-    {
-      "ref": "stageflow-frontend@0.1.0|next@16.2.11|postcss@8.4.31",
-      "dependsOn": [
-        "stageflow-frontend@0.1.0|nanoid@3.3.15",
-        "stageflow-frontend@0.1.0|picocolors@1.1.1",
-        "stageflow-frontend@0.1.0|source-map-js@1.2.1"
       ]
     },
     {
@@ -28575,9 +28704,9 @@
       ]
     },
     {
-      "ref": "stageflow-frontend@0.1.0|postcss@8.5.16",
+      "ref": "stageflow-frontend@0.1.0|postcss@8.5.23",
       "dependsOn": [
-        "stageflow-frontend@0.1.0|nanoid@3.3.15",
+        "stageflow-frontend@0.1.0|nanoid@3.3.18",
         "stageflow-frontend@0.1.0|picocolors@1.1.1",
         "stageflow-frontend@0.1.0|source-map-js@1.2.1"
       ]
@@ -28865,7 +28994,7 @@
         "stageflow-frontend@0.1.0|open@11.0.0",
         "stageflow-frontend@0.1.0|ora@8.2.0",
         "stageflow-frontend@0.1.0|postcss-selector-parser@7.1.4",
-        "stageflow-frontend@0.1.0|postcss@8.5.16",
+        "stageflow-frontend@0.1.0|postcss@8.5.23",
         "stageflow-frontend@0.1.0|prompts@2.4.2",
         "stageflow-frontend@0.1.0|recast@0.23.12",
         "stageflow-frontend@0.1.0|shadcn@4.13.0|fast-glob@3.3.3",
@@ -28874,7 +29003,7 @@
         "stageflow-frontend@0.1.0|tailwind-merge@3.6.0",
         "stageflow-frontend@0.1.0|ts-morph@26.0.0",
         "stageflow-frontend@0.1.0|tsconfig-paths@4.2.0",
-        "stageflow-frontend@0.1.0|undici@7.28.0",
+        "stageflow-frontend@0.1.0|undici@7.29.0",
         "stageflow-frontend@0.1.0|validate-npm-package-name@7.0.2",
         "stageflow-frontend@0.1.0|zod-to-json-schema@3.25.2"
       ]
@@ -28899,39 +29028,40 @@
       "ref": "stageflow-frontend@0.1.0|shadcn@4.13.0|zod@3.25.76"
     },
     {
-      "ref": "stageflow-frontend@0.1.0|sharp@0.34.5",
+      "ref": "stageflow-frontend@0.1.0|sharp@0.35.3",
       "dependsOn": [
         "stageflow-frontend@0.1.0|@img/colour@1.1.0",
-        "stageflow-frontend@0.1.0|@img/sharp-darwin-arm64@0.34.5",
-        "stageflow-frontend@0.1.0|@img/sharp-darwin-x64@0.34.5",
-        "stageflow-frontend@0.1.0|@img/sharp-libvips-darwin-arm64@1.2.4",
-        "stageflow-frontend@0.1.0|@img/sharp-libvips-darwin-x64@1.2.4",
-        "stageflow-frontend@0.1.0|@img/sharp-libvips-linux-arm@1.2.4",
-        "stageflow-frontend@0.1.0|@img/sharp-libvips-linux-arm64@1.2.4",
-        "stageflow-frontend@0.1.0|@img/sharp-libvips-linux-ppc64@1.2.4",
-        "stageflow-frontend@0.1.0|@img/sharp-libvips-linux-riscv64@1.2.4",
-        "stageflow-frontend@0.1.0|@img/sharp-libvips-linux-s390x@1.2.4",
-        "stageflow-frontend@0.1.0|@img/sharp-libvips-linux-x64@1.2.4",
-        "stageflow-frontend@0.1.0|@img/sharp-libvips-linuxmusl-arm64@1.2.4",
-        "stageflow-frontend@0.1.0|@img/sharp-libvips-linuxmusl-x64@1.2.4",
-        "stageflow-frontend@0.1.0|@img/sharp-linux-arm@0.34.5",
-        "stageflow-frontend@0.1.0|@img/sharp-linux-arm64@0.34.5",
-        "stageflow-frontend@0.1.0|@img/sharp-linux-ppc64@0.34.5",
-        "stageflow-frontend@0.1.0|@img/sharp-linux-riscv64@0.34.5",
-        "stageflow-frontend@0.1.0|@img/sharp-linux-s390x@0.34.5",
-        "stageflow-frontend@0.1.0|@img/sharp-linux-x64@0.34.5",
-        "stageflow-frontend@0.1.0|@img/sharp-linuxmusl-arm64@0.34.5",
-        "stageflow-frontend@0.1.0|@img/sharp-linuxmusl-x64@0.34.5",
-        "stageflow-frontend@0.1.0|@img/sharp-wasm32@0.34.5",
-        "stageflow-frontend@0.1.0|@img/sharp-win32-arm64@0.34.5",
-        "stageflow-frontend@0.1.0|@img/sharp-win32-ia32@0.34.5",
-        "stageflow-frontend@0.1.0|@img/sharp-win32-x64@0.34.5",
+        "stageflow-frontend@0.1.0|@img/sharp-darwin-arm64@0.35.3",
+        "stageflow-frontend@0.1.0|@img/sharp-darwin-x64@0.35.3",
+        "stageflow-frontend@0.1.0|@img/sharp-freebsd-wasm32@0.35.3",
+        "stageflow-frontend@0.1.0|@img/sharp-libvips-darwin-arm64@1.3.2",
+        "stageflow-frontend@0.1.0|@img/sharp-libvips-darwin-x64@1.3.2",
+        "stageflow-frontend@0.1.0|@img/sharp-libvips-linux-arm@1.3.2",
+        "stageflow-frontend@0.1.0|@img/sharp-libvips-linux-arm64@1.3.2",
+        "stageflow-frontend@0.1.0|@img/sharp-libvips-linux-ppc64@1.3.2",
+        "stageflow-frontend@0.1.0|@img/sharp-libvips-linux-riscv64@1.3.2",
+        "stageflow-frontend@0.1.0|@img/sharp-libvips-linux-s390x@1.3.2",
+        "stageflow-frontend@0.1.0|@img/sharp-libvips-linux-x64@1.3.2",
+        "stageflow-frontend@0.1.0|@img/sharp-libvips-linuxmusl-arm64@1.3.2",
+        "stageflow-frontend@0.1.0|@img/sharp-libvips-linuxmusl-x64@1.3.2",
+        "stageflow-frontend@0.1.0|@img/sharp-linux-arm@0.35.3",
+        "stageflow-frontend@0.1.0|@img/sharp-linux-arm64@0.35.3",
+        "stageflow-frontend@0.1.0|@img/sharp-linux-ppc64@0.35.3",
+        "stageflow-frontend@0.1.0|@img/sharp-linux-riscv64@0.35.3",
+        "stageflow-frontend@0.1.0|@img/sharp-linux-s390x@0.35.3",
+        "stageflow-frontend@0.1.0|@img/sharp-linux-x64@0.35.3",
+        "stageflow-frontend@0.1.0|@img/sharp-linuxmusl-arm64@0.35.3",
+        "stageflow-frontend@0.1.0|@img/sharp-linuxmusl-x64@0.35.3",
+        "stageflow-frontend@0.1.0|@img/sharp-webcontainers-wasm32@0.35.3",
+        "stageflow-frontend@0.1.0|@img/sharp-win32-arm64@0.35.3",
+        "stageflow-frontend@0.1.0|@img/sharp-win32-ia32@0.35.3",
+        "stageflow-frontend@0.1.0|@img/sharp-win32-x64@0.35.3",
         "stageflow-frontend@0.1.0|detect-libc@2.1.2",
-        "stageflow-frontend@0.1.0|sharp@0.34.5|semver@7.8.5"
+        "stageflow-frontend@0.1.0|sharp@0.35.3|semver@7.8.5"
       ]
     },
     {
-      "ref": "stageflow-frontend@0.1.0|sharp@0.34.5|semver@7.8.5"
+      "ref": "stageflow-frontend@0.1.0|sharp@0.35.3|semver@7.8.5"
     },
     {
       "ref": "stageflow-frontend@0.1.0|shebang-command@2.0.0",
@@ -29277,7 +29407,7 @@
       "ref": "stageflow-frontend@0.1.0|undici-types@8.3.0"
     },
     {
-      "ref": "stageflow-frontend@0.1.0|undici@7.28.0"
+      "ref": "stageflow-frontend@0.1.0|undici@7.29.0"
     },
     {
       "ref": "stageflow-frontend@0.1.0|unicorn-magic@0.3.0"
