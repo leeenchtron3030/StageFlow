@@ -247,6 +247,7 @@ function Test-RecordedLauncherLive {
 
 function Start-DemoStack {
     param($Configuration)
+    Import-RequiredSecret "STAGEFLOW_API_SHARED_SECRET"
     New-Item -ItemType Directory -Path $script:StateRoot -Force | Out-Null
     $existing = Read-ControllerState
     if (Test-RecordedLauncherLive $existing) { throw "controller_launcher_already_running" }
@@ -347,6 +348,7 @@ function Stop-DemoStack {
 }
 
 function Show-DemoStatus {
+    Import-RequiredSecret "STAGEFLOW_API_SHARED_SECRET"
     $payload = Invoke-DemoPython -Arguments @("status") -Capture | ConvertFrom-Json
     "STAGEFLOW DEMO STATUS"
     "Event: $($payload.event.event_key) [$($payload.event.event_id)]"
@@ -363,13 +365,22 @@ function Show-DemoStatus {
         ForEach-Object { "$($_.Name)=$($_.Value)" })
     "Operations: $($operationPairs -join ', ')"
     "Terminal failures: $(@($payload.operations.terminal_failures).Count)"
-    "Worker: $($payload.worker.state) available=$($payload.worker.available)"
+    "Worker: $($payload.worker.state) current=$($payload.worker.current) available=$($payload.worker.available) capacity=$($payload.worker.capacity) gpu_transcription=$($payload.worker.gpu_transcription)"
     "Transcription Evidence: complete=$($payload.transcript_evidence.complete) total=$($payload.transcript_evidence.count) (evidence only)"
     "Moments: $($payload.moments.count)"
-    "Devcon cached expectations: $($payload.devcon.cached_program_expectations)"
+    $automationProperty = $payload.PSObject.Properties["automation"]
+    if ($null -ne $automationProperty -and $null -ne $automationProperty.Value) {
+        $automation = $automationProperty.Value
+        "Automation: $($automation.state) owner=$($automation.owner)"
+        "Media reconciliation: cycles=$($automation.media_cycle_count) last=$($automation.media_last_success_at) failure=$($automation.media_last_failure_code)"
+        "Transcription enqueue: total=$($automation.transcription_operations_enqueued) failures=$($automation.transcription_enqueue_failures)"
+        "Program refresh: cycles=$($automation.program_refresh_count) last=$($automation.program_last_success_at) failure=$($automation.program_last_failure_code)"
+    }
+    "Devcon Program: current=$($payload.devcon.current) withdrawn=$($payload.devcon.withdrawn) status=$($payload.devcon.status) last=$($payload.devcon.last_successful_refresh)"
 }
 
 function Publish-Devcon {
+    Import-RequiredSecret "STAGEFLOW_API_SHARED_SECRET"
     $apiKey = Get-ProcessOrUserValue "STAGEFLOW_DEMO_DEVCON_API_KEY"
     if (-not [string]::IsNullOrWhiteSpace($apiKey)) {
         $env:STAGEFLOW_DEMO_DEVCON_API_KEY = $apiKey
@@ -440,6 +451,7 @@ try {
             "Demo diagnosis passed: config present, Demo database verified, CUDA inference available, Devcon GET available."
         }
         "rehearsal-report" {
+            Import-RequiredSecret "STAGEFLOW_API_SHARED_SECRET"
             if ([string]::IsNullOrWhiteSpace($ReportPath)) {
                 New-Item -ItemType Directory -Path $script:StateRoot -Force | Out-Null
                 $ReportPath = Join-Path $script:StateRoot (
@@ -453,5 +465,6 @@ try {
     }
 }
 finally {
+    $env:STAGEFLOW_API_SHARED_SECRET = $null
     $env:STAGEFLOW_DEMO_DEVCON_API_KEY = $null
 }

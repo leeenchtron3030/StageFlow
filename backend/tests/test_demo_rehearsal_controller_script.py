@@ -37,6 +37,7 @@ def test_controller_imports_only_named_user_values_without_printing_them() -> No
     assert '[Environment]::GetEnvironmentVariable($Name, "User")' in source
     for name in (
         "STAGEFLOW_DEMO_POSTGRES_DSN",
+        "STAGEFLOW_API_SHARED_SECRET",
         "STAGEFLOW_DEMO_CONFIG_PATH",
         "STAGEFLOW_DEMO_CUDA_RUNTIME_PATH",
         "STAGEFLOW_DEMO_OPERATOR_ID",
@@ -44,6 +45,8 @@ def test_controller_imports_only_named_user_values_without_printing_them() -> No
     ):
         assert name in source
     assert "STAGEFLOW_TEST_POSTGRES_DSN" not in source
+    assert source.count('Import-RequiredSecret "STAGEFLOW_API_SHARED_SECRET"') == 4
+    assert "$env:STAGEFLOW_API_SHARED_SECRET = $null" in source
     assert "STAGEFLOW_VALIDATION_DSN" not in source
     assert "postgresql://" not in source.casefold()
     assert re.search(r'Write-(?:Host|Output).*\$(?:apiKey|value)', source) is None
@@ -132,3 +135,14 @@ def test_lifecycle_state_handles_optional_operator_and_json_timestamps() -> None
     assert "$recordedStart.UtcDateTime.Ticks" in source
     assert 'Add-Member -NotePropertyName "stopped_at"' in source
     assert "$state.stopped_at =" not in source
+
+def test_status_surfaces_bounded_autonomy_program_and_worker_currentness() -> None:
+    source = _source()
+
+    assert '$payload.PSObject.Properties["automation"]' in source
+    assert '"Automation: $($automation.state) owner=$($automation.owner)"' in source
+    assert '"Media reconciliation: cycles=$($automation.media_cycle_count)' in source
+    assert '"Program refresh: cycles=$($automation.program_refresh_count)' in source
+    assert '"Devcon Program: current=$($payload.devcon.current) withdrawn=$($payload.devcon.withdrawn)' in source  # noqa: E501
+    assert 'current=$($payload.worker.current)' in source
+    assert 'gpu_transcription=$($payload.worker.gpu_transcription)' in source

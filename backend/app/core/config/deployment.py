@@ -229,6 +229,14 @@ class ResourceLimits(BaseModel):
     minimum_stable_seconds: int = Field(default=5, ge=1, le=3600)
 
 
+class AutonomousEventNodeConfiguration(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    enabled: bool = False
+    media_reconciliation_interval_seconds: float = Field(default=5.0, ge=2.0, le=300.0)
+    program_refresh_interval_seconds: float = Field(default=120.0, ge=30.0, le=3600.0)
+
+
 class KernelDeploymentConfiguration(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -245,6 +253,9 @@ class KernelDeploymentConfiguration(BaseModel):
     schedule_source_reference: str | None = None
     devcon_read: DevconReadConfiguration | None = None
     local_transcription: LocalTranscriptionConfiguration | None = None
+    autonomous_event_node: AutonomousEventNodeConfiguration = Field(
+        default_factory=AutonomousEventNodeConfiguration
+    )
 
     @field_validator(
         "schema_version",
@@ -290,6 +301,13 @@ class KernelDeploymentConfiguration(BaseModel):
                 raise ValueError(
                     "demo-single-stage runtime profile requires local transcription"
                 )
+        if (
+            self.autonomous_event_node.enabled
+            and self.runtime_profile is not RuntimeProfile.DEMO_SINGLE_STAGE
+        ):
+            raise ValueError(
+                "autonomous Event Node requires the demo-single-stage runtime profile"
+            )
         return self
 
 
@@ -320,6 +338,15 @@ class EffectiveKernelConfiguration(BaseModel):
             "node_id": self.deployment.node_id,
             "node_role": self.deployment.node_role.value,
             "runtime_profile": self.deployment.runtime_profile.value,
+            "autonomous_event_node": {
+                "enabled": self.deployment.autonomous_event_node.enabled,
+                "media_reconciliation_interval_seconds": (
+                    self.deployment.autonomous_event_node.media_reconciliation_interval_seconds
+                ),
+                "program_refresh_interval_seconds": (
+                    self.deployment.autonomous_event_node.program_refresh_interval_seconds
+                ),
+            },
             "event_mode": self.deployment.event_mode.value,
             "network_policy": self.deployment.network_policy.value,
             "event_key": self.deployment.event.key,
@@ -381,6 +408,7 @@ def load_kernel_deployment_configuration(
 
 
 __all__ = [
+    "AutonomousEventNodeConfiguration",
     "DevconReadConfiguration",
     "EffectiveKernelConfiguration",
     "EventDeploymentConfiguration",

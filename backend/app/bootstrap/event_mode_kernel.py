@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 from datetime import datetime
+from threading import Lock
 
 import psycopg
 
@@ -71,6 +72,8 @@ class KernelComponents:
     media_timing_evidence_repository: MediaTimingEvidenceRepository | None = None
     devcon_program_sync: DevconProgramSync | None = None
     editorial_moments: EditorialMomentService | None = None
+    media_cycle_lock: Lock = field(default_factory=Lock, repr=False)
+    program_sync_lock: Lock = field(default_factory=Lock, repr=False)
 
     @property
     def event_key(self) -> str:
@@ -134,31 +137,33 @@ class KernelComponents:
         )
 
     def run_media_cycle(self, *, event_id: EntityId, scope: str = "scheduled") -> MediaCycleResult:
-        if self.media_cycle is None:
-            self.compose_media_cycle()
-        assert self.media_cycle is not None
-        try:
-            result = self.media_cycle.run(event_id=event_id, scope=scope)
-        except KernelStorageUnavailableError:
-            self.postgresql_recovery_required = True
-            raise
-        if not result.source_failures:
-            self.postgresql_recovery_required = False
-        return result
+        with self.media_cycle_lock:
+            if self.media_cycle is None:
+                self.compose_media_cycle()
+            assert self.media_cycle is not None
+            try:
+                result = self.media_cycle.run(event_id=event_id, scope=scope)
+            except KernelStorageUnavailableError:
+                self.postgresql_recovery_required = True
+                raise
+            if not result.source_failures:
+                self.postgresql_recovery_required = False
+            return result
 
     def sync_devcon_program(self) -> ProgramSyncResult:
-        if self.devcon_program_sync is None:
-            raise RuntimeError("devcon_read_not_configured")
-        event = self.repository.get_event_by_key(self.event_key)
-        if event is None:
-            raise RuntimeError("explicit_event_stage_bootstrap_required")
-        stages = self.repository.list_stages(event.id)
-        if len(stages) != 1:
-            raise RuntimeError("demo_single_stage_topology_invalid")
-        return self.devcon_program_sync.synchronize(
-            event_id=event.id,
-            stage_id=stages[0].id,
-        )
+        with self.program_sync_lock:
+            if self.devcon_program_sync is None:
+                raise RuntimeError("devcon_read_not_configured")
+            event = self.repository.get_event_by_key(self.event_key)
+            if event is None:
+                raise RuntimeError("explicit_event_stage_bootstrap_required")
+            stages = self.repository.list_stages(event.id)
+            if len(stages) != 1:
+                raise RuntimeError("demo_single_stage_topology_invalid")
+            return self.devcon_program_sync.synchronize(
+                event_id=event.id,
+                stage_id=stages[0].id,
+            )
 
     def correct_session_boundary(
         self,

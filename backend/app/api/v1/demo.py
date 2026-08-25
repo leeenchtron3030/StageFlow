@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi import APIRouter, HTTPException, Query, Request, Response
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
 from app.api.v1.response_models import (
@@ -130,6 +130,8 @@ class ProcessTranscriptionResponse(BaseModel):
     assets_registered: int
     transcription_operation_ids: tuple[str, ...]
     operation_states: tuple[str, ...]
+    operations_enqueued: int = 0
+    enqueue_failure_codes: tuple[str, ...] = ()
 
 
 class EditorialMomentResponse(BaseModel):
@@ -311,7 +313,11 @@ def _translate_error(exc: Exception) -> HTTPException:
         return HTTPException(status_code=409, detail=str(exc))
     if isinstance(
         exc,
-        (KernelStorageUnavailableError, EditorialMomentStorageUnavailableError),
+        (
+            KernelStorageUnavailableError,
+            EditorialMomentStorageUnavailableError,
+            WorkExecutionStorageUnavailableError,
+        ),
     ):
         return HTTPException(status_code=503, detail="postgresql_unavailable")
     return HTTPException(status_code=422, detail=str(exc))
@@ -425,8 +431,15 @@ def process_transcription(
                 item.id.value for item in result.operations
             ),
             operation_states=tuple(item.status.value for item in result.operations),
+            operations_enqueued=result.operations_enqueued,
+            enqueue_failure_codes=result.enqueue_failures,
         )
-    except (KernelNotFoundError, KernelConflictError, KernelStorageUnavailableError) as exc:
+    except (
+        KernelNotFoundError,
+        KernelConflictError,
+        KernelStorageUnavailableError,
+        WorkExecutionStorageUnavailableError,
+    ) as exc:
         raise _translate_error(exc) from exc
 
 
@@ -465,7 +478,11 @@ def approve_package(
             expected_package_revision=command.package_revision,
         )
         return _session_response(command.operation_id, session)
-    except (KernelNotFoundError, KernelConflictError) as exc:
+    except (
+        KernelNotFoundError,
+        KernelConflictError,
+        KernelStorageUnavailableError,
+    ) as exc:
         raise _translate_error(exc) from exc
 
 
@@ -559,6 +576,9 @@ def session_workspace(
     session_id: UUID,
     request: Request,
     response: Response,
+    transcript_asset_limit: Annotated[int, Query(ge=1, le=100)] = (
+        _TRANSCRIPT_ASSET_LIMIT
+    ),
 ) -> SessionWorkspaceResponse:
     response.headers["Cache-Control"] = "no-store, max-age=0"
     response.headers["Pragma"] = "no-cache"
@@ -596,7 +616,7 @@ def session_workspace(
         evidence = tuple(
             item
             for asset_id in sorted(asset_ids, key=lambda item: item.value)[
-                :_TRANSCRIPT_ASSET_LIMIT
+                :transcript_asset_limit
             ]
             for item in work_repository.list_transcript_evidence_for_asset(
                 asset_id, limit=1
@@ -641,7 +661,8 @@ def session_workspace(
         ),
         operations_truncated=len(event_operations) == _OPERATION_LIMIT,
         transcript_evidence=tuple(_transcript_response(item) for item in evidence),
-        transcript_assets_truncated=len(asset_ids) > _TRANSCRIPT_ASSET_LIMIT,
+        transcript_assets_truncated=len(asset_ids) > transcript_asset_limit,
+        transcript_asset_limit=transcript_asset_limit,
         moments=tuple(_moment_response(moment) for moment in moments),
     )
 
@@ -666,6 +687,7 @@ def list_moments(session_id: UUID, request: Request) -> tuple[EditorialMomentRes
 
 
 __all__ = [
+    "ApprovePackageCommand",
     "EditorialMomentResponse",
     "EndPresentationCommand",
     "MarkMomentCommand",

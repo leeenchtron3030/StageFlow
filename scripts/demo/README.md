@@ -12,6 +12,9 @@ scope second:
 - `STAGEFLOW_DEMO_POSTGRES_DSN` — required secret; it must connect to exact database
   `stageflow_demo`. Test, validation, worker, qualification, or any other database is
   rejected before controller-triggered writes.
+- `STAGEFLOW_API_SHARED_SECRET` — required for `start`, `status`, `rehearsal-report`,
+  and `publish-devcon`; use a generated value of at least 32 characters. It is imported
+  into Process scope for backend/frontend authentication and never printed.
 - `STAGEFLOW_DEMO_CONFIG_PATH` — optional explicit path to the external Demo TOML. If
   absent, the controller accepts exactly one TOML from the bounded `C:\StageFlowDemo`
   or `C:\StageFlowDemo\config` locations.
@@ -101,3 +104,36 @@ explicitly captured by the invoking operator workflow. It does not bypass packag
 identity, credential, digest, durable Git, or public-convergence gates.
 
 This is Demo tooling, not a production publisher or a LAN-exposed Devcon write surface.
+
+## Demo 2 autonomous Event Node
+
+Demo 2 uses the same guarded launcher and `demo-single-stage` application stack. Copy
+`examples/demo2-autonomous-event-node.toml.example` to the controlled external Demo
+configuration location, set unique Event/deployment values and the external recordings
+path, and enable:
+
+```toml
+[autonomous_event_node]
+enabled = true
+media_reconciliation_interval_seconds = 5
+program_refresh_interval_seconds = 120
+```
+
+The setting is default-off, non-secret, and does not alter Demo 1. The backend lifespan
+owns one non-daemon coordinator thread. PostgreSQL advisory ownership prevents two
+backend processes for the same deployment from running cycles concurrently. Shutdown
+signals and joins that thread before readiness is cleared; process death releases the
+database lock, and the next owned process reconstructs freshness and work from durable
+state.
+
+Healthy automatic operation stays quiet in the Producer UI. `status` reports bounded
+cycle counts, last successful media/Program times, failure codes, enqueue totals, and
+worker currentness/capacity without paths, transcripts, credentials, or DSNs. `Process
+Media Now` and `Refresh Program` remain idempotent fallback/diagnostic actions. Automatic
+operation never starts or ends a Session, marks a Moment, changes package authority, or
+performs a Devcon PUT.
+
+Media registered before a safely eligible Session remains unresolved until the material
+Session input set changes. Demo 2 then reevaluates only the existing deterministic
+unresolved association through the accepted policy; unchanged inputs create no revision,
+and human or conflict associations remain protected.

@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 import json
+from typing import cast
+from urllib.request import Request
 
 import pytest
 
 from app.demo.controller import (
+    API_SHARED_SECRET,
     DemoControllerError,
+    _get_api_json,  # pyright: ignore[reportPrivateUsage]
+    _live_state,  # pyright: ignore[reportPrivateUsage]
     build_devcon_publish_candidate,
     execute_devcon_publish,
     preview_devcon_publish,
@@ -13,6 +18,7 @@ from app.demo.controller import (
     resolve_required_secret,
     summarize_demo_state,
     validate_database_identity,
+    worker_summary,
 )
 from app.infrastructure.devcon.session_publish import (
     DevconPublishError,
@@ -148,6 +154,76 @@ def test_missing_secret_reports_presence_by_name_only() -> None:
         resolve_required_secret({}, "STAGEFLOW_DEMO_POSTGRES_DSN")
 
     assert "postgresql://" not in str(caught.value)
+
+
+def test_controller_authenticates_loopback_reads(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    secret = "stageflow-controller-test-secret-0123456789"
+    captured: dict[str, object] = {}
+
+    class Response:
+        status = 200
+
+        def __enter__(self) -> Response:
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            del args
+
+        def read(self, maximum_bytes: int) -> bytes:
+            assert maximum_bytes > 0
+            return b'{"ready": true}'
+
+    def open_request(request: object, *, timeout: int) -> Response:
+        captured["request"] = request
+        captured["timeout"] = timeout
+        return Response()
+
+    monkeypatch.setenv(API_SHARED_SECRET, secret)
+    monkeypatch.setattr("app.demo.controller.urlopen", open_request)
+
+    assert _get_api_json("http://127.0.0.1:8000/api/v1/kernel/status") == {
+        "ready": True
+    }
+    request = cast(Request, captured["request"])
+    assert request.get_header("X-stageflow-api-secret") == secret
+    assert captured["timeout"] == 10
+
+
+def test_controller_requests_complete_bounded_workspace_for_publication(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    kernel = _kernel()
+    workspace = _workspace()
+    requested_urls: list[str] = []
+
+    def get_json(url: str) -> dict[str, object]:
+        requested_urls.append(url)
+        return kernel if url.endswith("/kernel/status") else workspace
+
+    monkeypatch.setattr("app.demo.controller._get_api_json", get_json)
+
+    assert _live_state() == (kernel, workspace)
+    assert requested_urls == [
+        "http://127.0.0.1:8000/api/v1/kernel/status",
+        (
+            f"http://127.0.0.1:8000/api/v1/demo/sessions/{SESSION_ID}/workspace"
+            "?transcript_asset_limit=100"
+        ),
+    ]
+
+
+def test_controller_loopback_read_fails_before_http_without_secret(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv(API_SHARED_SECRET)
+
+    with pytest.raises(
+        DemoControllerError,
+        match="required_secret_unavailable:STAGEFLOW_API_SHARED_SECRET",
+    ):
+        _get_api_json("http://127.0.0.1:8000/api/v1/kernel/status")
 
 
 def test_session_discovery_handles_none_one_and_ambiguity_safely() -> None:
@@ -492,4 +568,85 @@ def test_operation_counts_are_copied_as_bounded_scalar_mapping() -> None:
     assert isinstance(operations, dict)
     assert operations["counts"] == {
         "terminal_failed": 2
+    }
+
+def test_summary_projects_bounded_automation_and_program_freshness() -> None:
+    kernel = _kernel()
+    kernel["automation"] = {
+        "enabled": True,
+        "state": "running",
+        "owner": True,
+        "media_cycle_count": 4,
+        "media_last_success_at": "2026-08-20T20:00:00Z",
+        "program_refresh_count": 2,
+        "program_last_success_at": "2026-08-20T19:59:00Z",
+        "program_last_failure_code": None,
+    }
+    kernel["automation"]["private_path"] = "C:/private/recordings"
+    kernel["automation"]["dsn"] = "postgresql://user:password@example.invalid/demo"
+    kernel["program_synchronization"] = {
+        "synchronized_at": "2026-08-20T19:59:00Z",
+    }
+    program = kernel["program_expectations"]
+    assert isinstance(program, list)
+    program[0]["lifecycle_state"] = "current"
+
+    summary = summarize_demo_state(kernel, _workspace())
+
+    automation = summary["automation"]
+    assert isinstance(automation, dict)
+    assert "private_path" not in automation
+    assert "dsn" not in automation
+    assert automation["state"] == "running"
+    assert summary["devcon"] == {
+        "cached_program_expectations": 1,
+        "current": 1,
+        "withdrawn": 0,
+        "provider": "devcon",
+        "last_successful_refresh": "2026-08-20T19:59:00Z",
+        "last_failure_code": None,
+        "status": "current",
+    }
+
+
+def testworker_summary_scopes_current_available_gpu_worker_to_live_event(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    class Result:
+        def fetchall(self) -> list[tuple[object, ...]]:
+            return [("razer-event-node", True, False, "available", 1, True, True)]
+
+    class Connection:
+        def __enter__(self) -> Connection:
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            del args
+
+        def execute(
+            self, statement: str, parameters: object = None
+        ) -> Result:
+            if "FROM stageflow.work_worker" in statement:
+                captured["parameters"] = parameters
+            return Result()
+
+    def connect(dsn: str) -> Connection:
+        del dsn
+        return Connection()
+
+    monkeypatch.setattr("app.demo.controller.psycopg.connect", connect)
+
+    summary = worker_summary("postgresql://redacted", "event-id", "deployment-id")
+
+    assert captured["parameters"] == ("deployment-id", "event-id")
+    assert summary == {
+        "state": "available",
+        "current": True,
+        "node": "razer-event-node",
+        "registered": 1,
+        "available": 1,
+        "capacity": 1,
+        "gpu_transcription": "ready",
     }

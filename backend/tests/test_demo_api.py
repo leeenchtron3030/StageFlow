@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from datetime import UTC, datetime
 from types import SimpleNamespace
 from typing import Any, Protocol, cast
@@ -393,11 +394,17 @@ def test_transcription_evidence_workspace_is_bounded_no_store_and_redacted(
         },
     )
     session_id = start.json()["session_id"]
-    asset_id = EntityId("81000000-0000-0000-0000-000000000021")
+    asset_ids = tuple(
+        EntityId(f"81000000-0000-0000-0000-{number:012d}")
+        for number in range(21, 26)
+    )
+    asset_id = asset_ids[0]
+
     def recent_media(event_id: EntityId, *, limit: int = 100) -> tuple[object, ...]:
         del event_id, limit
-        return (
-            SimpleNamespace(session_id=EntityId(session_id), asset_id=asset_id),
+        return tuple(
+            SimpleNamespace(session_id=EntityId(session_id), asset_id=item)
+            for item in asset_ids
         )
 
     monkeypatch.setattr(components.repository, "list_recent_media", recent_media)
@@ -466,9 +473,9 @@ def test_transcription_evidence_workspace_is_bounded_no_store_and_redacted(
         def list_transcript_evidence_for_asset(
             self, selected_asset_id: EntityId, *, limit: int
         ) -> tuple[TranscriptEvidenceRevision, ...]:
-            assert selected_asset_id == asset_id
+            assert selected_asset_id in asset_ids
             assert limit == 1
-            return (evidence,)
+            return (replace(evidence, asset_id=selected_asset_id),)
 
     monkeypatch.setattr(demo_api, "PostgresWorkExecutionRepository", FakeWorkRepository)
     response = client.get(f"/demo/sessions/{session_id}/workspace")
@@ -481,10 +488,22 @@ def test_transcription_evidence_workspace_is_bounded_no_store_and_redacted(
     assert payload["operation_limit"] == 100
     assert payload["operations_truncated"] is False
     assert payload["transcript_asset_limit"] == 4
-    assert payload["transcript_assets_truncated"] is False
+    assert payload["transcript_assets_truncated"] is True
+    assert len(payload["transcript_evidence"]) == 4
     assert payload["transcript_evidence"][0]["segments"][0]["text"] == (
         "Welcome to the evidence surface."
     )
+    expanded = client.get(
+        f"/demo/sessions/{session_id}/workspace?transcript_asset_limit=5"
+    )
+    assert expanded.status_code == 200
+    expanded_payload = expanded.json()
+    assert expanded_payload["transcript_asset_limit"] == 5
+    assert expanded_payload["transcript_assets_truncated"] is False
+    assert len(expanded_payload["transcript_evidence"]) == 5
+    assert client.get(
+        f"/demo/sessions/{session_id}/workspace?transcript_asset_limit=101"
+    ).status_code == 422
     serialized = json.dumps(payload)
     assert "secret-dsn-not-response" not in serialized
     assert "media_path" not in serialized

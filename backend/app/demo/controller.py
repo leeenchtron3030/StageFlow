@@ -17,6 +17,7 @@ from urllib.request import Request, urlopen
 
 import psycopg
 
+from app.api.authentication import API_SECRET_HEADER
 from app.bootstrap.event_mode_kernel import load_kernel_components_from_environment
 from app.demo import cli as demo_cli
 from app.infrastructure.devcon.session_publish import (
@@ -26,10 +27,12 @@ from app.infrastructure.devcon.session_publish import (
 )
 
 EXPECTED_DEMO_DATABASE = "stageflow_demo"
+API_SHARED_SECRET = "STAGEFLOW_API_SHARED_SECRET"
 DEMO_DSN_SECRET = "STAGEFLOW_DEMO_POSTGRES_DSN"
 DEVCON_API_KEY_SECRET = "STAGEFLOW_DEMO_DEVCON_API_KEY"
 _API_BASE_URL = "http://127.0.0.1:8000/api/v1"
 _MAXIMUM_API_BYTES = 16 * 1024 * 1024
+_PUBLISH_TRANSCRIPT_ASSET_LIMIT = 100
 _PUBLIC_API_CONVERGENCE_DELAYS_SECONDS = (0.0, 65.0, 65.0, 65.0)
 
 
@@ -212,6 +215,48 @@ def summarize_demo_state(
         _as_sequence(kernel_status.get("stages"), "demo_stage_projection_invalid")[0],
         "demo_stage_projection_invalid",
     )
+    program_items = [
+        _as_mapping(item, "demo_program_projection_invalid")
+        for item in _as_sequence(
+            kernel_status.get("program_expectations", ()),
+            "demo_program_projection_invalid",
+        )
+    ]
+    raw_program_sync = kernel_status.get("program_synchronization")
+    program_sync: Mapping[str, object] = (
+        cast(Mapping[str, object], raw_program_sync)
+        if isinstance(raw_program_sync, dict)
+        else {}
+    )
+    raw_automation = kernel_status.get("automation")
+    automation: Mapping[str, object] = (
+        cast(Mapping[str, object], raw_automation)
+        if isinstance(raw_automation, dict)
+        else {}
+    )
+    bounded_automation = {
+        key: automation.get(key)
+        for key in (
+            "enabled",
+            "state",
+            "owner",
+            "media_reconciliation_interval_seconds",
+            "program_refresh_interval_seconds",
+            "media_cycle_count",
+            "media_last_attempt_at",
+            "media_last_success_at",
+            "media_last_failure_code",
+            "media_candidates_seen",
+            "media_assets_registered",
+            "transcription_operations_enqueued",
+            "transcription_enqueue_failures",
+            "program_refresh_count",
+            "program_last_attempt_at",
+            "program_last_success_at",
+            "program_last_failure_code",
+        )
+        if key in automation
+    }
     report: dict[str, object] = {
         "schema_version": "stageflow-demo-rehearsal-report-v1",
         "runtime_profile": kernel_status.get("runtime_profile"),
@@ -238,14 +283,23 @@ def summarize_demo_state(
                 "conflicting",
             )
         },
+        "automation": bounded_automation,
         "devcon": {
-            "cached_program_expectations": len(
-                _as_sequence(
-                    kernel_status.get("program_expectations", ()),
-                    "demo_program_projection_invalid",
-                )
+            "cached_program_expectations": len(program_items),
+            "current": sum(
+                item.get("lifecycle_state") == "current" for item in program_items
+            ),
+            "withdrawn": sum(
+                item.get("lifecycle_state") == "withdrawn" for item in program_items
             ),
             "provider": "devcon",
+            "last_successful_refresh": program_sync.get("synchronized_at"),
+            "last_failure_code": automation.get("program_last_failure_code"),
+            "status": (
+                "refresh_unavailable_cached_program_active"
+                if automation.get("program_last_failure_code")
+                else "current"
+            ),
         },
         "worker": dict(worker_summary or {"state": "unknown"}),
     }
@@ -596,7 +650,11 @@ def execute_devcon_publish(
 def _get_api_json(url: str) -> Mapping[str, object]:
     request = Request(
         url,
-        headers={"Accept": "application/json", "User-Agent": "StageFlow-Demo-Controller/1.0"},
+        headers={
+            "Accept": "application/json",
+            "User-Agent": "StageFlow-Demo-Controller/1.0",
+            API_SECRET_HEADER: resolve_required_secret(os.environ, API_SHARED_SECRET),
+        },
         method="GET",
     )
     try:
@@ -624,23 +682,37 @@ def _live_state() -> tuple[Mapping[str, object], Mapping[str, object] | None]:
         return kernel, None
     workspace = _get_api_json(
         f"{_API_BASE_URL}/demo/sessions/{selection.session_id}/workspace"
+        f"?transcript_asset_limit={_PUBLISH_TRANSCRIPT_ASSET_LIMIT}"
     )
     return kernel, workspace
 
 
-def _worker_summary(dsn: str, event_id: object, deployment_id: object) -> dict[str, object]:
+def worker_summary(dsn: str, event_id: object, deployment_id: object) -> dict[str, object]:
     if not isinstance(event_id, str) or not isinstance(deployment_id, str):
-        return {"state": "unknown", "registered": 0, "available": 0}
+        return {
+            "state": "unknown", "current": False, "registered": 0,
+            "available": 0, "capacity": 0, "gpu_transcription": "unknown",
+        }
     try:
         with psycopg.connect(dsn) as connection:
             connection.execute("SET TRANSACTION READ ONLY")
             rows = connection.execute(
                 """
-                SELECT w.enabled, w.draining, p.health_state,
-                       p.expires_at > statement_timestamp() AS presence_current
+                SELECT w.node_id, w.enabled, w.draining, p.health_state,
+                       COALESCE(p.maximum_concurrency, 0),
+                       COALESCE(p.expires_at > statement_timestamp(), false),
+                       EXISTS (
+                           SELECT 1 FROM stageflow.work_worker_capability c
+                           WHERE c.worker_id = w.worker_id
+                             AND c.operation_kind = 'transcription'
+                             AND c.configured_eligible
+                             AND c.effective_from <= statement_timestamp()
+                             AND (c.effective_until IS NULL
+                                  OR c.effective_until > statement_timestamp())
+                             AND c.provider_id = 'faster-whisper'
+                       )
                 FROM stageflow.work_worker w
-                LEFT JOIN stageflow.work_worker_presence p
-                  ON p.worker_id = w.worker_id
+                LEFT JOIN stageflow.work_worker_presence p ON p.worker_id = w.worker_id
                 WHERE w.deployment_id = %s AND w.event_id = %s
                 ORDER BY w.worker_id
                 LIMIT 20
@@ -648,20 +720,38 @@ def _worker_summary(dsn: str, event_id: object, deployment_id: object) -> dict[s
                 (deployment_id, event_id),
             ).fetchall()
     except psycopg.Error:
-        return {"state": "unavailable", "registered": 0, "available": 0}
-    available = sum(
-        bool(row[0])
-        and not bool(row[1])
-        and row[2] in ("available", "degraded")
-        and bool(row[3])
-        for row in rows
-    )
+        return {
+            "state": "unavailable", "current": False, "registered": 0,
+            "available": 0, "capacity": 0, "gpu_transcription": "unknown",
+        }
+    available_rows = [
+        row for row in rows
+        if bool(row[1]) and not bool(row[2])
+        and row[3] == "available" and bool(row[5])
+    ]
+    current_presence = [row for row in rows if bool(row[5])]
+    if not rows:
+        state = "absent"
+    elif available_rows:
+        state = "available"
+    elif not current_presence:
+        state = "stale"
+    elif any(row[3] == "degraded" for row in current_presence):
+        state = "degraded"
+    else:
+        state = "unavailable"
+    nodes = sorted({str(row[0]) for row in rows})
     return {
-        "state": "available" if available else "not_current",
+        "state": state,
+        "current": bool(rows),
+        "node": nodes[0] if len(nodes) == 1 else "multiple" if nodes else None,
         "registered": len(rows),
-        "available": available,
+        "available": len(available_rows),
+        "capacity": sum(int(row[4]) for row in available_rows),
+        "gpu_transcription": (
+            "ready" if any(bool(row[6]) for row in available_rows) else "unavailable"
+        ),
     }
-
 
 def _dsn() -> str:
     return resolve_required_secret(os.environ, DEMO_DSN_SECRET)
@@ -727,14 +817,14 @@ def _report() -> tuple[dict[str, object], Mapping[str, object], Mapping[str, obj
     dsn = _dsn()
     _verify_database()
     kernel, workspace = _live_state()
-    components = load_kernel_components_from_environment()
-    deployment_id = (
-        None if components is None else components.configuration.deployment.deployment_id
-    )
     summary = summarize_demo_state(
         kernel,
         workspace,
-        worker_summary=_worker_summary(dsn, kernel.get("event_id"), deployment_id),
+        worker_summary=worker_summary(
+            dsn,
+            kernel.get("event_id"),
+            kernel.get("deployment_id"),
+        ),
     )
     return summary, kernel, workspace
 
