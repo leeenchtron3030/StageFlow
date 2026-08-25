@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved / In progress
+Completed - core write-bearing flow qualified; PR promotion unqualified
 
 ## Execution authority
 
@@ -180,23 +180,25 @@ credential presence—not values—and omit transcript/media/provider contents.
 
 ## Acceptance criteria
 
-- [ ] A verified restorable backup exists before migration and no secret enters Git.
-- [ ] Exact database `stageflow_demo` reaches migrations 0001-0010 with preserved Demo 1
+- [x] A verified restorable backup exists before migration and no secret enters Git.
+- [x] Exact database `stageflow_demo` reaches migrations 0001-0010 with preserved Demo 1
   identities/counts and only the accepted 0010 schema addition.
-- [ ] The stack passes real CUDA preflight and preserves loopback backend/PostgreSQL plus
+- [x] The stack passes real CUDA preflight and preserves loopback backend/PostgreSQL plus
   trusted-LAN-only frontend boundaries.
-- [ ] Autonomous media progression and CUDA/float16 transcription run on the 5-second
+- [x] Autonomous media progression and CUDA/float16 transcription run on the 5-second
   timer without manual per-block cycle calls.
-- [ ] Autonomous 120-second Devcon Program refresh and truthful worker/GPU projection are
+- [x] Autonomous 120-second Devcon Program refresh and truthful worker/GPU projection are
   observed without interrupting local work on an induced provider/source failure.
-- [ ] A human Editorial Candidate Moment and Producer Work Queue projection are exercised
+- [x] A human Editorial Candidate Moment and Producer Work Queue projection are exercised
   without granting either automatic authority.
-- [ ] Mac UI Package Approval targets an audited exact completed package revision.
+- [x] Mac UI Package Approval targets an audited exact completed package revision.
 - [ ] ED-0063 visible degradation/loop survival and durable restart reconstruction pass.
-- [ ] The controller sends exactly one authorized PUT to Demo 1 test event
+  Durable restart passed; the controlled missing-source test recovered but did not enter
+  the unexpected-exception/degraded path.
+- [x] The controller sends exactly one authorized PUT to Demo 1 test event
   `test-devcon-8`; the accepted digest/fields and durable upstream result are verified.
-- [ ] A sanitized result distinguishes Demo qualification from production/event readiness.
-- [ ] PR #71 remains draft, open, and unmerged.
+- [x] A sanitized result distinguishes Demo qualification from production/event readiness.
+- [x] PR #71 remains draft, open, and unmerged.
 
 ## Rollback or reversal
 
@@ -214,12 +216,34 @@ no automatic reversal.
 
 ## Completion record
 
-- Implemented revision:
-- Files and migrations actually changed:
-- Commands and tests actually run:
-- Results and warnings:
+- Implemented revisions: `b2136c0`, `491eee8`, `88e41e5`, and `9b028aa`, plus
+  the final evidence commit recorded by Git history.
+- Files and migrations actually changed: the accepted migration 0010 was applied to
+  the preserved external `stageflow_demo` database after a verified custom-format
+  backup. Compatibility corrections changed the Demo controller, bounded Demo API
+  transcript projection, PowerShell launcher, directly affected tests, and controller
+  documentation. This plan, ED-0072, its plan index, and the sanitized result were
+  updated. No new migration file, dependency, payload field, or automatic write was
+  introduced.
+- Commands and tests actually run: PostgreSQL backup/listing and migration inspection;
+  Demo controller diagnose/preflight/start/status/report/publish/stop; real CUDA
+  inference; focused migration, controller, Demo API, authentication, and PowerShell
+  checks; full backend `pytest`, Ruff, and Pyright; `git diff --check`; and a final
+  secret/privacy review.
+- Results and warnings: backup verified (234 entries; SHA-256 recorded outside Git),
+  migration 0010 applied with pre-existing row counts preserved, 6/6 autonomous media
+  transcripts completed on CUDA/float16, one human Moment persisted, exact package
+  revision 1 approved on the Mac, durable restart reconstructed authority, and the one
+  authorized Devcon PUT converged durably and publicly. Full backend validation passed:
+  1822 passed, 5 skipped; Ruff passed; Pyright reported zero errors/warnings. One known
+  existing Starlette/httpx TestClient deprecation warning remained.
 - Execution authority used: Green bounded migration/rehearsal plus the user's explicit
   2026-08-24 approval for one guarded Devcon test PUT.
-- Approved deviations:
-- Rollback status:
-- Remaining work:
+- Approved deviations: none. A compatibility blocker was corrected within accepted
+  architecture; the write was not retried.
+- Rollback status: not invoked. The additive accepted schema, verified backup, durable
+  Demo state, and authorized external test side effect were preserved. Launcher-owned
+  processes were stopped; vMix was left open and no longer recording.
+- Remaining work: qualify ED-0063's unexpected-exception visible degradation/loop
+  survival path in a future bounded rehearsal. PR #71 remains draft, open, unmerged,
+  and promotion-unqualified until that gate is proven.
