@@ -133,7 +133,7 @@ Media Now` and `Refresh Program` remain idempotent fallback/diagnostic actions. 
 operation never starts or ends a Session, marks a Moment, changes package authority, or
 performs a Devcon PUT.
 
-Media registered before a safely eligible Session currently remains unresolved because
-the accepted Kernel does not reevaluate an existing deterministic association. The
-strict Demo 2 acceptance test records that gap; changing this lifecycle semantic requires
-the Yellow association-policy decision documented in the Demo 2 plan.
+Media registered before a safely eligible Session remains unresolved until the material
+Session input set changes. Demo 2 then reevaluates only the existing deterministic
+unresolved association through the accepted policy; unchanged inputs create no revision,
+and human or conflict associations remain protected.
