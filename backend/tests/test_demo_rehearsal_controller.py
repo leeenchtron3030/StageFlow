@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import json
+from typing import cast
+from urllib.request import Request
 
 import pytest
 
 from app.demo.controller import (
+    API_SHARED_SECRET,
     DemoControllerError,
+    _get_api_json,  # pyright: ignore[reportPrivateUsage]
     build_devcon_publish_candidate,
     execute_devcon_publish,
     preview_devcon_publish,
@@ -149,6 +153,53 @@ def test_missing_secret_reports_presence_by_name_only() -> None:
         resolve_required_secret({}, "STAGEFLOW_DEMO_POSTGRES_DSN")
 
     assert "postgresql://" not in str(caught.value)
+
+
+def test_controller_authenticates_loopback_reads(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    secret = "stageflow-controller-test-secret-0123456789"
+    captured: dict[str, object] = {}
+
+    class Response:
+        status = 200
+
+        def __enter__(self) -> Response:
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            del args
+
+        def read(self, maximum_bytes: int) -> bytes:
+            assert maximum_bytes > 0
+            return b'{"ready": true}'
+
+    def open_request(request: object, *, timeout: int) -> Response:
+        captured["request"] = request
+        captured["timeout"] = timeout
+        return Response()
+
+    monkeypatch.setenv(API_SHARED_SECRET, secret)
+    monkeypatch.setattr("app.demo.controller.urlopen", open_request)
+
+    assert _get_api_json("http://127.0.0.1:8000/api/v1/kernel/status") == {
+        "ready": True
+    }
+    request = cast(Request, captured["request"])
+    assert request.get_header("X-stageflow-api-secret") == secret
+    assert captured["timeout"] == 10
+
+
+def test_controller_loopback_read_fails_before_http_without_secret(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv(API_SHARED_SECRET)
+
+    with pytest.raises(
+        DemoControllerError,
+        match="required_secret_unavailable:STAGEFLOW_API_SHARED_SECRET",
+    ):
+        _get_api_json("http://127.0.0.1:8000/api/v1/kernel/status")
 
 
 def test_session_discovery_handles_none_one_and_ambiguity_safely() -> None:

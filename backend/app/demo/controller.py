@@ -17,6 +17,7 @@ from urllib.request import Request, urlopen
 
 import psycopg
 
+from app.api.authentication import API_SECRET_HEADER
 from app.bootstrap.event_mode_kernel import load_kernel_components_from_environment
 from app.demo import cli as demo_cli
 from app.infrastructure.devcon.session_publish import (
@@ -26,6 +27,7 @@ from app.infrastructure.devcon.session_publish import (
 )
 
 EXPECTED_DEMO_DATABASE = "stageflow_demo"
+API_SHARED_SECRET = "STAGEFLOW_API_SHARED_SECRET"
 DEMO_DSN_SECRET = "STAGEFLOW_DEMO_POSTGRES_DSN"
 DEVCON_API_KEY_SECRET = "STAGEFLOW_DEMO_DEVCON_API_KEY"
 _API_BASE_URL = "http://127.0.0.1:8000/api/v1"
@@ -647,7 +649,11 @@ def execute_devcon_publish(
 def _get_api_json(url: str) -> Mapping[str, object]:
     request = Request(
         url,
-        headers={"Accept": "application/json", "User-Agent": "StageFlow-Demo-Controller/1.0"},
+        headers={
+            "Accept": "application/json",
+            "User-Agent": "StageFlow-Demo-Controller/1.0",
+            API_SECRET_HEADER: resolve_required_secret(os.environ, API_SHARED_SECRET),
+        },
         method="GET",
     )
     try:
