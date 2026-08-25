@@ -32,6 +32,7 @@ DEMO_DSN_SECRET = "STAGEFLOW_DEMO_POSTGRES_DSN"
 DEVCON_API_KEY_SECRET = "STAGEFLOW_DEMO_DEVCON_API_KEY"
 _API_BASE_URL = "http://127.0.0.1:8000/api/v1"
 _MAXIMUM_API_BYTES = 16 * 1024 * 1024
+_PUBLISH_TRANSCRIPT_ASSET_LIMIT = 100
 _PUBLIC_API_CONVERGENCE_DELAYS_SECONDS = (0.0, 65.0, 65.0, 65.0)
 
 
@@ -681,6 +682,7 @@ def _live_state() -> tuple[Mapping[str, object], Mapping[str, object] | None]:
         return kernel, None
     workspace = _get_api_json(
         f"{_API_BASE_URL}/demo/sessions/{selection.session_id}/workspace"
+        f"?transcript_asset_limit={_PUBLISH_TRANSCRIPT_ASSET_LIMIT}"
     )
     return kernel, workspace
 

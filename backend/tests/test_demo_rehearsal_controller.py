@@ -10,6 +10,7 @@ from app.demo.controller import (
     API_SHARED_SECRET,
     DemoControllerError,
     _get_api_json,  # pyright: ignore[reportPrivateUsage]
+    _live_state,  # pyright: ignore[reportPrivateUsage]
     build_devcon_publish_candidate,
     execute_devcon_publish,
     preview_devcon_publish,
@@ -188,6 +189,29 @@ def test_controller_authenticates_loopback_reads(
     request = cast(Request, captured["request"])
     assert request.get_header("X-stageflow-api-secret") == secret
     assert captured["timeout"] == 10
+
+
+def test_controller_requests_complete_bounded_workspace_for_publication(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    kernel = _kernel()
+    workspace = _workspace()
+    requested_urls: list[str] = []
+
+    def get_json(url: str) -> dict[str, object]:
+        requested_urls.append(url)
+        return kernel if url.endswith("/kernel/status") else workspace
+
+    monkeypatch.setattr("app.demo.controller._get_api_json", get_json)
+
+    assert _live_state() == (kernel, workspace)
+    assert requested_urls == [
+        "http://127.0.0.1:8000/api/v1/kernel/status",
+        (
+            f"http://127.0.0.1:8000/api/v1/demo/sessions/{SESSION_ID}/workspace"
+            "?transcript_asset_limit=100"
+        ),
+    ]
 
 
 def test_controller_loopback_read_fails_before_http_without_secret(

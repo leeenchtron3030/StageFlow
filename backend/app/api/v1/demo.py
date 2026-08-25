@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi import APIRouter, HTTPException, Query, Request, Response
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
 from app.api.v1.response_models import (
@@ -576,6 +576,9 @@ def session_workspace(
     session_id: UUID,
     request: Request,
     response: Response,
+    transcript_asset_limit: Annotated[int, Query(ge=1, le=100)] = (
+        _TRANSCRIPT_ASSET_LIMIT
+    ),
 ) -> SessionWorkspaceResponse:
     response.headers["Cache-Control"] = "no-store, max-age=0"
     response.headers["Pragma"] = "no-cache"
@@ -613,7 +616,7 @@ def session_workspace(
         evidence = tuple(
             item
             for asset_id in sorted(asset_ids, key=lambda item: item.value)[
-                :_TRANSCRIPT_ASSET_LIMIT
+                :transcript_asset_limit
             ]
             for item in work_repository.list_transcript_evidence_for_asset(
                 asset_id, limit=1
@@ -658,7 +661,8 @@ def session_workspace(
         ),
         operations_truncated=len(event_operations) == _OPERATION_LIMIT,
         transcript_evidence=tuple(_transcript_response(item) for item in evidence),
-        transcript_assets_truncated=len(asset_ids) > _TRANSCRIPT_ASSET_LIMIT,
+        transcript_assets_truncated=len(asset_ids) > transcript_asset_limit,
+        transcript_asset_limit=transcript_asset_limit,
         moments=tuple(_moment_response(moment) for moment in moments),
     )
 
