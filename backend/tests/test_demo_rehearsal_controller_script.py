@@ -37,6 +37,7 @@ def test_controller_imports_only_named_user_values_without_printing_them() -> No
     assert '[Environment]::GetEnvironmentVariable($Name, "User")' in source
     for name in (
         "STAGEFLOW_DEMO_POSTGRES_DSN",
+        "STAGEFLOW_API_SHARED_SECRET",
         "STAGEFLOW_DEMO_CONFIG_PATH",
         "STAGEFLOW_DEMO_CUDA_RUNTIME_PATH",
         "STAGEFLOW_DEMO_OPERATOR_ID",
@@ -44,6 +45,8 @@ def test_controller_imports_only_named_user_values_without_printing_them() -> No
     ):
         assert name in source
     assert "STAGEFLOW_TEST_POSTGRES_DSN" not in source
+    assert source.count('Import-RequiredSecret "STAGEFLOW_API_SHARED_SECRET"') == 4
+    assert "$env:STAGEFLOW_API_SHARED_SECRET = $null" in source
     assert "STAGEFLOW_VALIDATION_DSN" not in source
     assert "postgresql://" not in source.casefold()
     assert re.search(r'Write-(?:Host|Output).*\$(?:apiKey|value)', source) is None

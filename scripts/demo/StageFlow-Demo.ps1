@@ -247,6 +247,7 @@ function Test-RecordedLauncherLive {
 
 function Start-DemoStack {
     param($Configuration)
+    Import-RequiredSecret "STAGEFLOW_API_SHARED_SECRET"
     New-Item -ItemType Directory -Path $script:StateRoot -Force | Out-Null
     $existing = Read-ControllerState
     if (Test-RecordedLauncherLive $existing) { throw "controller_launcher_already_running" }
@@ -347,6 +348,7 @@ function Stop-DemoStack {
 }
 
 function Show-DemoStatus {
+    Import-RequiredSecret "STAGEFLOW_API_SHARED_SECRET"
     $payload = Invoke-DemoPython -Arguments @("status") -Capture | ConvertFrom-Json
     "STAGEFLOW DEMO STATUS"
     "Event: $($payload.event.event_key) [$($payload.event.event_id)]"
@@ -378,6 +380,7 @@ function Show-DemoStatus {
 }
 
 function Publish-Devcon {
+    Import-RequiredSecret "STAGEFLOW_API_SHARED_SECRET"
     $apiKey = Get-ProcessOrUserValue "STAGEFLOW_DEMO_DEVCON_API_KEY"
     if (-not [string]::IsNullOrWhiteSpace($apiKey)) {
         $env:STAGEFLOW_DEMO_DEVCON_API_KEY = $apiKey
@@ -448,6 +451,7 @@ try {
             "Demo diagnosis passed: config present, Demo database verified, CUDA inference available, Devcon GET available."
         }
         "rehearsal-report" {
+            Import-RequiredSecret "STAGEFLOW_API_SHARED_SECRET"
             if ([string]::IsNullOrWhiteSpace($ReportPath)) {
                 New-Item -ItemType Directory -Path $script:StateRoot -Force | Out-Null
                 $ReportPath = Join-Path $script:StateRoot (
@@ -461,5 +465,6 @@ try {
     }
 }
 finally {
+    $env:STAGEFLOW_API_SHARED_SECRET = $null
     $env:STAGEFLOW_DEMO_DEVCON_API_KEY = $null
 }

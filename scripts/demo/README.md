@@ -12,6 +12,9 @@ scope second:
 - `STAGEFLOW_DEMO_POSTGRES_DSN` — required secret; it must connect to exact database
   `stageflow_demo`. Test, validation, worker, qualification, or any other database is
   rejected before controller-triggered writes.
+- `STAGEFLOW_API_SHARED_SECRET` — required for `start`, `status`, `rehearsal-report`,
+  and `publish-devcon`; use a generated value of at least 32 characters. It is imported
+  into Process scope for backend/frontend authentication and never printed.
 - `STAGEFLOW_DEMO_CONFIG_PATH` — optional explicit path to the external Demo TOML. If
   absent, the controller accepts exactly one TOML from the bounded `C:\StageFlowDemo`
   or `C:\StageFlowDemo\config` locations.
