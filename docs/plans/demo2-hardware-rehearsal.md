@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved
+Execution attempted - blocked at guarded schema preflight; unqualified
 
 ## Execution authority
 
@@ -290,4 +290,36 @@ existing controller never retries or compensates automatically.
 
 ## Completion record
 
-_(To be filled in by whoever executes this rehearsal.)_
+- **Attempted revision:** current main 0faf54153c054a63d1a82b2ea7a06727d195c7cd;
+  local-only rebased Demo 2 head c0d7504. The conflict-free merge-tree was
+  822e303ef9e033077191ba8f9660994e4ade5cc6.
+- **Files and migrations actually changed:** the sanitized
+  [rehearsal result](../validation/results/demo2-hardware-rehearsal-001.md), this
+  completion record, and directly affected indexes/statuses. No migration, schema,
+  dependency, production code, public contract, authority semantic, or durable runtime
+  configuration changed.
+- **Commands and tests actually run:** remote/PR inspection; local rebase and
+  merge-tree/diff checks; focused pytest; scoped Ruff/Pyright; non-sensitive external
+  config inventory; and guarded controller diagnosis against an ephemeral Demo 1-derived
+  5-second/120-second coordinator configuration.
+- **Results and warnings:** the local rebase and merge simulation passed. Focused pytest
+  passed 27 tests with one existing Starlette/httpx deprecation warning; Ruff and
+  Pyright passed. One earlier pytest command used a nonexistent filename and ran no
+  tests before the corrected run. Exact Demo database verification passed, then
+  current-main composition failed closed with editorial_schema_migration_required.
+  Per this plan's no-migration and stop constraints, the stack, vMix, Mac UI, CUDA
+  inference, autonomous progression, induced failure, and restart sequence were not run
+  and remain unqualified.
+- **Execution authority used:** Green autonomous rehearsal up to the mandatory
+  fail-closed preflight boundary.
+- **Approved deviations:** none. No manual media cycle, API Package Approval, schema
+  bypass, or alternate database was substituted.
+- **Rollback status:** the qualified Demo 1 config and durable database were unchanged;
+  the ephemeral config copy was removed after evidence capture. No launcher-owned
+  process or external write required reversal.
+- **Promotion state:** Demo 2 is **not promotion-qualified**. PR #71 remains open,
+  draft, unmerged, and un-force-pushed at remote head 9c176d4.
+- **Remaining work:** obtain separate migration-plan authority for bringing the
+  preserved Demo database to current main's migration 0010 requirement, or approve a
+  different compatible rehearsal-database decision; then repeat every live ED-0071
+  hardware gate.
