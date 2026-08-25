@@ -40,6 +40,10 @@ from app.contexts.production.event_mode_kernel.contracts import (
     MediaOperationalProjection,
     MediaRegistrationState,
     PackageReadyDecision,
+    ProducerWorkDecisionType,
+    ProducerWorkQueuePosition,
+    ProducerWorkQueueSubject,
+    ProducerWorkSubjectKind,
     ReconciliationRun,
     ReconciliationStatus,
     RegisteredMediaAsset,
@@ -378,6 +382,26 @@ def _association(row: Row) -> MediaAssociation:
             _association_input(value)
             for value in cast(list[dict[str, object]], row["input_references"])
         ),
+    )
+
+
+def _producer_work_queue_subject(row: Row) -> ProducerWorkQueueSubject:
+    return ProducerWorkQueueSubject(
+        projection_id=cast(str, row["projection_id"]),
+        decision_type=ProducerWorkDecisionType(cast(str, row["decision_type"])),
+        subject_kind=ProducerWorkSubjectKind(cast(str, row["subject_kind"])),
+        subject_id=EntityId(str(row["subject_id"])),
+        subject_revision=cast(int, row["subject_revision"]),
+        event_id=EntityId(str(row["event_id"])),
+        stage_id=EntityId(str(row["stage_id"])),
+        session_id=(
+            None if row["session_id"] is None else EntityId(str(row["session_id"]))
+        ),
+        priority=cast(int, row["priority"]),
+        reason_codes=cast(list[str], row["reason_codes"]),
+        action_reference=cast(str, row["action_reference"]),
+        created_at=cast(datetime, row["created_at"]),
+        updated_at=cast(datetime, row["updated_at"]),
     )
 
 
@@ -1929,6 +1953,119 @@ class PostgresEventModeKernelRepository(EventModeKernelRepository):
                     (asset_id.value,),
                 ).fetchone()
                 return None if row is None else _association(row)
+        except psycopg.OperationalError as exc:
+            raise KernelStorageUnavailableError("postgresql_unavailable") from exc
+
+    def list_producer_work_queue(
+        self,
+        event_id: EntityId,
+        *,
+        after: ProducerWorkQueuePosition | None = None,
+        limit: int = 50,
+    ) -> tuple[ProducerWorkQueueSubject, ...]:
+        if limit < 1 or limit > 101:
+            raise ValueError("limit must be between 1 and 101")
+        cursor_clause = ""
+        parameters: list[object] = [event_id.value, event_id.value]
+        if after is not None:
+            cursor_clause = (
+                "WHERE (priority, updated_at, projection_id) > (%s, %s, %s)"
+            )
+            parameters.extend(
+                (after.priority, after.updated_at, after.projection_id)
+            )
+        parameters.append(limit)
+        try:
+            with self._connect() as connection:
+                rows = connection.execute(
+                    f"""
+                    WITH queue_subject AS (
+                        SELECT
+                            'package:' || session_id::text AS projection_id,
+                            CASE package_state
+                                WHEN 'correction_required'
+                                    THEN 'package_correction_required'
+                                ELSE 'package_ready_for_review'
+                            END AS decision_type,
+                            'session_package' AS subject_kind,
+                            session_id AS subject_id,
+                            revision AS subject_revision,
+                            event_id,
+                            stage_id,
+                            session_id,
+                            CASE package_state
+                                WHEN 'correction_required' THEN 3
+                                ELSE 4
+                            END AS priority,
+                            jsonb_build_array(
+                                CASE package_state
+                                    WHEN 'correction_required'
+                                        THEN 'package_correction_required'
+                                    ELSE 'package_ready_for_review'
+                                END
+                            ) AS reason_codes,
+                            'session:' || session_id::text || ':package'
+                                AS action_reference,
+                            created_at,
+                            updated_at
+                        FROM stageflow.session
+                        WHERE event_id = %s
+                          AND package_state IN (
+                              'ready_for_review', 'correction_required'
+                          )
+
+                        UNION ALL
+
+                        SELECT
+                            'association:' || association.asset_id::text
+                                AS projection_id,
+                            CASE association.association_status
+                                WHEN 'conflict' THEN 'association_conflict'
+                                ELSE 'association_unresolved'
+                            END AS decision_type,
+                            'media_association' AS subject_kind,
+                            association.asset_id AS subject_id,
+                            association.revision AS subject_revision,
+                            stage.event_id,
+                            asset.stage_id,
+                            NULL::uuid AS session_id,
+                            CASE association.association_status
+                                WHEN 'conflict' THEN 1
+                                ELSE 2
+                            END AS priority,
+                            CASE
+                                WHEN jsonb_array_length(association.reason_codes) = 0
+                                    THEN jsonb_build_array(
+                                        CASE association.association_status
+                                            WHEN 'conflict'
+                                                THEN 'association_conflict'
+                                            ELSE 'association_unresolved'
+                                        END
+                                    )
+                                ELSE association.reason_codes
+                            END AS reason_codes,
+                            'media-association:' || association.asset_id::text
+                                AS action_reference,
+                            association.decided_at AS created_at,
+                            association.decided_at AS updated_at
+                        FROM stageflow.media_association association
+                        JOIN stageflow.completed_media_asset_registry asset
+                          ON asset.asset_id = association.asset_id
+                        JOIN stageflow.stage stage
+                          ON stage.stage_id = asset.stage_id
+                        WHERE stage.event_id = %s
+                          AND association.association_status IN (
+                              'unresolved', 'conflict'
+                          )
+                    )
+                    SELECT * FROM queue_subject
+                    {cursor_clause}
+                    ORDER BY priority, updated_at, projection_id
+                    LIMIT %s
+                    """,
+                    tuple(parameters),
+                ).fetchall()
+                return tuple(_producer_work_queue_subject(row) for row in rows)
         except psycopg.OperationalError as exc:
             raise KernelStorageUnavailableError("postgresql_unavailable") from exc
 

@@ -117,10 +117,17 @@ or architecture document unless those documents are explicitly updated.
 | [CI quality-matrix enforcement](ci-quality-matrix-enforcement.md) | Completed — independent review accepted | StageFlow Engineering | ABR-015 |
 | [Durable Event-Mode Kernel](durable-event-mode-kernel.md) | Completed operational foundation — not a readiness claim | StageFlow Architecture / Backend | ADR-0019-ADR-0024; D-01-D-08 |
 | [Minimal shared-secret API authentication](api-shared-secret-authentication.md) | Completed - Green security boundary | StageFlow Backend / Security | Due-diligence audit Blocker finding; ED-0055 |
-| [CI durability-test enablement and frontend test enforcement](ci-durability-and-frontend-enforcement.md) | Implementation complete; first hosted CI run and owner branch-protection action pending | StageFlow Engineering | Due-diligence audit Major finding; ED-0056 |
+| [CI durability-test enablement and frontend test enforcement](ci-durability-and-frontend-enforcement.md) | Completed - hosted CI verified; owner branch-protection action pending | StageFlow Engineering | Due-diligence audit Major finding; ED-0056 |
 | [Media candidate collection coordinator failure visibility](media-coordinator-failure-visibility.md) | Completed - Green observability correction | StageFlow Backend / Operations | Due-diligence audit Major finding; ED-0057 |
 | [Governance and documentation reconciliation](governance-documentation-reconciliation.md) | Completed - Green documentation reconciliation | StageFlow Engineering / Documentation | Due-diligence audit Major findings; ED-0058 |
 | [Stale environment example correction](stale-environment-example-correction.md) | Completed - Green documentation correction | StageFlow Engineering | ED-0059 |
 | [Cross-platform qualification harness gating](cross-platform-qualification-harness-gating.md) | Completed - Green qualification fix | StageFlow Validation | ED-0060 |
 | [Backend test coverage tooling](backend-test-coverage-tooling.md) | Completed - Green tooling addition | StageFlow Engineering | ED-0061 |
 | [API route code-quality residue cleanup](api-route-code-quality-cleanup.md) | Completed - Green API cleanup | StageFlow Backend | ED-0062 |
+| [Demo 2 rebase and coordinator exception safety net](demo2-rebase-and-coordinator-safety-net.md) | Implementation complete on draft PR; live promotion gate pending | StageFlow Demo Operations / Backend | PR #71 review; ED-0063 |
+| [Media candidate collection coordinator decomposition](media-coordinator-decomposition.md) | Completed - Green behavior-preserving decomposition | StageFlow Backend | Due-diligence audit Major finding; ED-0064 |
+| [Editorial Candidate Moment — Phase 1 human-declared slice](editorial-candidate-moment-phase1.md) | Completed | StageFlow Editorial / Backend | Post-Kernel capability layer Phase 1; ED-0067 |
+| [Producer Work Queue — Kernel-derived first slice](producer-work-queue-kernel-derived-slice.md) | Completed - Green Kernel-derived read model | StageFlow Production / Backend | Post-Kernel capability layer Work Queue; ED-0068 |
+| [Frontend dependency security remediation](frontend-dependency-security-remediation.md) | Completed - Green dependency remediation | StageFlow Engineering / Frontend | Due-diligence audit + ED-0066 follow-up; ED-0069 |
+| [Repository consistency closure](repository-consistency-closure.md) | Completed - Green repository reconciliation | StageFlow Engineering / Governance | 2026-08-22 ChatGPT Virtual Technical Producer review; ED-0070 |
+| [Demo 2 hardware rehearsal](demo2-hardware-rehearsal.md) | Approved | StageFlow Demo Operations / Backend | PR #71 promotion gate; ED-0063; ED-0071 |

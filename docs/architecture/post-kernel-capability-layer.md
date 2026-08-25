@@ -10,7 +10,9 @@ Kernel. It covers live Session intelligence, bounded AI/media worker execution, 
 Assembly, and progressive approval automation. It remains planning authority for those
 broader capabilities. Only the bounded transcription Work Execution and evidence slice
 explicitly authorized by ADR-0025 and its implementation-ready plan is currently
-implemented.
+implemented. ED-0067 also implements the bounded Phase 1 human-declared Editorial
+Candidate Moment slice; review decisions, Clips, and machine-origin candidates remain
+future work.
 
 The Kernel remains the protected operational foundation. New capabilities reference its
 Business Event, Stage, Program Expectation, realized Session, media registration,
@@ -280,10 +282,10 @@ status map keeps the boundary explicit:
 | UX requirement | Current authoritative basis | Proposed capability requirement | Status |
 | --- | --- | --- | --- |
 | One shared Session ID, Event, Stage, boundaries, package revision, and Program Expectation link | Kernel Session and bounded operational projection | Role-specific projections reference the same IDs/revisions | Kernel basis implemented; role projections future |
-| Producer Sessions list and unresolved-human Work Queue | Kernel exposes bounded Stage/recent Session/media/package status | Separate bounded All Sessions and Work Item projections with cursor pagination and stale-state markers | Proposed read models; no frontend/API workflow |
+| Producer Sessions list and unresolved-human Work Queue | Kernel exposes bounded Stage/recent Session/media/package status plus the ED-0068 Event-scoped package/association Work Queue API | Separate bounded All Sessions projection and later frontend workflow; expand Work Items only from implemented authority | Kernel-derived first Work Queue slice implemented; frontend workflow future |
 | Editorial Live Triage and Review Queue | No Editorial workflow implementation | Bounded cross-Session Candidate queue with stable ordering, mode, cursor, counts, selection continuity, and freshness | Proposed read model |
-| Candidate, Producer-mark, unreviewed, and approved counts per Session | No durable Editorial Candidate store | Candidate/review projection derived from authoritative candidate and append-only decision records | Future; depends on the Moment slices |
-| Producer-mark priority | Kernel has typed human-command patterns but no `Mark Moment` command | Declared Candidate provenance plus explicit priority signal; never automatic Editorial approval | Proposed Green slice after an implementation-ready plan |
+| Candidate, Producer-mark, unreviewed, and approved counts per Session | Durable declared Candidate store plus bounded count/latest/conflict projection; no review decisions | Candidate/review projection derived from authoritative candidate and append-only decision records | Phase 1 declared count implemented; reviewed/approved counts future |
+| Producer-mark priority | Idempotent authenticated `Mark Moment` command persists declared, unreviewed Candidates | Declared Candidate provenance plus explicit priority signal; never automatic Editorial approval | Phase 1 implemented; cross-Session priority future |
 | Candidate rationale and provenance | Observation/Evidence provenance and epistemic vocabulary exist | Candidate source/input, policy/model, actor, reason, and evidence references become first-class | Accepted semantic direction; persistence future |
 | Intelligence-processing lag | Transcription Operation timestamps and bounded status projection implemented | Operation/artifact timestamps and backlog projected as transcript/Moment lag | First-worker basis implemented; product read model and calibration remain future |
 | Human Editorial review lag | No Editorial queue implementation | Derived age of the oldest eligible priority Candidate, separate from compute lag | Proposed read-model calculation |
@@ -546,7 +548,7 @@ backlog remains visible and non-blocking according to policy.
 The earliest product value does not require constructing worker infrastructure first.
 Use a bounded sequence C:
 
-1. **Human-declared Moment slice:** durable Editorial Candidate Moment and append-only
+1. **Human-declared Moment slice (implemented by ED-0067):** durable Editorial Candidate Moment and append-only
    declaration lineage, `Mark Moment` application command, bounded Session/Stage
    projections, boundary-exclusion warning, and restart/replay tests. No model, worker,
    review UI, or clip rendering.

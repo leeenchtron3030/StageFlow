@@ -146,9 +146,15 @@ class EditorialMomentResponse(BaseModel):
     origin: Literal["declared"]
     epistemic_kind: Literal["declared"]
     reason_code: Literal["human_mark_moment"]
+    source_kind: Literal["producer_declaration"]
+    review_state: Literal["unreviewed"]
     actor_id: str
     note: str | None
     declared_at: datetime
+    created_at: datetime
+    updated_at: datetime
+    location_conflict: bool
+    location_conflict_reason: str | None
     revision: int
 
 
@@ -283,9 +289,19 @@ def _moment_response(moment: EditorialCandidateMoment) -> EditorialMomentRespons
         origin="declared",
         epistemic_kind="declared",
         reason_code="human_mark_moment",
+        source_kind="producer_declaration",
+        review_state="unreviewed",
         actor_id=moment.actor_id.value,
         note=moment.note,
         declared_at=moment.declared_at,
+        created_at=moment.created_at,
+        updated_at=moment.updated_at or moment.declared_at,
+        location_conflict=moment.location_conflict,
+        location_conflict_reason=(
+            None
+            if moment.location_conflict_reason is None
+            else moment.location_conflict_reason.value
+        ),
         revision=moment.revision,
     )
 
@@ -374,7 +390,7 @@ def end_presentation(
 ) -> SessionCommandResponse:
     components = _components(request)
     try:
-        session = components.kernel.correct_session_boundary(
+        session = components.correct_session_boundary(
             operation_id=EntityId(str(command.operation_id)),
             session_id=EntityId(str(command.session_id)),
             boundary_kind="end",
@@ -383,7 +399,12 @@ def end_presentation(
             reason=command.reason,
         )
         return _session_response(command.operation_id, session)
-    except (KernelNotFoundError, KernelConflictError, KernelStorageUnavailableError) as exc:
+    except (
+        KernelNotFoundError,
+        KernelConflictError,
+        KernelStorageUnavailableError,
+        EditorialMomentStorageUnavailableError,
+    ) as exc:
         raise _translate_error(exc) from exc
 
 

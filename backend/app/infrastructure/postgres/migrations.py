@@ -33,6 +33,7 @@ class PostgresMigrationRunner:
         self.apply_transcription_worker_v1()
         self.apply_demo_vertical_slice_v1()
         self.apply_program_expectation_reconciliation_v1()
+        self.apply_editorial_candidate_moment_v1()
 
     def apply_kernel_follow_up_closure(self) -> None:
         self._execute_if_missing(
@@ -64,6 +65,12 @@ class PostgresMigrationRunner:
             version="0009_program_expectation_reconciliation",
         )
 
+    def apply_editorial_candidate_moment_v1(self) -> None:
+        self._execute_if_missing(
+            "0010_editorial_candidate_moment_forward.sql",
+            version="0010_editorial_candidate_moment",
+        )
+
     def reverse_event_mode_kernel_v1(self) -> None:
         self.reverse_demo_vertical_slice_v1()
         self.reverse_transcription_worker_v1()
@@ -93,6 +100,7 @@ class PostgresMigrationRunner:
         )
 
     def reverse_demo_vertical_slice_v1(self) -> None:
+        self.reverse_editorial_candidate_moment_v1()
         self.reverse_program_expectation_reconciliation_v1()
         self._execute_if_present(
             "0008_demo_vertical_slice_reverse.sql",
@@ -103,6 +111,12 @@ class PostgresMigrationRunner:
         self._execute_if_present(
             "0009_program_expectation_reconciliation_reverse.sql",
             version="0009_program_expectation_reconciliation",
+        )
+
+    def reverse_editorial_candidate_moment_v1(self) -> None:
+        self._execute_if_present(
+            "0010_editorial_candidate_moment_reverse.sql",
+            version="0010_editorial_candidate_moment",
         )
 
     def _execute(self, filename: str) -> None:

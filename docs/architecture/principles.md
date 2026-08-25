@@ -117,8 +117,9 @@ ADRs, or the authoritative architecture-baseline disposition. “Accepted” doe
   verified reasoning.
 - **Non-goals:** Autonomous publication, opaque cross-domain inference in interpreters,
   or waiting for an entire Session when partial work is safe.
-- **Current alignment:** **Partially aligned.** Contracts and policies exist; no durable
-  orchestrated reasoning/editorial workflow exists.
+- **Current alignment:** **Partially aligned.** Contracts and policies exist, and ED-0067
+  adds durable human-declared Editorial Candidate Moments. No Editorial review/Clip or
+  orchestrated reasoning workflow exists.
 - **Related decisions:** ADR-0009, ADR-0011, ADR-0015, Product Constitution principles
   4–6 and 22–25.
 
@@ -136,8 +137,8 @@ ADRs, or the authoritative architecture-baseline disposition. “Accepted” doe
 - **Current alignment:** **Aligned at implemented Kernel boundaries.** Stable ingress,
   durable domain identity/history, strict aware timestamps, recursive metadata
   protection, deterministic association provenance, approved membership snapshots, and
-  original-result replay are implemented. Downstream editorial/delivery replay remains
-  future work.
+  original-result replay are implemented. Declared Editorial Candidate replay and
+  restart reconstruction are implemented; review/Clip/delivery replay remains future work.
 - **Related decisions:** ADR-0019, ADR-0021, ADR-0022, ABR-003/005/006/016 dispositions.
 
 ## 9. External systems remain behind provider-neutral adapters
@@ -150,9 +151,12 @@ ADRs, or the authoritative architecture-baseline disposition. “Accepted” doe
   report source facts; provider payloads do not become core models.
 - **Non-goals:** Implementing placeholder integrations, hard-coding a conference, or
   rejecting all external services.
-- **Current alignment:** **Aligned at the contract boundary.** No provider implementation
-  or SDK is currently present.
-- **Related decisions:** ADR-0004, ADR-0005, ADR-0011, ABR-017 disposition.
+- **Current alignment:** **Aligned for the bounded Devcon integration.** A configured
+  public-program adapter reconciles External Program Expectations, and a separate guarded
+  Demo controller can perform one explicitly human-confirmed transcript/duration
+  enrichment write. Devcon payloads and authority remain outside the Kernel; no provider
+  SDK or generic publication workflow is present.
+- **Related decisions:** ADR-0004, ADR-0005, ADR-0011, ADR-0028, ABR-017 disposition.
 
 ## 10. Operator visibility grows with operational capability
 

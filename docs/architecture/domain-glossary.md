@@ -147,10 +147,11 @@ authorized by this document.
 - **Definition:** A proposed editorial highlight awaiting human review.
 - **Distinction:** Not a Media Asset Candidate, Timeline Window Candidate, or approved
   Editorial Clip.
-- **Current aliases/legacy names:** Foundational documents use `Candidate Moment`; the
-  Editorial context is not implemented.
-- **Migration:** Qualify architectural/serialized use before Editorial implementation;
-  simple UI copy may remain “Candidate Moment” when context is unambiguous.
+- **Current aliases/legacy names:** Foundational documents use `Candidate Moment`; ED-0067
+  implements only the human-declared, unreviewed Phase 1 aggregate.
+- **Migration:** Canonical contracts and APIs use the qualified term. The Demo 1 import
+  surface remains a compatibility alias, and simple UI copy may remain "Candidate Moment"
+  when context is unambiguous.
 - **Example:** A transcript-supported moment recommended to a reviewer.
 
 ### Editorial Clip

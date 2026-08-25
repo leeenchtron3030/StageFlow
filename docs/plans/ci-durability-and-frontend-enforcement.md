@@ -2,7 +2,7 @@
 
 ## Status
 
-In progress
+Completed
 
 ## Execution authority
 
@@ -132,12 +132,12 @@ skipped, so a future regression here is visible rather than silent.
 
 ## Acceptance criteria
 
-- [ ] Backend CI job runs a Postgres service; durability tests execute and pass (not skip)
+- [x] Backend CI job runs a Postgres service; durability tests execute and pass (not skip)
   in the real GitHub Actions run.
-- [ ] Frontend CI job runs its existing test suite and passes.
-- [ ] The plan's completion record names the exact status-check strings for the
+- [x] Frontend CI job runs its existing test suite and passes.
+- [x] The plan's completion record names the exact status-check strings for the
   repository owner to mark as required.
-- [ ] No production DSN, credential, or real event data appears in workflow files or logs.
+- [x] No production DSN, credential, or real event data appears in workflow files or logs.
 
 ## Rollback or reversal
 
@@ -151,13 +151,22 @@ reverse.
 
 ## Completion record
 
-Implementation completed locally on 2026-08-21; hosted validation remains pending.
+Implementation and hosted validation are complete.
 
 - Backend CI now provisions an isolated PostgreSQL 17 service and sets the existing
   `STAGEFLOW_TEST_POSTGRES_DSN`; frontend CI runs `npm run test`.
 - Documented check names: `Backend / Python 3.13` and `Frontend / Node 22`.
-- Local default backend suite passed 1,796 tests with five PostgreSQL tests skipped.
-  A separately configured local validation DSN failed authentication, so this does not
-  substitute for the required first hosted Actions run.
-- Remaining external actions: observe the hosted run and have the repository owner require
-  both documented checks in branch protection.
+- Hosted Quality matrix run
+  [32657535897](https://github.com/leeenchtron3030/StageFlow/actions/runs/32657535897)
+  passed on `main` commit `2d1952c7eff70ff8c56c02267f61978d4455079b`.
+  The backend job initialized PostgreSQL 17, supplied the isolated
+  `stageflow_worker_test` DSN, and reported 1,807 passed with only one
+  non-PostgreSQL skip. The frontend job's explicit `Run frontend tests` step passed,
+  followed by build, lint, and typecheck.
+- The workflow contains only the declared ephemeral `stageflow_ci` /
+  `stageflow_worker_test` credentials and synthetic CI-local DSN; no production
+  secret, DSN, or event data is present.
+- Remaining external owner action: GitHub currently returns `404 Branch not protected`
+  for `main`. The repository owner must require `Backend / Python 3.13` and
+  `Frontend / Node 22`. Branch protection was explicitly out of this directive's
+  implementation scope and is not implied by the completed hosted validation.
