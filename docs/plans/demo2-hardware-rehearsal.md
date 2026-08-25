@@ -293,11 +293,14 @@ existing controller never retries or compensates automatically.
 - **Attempted revision:** current main 0faf54153c054a63d1a82b2ea7a06727d195c7cd;
   local-only rebased Demo 2 head c0d7504. The conflict-free merge-tree was
   822e303ef9e033077191ba8f9660994e4ade5cc6.
-- **Files and migrations actually changed:** the sanitized
+- **Files and migrations actually changed:** the local rebase resolved
+  backend/app/api/v1/kernel_status.py and
+  backend/app/bootstrap/event_mode_kernel.py by retaining main's merged Editorial/work
+  composition plus Demo 2's unique coordinator fields and locks. The sanitized
   [rehearsal result](../validation/results/demo2-hardware-rehearsal-001.md), this
-  completion record, and directly affected indexes/statuses. No migration, schema,
-  dependency, production code, public contract, authority semantic, or durable runtime
-  configuration changed.
+  completion record, and directly affected indexes/statuses were also recorded. No new
+  production capability, migration, schema, dependency, public contract, authority
+  semantic, or durable runtime configuration changed.
 - **Commands and tests actually run:** remote/PR inspection; local rebase and
   merge-tree/diff checks; focused pytest; scoped Ruff/Pyright; non-sensitive external
   config inventory; and guarded controller diagnosis against an ephemeral Demo 1-derived
