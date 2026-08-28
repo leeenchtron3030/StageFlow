@@ -70,6 +70,11 @@ Moment declaration record and command replay used by Demo 1.
 evaluations, preserving the declaration record while making contained, partially
 excluded, and excluded locations restart-safe and queryable. It does not alter Kernel
 Session tables or add review, Clip, worker, model, or automatic authority.
+`0011_editorial_review_foundation` adds append-only human review decisions with
+digest-based exact/conflicting replay, deterministic append ordering, and immutable
+Editorial Clips created only by approval. Current review state and the bounded
+Event-scoped queue derive from decision history; no Session, package, render, export, or
+publishing state is added.
 
 Registration is at least once and idempotent. It does not claim exactly-once delivery.
 Only a newly created ingress record is eligible for the included dispatcher path; an
@@ -99,8 +104,9 @@ table. `0002_event_mode_kernel_forward.sql`, `0003_kernel_projections_forward.sq
 `0006_media_timing_evidence_forward.sql` add bounded Production-owned objects.
 `0007_transcription_worker_forward.sql` adds the bounded first Work Execution and
 Transcript Evidence objects. `0008` adds the Demo declaration base, `0009` adds Program
-Expectation reconciliation, and `0010` adds Editorial location history. Reversal removes
-`0010` before its `0008` dependency, then removes `0009`, `0008`, `0007`, `0006`,
+Expectation reconciliation, `0010` adds Editorial location history, and `0011` adds
+Editorial review and Clip history. Reversal removes `0011` before `0010`, then removes
+`0010` before its `0008` dependency, followed by `0009`, `0008`, `0007`, `0006`,
 `0005`, `0004`, `0003`, then `0002` and their ledger rows while preserving ingress and the shared
 schema. The `0005` reverse removes only membership tagged as its legacy reconstruction
 before dropping its additive columns.

@@ -23,8 +23,12 @@ from app.contexts.editorial import (
     EditorialGenerationState,
     EditorialLocationConflictReason,
     EditorialMomentConflictError,
+    EditorialMomentReviewResult,
     EditorialMomentService,
+    EditorialReviewQueuePage,
+    EditorialReviewQueuePosition,
     EditorialSessionCandidateProjection,
+    ReviewEditorialMoment,
 )
 from app.contexts.events import EventStageBootstrapRequest, StageBootstrapDefinition
 from app.contexts.production.event_mode_kernel import (
@@ -94,6 +98,12 @@ class MemoryEditorialRepository:
         )
         self.by_operation[command.operation_id] = (command.request_digest, moment)
         return moment
+
+    def review(
+        self, command: ReviewEditorialMoment
+    ) -> EditorialMomentReviewResult:
+        del command
+        raise NotImplementedError
 
     def list_for_session(
         self, session_id: EntityId, *, limit: int = 100
@@ -167,6 +177,16 @@ class MemoryEditorialRepository:
                 ),
             )
         return self.list_for_session(session_id)
+
+    def list_review_queue(
+        self,
+        event_id: EntityId,
+        *,
+        after: EditorialReviewQueuePosition | None = None,
+        limit: int = 100,
+    ) -> EditorialReviewQueuePage:
+        del event_id, after, limit
+        raise NotImplementedError
 
 
 def _mark(

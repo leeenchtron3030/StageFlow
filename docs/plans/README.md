@@ -129,7 +129,7 @@ or architecture document unless those documents are explicitly updated.
 | [Frontend dependency security remediation](frontend-dependency-security-remediation.md) | Completed - Green dependency remediation | StageFlow Engineering / Frontend | Due-diligence audit + ED-0066 follow-up; ED-0069 |
 | [Repository consistency closure](repository-consistency-closure.md) | Completed - Green repository reconciliation | StageFlow Engineering / Governance | 2026-08-22 ChatGPT Virtual Technical Producer review; ED-0070 |
 | [Demo 2 hardware rehearsal](demo2-hardware-rehearsal.md) | Executed; evidence recording pending (ED-0074) | StageFlow Demo Operations / Backend | PR #71 promotion gate; ED-0063; ED-0071 |
-| [Editorial review foundation](editorial-review-foundation.md) | Approved | StageFlow Editorial / Backend | Post-Kernel delivery sequence step 2; ED-0072 |
+| [Editorial review foundation](editorial-review-foundation.md) | Completed | StageFlow Editorial / Backend | Post-Kernel delivery sequence step 2; ED-0072 |
 | [NVENC render benchmark spike](nvenc-render-benchmark-spike.md) | Approved | StageFlow Validation / Backend | ADR-0029 recommended evidence step; ED-0073 |
 | [Demo 2 promotion closure and plan-status reconciliation](demo2-promotion-closure.md) | Approved | StageFlow Demo Operations / Governance | ED-0071 closure; ED-0074 |
 | [Transcription distribution boundary](transcription-distribution-boundary.md) | Approved | StageFlow Engineering / Security | ED-0066 option 3 selection; ED-0075 |

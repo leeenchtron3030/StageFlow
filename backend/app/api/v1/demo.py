@@ -42,6 +42,13 @@ from app.infrastructure.postgres import PostgresWorkExecutionRepository
 from app.shared.ids import EntityId
 
 router = APIRouter(prefix="/demo", tags=["demo"])
+type EditorialReviewStateValue = Literal[
+    "unreviewed",
+    "approved",
+    "rejected",
+    "revision_requested",
+    "deferred",
+]
 _TRANSCRIPT_ASSET_LIMIT = 4
 _TRANSCRIPT_SEGMENT_LIMIT = 50
 _TRANSCRIPT_WORD_LIMIT = 50
@@ -145,7 +152,7 @@ class EditorialMomentResponse(BaseModel):
     epistemic_kind: Literal["declared"]
     reason_code: Literal["human_mark_moment"]
     source_kind: Literal["producer_declaration"]
-    review_state: Literal["unreviewed"]
+    review_state: EditorialReviewStateValue
     actor_id: str
     note: str | None
     declared_at: datetime
@@ -288,7 +295,7 @@ def _moment_response(moment: EditorialCandidateMoment) -> EditorialMomentRespons
         epistemic_kind="declared",
         reason_code="human_mark_moment",
         source_kind="producer_declaration",
-        review_state="unreviewed",
+        review_state=moment.review_state.value,
         actor_id=moment.actor_id.value,
         note=moment.note,
         declared_at=moment.declared_at,
