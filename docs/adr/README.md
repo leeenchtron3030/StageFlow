@@ -99,6 +99,7 @@ new context and names every superseded ADR. Update this index and mark the older
 | [ADR-0026](ADR-0026-policy-scoped-automatic-authority.md) | Evidence-to-policy-to-authority evaluation with scoped activation and durable provenance | Proposed | Yellow decision; no implementation |
 | [ADR-0027](ADR-0027-media-timing-evidence.md) | Dedicated durable revisioned advisory Media Timing Evidence linked to Completed Media Asset | Accepted | MTE v1 implemented; recorder qualification and automatic authority remain Yellow |
 | [ADR-0028](ADR-0028-devcon-external-integration-boundary.md) | Bounded Devcon program-read and guarded human-confirmed enrichment-write boundary | Accepted | Retroactively documents the shipped Demo integration and its failure/verification semantics; no new external write |
+| [ADR-0029](ADR-0029-nvenc-rendering-and-gpu-worker-requirement.md) | NVENC hardware-accelerated rendering; NVIDIA GPU required for render-eligible workers | Accepted | Encoder/hardware choice only; no Assembly, rendering, or render Worker Capability implemented yet |
 
 ## Unresolved ADR candidates
 

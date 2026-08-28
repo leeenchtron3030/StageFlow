@@ -2,7 +2,8 @@
 
 ## Status and scope
 
-**Status:** Completed evidence pass under ED-0066; dependency decision still required.
+**Status:** Completed evidence pass under ED-0066; PyAV/FFmpeg GPL provenance confirmed
+2026-08-28 (see below); dependency decision still required.
 
 This pass inventories the checked-in backend and frontend dependency graphs, records
 declared license metadata, and preserves machine-readable CycloneDX artifacts. It makes
@@ -69,10 +70,24 @@ The installed PyAV wheel reports `av 18.1.0` and loads FFmpeg-family libraries
 `faster-whisper`, but that evidence does not disclose the wheel's FFmpeg configuration
 or settle the earlier audit's potential GPL-2.0-compatible codec/build exposure.
 
+**2026-08-28 update — provenance established.** Direct inspection of the installed
+backend `.venv` (`backend/.venv/Lib/site-packages/av.libs/`) confirms the bundled FFmpeg
+build includes `libx264-165-....dll` and `libx265-....dll` as separate vendored DLLs.
+FFmpeg can only include those encoders when built with
+`--enable-gpl --enable-libx264 --enable-libx265`; there is no LGPL configuration that
+bundles them. This is direct evidence the installed FFmpeg build is GPL-licensed, not an
+unknown build. `faster-whisper` uses PyAV only to decode audio out of arbitrary input
+containers; it does not call the bundled encoders. Decode-only use does not require
+`libx264`/`libx265` at all — an LGPL-only rebuild (Decision option 1 below) would still
+satisfy the actual transcription use case.
+
 Treat any distributed backend bundle that includes the transcription group as
-**license review pending** until the FFmpeg/PyAV binary provenance is established and
-counsel confirms the obligations. Passing `pip-licenses` is not clearance for the
-native wheel.
+**license review pending, now with confirmed GPL exposure** until an option below is
+selected and, where required, counsel confirms the obligations. Passing `pip-licenses`
+is not clearance for the native wheel. See
+[ADR-0029](../adr/ADR-0029-nvenc-rendering-and-gpu-worker-requirement.md) for the related
+decision to keep this exposure from spreading to the separate future rendering capability
+by using NVENC hardware encoding instead of a second `libx264` dependency there.
 
 ### Frontend
 
