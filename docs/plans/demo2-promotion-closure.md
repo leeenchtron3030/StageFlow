@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved
+Completed
 
 ## Execution authority
 
@@ -178,4 +178,23 @@ Documentation-only and directly revertible.
 
 ## Completion record
 
-_(To be filled in by whoever implements this plan.)_
+- **Evidence supplied:** the operator's 2026-08-26 final-state report plus explicit
+  confirmation on 2026-08-28 that ED-0071 criteria 4, 6, and 7 were **not exercised**.
+- **Recorded:** [Demo 2 hardware rehearsal Run 001](../validation/results/demo2-hardware-rehearsal-001.md)
+  as a PARTIAL QUALIFICATION — seven criteria pass, three recorded NOT QUALIFIED rather
+  than inferred or generously interpreted, per this plan's own constraint.
+- **Reconciled:** ED-0071's plan status, acceptance criteria, and completion record; the
+  ED-0063, ED-0071, and ED-0074 directive rows; and the matching plan-index rows.
+- **Drift found and corrected in the `In progress` review:** `demo-rehearsal-controller.md`
+  and `producer-ux-operational-refinement.md` both declared themselves Completed/Complete
+  in their own Status blocks while the plan index still listed them as In progress. Index
+  corrected to match. `demo-hardware-rehearsal.md` (Demo 1) and `stable-ingress-identity.md`
+  were reviewed and are genuinely still in progress; both left unchanged.
+- **Promotion state:** Demo 2 is **not promotion-qualified**. PR #71 verified open and
+  draft on 2026-08-28 and deliberately not merged.
+- **Commands run:** `gh pr view 71` for draft-state verification; `git diff --check`;
+  deliberate diff review. No code changed, so no test suite was run.
+- **Execution authority used:** Green autonomous documentation reconciliation.
+- **Approved deviations:** none.
+- **Rollback status:** documentation-only and directly revertible.
+- **Remaining work:** a follow-up rehearsal exercising only criteria 4, 6, and 7.

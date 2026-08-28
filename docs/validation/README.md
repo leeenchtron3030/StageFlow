@@ -30,6 +30,7 @@ readiness.
 | [Run 002 — real-media Durable Event-Mode Kernel baseline](results/real-event-playback-run-002.md) | Sanitized real-media, Session/package, reconstruction, finding, performance, and UX evidence | **PASS — Real-media Durable Event-Mode Kernel baseline** |
 | [Run 003 — invalid same-Stage turnover execution](results/real-event-playback-run-003.md) | Sanitized missing-Session authority, conservative media preservation, and qualification-tooling incident evidence | **INVALID — intended same-Stage turnover qualification not executed**; secondary conservatism diagnostic pass |
 | [Run 004 — same-Stage turnover partial qualification](results/real-event-playback-run-004.md) | Sanitized lifecycle, media, association-policy, authority-latency, and runtime-estimator evidence | Lifecycle/preservation/policy **PASS**; content-correct automatic association **INCONCLUSIVE / NOT QUALIFIED** |
+| [Demo 2 hardware rehearsal — Run 001](results/demo2-hardware-rehearsal-001.md) | Sanitized two-machine autonomous media/transcription/approval evidence and unexercised failure-path criteria | **PARTIAL QUALIFICATION** — 7 of 10 criteria pass; worker projection, ED-0063 safety net, and restart reconstruction **NOT QUALIFIED**; Demo 2 not promotion-qualified |
 
 Future sanitized manifests may be stored under `docs/validation/corpora/`; completed
 results are stored under `docs/validation/results/` only when reviewed real values are
