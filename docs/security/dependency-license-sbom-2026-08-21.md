@@ -117,7 +117,23 @@ scanner output. That does not eliminate the unresolved PyAV/FFmpeg binary questi
 
 ## Decision options for the PyAV/FFmpeg exposure
 
-ED-0066 records options but does not select one:
+**2026-08-28 — Option 3 selected.** The repository owner accepted option 3 below: do not
+distribute the transcription group while the licensing question is open. An operator who
+wants local transcription installs that dependency group themselves on their own machine,
+which is not distribution and therefore triggers no GPL obligation.
+
+This is materially cheap because the exposure is already structurally isolated:
+`backend/pyproject.toml` declares `transcription` under `[dependency-groups]`, so a default
+`uv sync` does not install `faster-whisper`, `ctranslate2`, or the FFmpeg-carrying `av`
+wheel at all — only an explicit `--group transcription` or `--all-groups` does. The
+accepted decision therefore requires documenting and guarding the existing boundary rather
+than restructuring dependencies. ED-0075 implements it.
+
+Option 1 (own an auditable LGPL-only build) remains the recommended answer for the first
+genuinely distributed artifact, and is recorded as the intended future direction rather
+than a rejected alternative. Option 2 remains available only after counsel review.
+
+ED-0066 records the options but did not select one:
 
 1. **Own an auditable LGPL-only FFmpeg/PyAV build.** Pin the build inputs and configure
    only LGPL-compatible codecs/features. This gives the clearest provenance and can

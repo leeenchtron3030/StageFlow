@@ -2,7 +2,12 @@
 
 ## Status
 
-Proposed
+Accepted
+
+Accepted 2026-08-28. Acceptance establishes the authority boundary, the policy modes, and
+the required audit lineage. It activates no automation: every mode remains configured
+independently per decision type, Event/deployment, and version, and existing human-only
+Kernel commands gain no automatic authority from this acceptance.
 
 ## Date
 

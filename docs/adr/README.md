@@ -96,10 +96,11 @@ new context and names every superseded ADR. Update this index and mark the older
 | [ADR-0023](ADR-0023-session-authority-and-completion.md) | Session meaning, Stage invariants, association, boundaries, and completion authority | Accepted | Kernel Session aggregate, package approval/revision, and typed history implemented |
 | [ADR-0024](ADR-0024-durable-kernel-authority-and-persistence.md) | Explicit bootstrap, human Session realization, deterministic association, normalized state/history | Accepted | Kernel corrections and Green follow-up are closure-validated |
 | [ADR-0025](ADR-0025-postgresql-durable-operations-and-workers.md) | PostgreSQL-backed Durable Operations, attempts, leases, and Worker coordination | Accepted | First transcription-worker substrate implemented under the bounded Green plan; real provider/model and automatic enqueue remain unselected |
-| [ADR-0026](ADR-0026-policy-scoped-automatic-authority.md) | Evidence-to-policy-to-authority evaluation with scoped activation and durable provenance | Proposed | Yellow decision; no implementation |
+| [ADR-0026](ADR-0026-policy-scoped-automatic-authority.md) | Evidence-to-policy-to-authority evaluation with scoped activation and durable provenance | Accepted | Accepted 2026-08-28; establishes the boundary only and activates no automation; no implementation |
 | [ADR-0027](ADR-0027-media-timing-evidence.md) | Dedicated durable revisioned advisory Media Timing Evidence linked to Completed Media Asset | Accepted | MTE v1 implemented; recorder qualification and automatic authority remain Yellow |
 | [ADR-0028](ADR-0028-devcon-external-integration-boundary.md) | Bounded Devcon program-read and guarded human-confirmed enrichment-write boundary | Accepted | Retroactively documents the shipped Demo integration and its failure/verification semantics; no new external write |
 | [ADR-0029](ADR-0029-nvenc-rendering-and-gpu-worker-requirement.md) | NVENC hardware-accelerated rendering; NVIDIA GPU required for render-eligible workers | Accepted | Encoder/hardware choice only; no Assembly, rendering, or render Worker Capability implemented yet |
+| [ADR-0030](ADR-0030-packaging-asset-identity.md) | Separate `PackagingAsset` aggregate owned by Assembly, distinct from Completed Media Asset | Accepted | Resolves the deferred identity/ownership question and unblocks the Assembly foundation; no implementation |
 
 ## Unresolved ADR candidates
 
@@ -107,7 +108,6 @@ new context and names every superseded ADR. Update this index and mark the older
 | --- | --- | --- |
 | Kernel aggregate evolution | Explicit bootstrap; human Session realization; deterministic association; normalized state plus typed history | Post-Kernel split/merge and automated realization policy |
 | Relational store evolution | PostgreSQL normalized state plus typed append-only Kernel history | Backup/restore policy and schemas for future capabilities |
-| Packaging asset identity | Completed Media Asset remains production-media completion/readiness authority | Whether a separate Packaging Asset composes a Completed Media Asset/content manifest, and which context owns approval/applicability |
 | Post-Kernel Session revision policy | Human completion applies to one package revision; valid late media returns the current package to correction/review | Grace defaults, split/merge, and post-publication behavior |
 | Transactional outbox | Required for future externally meaningful durable messages | First consumer, message schema, dispatch/reconciliation ownership |
 
