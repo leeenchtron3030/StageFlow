@@ -148,7 +148,8 @@ authorized by this document.
 - **Distinction:** Not a Media Asset Candidate, Timeline Window Candidate, or approved
   Editorial Clip.
 - **Current aliases/legacy names:** Foundational documents use `Candidate Moment`; ED-0067
-  implements only the human-declared, unreviewed Phase 1 aggregate.
+  implements the human-declared aggregate and ED-0072 derives its current review state
+  from append-only decisions.
 - **Migration:** Canonical contracts and APIs use the qualified term. The Demo 1 import
   surface remains a compatibility alias, and simple UI copy may remain "Candidate Moment"
   when context is unambiguous.
@@ -159,9 +160,11 @@ authorized by this document.
 - **Definition:** A human-approved editorial selection intended for downstream rendering
   or publication workflows.
 - **Distinction:** It is not an ingest file, source segment, candidate, or rendered Export.
-- **Current aliases/legacy names:** Foundational documents use `Clip`; no implementation
-  exists.
-- **Migration:** Use the qualified term at cross-context boundaries when implemented.
+- **Current aliases/legacy names:** Foundational documents use `Clip`; ED-0072 implements
+  the qualified immutable selection contract.
+- **Migration:** Migration `0011_editorial_review_foundation` persists stable Clip
+  identity, approved Session-timeline range, candidate/revision lineage, review-decision
+  lineage, and Clip revision. Rendering and publication remain separate.
 - **Example:** A reviewer approves a 45-second range from an Editorial Candidate Moment.
 
 ### Hot Moment

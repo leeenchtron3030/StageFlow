@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved
+Completed
 
 ## Execution authority
 
@@ -161,21 +161,21 @@ per candidate without transcript content, media paths, or actor secrets.
 
 ## Acceptance criteria
 
-- [ ] `EditorialMomentReviewDecision` is append-only and carries candidate identity and
+- [x] `EditorialMomentReviewDecision` is append-only and carries candidate identity and
   revision, actor, decision time, action, notes/reason, and optional adjusted range.
-- [ ] All four minimum actions (approve-and-create-clip, reject, revise/range-adjust,
+- [x] All four minimum actions (approve-and-create-clip, reject, revise/range-adjust,
   defer) are implemented.
-- [ ] Review state is a projection derived from decision history; prior decisions remain
+- [x] Review state is a projection derived from decision history; prior decisions remain
   visible and are never overwritten.
-- [ ] Approval creates an `EditorialClip` with its own identity, approved range,
+- [x] Approval creates an `EditorialClip` with its own identity, approved range,
   candidate and decision lineage, and revision.
-- [ ] Clip creation does not render, publish, complete a package, or alter any Session
+- [x] Clip creation does not render, publish, complete a package, or alter any Session
   boundary.
-- [ ] A stale candidate revision is rejected explicitly.
-- [ ] Migration `0011` is additive, reverses cleanly, and does not disturb `0008`/`0010`.
-- [ ] New routes sit behind the existing ED-0055 shared-secret dependency.
-- [ ] Full backend suite, Ruff, and Pyright pass.
-- [ ] No machine-origin candidate, automatic approval, export, publishing, or
+- [x] A stale candidate revision is rejected explicitly.
+- [x] Migration `0011` is additive, reverses cleanly, and does not disturb `0008`/`0010`.
+- [x] New routes sit behind the existing ED-0055 shared-secret dependency.
+- [x] Full backend suite, Ruff, and Pyright pass.
+- [x] No machine-origin candidate, automatic approval, export, publishing, or
   packaging-asset behavior is introduced.
 
 ## Rollback or reversal
@@ -190,4 +190,22 @@ contracts/routes/tests. ED-0067's declaration path is untouched and continues to
 
 ## Completion record
 
-_(To be filled in by whoever implements this plan.)_
+Completed on 2026-08-28 on
+`codex/ed-0072-editorial-review-foundation`.
+
+- Added immutable review/action/range/Clip contracts, a shared human-command digest
+  helper, exact/conflicting replay, explicit candidate-revision conflict, and
+  transactionally coupled approval/Clip creation.
+- Added migration `0011_editorial_review_foundation` with deterministic append sequence,
+  bounded Event-scoped keyset queue reads, oldest-pending measurement, bounded decision
+  and Clip history, authenticated command/query routes, and startup schema verification.
+- Added behavior-first unit/API/PostgreSQL tests for all actions, immutable history,
+  replay, stale revisions, Clip lineage, pagination, authentication, restart
+  reconstruction, and `0011` reverse/reapply while preserving `0008`.
+- Validation: `uv run pytest` passed 1,815 tests with 2 skips; `uv run ruff check .`
+  passed; `uv run pyright` passed. Focused Demo/Editorial tests passed 15 tests. The
+  existing Starlette/httpx deprecation warning remained; the four pre-declared Windows
+  console-encoding failures did not reproduce.
+- No dependency, frontend, external-state, runtime-configuration, Session-boundary, or
+  package-authority change was made. Production backend code and the additive PostgreSQL
+  schema changed; no data migration or destructive migration was introduced.

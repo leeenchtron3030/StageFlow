@@ -10,9 +10,9 @@ Kernel. It covers live Session intelligence, bounded AI/media worker execution, 
 Assembly, and progressive approval automation. It remains planning authority for those
 broader capabilities. Only the bounded transcription Work Execution and evidence slice
 explicitly authorized by ADR-0025 and its implementation-ready plan is currently
-implemented. ED-0067 also implements the bounded Phase 1 human-declared Editorial
-Candidate Moment slice; review decisions, Clips, and machine-origin candidates remain
-future work.
+implemented. ED-0067 implements the bounded Phase 1 human-declared Editorial Candidate
+Moment slice, and ED-0072 implements the append-only human review, Editorial Clip, and
+bounded Event review-queue foundation. Machine-origin candidates remain future work.
 
 The Kernel remains the protected operational foundation. New capabilities reference its
 Business Event, Stage, Program Expectation, realized Session, media registration,
@@ -283,12 +283,12 @@ status map keeps the boundary explicit:
 | --- | --- | --- | --- |
 | One shared Session ID, Event, Stage, boundaries, package revision, and Program Expectation link | Kernel Session and bounded operational projection | Role-specific projections reference the same IDs/revisions | Kernel basis implemented; role projections future |
 | Producer Sessions list and unresolved-human Work Queue | Kernel exposes bounded Stage/recent Session/media/package status plus the ED-0068 Event-scoped package/association Work Queue API | Separate bounded All Sessions projection and later frontend workflow; expand Work Items only from implemented authority | Kernel-derived first Work Queue slice implemented; frontend workflow future |
-| Editorial Live Triage and Review Queue | No Editorial workflow implementation | Bounded cross-Session Candidate queue with stable ordering, mode, cursor, counts, selection continuity, and freshness | Proposed read model |
-| Candidate, Producer-mark, unreviewed, and approved counts per Session | Durable declared Candidate store plus bounded count/latest/conflict projection; no review decisions | Candidate/review projection derived from authoritative candidate and append-only decision records | Phase 1 declared count implemented; reviewed/approved counts future |
+| Editorial Live Triage and Review Queue | ED-0072 exposes an authenticated Event-scoped bounded Candidate queue with deterministic keyset pagination, counts, oldest-pending age, derived review state, and bounded decision/Clip history | Add richer modes, selection continuity, and controlled refresh in the frontend | Backend foundation implemented; frontend workflow future |
+| Candidate, Producer-mark, unreviewed, and approved counts per Session | Durable declared Candidate store, append-only review decisions, derived per-Candidate review state, and Event queue counts | Add reviewed/approved counts to bounded per-Session projections when a consumer requires them | Candidate review projection implemented; per-Session reviewed/approved counts future |
 | Producer-mark priority | Idempotent authenticated `Mark Moment` command persists declared, unreviewed Candidates | Declared Candidate provenance plus explicit priority signal; never automatic Editorial approval | Phase 1 implemented; cross-Session priority future |
 | Candidate rationale and provenance | Observation/Evidence provenance and epistemic vocabulary exist | Candidate source/input, policy/model, actor, reason, and evidence references become first-class | Accepted semantic direction; persistence future |
 | Intelligence-processing lag | Transcription Operation timestamps and bounded status projection implemented | Operation/artifact timestamps and backlog projected as transcript/Moment lag | First-worker basis implemented; product read model and calibration remain future |
-| Human Editorial review lag | No Editorial queue implementation | Derived age of the oldest eligible priority Candidate, separate from compute lag | Proposed read-model calculation |
+| Human Editorial review lag | ED-0072 exposes oldest-pending Candidate time and measured age, separate from compute lag | Add operational threshold calibration and frontend presentation | Backend calculation implemented; calibration/frontend future |
 | Selected review position versus live edge | Timeline contracts exist but no Editorial playback state | Preserve Session-relative review/playback position independently from current live position; expose explicit behind-live and return-to-live state | Proposed frontend/read-model contract |
 | Stable queue interaction | No Editorial queue implementation | Preserve selected Candidate, mode, filters, ordering generation, and return position while arrivals accumulate behind an explicit refresh signal | Proposed frontend/read-model contract |
 | Package-revision basis and downstream impact | Kernel package revision/history and late-media reopening are implemented | Candidate/Clip/Assembly/output references retain their historical basis and expose unaffected, revalidate, outside-boundary, or missing-source impact | Historical-basis requirement accepted; impact policy future |
@@ -552,8 +552,9 @@ Use a bounded sequence C:
    declaration lineage, `Mark Moment` application command, bounded Session/Stage
    projections, boundary-exclusion warning, and restart/replay tests. No model, worker,
    review UI, or clip rendering.
-2. **Editorial review foundation:** bounded candidate query and append-only review
-   decision that can create an Editorial Clip contract. No export/publishing.
+2. **Editorial review foundation (implemented by ED-0072):** bounded candidate query and
+   append-only review decision that can create an Editorial Clip contract. No
+   export/publishing.
 3. **Concrete transcription execution (bounded substrate implemented):** migration 0007
    and its internal contracts/repository implement the Durable Operation/Attempt/Worker
    pieces, provider-neutral transcript evidence, and bounded status projection. A real

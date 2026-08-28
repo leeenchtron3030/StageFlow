@@ -8,7 +8,11 @@ from app.shared.ids import EntityId
 from .contracts import (
     DeclareEditorialMoment,
     EditorialCandidateMoment,
+    EditorialMomentReviewResult,
+    EditorialReviewQueuePage,
+    EditorialReviewQueuePosition,
     EditorialSessionCandidateProjection,
+    ReviewEditorialMoment,
 )
 
 
@@ -27,6 +31,10 @@ class EditorialMomentStorageUnavailableError(RuntimeError):
 class EditorialMomentRepository(Protocol):
     def declare(self, command: DeclareEditorialMoment) -> EditorialCandidateMoment: ...
 
+    def review(
+        self, command: ReviewEditorialMoment
+    ) -> EditorialMomentReviewResult: ...
+
     def list_for_session(
         self, session_id: EntityId, *, limit: int = 100
     ) -> tuple[EditorialCandidateMoment, ...]: ...
@@ -42,6 +50,14 @@ class EditorialMomentRepository(Protocol):
     def revalidate_session_locations(
         self, session_id: EntityId, *, evaluated_at: datetime
     ) -> tuple[EditorialCandidateMoment, ...]: ...
+
+    def list_review_queue(
+        self,
+        event_id: EntityId,
+        *,
+        after: EditorialReviewQueuePosition | None = None,
+        limit: int = 100,
+    ) -> EditorialReviewQueuePage: ...
 
 
 __all__ = [

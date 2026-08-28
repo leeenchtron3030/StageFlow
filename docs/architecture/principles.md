@@ -117,9 +117,10 @@ ADRs, or the authoritative architecture-baseline disposition. “Accepted” doe
   verified reasoning.
 - **Non-goals:** Autonomous publication, opaque cross-domain inference in interpreters,
   or waiting for an entire Session when partial work is safe.
-- **Current alignment:** **Partially aligned.** Contracts and policies exist, and ED-0067
-  adds durable human-declared Editorial Candidate Moments. No Editorial review/Clip or
-  orchestrated reasoning workflow exists.
+- **Current alignment:** **Partially aligned.** Contracts and policies exist; ED-0067
+  adds durable human-declared Editorial Candidate Moments; ED-0072 adds append-only
+  human review decisions, derived review state, and approval-created Editorial Clips.
+  No machine candidate generation or orchestrated reasoning workflow exists.
 - **Related decisions:** ADR-0009, ADR-0011, ADR-0015, Product Constitution principles
   4–6 and 22–25.
 
