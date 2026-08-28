@@ -63,8 +63,13 @@ evidence, recorded as a sanitized validation result.
 - One qualification-only module under `backend/tests/qualification/` with explicit finite
   subcommands, following the existing harness conventions.
 - Measurement of: wall-clock encode time, real-time factor, output file size, and a
-  quality measure (VMAF or SSIM/PSNR, whichever the installed build supports) for NVENC
-  and libx264 over the same real input blocks.
+  quality measure for NVENC and libx264 over the same real input blocks. **The measure is
+  SSIM, with PSNR secondary** — the installed FFmpeg build provides `ssim`, `psnr`, and
+  `xpsnr` but not full `libvmaf` (verified 2026-08-28), so VMAF is unavailable.
+- The reference for the quality measure is **the source vMix blocks themselves**. No
+  pristine or unencoded master is required: StageFlow's real input is the vMix recording,
+  so the operative question is how much fidelity is lost re-encoding what StageFlow
+  actually receives.
 - One concurrency run: encode while a CUDA transcription job runs, recording whether
   either degrades.
 - A sanitized validation result under `docs/validation/results/`, containing no media
@@ -157,9 +162,23 @@ Delete the harness, its tests, and the result document. Nothing in production is
 
 ## Open questions
 
-- Which real Session's blocks are used, and does a quality measure require an unencoded
-  reference the corpus can supply? If VMAF is unavailable in the installed build, record
-  which measure was used instead and why.
+Both original open questions were resolved on 2026-08-28 and are recorded above:
+the quality measure is SSIM (PSNR secondary) because `libvmaf` is absent from the
+installed build, and the source vMix blocks serve as their own reference.
+
+The corpus question resolved as follows. A **semantically complete Session is not
+required** — Session start/end is a domain concern for Kernel association and package
+completion; the encoder decodes and re-encodes frames and is indifferent to it. The
+existing Demo 2 recorded-block folder (11 blocks, approximately 11 minutes) is therefore
+valid input for the NVENC-versus-libx264 comparison, and is the corpus for this run.
+
+One measurement caveat to record rather than resolve: at roughly 11 minutes of footage,
+the encode completes well inside a minute, which is short of thermal steady state on a
+laptop GPU, and the concurrent-transcription arm has only a narrow overlap window
+(transcription of 11 minutes completes in roughly 13 seconds at the measured RTF). Results
+for the sustained-load and concurrency arms must be reported with that limitation stated
+explicitly. A longer full-Session corpus is the better input for those two arms
+specifically and may be measured in a follow-up run; it does not block this one.
 
 ## Completion record
 
