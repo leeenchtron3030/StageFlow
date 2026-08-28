@@ -2,7 +2,10 @@
 
 ## Status
 
-Approved
+Executed 2026-08-26 — **PARTIAL QUALIFICATION**. Seven of ten acceptance criteria
+passed; criteria 4, 6, and 7 were not exercised and are recorded as not qualified. Demo 2
+is **not promotion-qualified**; PR #71 remains draft. See the
+[Run 001 result](../validation/results/demo2-hardware-rehearsal-001.md).
 
 ## Execution authority
 
@@ -246,28 +249,29 @@ Never record secret values, media paths, raw diagnostics, or unapproved transcri
 
 ## Acceptance criteria
 
-- [ ] The Demo 2 branch starts on the real Razer/Wenceslas stack with backend/PostgreSQL
+- [x] The Demo 2 branch starts on the real Razer/Wenceslas stack with backend/PostgreSQL
   loopback-only and Next.js reachable from the trusted Mac, reusing Demo 1's exact
   external configuration and Devcon test identity.
-- [ ] Media progresses automatically through the coordinator's own reconciliation timer
+- [x] Media progresses automatically through the coordinator's own reconciliation timer
   during real vMix rolling-block recording — no manual per-cycle trigger.
-- [ ] Real CUDA/float16 transcription evidence is produced automatically as part of that
+- [x] Real CUDA/float16 transcription evidence is produced automatically as part of that
   autonomous progression.
-- [ ] The worker/deployment status projection reflects real GPU/capacity/availability
-  state autonomously.
-- [ ] Package Approval is performed from the Mac UI against an audited exact revision,
+- [ ] **NOT QUALIFIED — not exercised.** The worker/deployment status projection reflects
+  real GPU/capacity/availability state autonomously.
+- [x] Package Approval is performed from the Mac UI against an audited exact revision,
   and any Devcon publication remains gated by the existing explicit-confirmation
   `publish-devcon` workflow, unchanged.
-- [ ] One induced live-simulation failure causes visible `degraded` status with a bounded
-  failure code, and the coordinator keeps attempting cycles rather than dying (ED-0063
+- [ ] **NOT QUALIFIED — not exercised.** One induced live-simulation failure causes visible
+  `degraded` status with a bounded failure code, and the coordinator keeps attempting cycles rather than dying (ED-0063
   safety net proven live, not just in unit tests).
-- [ ] Restart of the launcher-owned stack reconstructs coordinator ownership,
+- [ ] **NOT QUALIFIED — not exercised.** Restart of the launcher-owned stack reconstructs
+  coordinator ownership,
   Session/media/package state, and worker projection from durable state.
-- [ ] A factual result distinguishes rehearsal success from production or Event
+- [x] A factual result distinguishes rehearsal success from production or Event
   certification, and explicitly states whether Demo 2 is now promotion-qualified.
-- [ ] PR #71 remains draft and unmerged after this plan's execution, regardless of
+- [x] PR #71 remains draft and unmerged after this plan's execution, regardless of
   outcome.
-- [ ] No schema, migration, dependency, authority-semantic, or association-reevaluation
+- [x] No schema, migration, dependency, authority-semantic, or association-reevaluation
   policy change was made.
 
 ## Rollback or reversal
@@ -290,4 +294,23 @@ existing controller never retries or compensates automatically.
 
 ## Completion record
 
-_(To be filled in by whoever executes this rehearsal.)_
+- **Executed:** 2026-08-26 on the two-machine Razer/Wenceslas + Mac topology, reusing Demo
+  1's qualified external configuration, media path, and Devcon test identity. No new
+  credentials, dependencies, or configuration were provisioned.
+- **Result:** 11/11 media associated, 11/11 transcriptions complete, 1 declared Moment,
+  0 failures/conflicts/unresolved, package revision 1 complete and approved, 0 Devcon PUTs.
+  Launcher-owned services stopped with ports 8000/3000 confirmed closed.
+- **Disposition:** PARTIAL QUALIFICATION — seven criteria pass, three not qualified.
+  Criteria 4 (worker/deployment projection), 6 (ED-0063 safety net under induced failure),
+  and 7 (restart reconstruction) were confirmed by the operator as not exercised. A
+  zero-failure run cannot satisfy the failure-path criteria.
+- **Promotion state:** Demo 2 is **not promotion-qualified**. PR #71 remains open and
+  draft, verified 2026-08-28.
+- **Evidence:** sanitized operator report retained outside the repository;
+  SHA-256 `B6F1052696EDA50C511791778DA16A8F11053FDE578CC8BAEE61DB1A10624E07`. Full
+  assessment in the [Run 001 result](../validation/results/demo2-hardware-rehearsal-001.md).
+- **Deviations:** the induced-failure and restart steps in the implementation approach were
+  not performed. Recorded as an honest gap rather than a plan amendment.
+- **Remaining work:** a follow-up run exercising only criteria 4, 6, and 7.
+- **Rollback status:** nothing to roll back; no repository, schema, or production state
+  changed.
