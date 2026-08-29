@@ -182,4 +182,43 @@ specifically and may be measured in a follow-up run; it does not block this one.
 
 ## Completion record
 
-_(To be filled in by whoever implements this plan.)_
+- Completed 2026-08-29 under Green autonomous authority on the directive branch.
+- Added one qualification-only harness with explicit finite NVENC, libx264, and
+  concurrent-with-CUDA-transcription subcommands, plus eleven focused GPU-free tests.
+  The harness requires absolute external inputs/outputs, refuses repository output,
+  writes new-file-only sanitized JSON, records failures without software fallback, and
+  contains no production rendering or worker behavior.
+- Real Run 001 used 11 Demo 2 blocks totaling 657.390691 seconds. NVENC measured
+  435.540964 seconds (RTF 0.662530), 632,101,393 bytes, SSIM 0.996887551, and PSNR
+  47.770912 dB. libx264 measured 616.446733 seconds (RTF 0.937717), 654,975,207 bytes,
+  SSIM 0.997581141, and PSNR 48.962269 dB.
+- The concurrent arm measured NVENC at 436.052645 seconds (+0.1288%) and CUDA
+  transcription at 22.166632 seconds versus a 24.081776-second baseline (-7.9527%),
+  with 22.166541 seconds of actual overlap. One negative delta is treated as single-run
+  variation, not an improvement claim.
+- The plan's anticipated sub-minute encode did not reproduce. The sanitized result
+  explicitly records the 7 minute 15.541 second NVENC and 10 minute 16.447 second
+  libx264 durations, the end-to-end Python/PyAV decode/orchestration boundary, the
+  narrower-than-encode transcription overlap, and the lack of sustained-throughput or
+  general hardware qualification.
+- Source-block average-rate variation required a bounded normalization to the first
+  block's 29.97 fps; all blocks retained matching 1920x1080 geometry and stream time
+  base. Full-frame SSIM/PSNR remained unchanged, while their independent analysis was
+  parallelized after the first arm to reduce non-benchmark overhead. The concurrency
+  arm did not repeat quality analysis because its acceptance measure was degradation
+  and overlap.
+- Validation completed with the focused tests, direct CLI and synthetic real-codec
+  smoke runs, full backend pytest, Ruff, Pyright, and repository whitespace/privacy
+  checks. An initial full-suite run inherited an operator API secret and produced 11
+  unrelated authentication 401 failures because the test fixture intentionally uses
+  `setdefault`; the rerun explicitly scoped the repository's synthetic test-only secret
+  to that process and passed 1,826 tests with 2 skipped. The four previously warned
+  Windows validation-controller cases were also run explicitly and passed.
+- No production package, dependency manifest or lockfile, schema, migration, production
+  external state, or persistent runtime configuration changed. Qualification external
+  state was created as three videos and three sanitized raw JSON reports outside Git;
+  the concurrent process also prepended the explicit local CUDA directory to its own
+  PATH for that process only.
+- Remaining evidence needs are repeated and longer-corpus thermal runs, a native
+  renderer-path investigation that separates decode/orchestration from encoder
+  throughput, and separate NAS-transfer measurement. None is authorized by ED-0073.
