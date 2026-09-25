@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import cast
 from urllib.request import Request
 
 import pytest
 
+from app.demo import controller
 from app.demo.controller import (
     API_SHARED_SECRET,
     DemoControllerError,
@@ -270,11 +272,67 @@ def test_no_session_summary_is_bounded_and_non_authoritative() -> None:
     summary = summarize_demo_state(_kernel(sessions=[]), None)
 
     assert summary["session"] is None
+    assert summary["program"] == summary["devcon"]
     assert summary["transcript_evidence"] == {
         "count": 0,
         "complete": 0,
         "items": (),
     }
+
+
+@pytest.mark.parametrize("command", ["status", "rehearsal-report"])
+@pytest.mark.parametrize("has_session", [False, True])
+def test_controller_serializes_neutral_program_and_identical_alias(
+    command: str,
+    has_session: bool,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    kernel = _kernel() if has_session else _kernel(sessions=[])
+    workspace = _workspace() if has_session else None
+    kernel["program_expectations"] = [
+        {"lifecycle_state": "current"}, {"lifecycle_state": "withdrawn"}
+    ]
+    kernel["program_synchronization"] = {
+        "provider": "local_file", "synchronized_at": "2026-08-20T19:59:00Z"
+    }
+
+    def unknown_worker(*args: object) -> dict[str, object]:
+        return {"state": "unknown"}
+
+    monkeypatch.setattr(controller, "_dsn", lambda: "synthetic-dsn")
+    monkeypatch.setattr(controller, "_verify_database", lambda: "stageflow_demo")
+    monkeypatch.setattr(controller, "_live_state", lambda: (kernel, workspace))
+    monkeypatch.setattr(controller, "worker_summary", unknown_worker)
+    output = tmp_path / "report.json"
+    arguments = [command]
+    if command == "rehearsal-report":
+        arguments.extend(["--output", str(output)])
+
+    assert controller.main(arguments) == 0
+    captured = capsys.readouterr()
+    assert captured.err == ""
+    payload = json.loads(
+        output.read_text(encoding="utf-8") if command == "rehearsal-report"
+        else captured.out
+    )
+    assert payload["schema_version"] == "stageflow-demo-rehearsal-report-v1"
+    assert payload["program"] == payload["devcon"]
+    assert payload["program"] == {
+        "cached_program_expectations": 2,
+        "current": 1,
+        "withdrawn": 1,
+        "provider": "local_file",
+        "last_successful_refresh": "2026-08-20T19:59:00Z",
+        "last_failure_code": None,
+        "status": "current",
+    }
+    if command == "rehearsal-report":
+        assert json.loads(captured.out) == {
+            "report_written": True,
+            "schema_version": "stageflow-demo-rehearsal-report-v1",
+        }
 
 
 class FakeDevconAdapter:
@@ -599,7 +657,8 @@ def test_summary_projects_bounded_automation_and_program_freshness() -> None:
     assert "private_path" not in automation
     assert "dsn" not in automation
     assert automation["state"] == "running"
-    assert summary["devcon"] == {
+    assert summary["program"] == summary["devcon"]
+    assert summary["program"] == {
         "cached_program_expectations": 1,
         "current": 1,
         "withdrawn": 0,
@@ -622,7 +681,8 @@ def test_summary_distinguishes_current_failure_from_retained_history(recovered: 
         ),
     }
     summary = summarize_demo_state(kernel, _workspace())
-    program = summary["devcon"]
+    program = summary["program"]
+    assert program == summary["devcon"]
     assert isinstance(program, dict)
     assert program["provider"] is None
     assert program["last_failure_code"] == "unexpected_cycle_failure"

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import os
 import re
 import shutil
 import subprocess
@@ -139,11 +141,76 @@ def test_status_surfaces_bounded_autonomy_program_and_worker_currentness() -> No
     assert '"Automation: $($automation.state) owner=$($automation.owner)"' in source
     assert '"Media reconciliation: cycles=$($automation.media_cycle_count)' in source
     assert '"Program refresh: cycles=$($automation.program_refresh_count)' in source
-    assert '"Program: current=$($payload.devcon.current) withdrawn=$($payload.devcon.withdrawn)' in source  # noqa: E501
+    assert '"Program: current=$($payload.program.current) withdrawn=$($payload.program.withdrawn)' in source  # noqa: E501
     assert 'current=$($payload.worker.current)' in source
     assert 'gpu_transcription=$($payload.worker.gpu_transcription)' in source
     assert 'failure_at=$($automation.media_last_failure_at)' in source
     assert 'failure_at=$($automation.program_last_failure_at)' in source
+
+
+@pytest.mark.skipif(
+    shutil.which("pwsh") is None and shutil.which("powershell.exe") is None,
+    reason="PowerShell is required to execute the launcher status function",
+)
+def test_status_reads_neutral_program_with_unchanged_displayed_text() -> None:
+    source = _source()
+    start = source.index("function Show-DemoStatus {")
+    end = source.index("\n}\n", start) + 2
+    status_function = source[start:end]
+    payload: dict[str, object] = {
+        "event": {"event_key": "example-event", "event_id": "event-id"},
+        "stage": {"stage_key": "main", "stage_id": "stage-id"},
+        "session": None,
+        "media": {
+            "registered": 5, "associated": 4, "stabilizing": 1,
+            "unresolved": 1, "conflicting": 0,
+        },
+        "operations": {"counts": {"succeeded": 2}, "terminal_failures": []},
+        "worker": {
+            "state": "available", "current": True, "available": 1,
+            "capacity": 1, "gpu_transcription": "ready",
+        },
+        "transcript_evidence": {"complete": 2, "count": 3},
+        "moments": {"count": 1},
+        "program": {
+            "current": 3, "withdrawn": 1, "status": "current",
+            "last_successful_refresh": "refresh-marker",
+            "cached_program_expectations": 4,
+        },
+        "devcon": {
+            "current": 99, "withdrawn": 99, "status": "legacy-unused",
+            "last_successful_refresh": "legacy-unused",
+            "cached_program_expectations": 99,
+        },
+    }
+    script = (
+        "$ErrorActionPreference = 'Stop'\n"
+        "function Import-RequiredSecret {}\n"
+        f"function Invoke-DemoPython {{ '{json.dumps(payload)}' }}\n"
+        + status_function + "\nShow-DemoStatus\n"
+    )
+    result = subprocess.run(
+        [shutil.which("pwsh") or "powershell.exe", "-NoProfile", "-NonInteractive",
+         "-Command", script],
+        capture_output=True, timeout=30, check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stderr == b""
+    assert result.stdout == os.linesep.encode().join([
+        b"STAGEFLOW DEMO STATUS",
+        b"Event: example-event [event-id]",
+        b"Stage: main [stage-id]",
+        b"Session: NONE",
+        b"Media: registered=5 associated=4 stabilizing=1 unresolved=1 conflicting=0",
+        b"Operations: succeeded=2",
+        b"Terminal failures: 0",
+        b"Worker: available current=True available=1 capacity=1 gpu_transcription=ready",
+        b"Transcription Evidence: complete=2 total=3 (evidence only)",
+        b"Moments: 1",
+        b"Program: current=3 withdrawn=1 status=current last=refresh-marker",
+        b"Program cached expectations: 4",
+        b"",
+    ])
 
 
 @pytest.mark.skipif(

@@ -103,17 +103,19 @@ new context and names every superseded ADR. Update this index and mark the older
 | [ADR-0030](ADR-0030-packaging-asset-identity.md) | Separate `PackagingAsset` aggregate owned by Assembly, distinct from Completed Media Asset | Accepted | ED-0076 implements Packaging Asset identity, immutable content revisions, and human approval lineage; ED-0077 implements Session Assembly templates, frozen proposals, validation, and human approval |
 | [ADR-0031](ADR-0031-white-label-identity-and-provider-neutral-program-sources.md) | White-label product identity; provider-neutral program-source port with a local schedule-file default; external publication frozen | Accepted | Implemented through ED-0079 and ED-0080; narrows ADR-0028's role |
 
-**ADR-0031 known residual:** Demo CLI preflight retains `devcon_read_available` and
-`devcon_program_items` (`backend/app/demo/cli.py:144`, `backend/app/demo/cli.py:145`),
-and the `devcon_read_not_configured` /
-`configured_devcon_program_empty` error codes outside adapters
-(`backend/app/demo/cli.py:105`, `backend/app/demo/cli.py:108`). The Demo rehearsal-report
-projection retains the `devcon` key (`backend/app/demo/controller.py:297`), consumed
-through `payload.devcon.*` reads in `scripts/demo/StageFlow-Demo.ps1:383` and
-`scripts/demo/StageFlow-Demo.ps1:384`. These names remain pending a follow-up directive
-covering both producer and launcher consumer; ED-0082 records the residual without renaming fields
-(`docs/plans/post-merge-documentation-reconciliation.md:78`,
-`docs/plans/post-merge-documentation-reconciliation.md:98`).
+**ADR-0031 Demo tooling residual resolved (ED-0084):** Demo CLI preflight emits
+`program_source_available` and `program_source_items`; `devcon_read_available` and
+`devcon_program_items` remain deprecated aliases with identical values
+([CLI](../../backend/app/demo/cli.py)). The status summary and rehearsal report emit
+`program`, retaining `devcon` as an identical deprecated alias with unchanged
+`schema_version` ([controller](../../backend/app/demo/controller.py)). The
+[launcher](../../scripts/demo/StageFlow-Demo.ps1) reads `payload.program.*` with
+unchanged displayed text. These aliases may be removed only after one release with
+the neutral names in place and no in-repository consumer reading the legacy names.
+Preflight error codes changed from `devcon_read_not_configured` to
+`program_source_not_configured` and from `configured_devcon_program_empty` to
+`configured_program_source_empty`; operators matching the old codes must update.
+HTTP API fields, stored data, and the legacy external-reference fallback are unchanged.
 
 ## Unresolved ADR candidates
 

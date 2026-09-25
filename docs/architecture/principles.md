@@ -158,17 +158,18 @@ ADRs, or the authoritative architecture-baseline disposition. “Accepted” doe
   provider attribution from data. External publication is frozen pending Delivery design,
   and the backend publish adapter remains dormant. Provider payloads and authority remain
   outside the Kernel; no provider SDK or generic publication workflow is present.
-- **Known residual:** Demo CLI preflight still emits legacy `devcon_read_available` and
-  `devcon_program_items` keys (`backend/app/demo/cli.py:144`,
-  `backend/app/demo/cli.py:145`) and the `devcon_read_not_configured` /
-  `configured_devcon_program_empty` error codes outside adapters
-  (`backend/app/demo/cli.py:105`, `backend/app/demo/cli.py:108`). The Demo rehearsal-report
-  projection retains the `devcon` key (`backend/app/demo/controller.py:297`), consumed
-  through `payload.devcon.*` reads in `scripts/demo/StageFlow-Demo.ps1:383` and
-  `scripts/demo/StageFlow-Demo.ps1:384`. These compatibility names remain pending a
-  follow-up directive covering both producer and launcher consumer; ED-0082 records the residual
-  without renaming fields (`docs/plans/post-merge-documentation-reconciliation.md:78`,
-  `docs/plans/post-merge-documentation-reconciliation.md:98`).
+- **Demo tooling residual resolved (ED-0084):** [Preflight](../../backend/app/demo/cli.py)
+  emits `program_source_available` and `program_source_items`, retaining
+  `devcon_read_available` and `devcon_program_items` as identical deprecated aliases.
+  Its error codes are `program_source_not_configured` and
+  `configured_program_source_empty`; operators matching the former
+  `devcon_read_not_configured` / `configured_devcon_program_empty` codes must update.
+  The [status summary and rehearsal report](../../backend/app/demo/controller.py)
+  emit `program`, with an identical deprecated `devcon` alias and unchanged
+  `schema_version`. The [launcher](../../scripts/demo/StageFlow-Demo.ps1) reads
+  `payload.program.*` with unchanged displayed text. Alias removal requires one release
+  with the neutral names in place and no in-repository consumer reading the legacy names.
+  HTTP API fields, stored data, and the legacy external-reference fallback are unchanged.
 - **Related decisions:** ADR-0004, ADR-0005, ADR-0011, ADR-0028, ADR-0031, ABR-017 disposition.
 
 ## 10. Operator visibility grows with operational capability

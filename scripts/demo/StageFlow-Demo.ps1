@@ -380,8 +380,8 @@ function Show-DemoStatus {
         "Transcription enqueue: total=$($automation.transcription_operations_enqueued) failures=$($automation.transcription_enqueue_failures)"
         "Program refresh: cycles=$($automation.program_refresh_count) last=$($automation.program_last_success_at) failure=$($automation.program_last_failure_code) failure_at=$($automation.program_last_failure_at)"
     }
-    "Program: current=$($payload.devcon.current) withdrawn=$($payload.devcon.withdrawn) status=$($payload.devcon.status) last=$($payload.devcon.last_successful_refresh)"
-    "Program cached expectations: $($payload.devcon.cached_program_expectations)"
+    "Program: current=$($payload.program.current) withdrawn=$($payload.program.withdrawn) status=$($payload.program.status) last=$($payload.program.last_successful_refresh)"
+    "Program cached expectations: $($payload.program.cached_program_expectations)"
 }
 
 try {
