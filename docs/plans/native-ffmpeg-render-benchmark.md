@@ -51,6 +51,12 @@ product priority, and render-fleet sizing depends on a real throughput number.
   results differ in pipeline, not FFmpeg version.
 - The Demo 2 recorded-block corpus used by ED-0073 remains available outside the
   repository.
+- **Corpus amendment (2026-09-25).** The owner selected the Demo 2 **dress-rehearsal**
+  corpus (recorded 2026-08-25) rather than the live-run folder, which had since acquired an
+  unrelated later recording. The dress corpus is five closed blocks — four full blocks plus
+  a short final block, roughly four minutes of footage. Because it differs from ED-0073's
+  eleven-block corpus, this plan adds a same-corpus PyAV baseline arm. The absolute path
+  stays out of the repository and is supplied to the implementer directly.
 
 ## Desired behavior
 
@@ -64,14 +70,18 @@ first-order input to render-fleet sizing.
   `subprocess` using an **explicit `--ffmpeg` executable path** argument — never a bare
   `ffmpeg` resolved from `PATH` — and that record the binary's version string, SHA-256, and
   whether its configuration contains `--enable-gpl`.
-- Native arms, all over the same Demo 2 corpus, video-only, at ED-0073's bitrate and GOP
-  settings for comparability:
+- Native arms, all over the same corpus, video-only, at ED-0073's bitrate and GOP settings
+  for comparability:
   1. **CPU decode → NVENC**, using the FFmpeg concat demuxer.
   2. **CUDA decode → NVENC**, with frames kept on the GPU (`-hwaccel cuda
      -hwaccel_output_format cuda`, GPU scaling only if needed).
   3. **Repeat** each of the above three times to report variance, not a single sample.
   4. **Concurrency**: arm 2 run while a real CUDA transcription job runs, reporting the
      actual overlap window.
+- **Same-corpus PyAV baseline:** re-run ED-0073's existing PyAV NVENC arm over the same
+  corpus, once, so native and PyAV throughput are compared like-for-like inside this run.
+  ED-0073's own numbers are cited as context only, because they come from a different
+  corpus.
 - Quality: SSIM and PSNR of each native output against the source blocks, using the
   existing ED-0073 measurement for comparability.
 - Optional **long-corpus arm** if the operator supplies a full-Session block folder:
@@ -157,8 +167,11 @@ quality. GPU samples, if captured, are diagnostic only.
 - [ ] Arms 1 and 2 are each measured three times over the Demo 2 corpus, with wall-clock
   time, real-time factor, frame count, output size, and SSIM/PSNR recorded.
 - [ ] The concurrency arm is measured with its actual overlap window reported.
-- [ ] The result compares native arms with ED-0073's PyAV arm and states whether the
-  native pipeline changes the throughput conclusion.
+- [ ] A same-corpus PyAV baseline is measured, and the result compares native arms with it,
+  citing ED-0073 as different-corpus context, and states whether the native pipeline changes
+  the throughput conclusion.
+- [ ] The result states the corpus's roughly four-minute length as a limitation for the
+  sustained-load and concurrency arms.
 - [ ] The result states which arms were executed inside and outside any sandbox.
 - [ ] No production code, repository dependency, schema, migration, or runtime
   configuration changed.
