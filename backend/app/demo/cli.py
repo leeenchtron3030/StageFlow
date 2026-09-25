@@ -102,10 +102,10 @@ def _preflight() -> int:
     if not source_available:
         raise RuntimeError("configured_media_source_unavailable")
     if components.program_source is None:
-        raise RuntimeError("devcon_read_not_configured")
+        raise RuntimeError("program_source_not_configured")
     fetched_count = components.program_source.probe()
     if fetched_count == 0:
-        raise RuntimeError("configured_devcon_program_empty")
+        raise RuntimeError("configured_program_source_empty")
     transcription = deployment.local_transcription
     if transcription is None:
         raise RuntimeError("local_transcription_not_configured")
@@ -141,6 +141,9 @@ def _preflight() -> int:
             "runtime_profile": deployment.runtime_profile.value,
             "database_available": True,
             "media_sources_available": True,
+            "program_source_available": True,
+            "program_source_items": fetched_count,
+            # Deprecated aliases retained for the operator-tooling transition.
             "devcon_read_available": True,
             "devcon_program_items": fetched_count,
             "transcription_provider": execution.provider_id,

@@ -294,7 +294,7 @@ def summarize_demo_state(
             )
         },
         "automation": bounded_automation,
-        "devcon": {
+        "program": {
             "cached_program_expectations": len(program_items),
             "current": sum(
                 item.get("lifecycle_state") == "current" for item in program_items
@@ -313,6 +313,8 @@ def summarize_demo_state(
         },
         "worker": dict(worker_summary or {"state": "unknown"}),
     }
+    # Deprecated alias retained for the operator-tooling transition.
+    report["devcon"] = report["program"]
     if selection is None:
         report.update(
             {
