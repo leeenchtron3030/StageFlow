@@ -902,6 +902,12 @@ function Assert-PackageReadyPreconditions {
     }
 }
 
+# Operator checkpoints contain non-ASCII text (for example an em dash). Windows consoles and
+# redirected output otherwise use the OEM code page, which degrades those characters, so
+# emit UTF-8 explicitly for this run and restore the caller's encoding afterwards.
+$script:PreviousOutputEncoding = [Console]::OutputEncoding
+[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
+
 try {
     $repositoryRoot = Get-NormalizedFullPath (Join-Path $PSScriptRoot "..\..")
     $runnerPath = Join-Path $repositoryRoot "backend\tests\qualification\real_event_playback.py"
@@ -1159,4 +1165,7 @@ catch {
 }
 finally {
     Exit-RunOperationLock
+    if ($null -ne $script:PreviousOutputEncoding) {
+        [Console]::OutputEncoding = $script:PreviousOutputEncoding
+    }
 }
