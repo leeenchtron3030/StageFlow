@@ -138,3 +138,4 @@ or architecture document unless those documents are explicitly updated.
 | [Native FFmpeg render benchmark](native-ffmpeg-render-benchmark.md) | Completed - Green native FFmpeg render benchmark | StageFlow Validation / Backend | ED-0073 follow-up; ADR-0029; ED-0078 |
 | [Provider-neutral program source](provider-neutral-program-source.md) | Completed - Green provider-neutral program source | StageFlow Integration / Backend | ADR-0031; ED-0079 |
 | [White-label presentation pass](white-label-presentation-pass.md) | Completed - Green white-label presentation pass | StageFlow Frontend / Operations | ADR-0031; ED-0080 |
+| [Demo 2 generalization and remaining-criteria rehearsal](demo2-generalization.md) | Approved | StageFlow Demo Operations / Backend | ADR-0031; ED-0071 criteria 4, 6, 7; ED-0063; ED-0079; ED-0081 |
