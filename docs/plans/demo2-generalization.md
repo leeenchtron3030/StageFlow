@@ -2,7 +2,10 @@
 
 ## Status
 
-Approved
+Completed (2026-09-25). Implemented on draft PR #71 and rehearsed on the reference host.
+ED-0071 criteria 4, 6, and 7 qualified; the PostgreSQL-outage leg was not exercised live.
+Merging PR #71 awaits the owner's explicit approval. See
+[Run 002](../validation/results/demo2-hardware-rehearsal-002.md) and the completion record.
 
 ## Execution authority
 
@@ -349,37 +352,39 @@ kind and exception type. No media path or transcript text appears in logs or res
 
 ## Acceptance criteria
 
-- [ ] `main` is merged into PR #71's branch without a force push; the seven conflicts are
+- [x] `main` is merged into PR #71's branch without a force push; the seven conflicts are
   resolved in favor of `main`'s white-label and publication-freeze decisions.
-- [ ] `main`'s `demo2-hardware-rehearsal-001.md` is unchanged. The three branch records
+- [x] `main`'s `demo2-hardware-rehearsal-001.md` is unchanged. The three branch records
   appear under dated names with unchanged content and working links.
-- [ ] Demo 2 code uses `program_source` / `sync_program()` and
+- [x] Demo 2 code uses `program_source` / `sync_program()` and
   `ProgramSourceUnavailableError`. No Demo 2 code path references the Devcon aliases or
   Devcon errors.
-- [ ] The Demo 2 example uses a local schedule and placeholder identities, and the
+- [x] The Demo 2 example uses a local schedule and placeholder identities, and the
   white-label guard covers it.
-- [ ] After a catch-all failure, a successful cycle returns the coordinator to `running`,
+- [x] After a catch-all failure, a successful cycle returns the coordinator to `running`,
   with the last failure code and time still visible. This is tested.
-- [ ] The fault hook is default-off, rejected outside rehearsal mode, and one-shot. This
+- [x] The fault hook is default-off, rejected outside rehearsal mode, and one-shot. This
   is tested.
-- [ ] `main`'s Python Devcon aliases are removed, and `[devcon_read]` configuration still
+- [x] `main`'s Python Devcon aliases are removed, and `[devcon_read]` configuration still
   loads.
-- [ ] The full backend and frontend checks pass on the host, apart from documented
+- [x] The full backend and frontend checks pass on the host, apart from documented
   pre-existing failures.
-- [ ] Criterion 4: the worker projection autonomously reflects real GPU readiness,
+- [x] Criterion 4: the worker projection autonomously reflects real GPU readiness,
   capacity, and availability, including a worker stop and restart.
-- [ ] Criterion 6: the fault hook produces `degraded` with `unexpected_cycle_failure`,
-  cycles continue, and the state recovers. A PostgreSQL outage produces `degraded` with
-  `postgresql_unavailable`, and the state recovers.
-- [ ] Criterion 7: a restart of the launcher-owned stack reconstructs coordinator
+- [x] Criterion 6: the fault hook produces `degraded` with `unexpected_cycle_failure`,
+  cycles continue, and the state recovers.
+- [ ] *Not exercised live (owner skipped; needs an elevated shell):* a PostgreSQL outage
+  produces `degraded` with `postgresql_unavailable`, and the state recovers. Covered by a
+  unit test only.
+- [x] Criterion 7: a restart of the launcher-owned stack reconstructs coordinator
   ownership, Session, media, and package state, and the worker projection from durable
   state.
-- [ ] `demo2-hardware-rehearsal-002.md` records each criterion honestly as qualified or
+- [x] `demo2-hardware-rehearsal-002.md` records each criterion honestly as qualified or
   not. It states that the run was single-host and offline, and that it is not Event
   certification.
-- [ ] No schema, migration, dependency, publication, or association-semantic change. No
+- [x] No schema, migration, dependency, publication, or association-semantic change. No
   external provider API was called.
-- [ ] PR #71 is not merged without the owner's explicit approval.
+- [x] PR #71 is not merged without the owner's explicit approval.
 
 ## Rollback or reversal
 
@@ -399,11 +404,73 @@ kind and exception type. No media path or transcript text appears in logs or res
 
 ## Completion record
 
-- Implemented revision:
-- Files and migrations actually changed:
-- Commands and tests actually run:
-- Results and warnings:
-- Execution authority used:
-- Approved deviations:
-- Rollback status:
-- Remaining work:
+- **Implemented revision:** PR #71 branch `codex/demo2-autonomous-event-node`. Commits:
+  - merge commit `9d63290`, with parents `1433bea` (branch) and `34a804e` (`main`);
+  - launcher fix `f48087f`;
+  - the result and status commit that records this completion.
+
+  Nothing was force-pushed.
+- **Files and migrations actually changed:**
+  - The 7 conflicts were resolved in favour of `main`.
+  - `backend/app/demo/autonomous.py`: neutral source and error, per-kind degraded
+    recovery under the state lock, and the one-shot `rehearsal_fault_media_cycle`.
+  - `backend/app/core/config/deployment.py`: the rehearsal-only validation.
+  - `backend/app/bootstrap/event_mode_kernel.py`: the aliases were removed.
+  - The white-labelled Demo 2 example and its guard; `backend/tests/qualification/block_replay.py`
+    and its tests; Demo 2, provider-neutral, and white-label tests; the frontend recovery
+    projection.
+  - The PowerShell 7.3 launcher requirement: `scripts/demo/Start-StageFlowDemo.ps1`,
+    `scripts/demo/README.md`, and a test.
+  - The three branch rehearsal records were moved byte-identical to
+    `demo2-branch-rehearsal-*`; `main`'s Run 001 is unchanged.
+  - Documentation: the result, indexes, and architecture and glossary wording.
+  - No repository migration was added. On the local Demo database, `main`'s accepted
+    migrations `0011`-`0013` were applied in place after a verified full backup, by owner
+    decision. The ledger gained 3 rows, 13 empty tables were created, and all 33,211
+    existing data rows were preserved.
+- **Commands and tests actually run:**
+  - Codex, in the sandbox: focused suites, Ruff, Pyright, frontend typecheck and lint.
+  - Independent `directive-reviewer`: ESCALATE (ED-0072 numbering) plus three Green fixes.
+    After the owner's decision and the fixes, it re-reviewed and returned APPROVE.
+  - Host, on the committed merge: `uv run --no-sync pytest`, 2,117 passed, 4 failed,
+    2 skipped. The 4 failures are the known Windows console-encoding cases in
+    `test_validation_controller.py`. Frontend `npm run test` 60/60, `build`, `lint`, and
+    `typecheck` passed.
+  - After the launcher fix: the controller-script and white-label suites passed. The new
+    PowerShell test fails without the guard.
+  - The rehearsal is recorded in [Run 002](../validation/results/demo2-hardware-rehearsal-002.md).
+- **Results and warnings:** criteria 4, 6, and 7 qualified; Demo 2 is promotion-qualified.
+  Warnings:
+  - legacy `devcon_*` field names remain in the preflight and status output;
+  - `status` mixes time zones;
+  - stale fault kinds survive outer-loop recovery by design.
+- **Execution authority used:** Green, with the owner decisions recorded above, plus the
+  owner's 2026-09-25 decisions to:
+  - apply migrations in place;
+  - install PowerShell 7 with winget;
+  - skip the PostgreSQL outage.
+- **Approved deviations:**
+  1. The merge resolution and the generalization overlap in the same files, so they landed
+     as one merge commit rather than two.
+  2. The worker was stopped through a full launcher stop, because the launcher treats any
+     child exit as fatal.
+  3. The PostgreSQL-outage leg of criterion 6 was not exercised live.
+  4. The fault setting stayed enabled across the criterion 7 restart. It fired again after
+     the reconstruction checks; that let the 1-second poller capture `degraded` live, and
+     it did not affect durable state.
+  5. The launcher PowerShell requirement (`f48087f`) is a directly blocking Green
+     correction outside the listed files.
+  6. **Branch-local ED-0072 numbering.** On the branch, "ED-0072" named the Demo 2 Database
+     Compatibility Upgrade and Write-Bearing Rehearsal, which collides with `main`'s ED-0072
+     (Editorial Review Foundation). The ED-number owner decided not to assign a new number.
+     The historical plan carries a dated note, and the index references read "branch-local
+     ED-0072 (superseded numbering; see ED-0081)". `main`'s ED-0072 row is unchanged.
+- **Rollback status:**
+  - Nothing is merged to `main`.
+  - The Demo database can be restored from the pre-ED-0081 backup, or reversed with the
+    `0013`-`0011` reverse scripts.
+  - PowerShell 7 can be removed with `winget uninstall Microsoft.PowerShell`.
+- **Remaining work:**
+  - the owner's review and explicit approval to merge PR #71;
+  - optionally, a live PostgreSQL-outage exercise;
+  - a later white-label alias for the legacy `devcon_*` status field names.
