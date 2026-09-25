@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved
+Completed (2026-09-25). See the [result](../validation/results/render-benchmark-003.md).
 
 ## Execution authority
 
@@ -161,16 +161,16 @@ and the real-GPU run by the owner.
 
 ## Acceptance criteria
 
-- [ ] `native-parallel` exists with bounded `--parallelism` and `--repetitions`, reusing the
+- [x] `native-parallel` exists with bounded `--parallelism` and `--repetitions`, reusing the
   ED-0078 identity, GPL refusal, and fallback guard. Earlier arms and reports are unchanged.
-- [ ] Per-encode and aggregate timing, speed, efficiency, and variance are reported for each
+- [x] Per-encode and aggregate timing, speed, efficiency, and variance are reported for each
   N.
-- [ ] Session refusal is recorded as `nvenc_session_unavailable`, and the arm continues.
-- [ ] Outputs are hash-verified against the N = 1 reference, with SSIM only on mismatch.
+- [x] Session refusal is recorded as `nvenc_session_unavailable`, and the arm continues.
+- [x] Outputs are hash-verified against the N = 1 reference, with SSIM only on mismatch.
   Discarding covers only verified, self-written outputs.
-- [ ] Focused tests pass without a GPU; Ruff, Pyright, and the full backend suite pass on
+- [x] Focused tests pass without a GPU; Ruff, Pyright, and the full backend suite pass on
   the host.
-- [ ] The host run covers N = 1..4 × 2 over the ED-0078 corpus (same fingerprint), and
+- [x] The host run covers N = 1..4 × 2 over the ED-0078 corpus (same fingerprint), and
   `render-benchmark-003.md` reports every run, including refusals and outliers, as
   first-order sizing input.
 
@@ -185,4 +185,29 @@ Remove the arm, its tests, and the result.
 
 ## Completion record
 
-_(Filled in on completion.)_
+- **Implemented revision:** branch `codex/ed-0085-multi-encode-render-benchmark`, harness
+  commit `c686fd0` plus the result and records commit. Codex built the harness in the
+  sandbox, and the owner committed it.
+- **Files changed:** `backend/tests/qualification/render_benchmark.py`,
+  `backend/tests/qualification/test_render_benchmark.py`, the result
+  `render-benchmark-003.md`, and the index and plan rows. No production code,
+  dependency, schema, migration, or configuration change.
+- **Review:**
+  - The `directive-reviewer` first returned FIX-FIRST because
+    `--discard-verified-outputs` could delete the reference output.
+  - Fixed: the reference is kept and marked `is_reference`, specific `BenchmarkError`
+    codes are preserved, and the barrier has a 60 s timeout.
+  - The re-review returned APPROVE, with 124 focused tests passing.
+- **Host checks:**
+  - A real-FFmpeg smoke test on synthetic clips, for N = 1..3.
+  - The full host suite: **2,169 passed, 2 skipped, 1 failed**. The failure was the
+    known intermittent `test_devcon_session_publish.py` local-HTTP case, which passed when
+    rerun in isolation. Ruff and Pyright were clean.
+- **Measurement (owner, reference host, outside any sandbox):** N = 1..4 × 2 over the
+  ED-0078 corpus, with the same fingerprint.
+  - All 20 encodes succeeded, and all outputs were byte-identical to the reference.
+  - Aggregate speed was flat at about 13.6× real time, with NVENC saturated at 99.6%.
+  - No session was refused up to N = 4.
+- **Deviations:** none.
+- **Remaining work:** none for this plan. The finding feeds the render Durable Operation
+  plan: one render lease per GPU gives the lowest latency at the same total throughput.
