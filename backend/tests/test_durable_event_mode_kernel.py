@@ -170,8 +170,8 @@ def test_versioned_configuration_resolves_secret_and_redacts_it(tmp_path: Path) 
     path.write_text(
         """
 schema_version = "1.0"
-deployment_id = "razer-reference"
-node_id = "node-razer"
+deployment_id = "example-reference"
+node_id = "node-example"
 node_role = "node"
 event_mode = "event"
 network_policy = "local_only"
@@ -213,17 +213,16 @@ def test_demo_single_stage_profile_is_explicit_and_bounded(tmp_path: Path) -> No
     path.write_text(
         """
 schema_version = "1.0"
-deployment_id = "razer-demo"
-node_id = "razer-node"
+deployment_id = "example-demo"
+node_id = "example-node"
 runtime_profile = "demo-single-stage"
 node_role = "node"
 event_mode = "rehearsal"
 network_policy = "optional"
 postgres_dsn_secret_ref = "STAGEFLOW_KERNEL_DSN"
-schedule_source_reference = "https://api.devcon.org"
-[devcon_read]
-event_id = "test-devcon-8"
-room_id = "stage-1"
+schedule_source_reference = "C:/StageFlowDemo/local-schedule.json"
+[local_schedule]
+path = "C:/StageFlowDemo/local-schedule.json"
 [local_transcription]
 model_version = "0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf"
 model_path = "C:/StageFlowDemo/models/faster-whisper-large-v3-turbo"
@@ -248,9 +247,9 @@ path = "C:/StageFlowDemo/recordings"
     assert effective.deployment.runtime_profile.value == "demo-single-stage"
     assert len(effective.deployment.event.stages) == 1
     assert effective.deployment.network_policy.value == "optional"
-    assert effective.deployment.devcon_read is not None
-    assert effective.deployment.devcon_read.event_id == "test-devcon-8"
-    assert effective.deployment.devcon_read.room_id == "stage-1"
+    assert effective.deployment.local_schedule is not None
+    assert effective.deployment.local_schedule.path == "C:/StageFlowDemo/local-schedule.json"
+    assert effective.deployment.devcon_read is None
     assert effective.deployment.local_transcription is not None
     assert effective.deployment.local_transcription.provider == "faster-whisper"
     assert effective.deployment.local_transcription.device == "cuda"
@@ -277,8 +276,8 @@ def test_demo_single_stage_profile_rejects_incoherent_topology(
     path.write_text(
         f"""
 schema_version = "1.0"
-deployment_id = "razer-demo"
-node_id = "razer-node"
+deployment_id = "example-demo"
+node_id = "example-node"
 runtime_profile = "demo-single-stage"
 node_role = "node"
 network_policy = "{network_policy}"

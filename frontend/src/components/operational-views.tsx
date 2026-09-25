@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { programProviderDisplayName } from "@/experience/program-provider.ts";
 
 import type {
   EditorialCandidateView,
@@ -362,7 +363,7 @@ export function StageOperationalView({
         <SessionContext label="Previous" session={stage.previousSession} />
         <SessionContext label="Current" session={stage.currentSession} />
         <div className="context-column">
-          <span className="eyebrow">Next · external{stage.nextExpectationProvider ? ` · ${stage.nextExpectationProvider}` : ""}</span>
+          <span className="eyebrow">Next · external{stage.nextExpectationProvider ? ` · ${programProviderDisplayName(stage.nextExpectationProvider)}` : ""}</span>
           <strong>{stage.nextExpectation ?? "Not reported"}</strong>
           {stage.nextExpectationSpeakers?.length ? <span>{stage.nextExpectationSpeakers.join(" · ")}</span> : null}
           {stage.nextExpectationPlannedStart ? (

@@ -8,23 +8,27 @@ Runs the guarded StageFlow Demo hardware-rehearsal lifecycle.
 .EXAMPLE
 .\scripts\demo\StageFlow-Demo.ps1 start
 
-.EXAMPLE
-.\scripts\demo\StageFlow-Demo.ps1 publish-devcon
+.PARAMETER Action
+Supported actions: prepare, start, status, diagnose, stop, rehearsal-report.
 #>
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true, Position = 0)]
-    [ValidateSet(
-        "prepare", "start", "status", "diagnose", "stop",
-        "rehearsal-report", "publish-devcon"
-    )]
+    [ValidateScript({
+        if ($_ -eq "publish-devcon") {
+            throw "External publication is frozen under ADR-0031; awaiting Delivery design. No network call was made."
+        }
+        if ($_ -notin @("prepare", "start", "status", "diagnose", "stop", "rehearsal-report")) {
+            throw "Unsupported action. Use prepare, start, status, diagnose, stop, or rehearsal-report."
+        }
+        return $true
+    })]
     [string]$Action,
     [string]$ConfigPath,
     [string]$CudaRuntimePath,
     [guid]$OperatorId,
     [string]$ProducerAddress,
-    [string]$ReportPath,
-    [switch]$ConfirmHumanAuthority
+    [string]$ReportPath
 )
 
 $ErrorActionPreference = "Stop"
@@ -296,7 +300,7 @@ function Start-DemoStack {
                 $output = Get-Content -LiteralPath $script:StdoutPath -Raw -Encoding UTF8
                 $ready = [regex]::Match(
                     $output,
-                    'StageFlow Demo 1 is ready at (http://[^/\s]+:\d+/)'
+                    'StageFlow is ready at (http://[^/\s]+:\d+/)'
                 )
                 if ($ready.Success) {
                     $state.status = "ready"
@@ -366,92 +370,43 @@ function Show-DemoStatus {
     "Worker: $($payload.worker.state) available=$($payload.worker.available)"
     "Transcription Evidence: complete=$($payload.transcript_evidence.complete) total=$($payload.transcript_evidence.count) (evidence only)"
     "Moments: $($payload.moments.count)"
-    "Devcon cached expectations: $($payload.devcon.cached_program_expectations)"
+    "Program cached expectations: $($payload.devcon.cached_program_expectations)"
 }
 
-function Publish-Devcon {
-    $apiKey = Get-ProcessOrUserValue "STAGEFLOW_DEMO_DEVCON_API_KEY"
-    if (-not [string]::IsNullOrWhiteSpace($apiKey)) {
-        $env:STAGEFLOW_DEMO_DEVCON_API_KEY = $apiKey
-    }
-    $preview = Invoke-DemoPython -Arguments @("publish-preview") -Capture |
-        ConvertFrom-Json
-    "DEVCON PUBLISH"
-    ""
-    "Event:"
-    $preview.event
-    ""
-    "Target session:"
-    $preview.target_session
-    ""
-    "Fields:"
-    @($preview.fields) | ForEach-Object { $_ }
-    ""
-    "Remote identity verified: $(if ($preview.remote_identity_verified) { 'YES' } else { 'NO' })"
-    "Package approved: $(if ($preview.package_approved) { 'YES' } else { 'NO' })"
-    "Credential available: $(if ($preview.credential_available) { 'YES' } else { 'NO' })"
-    if (-not $preview.credential_available) {
-        throw "required_secret_unavailable: STAGEFLOW_DEMO_DEVCON_API_KEY (presence only)"
-    }
-    $confirmed = $ConfirmHumanAuthority.IsPresent
-    if (-not $confirmed) {
-        $answer = Read-Host "Publish this StageFlow enrichment to Devcon? [y/N]"
-        $confirmed = $answer -in @("y", "Y", "yes", "YES", "Yes")
-    }
-    if (-not $confirmed) {
-        "Devcon publish cancelled; no PUT was sent."
-        return
-    }
-    $result = Invoke-DemoPython -Arguments @(
-        "publish", "--expected-digest", [string]$preview.candidate_digest, "--confirmed"
-    ) -Capture | ConvertFrom-Json
-    "Devcon write accepted: $(if ($result.write_accepted) { 'YES' } else { 'NO' })"
-    "Devcon durable Git persistence verified: $(if ($result.durable_persistence_verified) { 'YES' } else { 'NO' })"
-    "Devcon public API convergence: $([string]$result.public_api_state)"
-    "Devcon publication status: $([string]$result.publication_status)"
+if ($Action -eq "stop") {
+    Stop-DemoStack
+    exit 0
 }
-
-$configuration = $null
-try {
-    if ($Action -eq "stop") {
-        Stop-DemoStack
-        exit 0
+$configuration = Initialize-DemoEnvironment
+switch ($Action) {
+    "prepare" {
+        Invoke-WithCudaRuntime -RuntimePath $configuration.CudaRuntimePath -Operation {
+            Invoke-DemoPython -Arguments @("prepare")
+        }
     }
-    $configuration = Initialize-DemoEnvironment
-    switch ($Action) {
-        "prepare" {
-            Invoke-WithCudaRuntime -RuntimePath $configuration.CudaRuntimePath -Operation {
-                Invoke-DemoPython -Arguments @("prepare")
+    "start" { Start-DemoStack $configuration }
+    "status" { Show-DemoStatus }
+    "diagnose" {
+        Invoke-DemoPython -Arguments @("verify-database") | Out-Null
+        Invoke-WithCudaRuntime -RuntimePath $configuration.CudaRuntimePath -Operation {
+            Push-Location $script:BackendRoot
+            try {
+                $uv = Resolve-UvCommand
+                & $uv run --group transcription python -m app.demo.cli preflight
+                if ($LASTEXITCODE -ne 0) { throw "demo_diagnose_preflight_failed" }
             }
+            finally { Pop-Location }
         }
-        "start" { Start-DemoStack $configuration }
-        "status" { Show-DemoStatus }
-        "diagnose" {
-            Invoke-DemoPython -Arguments @("verify-database") | Out-Null
-            Invoke-WithCudaRuntime -RuntimePath $configuration.CudaRuntimePath -Operation {
-                Push-Location $script:BackendRoot
-                try {
-                    $uv = Resolve-UvCommand
-                    & $uv run --group transcription python -m app.demo.cli preflight
-                    if ($LASTEXITCODE -ne 0) { throw "demo_diagnose_preflight_failed" }
-                }
-                finally { Pop-Location }
-            }
-            "Demo diagnosis passed: config present, Demo database verified, CUDA inference available, Devcon GET available."
-        }
-        "rehearsal-report" {
-            if ([string]::IsNullOrWhiteSpace($ReportPath)) {
-                New-Item -ItemType Directory -Path $script:StateRoot -Force | Out-Null
-                $ReportPath = Join-Path $script:StateRoot (
-                    "rehearsal-report-{0}.json" -f [DateTimeOffset]::UtcNow.ToString("yyyyMMdd-HHmmss")
-                )
-            }
-            Invoke-DemoPython -Arguments @("rehearsal-report", "--output", $ReportPath) | Out-Null
-            "Sanitized rehearsal report written."
-        }
-        "publish-devcon" { Publish-Devcon }
+        "Demo diagnosis passed: config present, Demo database verified, CUDA inference available, program source available."
     }
-}
-finally {
-    $env:STAGEFLOW_DEMO_DEVCON_API_KEY = $null
+    "rehearsal-report" {
+        if ([string]::IsNullOrWhiteSpace($ReportPath)) {
+            New-Item -ItemType Directory -Path $script:StateRoot -Force | Out-Null
+            $ReportPath = Join-Path $script:StateRoot (
+                "rehearsal-report-{0}.json" -f [DateTimeOffset]::UtcNow.ToString("yyyyMMdd-HHmmss")
+            )
+        }
+        Invoke-DemoPython -Arguments @("rehearsal-report", "--output", $ReportPath) | Out-Null
+        "Sanitized rehearsal report written."
+    }
 }

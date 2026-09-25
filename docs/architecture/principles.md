@@ -152,12 +152,13 @@ ADRs, or the authoritative architecture-baseline disposition. “Accepted” doe
   report source facts; provider payloads do not become core models.
 - **Non-goals:** Implementing placeholder integrations, hard-coding a conference, or
   rejecting all external services.
-- **Current alignment:** **Aligned for the bounded Devcon integration.** A configured
-  public-program adapter reconciles External Program Expectations, and a separate guarded
-  Demo controller can perform one explicitly human-confirmed transcript/duration
-  enrichment write. Devcon payloads and authority remain outside the Kernel; no provider
-  SDK or generic publication workflow is present.
-- **Related decisions:** ADR-0004, ADR-0005, ADR-0011, ADR-0028, ABR-017 disposition.
+- **Current alignment:** **Aligned for bounded program sources.** The offline local
+  schedule file is the default; Devcon is one optional read adapter. Both reconcile
+  External Program Expectations behind the provider-neutral port. Operator labels use
+  provider attribution from data. External publication is frozen pending Delivery design,
+  and the backend publish adapter remains dormant. Provider payloads and authority remain
+  outside the Kernel; no provider SDK or generic publication workflow is present.
+- **Related decisions:** ADR-0004, ADR-0005, ADR-0011, ADR-0028, ADR-0031, ABR-017 disposition.
 
 ## 10. Operator visibility grows with operational capability
 

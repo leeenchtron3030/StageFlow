@@ -12,7 +12,7 @@ test("manual Program refresh is a launch-protected local POST with no body", asy
     launchContext,
     fetcher: (async (input: RequestInfo | URL, init?: RequestInit) => {
       request = { input: input.toString(), init };
-      return Response.json({ provider: "devcon", observed: 4 });
+      return Response.json({ provider: "local_file", observed: 4 });
     }) as typeof fetch,
   });
 

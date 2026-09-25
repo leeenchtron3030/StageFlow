@@ -171,7 +171,7 @@ try {
         & $uv run --group transcription python -m app.demo.cli bootstrap
         if ($LASTEXITCODE -ne 0) { throw "Demo bootstrap failed." }
         & $uv run --group transcription python -m app.demo.cli sync-program
-        if ($LASTEXITCODE -ne 0) { throw "Devcon program synchronization failed." }
+        if ($LASTEXITCODE -ne 0) { throw "Program synchronization failed." }
     }
     finally {
         Pop-Location
@@ -213,10 +213,10 @@ try {
     Wait-HttpReady "http://127.0.0.1:$BackendPort/api/v1/health" "Backend"
     Wait-HttpReady "http://${producerIp}:$FrontendPort/" "Producer UI"
 
-    Write-Host "StageFlow Demo 1 is ready at http://${producerIp}:$FrontendPort/"
+    Write-Host "StageFlow is ready at http://${producerIp}:$FrontendPort/"
     Write-Host "Profile: demo-single-stage (not Event-readiness certified)"
     Write-Host "Backend: loopback only; PostgreSQL is not exposed by this launcher."
-    Write-Host "Devcon program: cached locally after the successful startup sync."
+    Write-Host "Program: cached locally after the successful startup sync."
     Write-Host "Press Ctrl+C to stop only the processes owned by this launcher."
 
     while ($true) {
