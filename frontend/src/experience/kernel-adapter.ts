@@ -600,18 +600,18 @@ function infrastructure(payload: KernelStatusPayload): InfrastructureItemView[] 
   if (demo) {
     items.push(
       {
-        id: "devcon-read",
-        label: "Devcon program read",
+        id: "program-read",
+        label: "Program read",
         health: programCount > 0 ? "ready" : "unknown",
         state: `${programCount} cached Program Expectations`,
         impact: "Read-only external evidence; cached data does not create Session authority.",
       },
       {
-        id: "devcon-write",
-        label: "Devcon publication",
+        id: "publication",
+        label: "Publication",
         health: "unknown",
-        state: "Disabled",
-        impact: "No Devcon write capability is exposed; the upstream durability gate remains unqualified.",
+        state: "Frozen — awaiting Delivery design",
+        impact: "External publication is frozen under ADR-0031.",
       },
     );
   }

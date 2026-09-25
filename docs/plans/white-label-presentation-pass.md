@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved — sequenced after ED-0079
+Completed — Green implementation; sandbox validation limits recorded below
 
 ## Execution authority
 
@@ -11,7 +11,7 @@ Approved — sequenced after ED-0079
   (Accepted 2026-09-24), decisions 1 and 5: no event, organizer, provider, or venue
   identity in operator-facing strings or default examples and fixtures; external
   publication frozen and removed from operator-facing workflow and documentation.
-- Implementation-ready: Yes, once ED-0079 has landed. This plan relies on ED-0079's
+- Implementation-ready: Yes; ED-0079 has landed. This plan relies on ED-0079's
   provider identifier on program-source results and its `[local_schedule]` configuration
   section. Use their names **as implemented** by ED-0079, not as guessed here.
 - Required escalation or approval, if any: none. Stop and escalate if the work appears to
@@ -141,19 +141,19 @@ Not applicable beyond the neutral status labels.
 
 ## Acceptance criteria
 
-- [ ] No hardcoded provider or event name remains in operator-facing frontend strings,
+- [x] No hardcoded provider or event name remains in operator-facing frontend strings,
   outside the provider display-name mapping.
-- [ ] Program data is labelled by its provider identifier.
-- [ ] Status items use neutral ids and labels; publication shows as frozen with no action.
-- [ ] Launcher output and readiness detection are neutral and still work.
-- [ ] `publish-devcon` is removed from the documented action set and refuses with a clear
+- [x] Program data is labelled by its provider identifier.
+- [x] Status items use neutral ids and labels; publication shows as frozen with no action.
+- [x] Launcher output and readiness detection are neutral and still work.
+- [x] `publish-devcon` is removed from the documented action set and refuses with a clear
   ADR-0031 message, making no network call.
-- [ ] The example configuration uses placeholder identities and the local schedule
+- [x] The example configuration uses placeholder identities and the local schedule
   source by default.
-- [ ] Fixtures outside Devcon-adapter tests use neutral placeholders.
-- [ ] A white-label guard test prevents regression.
-- [ ] Historical documents, backend adapter code, API fields, and storage are unchanged.
-- [ ] Frontend and backend checks pass, apart from known environmental failures.
+- [x] Fixtures outside Devcon-adapter tests use neutral placeholders.
+- [x] A white-label guard test prevents regression.
+- [x] Historical documents, backend adapter code, API fields, and storage are unchanged.
+- [x] Frontend and backend checks pass, apart from known environmental failures.
 
 ## Rollback or reversal
 
@@ -165,4 +165,101 @@ Presentation, tooling, examples, and fixtures only; directly revertible.
 
 ## Completion record
 
-_(To be filled in by whoever implements this plan.)_
+Implemented as uncommitted changes on `codex/ed-0080-white-label-presentation-pass`
+for owner review. ED-0079 was verified present before implementation. No new decision,
+external service, dependency, or authority change was required.
+
+### Delivered scope
+
+- Added `frontend/src/experience/program-provider.ts`: `local_file` displays as
+  "Local schedule", `devcon` as "Devcon", unknown identifiers remain unchanged, and
+  missing attribution displays as unknown. Both Demo controls and the Stage's next
+  expectation use this mapping. Refresh results use their own returned provider.
+- Neutralized Program/Publication status ids and labels; publication reports
+  "Frozen — awaiting Delivery design" with no action. Frontend changes are presentation
+  only; API field names and authority behavior are unchanged.
+- Changed both launcher readiness emission and controller detection together. Removed
+  publication help, implementation, credential import, and confirmation option from the
+  PowerShell controller. The retired action refuses during parameter validation with an
+  ADR-0031 message before configuration, process launch, or network work.
+- Updated the example configuration to placeholder Event/deployment/node identities and
+  `[local_schedule]`, aligned with the existing example JSON. `[devcon_read]` appears only
+  as a commented optional alternative. No deployed runtime configuration was modified.
+- Neutralized general frontend fixtures and backend refresh API / Kernel configuration
+  fixtures. Devcon adapter/synchronizer tests, explicit legacy compatibility tests, and
+  provider-exclusion assertions retain their specific coverage.
+- Updated root and Demo READMEs, current architecture principles/system context/glossary,
+  and the ED-0080 plan/directive index entries. Historical plans, reviews, validation
+  results, ADRs, migration `0009`, backend application/adapters, and storage are unchanged.
+- Added `backend/tests/test_white_label_presentation.py` and the frontend
+  `white-label.test.ts`, registered in `package.json`. Tests exercise refusal with blocked
+  network/process commands, both PowerShell AST parses, readiness URL matching, example
+  identity alignment, real component rendering, mapping fallbacks, and a recursive guard
+  over components/routes plus the Kernel presentation adapter. Updated existing script
+  contract and frontend projection tests. No dependency or lockfile changed.
+
+### Validation evidence
+
+All test processes cleared inherited `STAGEFLOW_API_SHARED_SECRET`. Backend pytest used
+`TMP` and `TEMP` at `C:\Dev\StageFlow-codex\.codex-tmp`; uv always used `--no-sync`.
+The inherited `VIRTUAL_ENV` was cleared so only this worktree's `.venv` was selected.
+Default uv cache access failed, so `UV_CACHE_DIR` (and Ruff's cache) was placed under
+`.codex-tmp`. The directory is retained for owner cleanup as instructed, with a local
+ignore file for generated contents. No git metadata writes, install/sync, external
+publication, deployment, or history changes occurred.
+
+| Check actually run | Observed result |
+| --- | --- |
+| `uv run --no-sync pytest tests/test_white_label_presentation.py` (with relocated pytest cache on retry) | 6 passed, 0 failed/skipped; 1 cache warning. Includes 2 successful AST parses and 2 successful refusal cases. Initial attempt could not initialize uv cache; first executing attempt had 4 passed / 2 failures because host policy prohibited `.ps1` file execution. The test now invokes the parsed script in memory without changing execution policy. |
+| `uv run --no-sync pytest -o cache_dir=../.codex-tmp/pytest-cache` | 1,742 passed, 1 failed, 1 skipped, 178 setup errors, 3 warnings. |
+| Same full suite with `--tb=line -r fs` for diagnosis | 1,743 passed, 0 failed, 1 skipped, 178 setup errors, 3 warnings. All 178 errors were `PermissionError` on `.codex-tmp/pytest-of-<user>`; those test bodies did not execute. The skip is the POSIX descriptor-bound `scandir` case. |
+| `uv run --no-sync pytest -p no:cacheprovider tests/test_white_label_presentation.py tests/test_demo_program_refresh_api.py tests/test_demo_rehearsal_controller_script.py tests/test_devcon_session_publish.py` | 25 passed, 1 failed, 0 skipped, 1 warning. The unchanged `test_devcon_no_body_response_maps_to_bounded_reason_without_retry` intermittently returned `devcon_publish_unavailable` from its local HTTP test server instead of `devcon_publish_rejected:no_body`; it passed in the diagnostic full run. No adapter code or test was modified. |
+| `uv run --no-sync pytest -p no:cacheprovider tests/test_white_label_presentation.py tests/test_demo_program_refresh_api.py tests/test_demo_rehearsal_controller_script.py` | Final directive-focused check: 17 passed, 0 failed/skipped, 1 existing Starlette/httpx deprecation warning. |
+| Focused changed configuration test with `--tb=short` | 1 setup error / 2 cache warnings; confirmed the same temporary-directory access denial. |
+| `uv run --no-sync ruff check .` | All checks passed. |
+| `uv run --no-sync pyright` | 0 errors, 0 warnings, 0 informations; tool printed an available-version notice. |
+| `npm.cmd run test` | 0 passed, 9 file-launch failures, 0 skipped: sandbox `spawn EPERM` before test execution. |
+| Same package test list with `node --test-isolation=none` | Final: 59 passed, 0 failed, 0 skipped. An initial guard path error was corrected; a redundant rendered Devcon fixture was removed to keep fixtures neutral. The mapping still tests the Devcon display name. |
+| `npm.cmd run lint` / `npm.cmd run typecheck` | Both passed with exit 0. |
+| `npm.cmd run build` | Production compilation succeeded; completion blocked by `spawn EPERM` at the TypeScript worker. Not a successful build. |
+| `git diff` / `git diff --check` | Complete scoped diff self-reviewed; whitespace check passed. Git reports LF-to-CRLF normalization notices. |
+
+The four known parametrizations of
+`test_turnover_boundaries_emit_exact_live_operation_checkpoints` all stopped at fixture
+setup due to temporary-directory denial. Their em-dash assertions were neither passed
+nor failed, and were not investigated or changed. Real-PostgreSQL startup cases that
+require these fixtures were likewise not run; no database-connectivity failure was
+observed in the diagnostic run. The owner must complete full-suite/PostgreSQL validation
+and the frontend build outside this sandbox. Starlette/httpx deprecation and pytest
+cache write warnings are environmental/pre-existing. The unrelated intermittent adapter
+failure is recorded, not repaired as adjacent work.
+
+### Review, reversal, and remaining work
+
+Every changed source/document belongs to ED-0080. Self-review checked the provider-data
+flow, refusal before side effects, unchanged backend/API/storage boundaries, preserved
+adapter/legacy test coverage, and paired readiness strings. No Yellow/Red condition or
+blocking architecture decision appeared. Delivery design remains deliberately deferred.
+The implementation is directly reversible. No production-event-readiness claim is made;
+owner review/commit and validation outside the sandbox remain outstanding.
+
+### Owner validation addendum (2026-09-24)
+
+The sandbox blocked the frontend test runner and the build worker (`spawn EPERM`) and the
+pytest temporary directory, so the owner re-ran every check on the host:
+
+- Frontend: `npm run test` **59 passed, 0 failed**, including the new white-label guard;
+  `npm run lint`, `npm run typecheck`, and `npm run build` all passed.
+- Backend full suite, with the inherited `STAGEFLOW_API_SHARED_SECRET` and `VIRTUAL_ENV`
+  cleared and `uv run --no-sync`: **1,916 passed, 4 failed, 2 skipped**. The 4 failures are
+  the known Windows console-encoding cases in
+  `test_validation_controller.py::test_turnover_boundaries_emit_exact_live_operation_checkpoints`.
+  The intermittently failing Devcon publish test passed. Ruff and Pyright were clean.
+
+Owner review confirmed `frontend/package.json` changes only the test script's file list (no
+dependency change); `operational-views.tsx` routes an existing provider label through the
+display mapping; and the Kernel test fixtures that moved from `[devcon_read]` to
+`[local_schedule]` lose no coverage, because ED-0079's tests still exercise legacy
+`[devcon_read]` acceptance. `C:/StageFlowDemo/...` in examples and fixtures follows the
+install-root convention the example configuration already used.
+

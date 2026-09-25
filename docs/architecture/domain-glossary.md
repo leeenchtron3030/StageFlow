@@ -16,7 +16,7 @@ authorized by this document.
 - **Current aliases/legacy names:** Older documents use unqualified `Event`.
 - **Migration:** The Kernel implements the qualified `BusinessEvent` contract and
   normalized PostgreSQL identity; continue qualifying new schemas/APIs.
-- **Example:** “Devcon 2026” is a Business Event; “media asset registered” is a
+- **Example:** “Example Conference” is a Business Event; “media asset registered” is a
   Production Event.
 
 ### Program Expectation

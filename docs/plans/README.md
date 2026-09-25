@@ -137,4 +137,4 @@ or architecture document unless those documents are explicitly updated.
 | [Session Assembly foundation](session-assembly-foundation.md) | Approved | StageFlow Assembly / Backend | Delivery-sequence step 5; ADR-0030; ED-0077 |
 | [Native FFmpeg render benchmark](native-ffmpeg-render-benchmark.md) | Approved | StageFlow Validation / Backend | ED-0073 follow-up; ADR-0029; ED-0078 |
 | [Provider-neutral program source](provider-neutral-program-source.md) | Completed - Green provider-neutral program source | StageFlow Integration / Backend | ADR-0031; ED-0079 |
-| [White-label presentation pass](white-label-presentation-pass.md) | Approved | StageFlow Frontend / Operations | ADR-0031; ED-0080 |
+| [White-label presentation pass](white-label-presentation-pass.md) | Completed - Green white-label presentation pass | StageFlow Frontend / Operations | ADR-0031; ED-0080 |

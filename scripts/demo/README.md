@@ -1,6 +1,6 @@
 # Guarded Demo rehearsal controller
 
-Use `StageFlow-Demo.ps1` for the real Razer/Mac Demo rehearsal. It is a thin operator
+Use `StageFlow-Demo.ps1` for the local Demo rehearsal. It is a thin operator
 controller around the existing Python Demo CLI, loopback APIs, and
 `Start-StageFlowDemo.ps1`; it does not implement alternate application behavior.
 
@@ -21,10 +21,15 @@ scope second:
 - `STAGEFLOW_DEMO_OPERATOR_ID` — optional attributable operator UUID. When absent, the
   controller accepts exactly one actor already recorded for the unambiguous current
   Demo Session; it never invents authority.
-- `STAGEFLOW_DEMO_DEVCON_API_KEY` — required only for `publish-devcon`; its presence is
-  reported, never its value.
 
 Configuration, model, media, and CUDA directories remain external and uncommitted.
+Start with [`demo-single-stage.toml.example`](../../examples/demo-single-stage.toml.example)
+and copy [`local-schedule.example.json`](../../examples/local-schedule.example.json) to
+its configured `[local_schedule].path`. Customize the placeholder Event identity and keep
+the schedule's `event_key` and `stage_key` aligned with the configuration. This default
+program source runs offline. Devcon is one optional read adapter: replace `[local_schedule]`
+with the commented `[devcon_read]` alternative only when that source is explicitly wanted;
+exactly one program source must be configured.
 
 ## Actions
 
@@ -40,15 +45,16 @@ $demo = ".\scripts\demo\StageFlow-Demo.ps1"
 ```
 
 `prepare` verifies the exact database, performs the existing real CUDA silent-inference
-preflight, bootstraps idempotently, and performs the explicit Devcon GET/cache sync.
+preflight, bootstraps idempotently, and performs the configured program-source read/cache
+sync.
 `start` re-verifies the database, launches the existing stack in an owned hidden process,
-and waits for loopback health plus the LAN-ready signal. `stop` targets only the recorded
-launcher process tree. It does not delete database rows, media, logs, models, or remote
-state.
+and waits for loopback health plus the neutral `StageFlow is ready at …` LAN-ready signal.
+`stop` targets only the recorded launcher process tree. It does not delete database rows,
+media, logs, models, or remote state.
 
 `status` and `rehearsal-report` resolve Event, Stage, and current Session identities
 without copy/paste. They summarize bounded media, Operations, worker presence,
-Transcription Evidence provenance/counts, Moments, package state, and Devcon cache state.
+Transcription Evidence provenance/counts, Moments, package state, and program cache state.
 Reports omit transcript text, media/config paths, DSNs, credentials, tokens, raw provider
 diagnostics, and API request bodies.
 
@@ -64,40 +70,11 @@ Normal output and reports never contain the launch context. Authority-request di
 records only its short SHA-256 fingerprint plus bounded request attribution; it never
 records request bodies, transcripts, credentials, DSNs, or the launch context itself.
 
-## Devcon publication
+## Publication status
 
-Publication is never automatic and never follows Session end. It is permitted only for
-the current unambiguous Session when Presentation has ended, package state is `complete`,
-the linked External Program Expectation resolves one remote Devcon Event/Session, and the
-bounded transcript projection is complete and untruncated.
-
-```powershell
-& $demo publish-devcon
-```
-
-The controller performs a credential-free GET identity check and displays only the
-Event, target Session, field names (`transcript_text` and `duration`), and YES/NO gates.
-It does not display field values. The default interactive path asks:
-
-```text
-Publish this StageFlow enrichment to Devcon? [y/N]
-```
-
-Confirmation is bound to a SHA-256 digest of the exact candidate. Before the PUT, the
-controller reconstructs current local state and rejects any digest change. It sends one
-bounded PUT with exactly the two named fields. After HTTP 204, it verifies the exact
-Git-backed devcon-api/data/sessions/{eventId}/{sessionId}.json file using credential-free,
-cache-bypassing reads. A durable mismatch fails closed.
-
-Public GET /sessions/:id is cache-sensitive (max-age=60,
-stale-while-revalidate=120), so it is convergence evidence rather than durability
-authority. The controller performs only bounded GET polling: one immediate check followed
-by at most three 65-second waits. Matching durable Git state plus a still-stale public API
-returns published_durable_api_stale, not publication failure. A later match returns
-published_durable_api_converged. No read result can cause a second PUT.
-
--ConfirmHumanAuthority is available only when the human confirmation is already
-explicitly captured by the invoking operator workflow. It does not bypass package,
-identity, credential, digest, durable Git, or public-convergence gates.
-
-This is Demo tooling, not a production publisher or a LAN-exposed Devcon write surface.
+External publication is frozen under
+[ADR-0031](../../docs/adr/ADR-0031-white-label-identity-and-provider-neutral-program-sources.md)
+until a provider-neutral Delivery context is designed. Publication is absent from the
+supported action set. The retired publication action refuses with an ADR-0031 message
+and a non-zero exit before configuration, credential access, or network calls. The backend
+Devcon adapter remains dormant; no replacement delivery workflow is introduced.
