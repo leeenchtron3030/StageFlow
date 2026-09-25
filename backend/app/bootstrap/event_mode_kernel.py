@@ -6,6 +6,7 @@ from datetime import datetime
 
 import psycopg
 
+from app.contexts.assembly.service import PackagingAssetService
 from app.contexts.editorial import EditorialMomentService
 from app.contexts.events import EventStageBootstrapRequest, StageBootstrapDefinition
 from app.contexts.integration.devcon import DevconProgramSync, ProgramSyncResult
@@ -33,6 +34,7 @@ from app.infrastructure.postgres import (
     PostgresIngressRepository,
     PostgresMediaTimingEvidenceRepository,
 )
+from app.infrastructure.postgres.packaging_asset_repository import PostgresPackagingAssetRepository
 from app.shared.ids import EntityId
 from app.shared.time import Clock, SystemClock
 
@@ -71,6 +73,7 @@ class KernelComponents:
     media_timing_evidence_repository: MediaTimingEvidenceRepository | None = None
     devcon_program_sync: DevconProgramSync | None = None
     editorial_moments: EditorialMomentService | None = None
+    packaging_assets: PackagingAssetService | None = None
 
     @property
     def event_key(self) -> str:
@@ -256,11 +259,12 @@ def verify_editorial_schema(dsn: str) -> None:
                 WHERE version IN (
                     '0008_demo_vertical_slice',
                     '0010_editorial_candidate_moment',
-                    '0011_editorial_review_foundation'
+                    '0011_editorial_review_foundation',
+                    '0012_packaging_asset_foundation'
                 )
                 """
             ).fetchone()
-            if row is None or row[0] != 3:
+            if row is None or row[0] != 4:
                 raise KernelSchemaMigrationRequiredError(
                     "editorial_schema_migration_required"
                 )
@@ -285,6 +289,9 @@ def build_kernel_components(
         configuration=configuration,
         repository=repository,
         kernel=kernel,
+        packaging_assets=PackagingAssetService(
+            PostgresPackagingAssetRepository(configuration.postgres_dsn), kernel.clock,
+        ),
         editorial_moments=EditorialMomentService(
             PostgresEditorialMomentRepository(configuration.postgres_dsn),
             kernel.clock,

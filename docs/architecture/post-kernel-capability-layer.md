@@ -13,6 +13,9 @@ explicitly authorized by ADR-0025 and its implementation-ready plan is currently
 implemented. ED-0067 implements the bounded Phase 1 human-declared Editorial Candidate
 Moment slice, and ED-0072 implements the append-only human review, Editorial Clip, and
 bounded Event review-queue foundation. Machine-origin candidates remain future work.
+ED-0076 implements ADR-0030's Packaging Asset identity, immutable content revisions,
+human approval lineage, and bounded authenticated reads in the new Assembly context.
+Session Assembly templates, proposals, revisions, validation, and rendering remain future work.
 
 The Kernel remains the protected operational foundation. New capabilities reference its
 Business Event, Stage, Program Expectation, realized Session, media registration,
@@ -418,18 +421,29 @@ Completed Media Asset and packaging identity have different meanings. A Complete
 Asset proves finalized, safe-to-read production media. A packaging asset adds curated
 role, applicability, version, approval/trust, and effective-context semantics.
 
-The recommended Yellow decision is a separate `PackagingAsset` aggregate whose immutable
-content revision references a stable media manifest or, when appropriate, a Completed
-Media Asset. This composes existing resource/readiness semantics without pretending that
-all registered production media is branding or that branding approval is media
-completion. Media blobs remain outside PostgreSQL; raw filesystem paths are not product
-identity.
+Accepted [ADR-0030](../adr/ADR-0030-packaging-asset-identity.md) resolves ownership and
+identity as a separate Assembly-owned `PackagingAsset`; ED-0076 implements that first
+slice. An asset has stable ID, Event scope, optional Stage scope, name, and one of the
+roles `opening_bumper`, `title_card`, `sponsor_card`, or `outro`. Track applicability
+remains deferred until a domain track concept exists.
 
-Minimum packaging-asset facts are ID, name, role/category, content reference/version,
-optional measured duration, Event/Stage/track applicability, effective interval,
-approval/trust state and decision lineage. The exact aggregate ownership and whether all
-content must first become a Completed Media Asset require explicit approval before the
-Assembly persistence design.
+Immutable numbered content revisions reference either external content (opaque content
+key, SHA-256 digest, byte size, declared media type) or an existing Completed Media Asset
+ID. Optional measured duration and aware effective endpoints are revision facts. Media
+blobs remain outside PostgreSQL; filesystem paths are not accepted as identity.
+
+Append-only human decisions approve, reject, or revoke one exact revision. The latest
+append sequence derives that revision's approval state; new revisions start unreviewed.
+The synchronous service uses command digest replay and an expected current revision
+guard. The approval target revision is separate from that guard, so a human with a fresh
+view can revoke an older revision. Registration starts at revision count zero; adding
+the first content revision requires `expected_revision=0`.
+
+Authenticated `/api/v1/assembly` routes register assets, append revisions and decisions,
+and provide Event-scoped asset and revision pages with limits 1–100, keyset continuation,
+counts, and explicit truncation. Completed Media Asset lifecycle coupling, Session
+Assembly templates/proposals/revisions, and validation remain ED-0077 scope. The reserved
+`packaging` context and the unrelated Runtime asset assembly plan remain unchanged.
 
 ### Metadata-driven graphics
 
@@ -561,8 +575,9 @@ Use a bounded sequence C:
    provider/model and deployment qualification remain separate Yellow work.
 4. **Machine candidate generation:** deterministic and then inferred candidates consume
    versioned transcript/analysis artifacts with provenance and idempotent outputs.
-5. **Assembly foundation:** after packaging-asset identity is approved, add templates,
-   proposals, independent revisions, validation, and manual approval.
+5. **Assembly foundation:** ADR-0030 identity and the ED-0076 Packaging Asset foundation
+   are implemented. Templates, proposals, independent Session Assembly revisions,
+   validation, and manual Assembly approval remain ED-0077 work.
 6. **Scoped automation:** after ADR-0026 acceptance and sufficient measured evidence,
    enable one low-risk decision type at a time. Rendering and publishing remain later
    consumers.
@@ -622,8 +637,9 @@ itself. Each slice still needs a bounded implementation-ready plan and objective
 
 1. **ADR-0026:** accept versioned, policy-scoped automatic decision authority and
    activation/provenance semantics.
-2. **Packaging asset identity:** approve the recommended separate Packaging Asset
-   aggregate and its composition with Completed Media Asset before Assembly persistence.
+
+Packaging asset identity was resolved by accepted ADR-0030 and implemented in the
+bounded ED-0076 slice; it is no longer a Yellow decision.
 
 Moment naming is not Yellow at this baseline because the current qualified glossary
 already establishes Editorial Candidate Moment, Editorial Clip, and Hot urgency. A

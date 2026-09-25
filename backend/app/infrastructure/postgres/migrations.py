@@ -77,6 +77,13 @@ class PostgresMigrationRunner:
             "0011_editorial_review_foundation_forward.sql",
             version="0011_editorial_review_foundation",
         )
+        self.apply_packaging_asset_foundation_v1()
+
+    def apply_packaging_asset_foundation_v1(self) -> None:
+        self._execute_if_missing(
+            "0012_packaging_asset_foundation_forward.sql",
+            version="0012_packaging_asset_foundation",
+        )
 
     def reverse_event_mode_kernel_v1(self) -> None:
         self.reverse_demo_vertical_slice_v1()
@@ -128,9 +135,16 @@ class PostgresMigrationRunner:
         )
 
     def reverse_editorial_review_foundation_v1(self) -> None:
+        self.reverse_packaging_asset_foundation_v1()
         self._execute_if_present(
             "0011_editorial_review_foundation_reverse.sql",
             version="0011_editorial_review_foundation",
+        )
+
+    def reverse_packaging_asset_foundation_v1(self) -> None:
+        self._execute_if_present(
+            "0012_packaging_asset_foundation_reverse.sql",
+            version="0012_packaging_asset_foundation",
         )
 
     def _execute(self, filename: str) -> None:
