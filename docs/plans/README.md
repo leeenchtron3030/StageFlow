@@ -144,3 +144,4 @@ or architecture document unless those documents are explicitly updated.
 | [Post-merge documentation reconciliation](post-merge-documentation-reconciliation.md) | Completed - Green documentation reconciliation | StageFlow Governance / Architecture | drift-auditor sweep 2026-09-25; ED-0082 |
 | [Validation controller console encoding](validation-controller-console-encoding.md) | Completed - Green qualification tooling fix | StageFlow Validation | ED-0083 |
 | [Neutral Demo program-source fields](neutral-demo-program-fields.md) | Completed - Green white-label tooling fields | StageFlow Demo Operations | ADR-0031; ED-0082 residual; ED-0084 |
+| [Multi-encode render benchmark](multi-encode-render-benchmark.md) | Completed - Green qualification tooling and measurement | StageFlow Validation / Backend | ADR-0029; ED-0078 follow-up; ED-0085 |
