@@ -6,9 +6,11 @@ from collections.abc import Mapping
 from enum import StrEnum
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from types import MappingProxyType
-from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+# Compatibility import; provider defaults belong to the optional adapter.
+from app.contexts.integration.devcon.configuration import DevconReadConfiguration
 
 
 class NodeRole(StrEnum):
@@ -34,39 +36,24 @@ class RuntimeProfile(StrEnum):
     DEMO_SINGLE_STAGE = "demo-single-stage"
 
 
-class DevconReadConfiguration(BaseModel):
-    model_config = ConfigDict(frozen=True)
+class LocalScheduleConfiguration(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
-    base_url: str = "https://api.devcon.org"
-    event_id: str
-    room_id: str
-    page_size: int = Field(default=500, ge=1, le=1000)
-    maximum_catalog_sessions: int = Field(default=5000, ge=1, le=10_000)
-    timeout_seconds: int = Field(default=10, ge=1, le=30)
+    path: str
 
-    @field_validator("event_id", "room_id")
+    @field_validator("path")
     @classmethod
-    def non_empty(cls, value: str) -> str:
+    def local_file_path(cls, value: str) -> str:
         normalized = value.strip()
-        if not normalized:
-            raise ValueError("value must not be empty")
+        windows = PureWindowsPath(normalized)
+        posix = PurePosixPath(normalized)
+        if not windows.is_absolute() and not posix.is_absolute():
+            raise ValueError("local schedule path must be absolute")
+        if windows.drive.startswith("\\\\") or normalized.startswith("//"):
+            raise ValueError("local schedule path must not be a network path")
+        if ".." in windows.parts or ".." in posix.parts:
+            raise ValueError("local schedule path cannot contain parent traversal")
         return normalized
-
-    @field_validator("base_url")
-    @classmethod
-    def official_https_endpoint(cls, value: str) -> str:
-        normalized = value.strip().rstrip("/")
-        parsed = urlsplit(normalized)
-        if (
-            parsed.scheme != "https"
-            or parsed.hostname != "api.devcon.org"
-            or parsed.port is not None
-            or parsed.path not in {"", "/"}
-            or parsed.query
-            or parsed.fragment
-        ):
-            raise ValueError("Devcon read base_url must be https://api.devcon.org")
-        return "https://api.devcon.org"
 
 
 class LocalTranscriptionConfiguration(BaseModel):
@@ -243,6 +230,7 @@ class KernelDeploymentConfiguration(BaseModel):
     event: EventDeploymentConfiguration
     resources: ResourceLimits = Field(default_factory=ResourceLimits)
     schedule_source_reference: str | None = None
+    local_schedule: LocalScheduleConfiguration | None = None
     devcon_read: DevconReadConfiguration | None = None
     local_transcription: LocalTranscriptionConfiguration | None = None
 
@@ -269,6 +257,8 @@ class KernelDeploymentConfiguration(BaseModel):
             NetworkPolicy.OPTIONAL,
         }:
             raise ValueError("Event mode cannot require continuous Internet access")
+        if self.local_schedule is not None and self.devcon_read is not None:
+            raise ValueError("configure exactly one of local_schedule or devcon_read")
         if self.runtime_profile is RuntimeProfile.DEMO_SINGLE_STAGE:
             if len(self.event.stages) != 1:
                 raise ValueError(
@@ -278,13 +268,13 @@ class KernelDeploymentConfiguration(BaseModel):
                 raise ValueError(
                     "demo-single-stage runtime profile requires a StageFlow Node"
                 )
-            if self.network_policy is not NetworkPolicy.OPTIONAL:
+            if self.local_schedule is None and self.network_policy is not NetworkPolicy.OPTIONAL:
                 raise ValueError(
                     "demo-single-stage runtime profile requires optional Internet"
                 )
-            if self.devcon_read is None:
+            if self.local_schedule is None and self.devcon_read is None:
                 raise ValueError(
-                    "demo-single-stage runtime profile requires Devcon read configuration"
+                    "demo-single-stage requires exactly one of local_schedule or devcon_read"
                 )
             if self.local_transcription is None:
                 raise ValueError(
@@ -386,6 +376,7 @@ __all__ = [
     "EventDeploymentConfiguration",
     "EventModePolicy",
     "KernelDeploymentConfiguration",
+    "LocalScheduleConfiguration",
     "LocalTranscriptionConfiguration",
     "NetworkPolicy",
     "NodeRole",

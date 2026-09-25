@@ -183,10 +183,10 @@ def test_sync_records_external_expectations_without_realizing_session_and_caches
     expectation = result.expectations[0]
     assert expectation.stage_id == stage.id
     assert expectation.external_references == {
-        "devcon_event_id": "test-devcon-8",
-        "devcon_room_id": "stage-1",
+        "external_event_id": "test-devcon-8",
+        "external_room_id": "stage-1",
         "devcon_room_name": "Stage 1",
-        "devcon_session_id": "real-program-item",
+        "external_session_id": "real-program-item",
         "provider": "devcon",
     }
     assert repository.list_sessions_for_stage(stage.id) == ()

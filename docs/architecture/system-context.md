@@ -22,7 +22,7 @@ foundation is closure-validated but is not event-ready software.
 | Marketing user | No implemented workflow | Consumes approved clips, assembled outputs, metadata, and delivery state rather than raw candidate intelligence |
 | AI/media Event Worker | No implementation | Claims approved PostgreSQL-backed work for transcription, analysis, vision, proxy, or rendering without owning Session/media authority |
 | Recording/shared-storage system | Files may be inspected only by an explicit one-shot local discovery call | Remains source of media; StageFlow registers completed assets by reference |
-| Schedule/conference system | Optional bounded Devcon public-program read reconciles one configured Event/room into External Program Expectations | Remains source of planned conference data and external identifiers |
+| Schedule/conference system | Provider-neutral program source reconciles a complete Stage snapshot from an offline local schedule file or optional Devcon public-program read into External Program Expectations | Remains source of planned conference data and external identifiers |
 | Transcript/vision providers | Adapter/interpreter contracts only | Optional providers behind adapters; unavailable service must not stop local event work |
 | Publishing/delivery destinations | Guarded Demo controller can perform one explicitly confirmed Devcon transcript/duration enrichment write | Future provider-neutral durable operations with idempotency and reconciliation |
 
@@ -46,7 +46,8 @@ decision or Clip, publish editorial output, or deliver an output through this sl
 | Durable Kernel repository | Event/Stage, Program Expectation, Session, media registry/association, completion snapshots, reconciliation, human-command replay, and typed history | Normalized PostgreSQL current state plus typed append-only history |
 | Media Timing Evidence repository | Append/retrieve immutable asset-linked Observed facts, Derived intervals, qualification state, and exact application replay | Additive PostgreSQL revision/history authority; advisory only |
 | Durable Kernel service | Explicit bootstrap, idempotent human Session boundaries/assignment/completion, readiness/asset adapters, stable ingress, and provenance-bearing categorical association | Direct synchronous application boundary |
-| Devcon integration | Optional bounded public-program read/reconciliation plus one guarded human-confirmed transcript/duration enrichment write and separated durability/cache verification | Devcon remains external authority; network failure does not replace local Kernel state |
+| Program schedule sources | `ProgramScheduleSource` composes strict offline JSON (`local_file`) or optional public-program reads (`devcon`); results/status retain provider attribution | Existing PostgreSQL snapshot reconciliation/cache; failed reads preserve the last successful program and never realize Sessions |
+| Devcon publication integration | Retained guarded human-confirmed transcript/duration enrichment write and separated durability/cache verification | External authority remains separate; ED-0079 makes no publication change |
 | Editorial Candidate Moment repository/service | Idempotent declared Candidate creation, bounded per-Session reads, and append-only boundary-conflict evaluation | PostgreSQL declaration and location-history authority; no in-memory runtime fallback |
 | Evidence/reasoning/state policies | Deterministic transformation and transition contracts | Caller-invoked; no orchestrator or durable lineage store |
 | In-memory Operational State repository | Atomic accepted Recording/Session state, lineage, revision, and operation replay | Thread-safe and explicitly process-local |
