@@ -8,6 +8,7 @@ from pathlib import Path
 import psycopg
 
 from app.contexts.assembly.service import PackagingAssetService
+from app.contexts.assembly.session_service import SessionAssemblyService
 from app.contexts.editorial import EditorialMomentService
 from app.contexts.events import EventStageBootstrapRequest, StageBootstrapDefinition
 from app.contexts.integration.devcon import DevconProgramSync
@@ -38,6 +39,9 @@ from app.infrastructure.postgres import (
     PostgresMediaTimingEvidenceRepository,
 )
 from app.infrastructure.postgres.packaging_asset_repository import PostgresPackagingAssetRepository
+from app.infrastructure.postgres.session_assembly_repository import (
+    PostgresSessionAssemblyRepository,
+)
 from app.shared.ids import EntityId
 from app.shared.time import Clock, SystemClock
 
@@ -77,6 +81,7 @@ class KernelComponents:
     program_source: ProgramScheduleSource | None = None
     editorial_moments: EditorialMomentService | None = None
     packaging_assets: PackagingAssetService | None = None
+    session_assemblies: SessionAssemblyService | None = None
 
     def __init__(
         self,
@@ -94,6 +99,7 @@ class KernelComponents:
         packaging_assets: PackagingAssetService | None = None,
         *,
         program_source: ProgramScheduleSource | None = None,
+        session_assemblies: SessionAssemblyService | None = None,
     ) -> None:
         # Retain the old positional/keyword constructor as well as attribute access.
         # Remove this compatibility constructor once Demo 2 no longer calls the alias.
@@ -115,6 +121,7 @@ class KernelComponents:
         self.program_source = program_source if program_source is not None else devcon_program_sync
         self.editorial_moments = editorial_moments
         self.packaging_assets = packaging_assets
+        self.session_assemblies = session_assemblies
 
     @property
     def event_key(self) -> str:
@@ -314,11 +321,12 @@ def verify_editorial_schema(dsn: str) -> None:
                     '0008_demo_vertical_slice',
                     '0010_editorial_candidate_moment',
                     '0011_editorial_review_foundation',
-                    '0012_packaging_asset_foundation'
+                    '0012_packaging_asset_foundation',
+                    '0013_session_assembly_foundation'
                 )
                 """
             ).fetchone()
-            if row is None or row[0] != 4:
+            if row is None or row[0] != 5:
                 raise KernelSchemaMigrationRequiredError(
                     "editorial_schema_migration_required"
                 )
@@ -361,6 +369,9 @@ def build_kernel_components(
         kernel=kernel,
         packaging_assets=PackagingAssetService(
             PostgresPackagingAssetRepository(configuration.postgres_dsn), kernel.clock,
+        ),
+        session_assemblies=SessionAssemblyService(
+            PostgresSessionAssemblyRepository(configuration.postgres_dsn), kernel.clock,
         ),
         editorial_moments=EditorialMomentService(
             PostgresEditorialMomentRepository(configuration.postgres_dsn),

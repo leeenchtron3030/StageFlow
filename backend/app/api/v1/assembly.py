@@ -25,6 +25,22 @@ from app.contexts.assembly.repository import (
     PackagingAssetStorageUnavailableError,
 )
 from app.contexts.assembly.service import PackagingAssetService
+from app.contexts.assembly.session_contracts import (
+    AssemblyAction,
+    AssemblyApprovalDecision,
+    AssemblyRevision,
+    AssemblySlot,
+    AssemblyTemplate,
+    ExplicitBinding,
+    MetadataField,
+    PlacementRole,
+)
+from app.contexts.assembly.session_repository import (
+    AssemblyConflictError,
+    AssemblyNotFoundError,
+    AssemblyStorageUnavailableError,
+)
+from app.contexts.assembly.session_service import SessionAssemblyService
 from app.shared.ids import EntityId
 
 router = APIRouter(prefix="/assembly", tags=["assembly"])
@@ -153,17 +169,18 @@ def _service(request: Request) -> PackagingAssetService:
 
 
 def _error(exc: Exception) -> HTTPException:
-    if isinstance(exc, PackagingAssetNotFoundError):
+    if isinstance(exc, (PackagingAssetNotFoundError, AssemblyNotFoundError)):
         return HTTPException(404, str(exc))
-    if isinstance(exc, PackagingAssetConflictError):
+    if isinstance(exc, (PackagingAssetConflictError, AssemblyConflictError)):
         return HTTPException(409, str(exc))
-    if isinstance(exc, PackagingAssetStorageUnavailableError):
+    if isinstance(exc, (PackagingAssetStorageUnavailableError, AssemblyStorageUnavailableError)):
         return HTTPException(503, "postgresql_unavailable")
     return HTTPException(422, str(exc))
 
 
 _ERRORS = (PackagingAssetNotFoundError, PackagingAssetConflictError,
-           PackagingAssetStorageUnavailableError, ValueError)
+           PackagingAssetStorageUnavailableError, AssemblyNotFoundError, AssemblyConflictError,
+           AssemblyStorageUnavailableError, ValueError)
 
 
 def _asset(asset: PackagingAsset) -> AssetResponse:
@@ -292,5 +309,176 @@ def list_revisions(
             ) for item in page.items), total_count=page.total_count, next_after=page.next_after,
             items_truncated=page.next_after is not None, limit=limit,
         )
+    except _ERRORS as exc:
+        raise _error(exc) from exc
+
+# Session Assembly commands share this router's existing authentication boundary.
+class SlotBody(StrictModel):
+    key: Annotated[str, Field(min_length=1, max_length=100)]
+    role: PlacementRole
+    required: Annotated[bool, Field(strict=True)]
+
+
+class TemplateCommand(HumanCommand):
+    event_id: UUID
+    template_key: Annotated[str, Field(min_length=1, max_length=100)]
+    expected_version: Annotated[int, Field(ge=0, le=MAX_INTEGER - 1, strict=True)]
+    name: Annotated[str, Field(min_length=1, max_length=200)]
+    slots: Annotated[tuple[SlotBody, ...], Field(min_length=1, max_length=100)]
+    required_metadata: tuple[MetadataField, ...] = ()
+
+
+class BindingBody(StrictModel):
+    slot_key: Annotated[str, Field(min_length=1, max_length=100)]
+    packaging_revision_id: UUID
+
+
+class ProposalCommand(HumanCommand):
+    template_id: UUID
+    expected_revision: Annotated[int, Field(ge=0, le=MAX_INTEGER - 1, strict=True)]
+    expected_package_revision: Annotated[int, Field(ge=1, le=MAX_INTEGER, strict=True)]
+    explicit: Annotated[tuple[BindingBody, ...], Field(max_length=100)] = ()
+
+
+class AssemblyDecisionCommand(HumanCommand):
+    revision_number: Annotated[int, Field(ge=1, le=MAX_INTEGER, strict=True)]
+    expected_revision: Annotated[int, Field(ge=1, le=MAX_INTEGER, strict=True)]
+    expected_decision_count: Annotated[int, Field(ge=0, le=MAX_INTEGER - 1, strict=True)]
+    action: AssemblyAction
+    reason: Annotated[str, Field(min_length=1, max_length=500)]
+
+
+def _assemblies(request: Request) -> SessionAssemblyService:
+    components = getattr(request.app.state, "kernel", None)
+    if not isinstance(components, KernelComponents) or components.session_assemblies is None:
+        raise HTTPException(503, "session_assembly_service_unavailable")
+    return components.session_assemblies
+
+
+def _template_response(t: AssemblyTemplate) -> dict[str, object]:
+    return {"template_id": t.id.value, "event_id": t.event_id.value,
+            "template_key": t.template_key, "version": t.version, "name": t.name,
+            "slots": [{"key": s.key, "role": s.role.value, "required": s.required}
+                      for s in t.slots],
+            "required_metadata": list(t.required_metadata), "created_at": t.created_at}
+
+
+def _assembly_response(r: AssemblyRevision) -> dict[str, object]:
+    return {
+        "revision_id": r.id.value, "session_id": r.session_id.value, "event_id": r.event_id.value,
+        "revision_number": r.revision_number,
+        "supersedes_id": None if r.supersedes_id is None else r.supersedes_id.value,
+        "template_id": r.template_id.value, "package_revision": r.package_revision,
+        "completion_decision_id": (None if r.completion_decision_id is None
+                                   else r.completion_decision_id.value),
+        "membership": [{"asset_id": m.asset_id.value,
+                        "association_revision": m.association_revision,
+                        "media_started_at": m.media_started_at} for m in r.membership],
+        "bindings": [{"slot_key": b.slot_key, "outcome": b.outcome,
+                      "packaging_revision_id": (None if b.packaging_revision_id is None
+                                                else b.packaging_revision_id.value)}
+                     for b in r.bindings],
+        "metadata": [{"field": m.field.value, "values": m.values, "source": m.source,
+                      "source_id": m.source_id.value, "source_revision": m.source_revision}
+                     for m in r.metadata],
+        "validation": {"state": r.validation.state, "issues": [
+            {"code": i.code.value, "subject": i.subject} for i in r.validation.issues]},
+        "actor_id": r.actor_id.value, "created_at": r.created_at,
+    }
+
+
+def _assembly_decision(d: AssemblyApprovalDecision) -> dict[str, object]:
+    return {"decision_id": d.id.value, "session_id": d.session_id.value,
+            "revision_id": d.revision_id.value, "sequence": d.sequence,
+            "actor_id": d.actor_id.value, "decided_at": d.decided_at,
+            "action": d.action.value, "reason": d.reason, "authority_kind": d.authority_kind}
+
+
+@router.post("/templates")
+def create_template(command: TemplateCommand, request: Request) -> dict[str, object]:
+    try:
+        return _template_response(_assemblies(request).create_template(
+            operation_id=EntityId(str(command.operation_id)),
+            actor_id=EntityId(str(command.actor_id)), event_id=EntityId(str(command.event_id)),
+            template_key=command.template_key, expected_version=command.expected_version,
+            name=command.name, slots=tuple(AssemblySlot(s.key, s.role, s.required)
+                                           for s in command.slots),
+            required_metadata=command.required_metadata,
+        ))
+    except _ERRORS as exc:
+        raise _error(exc) from exc
+
+
+@router.post("/sessions/{session_id}/revisions")
+def propose_assembly(
+    session_id: UUID, command: ProposalCommand, request: Request,
+) -> dict[str, object]:
+    try:
+        return _assembly_response(_assemblies(request).propose(
+            operation_id=EntityId(str(command.operation_id)),
+            actor_id=EntityId(str(command.actor_id)), session_id=EntityId(str(session_id)),
+            template_id=EntityId(str(command.template_id)),
+            expected_revision=command.expected_revision,
+            expected_package_revision=command.expected_package_revision,
+            explicit=tuple(ExplicitBinding(b.slot_key, EntityId(str(b.packaging_revision_id)))
+                           for b in command.explicit),
+        ))
+    except _ERRORS as exc:
+        raise _error(exc) from exc
+
+
+@router.post("/sessions/{session_id}/approvals")
+def decide_assembly(
+    session_id: UUID, command: AssemblyDecisionCommand, request: Request,
+) -> dict[str, object]:
+    try:
+        return _assembly_decision(_assemblies(request).decide(
+            operation_id=EntityId(str(command.operation_id)),
+            actor_id=EntityId(str(command.actor_id)), session_id=EntityId(str(session_id)),
+            revision_number=command.revision_number, expected_revision=command.expected_revision,
+            expected_decision_count=command.expected_decision_count,
+            action=command.action, reason=command.reason,
+        ))
+    except _ERRORS as exc:
+        raise _error(exc) from exc
+
+
+@router.get("/events/{event_id}/templates")
+def list_templates(
+    event_id: UUID, request: Request, limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    after: UUID | None = None,
+) -> dict[str, object]:
+    try:
+        page = _assemblies(request).repository.list_templates(
+            EntityId(str(event_id)), after=None if after is None else EntityId(str(after)),
+            limit=limit,
+        )
+        return {"event_id": str(event_id), "items": [_template_response(t) for t in page.items],
+                "total_count": page.total_count, "limit": limit,
+                "next_after": None if page.next_after is None else page.next_after.value,
+                "items_truncated": page.next_after is not None}
+    except _ERRORS as exc:
+        raise _error(exc) from exc
+
+
+@router.get("/events/{event_id}/sessions/{session_id}/revisions")
+def list_assembly_revisions(
+    event_id: UUID, session_id: UUID, request: Request,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    after: Annotated[int, Query(ge=0, le=MAX_INTEGER)] = 0,
+) -> dict[str, object]:
+    try:
+        page = _assemblies(request).repository.list_revisions(
+            EntityId(str(event_id)), EntityId(str(session_id)), after=after, limit=limit,
+        )
+        return {"event_id": str(event_id), "session_id": str(session_id), "items": [
+            {"revision": _assembly_response(i.revision),
+             "current_revision_number": i.current_revision_number,
+             "stale": i.stale, "approval_state": i.approval_state.value,
+             "decision_count": i.decision_count,
+             "latest_decision": (None if i.latest_decision is None
+                                 else _assembly_decision(i.latest_decision))} for i in page.items
+        ], "total_count": page.total_count, "next_after": page.next_after,
+            "items_truncated": page.next_after is not None, "limit": limit}
     except _ERRORS as exc:
         raise _error(exc) from exc
