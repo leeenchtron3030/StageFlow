@@ -104,13 +104,33 @@ re-enters the same flow from PostgreSQL plus a new bounded source reconciliation
 
 The Demo 2 Event Node implementation adds an optional, default-off lifespan coordinator
 for the existing `demo-single-stage` profile. When enabled, it runs the same bounded
-media cycle and program-source reconciliation at configured cadences. A PostgreSQL
+media cycle and Program refresh at configured cadences. Program refresh is the timed
+`sync_program()` call whose result is a Program Expectation reconciliation
+(`backend/app/demo/autonomous.py:315`,
+`backend/app/contexts/integration/program_source.py:8`). A PostgreSQL
 session advisory lock keyed by deployment permits one owning coordinator; a second
 backend remains standby. The lock, process thread, and stop signal are runtime
 coordination only. PostgreSQL records, stable transcription Operation identity, and the
 existing deterministic policies remain authoritative. The coordinator has no Session,
 Moment, package, or publication command path, and Program refresh has no external publication
 path.
+
+The ED-0063 catch-all handles unexpected exceptions separately for media cycles and
+Program refresh: it records `unexpected_cycle_failure` and the failure time for that
+kind, marks the coordinator `degraded`, and schedules the next bounded cycle rather than
+terminating the loop (`backend/app/demo/autonomous.py:211`). ED-0081 cycle recovery is per
+kind: within the owned loop, a successful cycle clears that kind's degraded marker and
+restores `running` only when no failed kind remains. Last failure codes and times remain visible
+(`backend/app/demo/autonomous.py:135`, `backend/app/demo/autonomous.py:298`,
+`backend/app/demo/autonomous.py:338`).
+
+The optional `rehearsal_fault_media_cycle` setting defaults to unset and accepts a positive
+integer only in `event_mode = "rehearsal"`; configuration rejects it in other modes
+(`backend/app/core/config/deployment.py:219`,
+`backend/app/core/config/deployment.py:272`). It raises one unexpected failure at the
+selected media attempt per coordinator instance, exercising the catch-all; a new
+instance resets the attempt count (`backend/app/demo/autonomous.py:57`,
+`backend/app/demo/autonomous.py:270`).
 
 A registered asset with an existing deterministic `unresolved` association is reevaluated
 only when the material Session input set changes, represented by durable Session identity

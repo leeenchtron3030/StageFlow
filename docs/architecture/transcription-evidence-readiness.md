@@ -7,8 +7,18 @@
 This document defines the first transcription evidence boundary requested by the
 recorder-calibration/transcription-readiness milestone. It specializes the accepted
 post-Kernel direction and accepted ADR-0025. Migration 0007 and the bounded internal
-contracts/repository implement the provider-neutral evidence and operation substrate
-without selecting a real provider/model or authorizing automatic enqueue.
+contracts/repository implement the provider-neutral evidence and operation substrate.
+Automatic enqueue exists only in the bounded, default-off Demo 2 coordinator
+(`docs/plans/demo2-autonomous-event-node.md:14`, `backend/app/demo/autonomous.py:270`),
+not as a general automatic-enqueue selection.
+The first local provider was subsequently accepted on 2026-08-18: faster-whisper 1.2.1,
+CTranslate2 4.8.1, and the pinned large-v3-turbo model; broader production selection
+remains conditional (`docs/validation/transcription-engine-evaluation.md:133`). The worker
+composes that adapter behind the provider-neutral Work Execution port
+(`backend/app/demo/worker.py:72`, `backend/app/contexts/work_execution/service.py:42`,
+`backend/app/contexts/transcription_evidence/application.py:40`). Local transcription
+remains optional and operator-installed; ED-0075 excludes the `transcription` group from
+distributable artifacts without granting legal clearance (`backend/pyproject.toml:14`).
 
 `Transcript Evidence Revision` is the accepted internal asset/manifest-scoped evidence
 term. Session Transcript composition and any public API naming remain unresolved.
@@ -145,7 +155,7 @@ response
 ```
 
 The port must expose capabilities rather than promise unsupported values. Required
-adapter reconnaissance before selection:
+adapter reconnaissance for any further selection:
 
 | Requirement | Adapter obligation |
 | --- | --- |
@@ -160,8 +170,11 @@ adapter reconnaissance before selection:
 | Cancellation | Cooperatively observe cancellation and report whether an external call may continue |
 | Telemetry | Report bounded duration/resource/provider facts without payloads, secrets, or paths |
 
-No provider or model is selected by this document. Local and cloud adapters must satisfy
-the same domain result boundary. A cloud adapter remains deferrable in Event Mode.
+The accepted first local baseline is recorded in
+`docs/validation/transcription-engine-evaluation.md:133`; the core execution port remains
+provider-neutral (`backend/app/contexts/transcription_evidence/application.py:40`). Local
+and cloud adapters must satisfy the same domain result boundary. A cloud adapter remains
+deferrable in Event Mode.
 
 ## Media Timing Evidence alignment
 
@@ -231,7 +244,8 @@ No provider-specific storage or automatic downstream authority is implied.
 
 - acceptance and canonical naming of Transcript Evidence/Alignment aggregates;
 - raw provider artifact retention/deletion and encryption policy;
-- first provider/model/dependency and local GPU runtime;
+- broader production-provider/model qualification beyond the accepted first local baseline
+  (`docs/validation/transcription-engine-evaluation.md:140`);
 - Session Transcript stitching across asset revisions and overlapping media;
 - human transcript correction/review ownership;
 - diarization-to-participant identity resolution;

@@ -95,13 +95,25 @@ new context and names every superseded ADR. Update this index and mark the older
 | [ADR-0022](ADR-0022-postgresql-authoritative-operational-store.md) | PostgreSQL authoritative operational store | Accepted | Ingress and bounded Kernel authority are composed; broader durable workflows remain future work |
 | [ADR-0023](ADR-0023-session-authority-and-completion.md) | Session meaning, Stage invariants, association, boundaries, and completion authority | Accepted | Kernel Session aggregate, package approval/revision, and typed history implemented |
 | [ADR-0024](ADR-0024-durable-kernel-authority-and-persistence.md) | Explicit bootstrap, human Session realization, deterministic association, normalized state/history | Accepted | Kernel corrections and Green follow-up are closure-validated |
-| [ADR-0025](ADR-0025-postgresql-durable-operations-and-workers.md) | PostgreSQL-backed Durable Operations, attempts, leases, and Worker coordination | Accepted | First transcription-worker substrate implemented under the bounded Green plan; real provider/model and automatic enqueue remain unselected |
+| [ADR-0025](ADR-0025-postgresql-durable-operations-and-workers.md) | PostgreSQL-backed Durable Operations, attempts, leases, and Worker coordination | Accepted | First transcription-worker substrate implemented; automatic enqueue exists only in the bounded, default-off Demo 2 coordinator (`docs/plans/demo2-autonomous-event-node.md:14`, `backend/app/demo/autonomous.py:270`), not as a general selection; the 2026-08-18 acceptance selects faster-whisper 1.2.1, CTranslate2 4.8.1, and pinned large-v3-turbo for the first local implementation, with broader production qualification conditional (`docs/validation/transcription-engine-evaluation.md:133`). The worker composes the adapter (`backend/app/demo/worker.py:72`); the core Work Execution port remains provider-neutral (`backend/app/contexts/work_execution/service.py:42`, `backend/app/contexts/transcription_evidence/application.py:40`). The optional operator-installed `transcription` group is excluded from distributable artifacts under ED-0075, without legal clearance (`backend/pyproject.toml:14`) |
 | [ADR-0026](ADR-0026-policy-scoped-automatic-authority.md) | Evidence-to-policy-to-authority evaluation with scoped activation and durable provenance | Accepted | Accepted 2026-08-28; establishes the boundary only and activates no automation; no implementation |
 | [ADR-0027](ADR-0027-media-timing-evidence.md) | Dedicated durable revisioned advisory Media Timing Evidence linked to Completed Media Asset | Accepted | MTE v1 implemented; recorder qualification and automatic authority remain Yellow |
 | [ADR-0028](ADR-0028-devcon-external-integration-boundary.md) | Bounded Devcon program-read and guarded human-confirmed enrichment-write boundary | Accepted | Retroactively documents the shipped Demo integration and its failure/verification semantics; no new external write; role narrowed to optional adapter with its write path frozen by ADR-0031 |
 | [ADR-0029](ADR-0029-nvenc-rendering-and-gpu-worker-requirement.md) | NVENC hardware-accelerated rendering; NVIDIA GPU required for render-eligible workers | Accepted | Encoder/hardware choice only; ED-0077 implements Session Assembly; rendering and render Worker Capability remain future work |
 | [ADR-0030](ADR-0030-packaging-asset-identity.md) | Separate `PackagingAsset` aggregate owned by Assembly, distinct from Completed Media Asset | Accepted | ED-0076 implements Packaging Asset identity, immutable content revisions, and human approval lineage; ED-0077 implements Session Assembly templates, frozen proposals, validation, and human approval |
 | [ADR-0031](ADR-0031-white-label-identity-and-provider-neutral-program-sources.md) | White-label product identity; provider-neutral program-source port with a local schedule-file default; external publication frozen | Accepted | Implemented through ED-0079 and ED-0080; narrows ADR-0028's role |
+
+**ADR-0031 known residual:** Demo CLI preflight retains `devcon_read_available` and
+`devcon_program_items` (`backend/app/demo/cli.py:144`, `backend/app/demo/cli.py:145`),
+and the `devcon_read_not_configured` /
+`configured_devcon_program_empty` error codes outside adapters
+(`backend/app/demo/cli.py:105`, `backend/app/demo/cli.py:108`). The Demo rehearsal-report
+projection retains the `devcon` key (`backend/app/demo/controller.py:297`), consumed
+through `payload.devcon.*` reads in `scripts/demo/StageFlow-Demo.ps1:383` and
+`scripts/demo/StageFlow-Demo.ps1:384`. These names remain pending a follow-up directive
+covering both producer and launcher consumer; ED-0082 records the residual without renaming fields
+(`docs/plans/post-merge-documentation-reconciliation.md:78`,
+`docs/plans/post-merge-documentation-reconciliation.md:98`).
 
 ## Unresolved ADR candidates
 

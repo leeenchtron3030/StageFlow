@@ -2,6 +2,10 @@
 
 ## Status
 
+*Status note 2026-09-25:* Completed; real PostgreSQL execution verified, including
+reconstruction and concurrent registration
+(`docs/reviews/contract-stabilization-final-verification.md:130`).
+
 In progress - implementation complete; real PostgreSQL execution pending
 
 ## Execution authority

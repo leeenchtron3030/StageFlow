@@ -73,7 +73,11 @@ active and still-assembling Sessions, a bounded recent Session projection with e
 truncation, expectation linkage and completion authority, package revision/state,
 bounded recent media identities and association provenance, advisory boundary proposals,
 media-state counts, latest media arrival, reconciliation state, dependency state, and
-attention codes. A database outage returns HTTP 503 with `postgresql_unavailable`.
+attention codes. The nullable `automation` projection reports coordinator enablement,
+state, ownership, configured cadences, cycle/enqueue counts, and last attempt, success,
+and failure details (`backend/app/api/v1/kernel_status.py:177`,
+`backend/app/api/v1/kernel_status.py:210`). A database outage returns HTTP 503 with
+`postgresql_unavailable`.
 Source paths and the PostgreSQL DSN are not returned.
 
 `KernelComponents.run_media_cycle(...)` performs one bounded synchronous pass. Each pass

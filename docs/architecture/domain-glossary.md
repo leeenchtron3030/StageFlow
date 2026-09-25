@@ -58,6 +58,19 @@ authorized by this document.
 - **Composition aliases:** removed under ED-0081. `program_source` and `sync_program()`
   are the only composition names; the former Devcon aliases no longer exist.
 
+### Program refresh
+
+- **Definition:** The coordinator's timed call of `sync_program()`, whose successful
+  outcome is a Program Expectation reconciliation
+  (`backend/app/demo/autonomous.py:220`, `backend/app/demo/autonomous.py:315`,
+  `backend/app/contexts/integration/program_source.py:8`).
+- **Distinction:** Refresh names the scheduled invocation; reconciliation names its
+  domain result. The call delegates to the configured Program Schedule Source
+  (`backend/app/bootstrap/event_mode_kernel.py:164`).
+- **Compatibility:** Existing `program_refresh_*` configuration/status fields retain
+  their names (`backend/app/core/config/deployment.py:225`,
+  `backend/app/api/v1/kernel_status.py:184`, `backend/app/api/v1/kernel_status.py:194`).
+
 ### Production Event
 
 - **Definition:** The provider-neutral ingress statement that a source reports something

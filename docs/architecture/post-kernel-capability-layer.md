@@ -26,8 +26,9 @@ authority. They do not create parallel versions of those concepts.
 Related authority includes the Product Constitution, ADR-0001, ADR-0002, ADR-0009,
 ADR-0012, ADR-0013, ADR-0022 through ADR-0025, the current domain glossary, and the
 Durable Event-Mode Kernel architecture and closure record. ADR-0025 accepts the bounded
-first-transcription-worker execution model; proposed ADR-0026 retains the unresolved
-automation-authority decision.
+first-transcription-worker execution model; ADR-0026 was accepted on 2026-08-28 and
+establishes the policy-scoped authority boundary without activating automation
+(`docs/adr/ADR-0026-policy-scoped-automatic-authority.md:5`).
 
 ## Protected Kernel boundary
 
@@ -130,7 +131,7 @@ or externally dependent.
 | Program Expectation `speakers: Sequence[str]` | Requires bounded extension | Supplies provisional display names only; it has no participant identity, role, affiliation, ordering authority, or observed-presence meaning |
 | In-memory Operational State repository | Legacy for durable capability authority | Useful policy evidence only; restart-safe candidate, worker, approval, and assembly state belongs in PostgreSQL |
 | Foundational broad Candidate Moment/Clip documents | Reusable business meaning, legacy implementation detail | Preserve Candidate → Clip and Hot urgency semantics; do not copy unapproved lifecycle/event shapes mechanically |
-| Transcription/vision execution provider interfaces | Bounded transcription port implemented | Provider-neutral transcription port and durable normalized evidence exist; no provider SDK/model runtime, FFmpeg boundary, or vision execution port is selected |
+| Transcription/vision execution provider interfaces | Bounded transcription port and first local adapter implemented | The core Work Execution port remains provider-neutral; the first local provider is accepted and optional/operator-installed, with the distribution exclusion retained.[^local-transcription] Vision execution remains future work |
 
 Provider request/response contracts must be isolated behind capability-specific ports.
 Provider/model output becomes a versioned analysis artifact with provenance before a
@@ -298,12 +299,12 @@ status map keeps the boundary explicit:
 | Package-revision basis and downstream impact | Kernel package revision/history and late-media reopening are implemented | Candidate/Clip/Assembly/output references retain their historical basis and expose unaffected, revalidate, outside-boundary, or missing-source impact | Historical-basis requirement accepted; impact policy future |
 | Cross-role review/request attention | No cross-role request workflow | Typed request/attention projection names required authority and affected Session/revision; it does not perform the target command | Proposed capability; generic task assignment deferred |
 | Evidence/provenance inspector | Epistemic/provenance contracts exist | Provide domain-qualified meaning, source, policy/model/actor, evidence, history, and technical detail in progressive-disclosure order | Accepted UX constraint; projection future |
-| Shared state/revision components | Kernel exposes package revision and recovery state; Assembly absent | Distinguish health/impact/attention, stale/recovering/available, authoritative/proposed, package/Assembly revision, and read-only history | Proposed shared frontend language; no new domain authority |
+| Shared state/revision components | Kernel exposes package revision and recovery state; ED-0077 implements independent Assembly revisions (`docs/plans/session-assembly-foundation.md:222`) | Distinguish health/impact/attention, stale/recovering/available, authoritative/proposed, package/Assembly revision, and read-only history | Proposed shared frontend language; no new domain authority |
 | Shared visual system and density | No shared frontend component/design-token system exists | Stable dark-capable surface hierarchy, dense aligned rows, restrained semantic color, provenance/timeline grammar, visible keyboard focus, accessible redundant state cues, and role-specific composition over shared primitives | UX/frontend requirement; no architecture decision or implementation |
 | Responsive operational layout | Current frontend is a static shell | MacBook layouts preserve identity/state/action and collapse secondary context; external displays add simultaneous context rather than scaling typography | Future frontend requirement |
 | Stale-state action gating | Kernel commands support expected revisions; no control frontend | Mark projections stale, disable authoritative actions, explain why, refresh current revision, and reject stale multi-operator commands | Accepted safety requirement; UI/API composition future |
 | Bounded collections | Kernel status is bounded; no Editorial/Work Queue APIs | Cursor, limit, ordering/freshness token, reliable count semantics, explicit truncation, and continuation | Proposed read-model/API requirement |
-| Assembly state and approval provenance | Kernel package state is implemented; Assembly is not | Independent Assembly revision/status projection and scoped approval decision | Packaging identity and ADR-0026 remain Yellow-gated where applicable |
+| Assembly state and approval provenance | ED-0077 implements independent Assembly revisions, validation, and human approval (`docs/plans/session-assembly-foundation.md:222`) | Independent Assembly revision/status projection and scoped approval decision | Human-only foundation implemented; accepted ADR-0026 activates no automation (`docs/adr/ADR-0026-policy-scoped-automatic-authority.md:5`) |
 | Marketing-ready outputs | No Marketing/render/publish workflow | Consume Editorial-approved, rendered, provenance-bearing outputs without raw Candidate authority | Deferred |
 
 UI-friendly `Moment Candidate` labels map to canonical `Editorial Candidate Moment`.
@@ -512,7 +513,8 @@ Durable Operation.
 ## Progressive approval automation
 
 Automation is policy-scoped by decision type, Event/deployment, and version. It is never
-a global Boolean. Proposed ADR-0026 defines the durable authority boundary.
+a global Boolean. Accepted ADR-0026 defines the durable authority boundary without
+activating automation (`docs/adr/ADR-0026-policy-scoped-automatic-authority.md:5`).
 
 The policy modes are:
 
@@ -613,13 +615,16 @@ Use a bounded sequence C:
 3. **Concrete transcription execution (bounded substrate implemented):** migration 0007
    and its internal contracts/repository implement the Durable Operation/Attempt/Worker
    pieces, provider-neutral transcript evidence, and bounded status projection. A real
-   provider/model and deployment qualification remain separate Yellow work.
+   local provider is accepted and implemented behind the adapter; broader production
+   qualification remains conditional.[^local-transcription]
 4. **Machine candidate generation:** deterministic and then inferred candidates consume
    versioned transcript/analysis artifacts with provenance and idempotent outputs.
 5. **Assembly foundation:** ADR-0030 identity and the ED-0076 Packaging Asset foundation
    are implemented. Templates, proposals, independent Session Assembly revisions,
-   validation, and manual Assembly approval remain ED-0077 work.
-6. **Scoped automation:** after ADR-0026 acceptance and sufficient measured evidence,
+   validation, and manual Assembly approval are implemented by ED-0077
+   (`docs/plans/session-assembly-foundation.md:222`).
+6. **Scoped automation:** under accepted ADR-0026, with sufficient measured evidence
+   and explicit scoped activation (`docs/adr/ADR-0026-policy-scoped-automatic-authority.md:47`),
    enable one low-risk decision type at a time. Rendering and publishing remain later
    consumers.
 
@@ -667,17 +672,20 @@ are healthy.
 Green classification does not authorize implementation from this proposed document by
 itself. Each slice still needs a bounded implementation-ready plan and objective tests.
 
-### Resolved decision
+### Resolved decisions
 
 - **ADR-0025:** accepted on 2026-08-17 for the PostgreSQL Durable
   Operation/Attempt/lease/Worker model and its first transcription consumer. The bounded
-  migration-0007 substrate is implemented; this does not select a real provider/model,
-  authorize automatic enqueue, or expand Session/media/Editorial authority.
+  migration-0007 substrate is implemented. The subsequent 2026-08-18 acceptance selects
+  the first local provider; the Work Execution port remains provider-neutral.[^local-transcription]
+- **ADR-0026:** accepted on 2026-08-28 for versioned, policy-scoped automatic authority
+  and activation/provenance semantics; acceptance activates no automation
+  (`docs/adr/ADR-0026-policy-scoped-automatic-authority.md:5`).
 
 ### Yellow decisions
 
-1. **ADR-0026:** accept versioned, policy-scoped automatic decision authority and
-   activation/provenance semantics.
+ADR-0026 acceptance is resolved; activation remains explicit per decision type and scope
+(`docs/adr/ADR-0026-policy-scoped-automatic-authority.md:47`).
 
 Packaging asset identity was resolved by accepted ADR-0030 and implemented in the
 bounded ED-0076 slice; it is no longer a Yellow decision.
@@ -688,7 +696,8 @@ future change to those durable/public terms would be Yellow.
 
 ## Deferred capabilities and non-goals
 
-Deferred work includes model/provider selection, speaker diarization and authoritative
+Deferred work includes broader production-provider/model qualification beyond the
+accepted first local baseline,[^local-transcription] speaker diarization and authoritative
 participant identity, candidate merge/split, clip export, rendering, publishing,
 delivery, cloud scheduling, a transactional outbox, broker adoption, cross-Event worker
 federation, automatic OS/recorder control, and production hardware qualification.
@@ -696,3 +705,13 @@ federation, automatic OS/recorder control, and production hardware qualification
 This architecture does not authorize production code, dependencies, schemas,
 migrations, frontend work, deployment, machine-setting changes, or event-readiness
 claims.
+
+[^local-transcription]: The 2026-08-18 acceptance selects faster-whisper 1.2.1,
+    CTranslate2 4.8.1, and the pinned large-v3-turbo model for the first local implementation;
+    broader production selection remains conditional
+    (`docs/validation/transcription-engine-evaluation.md:133`). The worker composes the
+    adapter (`backend/app/demo/worker.py:72`) behind the provider-neutral execution port
+    (`backend/app/contexts/transcription_evidence/application.py:40`,
+    `backend/app/contexts/work_execution/service.py:42`). The optional operator-installed
+    `transcription` group is excluded from distributable artifacts under ED-0075
+    (`backend/pyproject.toml:14`); this is not legal clearance.

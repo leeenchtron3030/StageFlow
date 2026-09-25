@@ -2,6 +2,9 @@
 
 ## Status
 
+*Status note 2026-09-25:* Completed; PR #71 merged to `main` (`085e01f`, 2026-09-25).
+Merge evidence: commit `085e01f`.
+
 Completed (2026-09-25). Implemented on draft PR #71 and rehearsed on the reference host.
 ED-0071 criteria 4, 6, and 7 qualified; the PostgreSQL-outage leg was not exercised live.
 Merging PR #71 awaits the owner's explicit approval. See
