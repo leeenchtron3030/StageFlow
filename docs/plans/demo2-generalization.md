@@ -406,7 +406,8 @@ kind and exception type. No media path or transcript text appears in logs or res
 
 - **Implemented revision:** PR #71 branch `codex/demo2-autonomous-event-node`. Commits:
   - merge commit `9d63290`, with parents `1433bea` (branch) and `34a804e` (`main`);
-  - launcher fix `f48087f`;
+  - launcher fixes `f48087f` and `4a0ec4f` (the second rewords a header comment that
+    broke the launcher contract test in Linux CI);
   - the result and status commit that records this completion.
 
   Nothing was force-pushed.
