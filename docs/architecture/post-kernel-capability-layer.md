@@ -15,7 +15,8 @@ Moment slice, and ED-0072 implements the append-only human review, Editorial Cli
 bounded Event review-queue foundation. Machine-origin candidates remain future work.
 ED-0076 implements ADR-0030's Packaging Asset identity, immutable content revisions,
 human approval lineage, and bounded authenticated reads in the new Assembly context.
-Session Assembly templates, proposals, revisions, validation, and rendering remain future work.
+ED-0077 implements Session Assembly templates, proposals, revisions, validation, and
+human approval. Rendering remains future work.
 
 The Kernel remains the protected operational foundation. New capabilities reference its
 Business Event, Stage, Program Expectation, realized Session, media registration,
@@ -441,8 +442,8 @@ the first content revision requires `expected_revision=0`.
 
 Authenticated `/api/v1/assembly` routes register assets, append revisions and decisions,
 and provide Event-scoped asset and revision pages with limits 1–100, keyset continuation,
-counts, and explicit truncation. Completed Media Asset lifecycle coupling, Session
-Assembly templates/proposals/revisions, and validation remain ED-0077 scope. The reserved
+counts, and explicit truncation. Session Assembly references those revisions through the
+ED-0077 foundation below. The reserved
 `packaging` context and the unrelated Runtime asset assembly plan remain unchanged.
 
 ### Metadata-driven graphics
@@ -462,11 +463,51 @@ it required; it does not make the Session package incomplete.
 
 ### Proposal and approval
 
+ED-0077 implements the bounded human-only foundation. Template versions are immutable
+within an Event and template key; each has 1–100 ordered, uniquely keyed slots and
+declares required `session_title` and/or `participant_names` metadata. A Session's ID
+also identifies its Assembly history; proposals append numbered revisions, superseding
+the prior revision, with optimistic Assembly and package-revision guards.
+
+Proposals require a `complete` Kernel package and pin its completion decision and exact
+`session_completion_asset` membership, including association revisions. Ineligible
+packages produce a persisted invalid revision. Members sort by registered media start,
+then asset ID for ties; missing timing or unavailable membership blocks validation.
+No live association membership or media content is read. Each `session_media` slot
+references that one frozen membership sequence.
+
+For each packaging slot, only approved revisions with matching role and Event, matching
+or unset Stage, and an effective interval covering authoritative Session start qualify.
+Intervals are start-inclusive and end-exclusive; an absent endpoint is unbounded.
+Exactly one candidate binds; zero or multiple candidates remain unresolved. Explicit
+bindings must themselves qualify. Unresolved required slots fail validation; optional
+unresolved slots remain visible. Invalid explicit bindings fail even for optional slots.
+
+Metadata freezes title and speaker display strings from the current revision of the
+Session's linked Program Expectation. Each field retains source identity and revision.
+Alphabetical display-string normalization conveys no participant identity or billing
+order. Missing metadata blocks only templates requiring it. Neither metadata changes nor
+new Packaging Asset content revisions rewrite an existing Assembly.
+
+Read-time staleness means a later Kernel package revision or a bound Packaging Asset
+revision whose latest decision is no longer approval. Human approve/reject decisions
+require a valid, current, non-stale revision and the displayed per-revision decision
+count. Decisions retain a Session-wide append sequence and `authority_kind=human`.
+Exact command replay returns its immutable original result. No automation is activated.
+
+The existing authenticated `/api/v1/assembly` router now adds template creation,
+Session proposal and approval commands, Event-scoped template pages, and Event-scoped
+per-Session revision pages. Reads expose validation reasons, current revision, staleness,
+and decision lineage with limits 1–100 and explicit continuation. Migration `0013`
+persists this foundation; rendering, metadata overrides, and a participant model remain
+outside its scope.
+
 An Assembly proposal resolves the applicable template against a fixed package revision,
 selects approved packaging-asset versions, snapshots metadata, and records provenance.
 Validation checks references, versions, template resolution, required bindings, package
-eligibility, and prohibited unresolved conditions. Approval then follows the scoped
-automation policy. Rendering remains a separate future Durable Operation.
+eligibility, and prohibited unresolved conditions. Future automatic approval requires an
+explicitly activated scoped policy under ADR-0026. Rendering remains a separate future
+Durable Operation.
 
 ## Progressive approval automation
 

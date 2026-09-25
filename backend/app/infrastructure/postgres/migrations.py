@@ -84,6 +84,13 @@ class PostgresMigrationRunner:
             "0012_packaging_asset_foundation_forward.sql",
             version="0012_packaging_asset_foundation",
         )
+        self.apply_session_assembly_foundation_v1()
+
+    def apply_session_assembly_foundation_v1(self) -> None:
+        self._execute_if_missing(
+            "0013_session_assembly_foundation_forward.sql",
+            version="0013_session_assembly_foundation",
+        )
 
     def reverse_event_mode_kernel_v1(self) -> None:
         self.reverse_demo_vertical_slice_v1()
@@ -142,9 +149,16 @@ class PostgresMigrationRunner:
         )
 
     def reverse_packaging_asset_foundation_v1(self) -> None:
+        self.reverse_session_assembly_foundation_v1()
         self._execute_if_present(
             "0012_packaging_asset_foundation_reverse.sql",
             version="0012_packaging_asset_foundation",
+        )
+
+    def reverse_session_assembly_foundation_v1(self) -> None:
+        self._execute_if_present(
+            "0013_session_assembly_foundation_reverse.sql",
+            version="0013_session_assembly_foundation",
         )
 
     def _execute(self, filename: str) -> None:

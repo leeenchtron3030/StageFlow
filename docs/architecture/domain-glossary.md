@@ -159,7 +159,8 @@ authorized by this document.
   per revision and never inherited by another revision.
 - **Migration:** ADR-0030 and ED-0076 implement this boundary in `contexts/assembly/`
   and additive migration `0012`. Paths are not accepted as identity. Track applicability
-  and Session Assembly remain deferred; `contexts/packaging/` stays reserved for delivery.
+  remains deferred; ED-0077 implements Session Assembly. `contexts/packaging/` stays
+  reserved for delivery.
 - **Example:** A sponsor card's second content revision starts unreviewed even when its
   first revision was approved.
 
@@ -226,8 +227,15 @@ authorized by this document.
   branding settings but do not define this separate aggregate. The existing Runtime
   asset assembly plan is a Completed Media Asset manifest mapping and is not Session
   Assembly.
-- **Migration:** No implementation exists. Assembly revision must remain independent of
-  Session package revision when introduced.
+- **Implementation:** ED-0077 implements immutable Event-scoped `AssemblyTemplate`
+  versions, ordered slots, Session-numbered `AssemblyRevision`s, frozen completion
+  membership and metadata values with Program Expectation source revisions, typed
+  validation, and append-only human `AssemblyApprovalDecision`s. `SessionAssembly` is a
+  read projection using the Session ID as its stable identity. Current revision,
+  approval, and staleness derive from authoritative inputs/history.
+- **Migration:** Additive migration `0013`; reverses before Packaging Assets (`0012`).
+  Assembly revision remains independent of Session package revision. No rendering or
+  Runtime asset assembly plan change is included.
 - **Example:** Replacing a sponsor outro creates Assembly revision 4 while Session
   package revision 2 remains unchanged.
 

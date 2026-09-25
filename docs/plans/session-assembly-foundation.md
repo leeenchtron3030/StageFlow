@@ -2,7 +2,8 @@
 
 ## Status
 
-Approved
+Completed (2026-09-25). Sandbox validation passed; the owner's full-suite host validation
+passed (see the addendum at the end).
 
 ## Execution authority
 
@@ -187,23 +188,24 @@ and approval state, without media paths or actor secrets.
 
 ## Acceptance criteria
 
-- [ ] Templates are immutable, versioned, Event-scoped, with ordered slots and declared
+- [x] Templates are immutable, versioned, Event-scoped, with ordered slots and declared
   required metadata.
-- [ ] Proposals require a `complete` package and pin its revision and completion
+- [x] Proposals require a `complete` package and pin its revision and completion
   membership.
-- [ ] Packaging binding is deterministic: exactly one eligible approved candidate binds;
+- [x] Packaging binding is deterministic: exactly one eligible approved candidate binds;
   zero or several leave the slot unresolved unless a valid explicit binding is given.
-- [ ] Each revision freezes its bindings, membership, and metadata snapshot with source
+- [x] Each revision freezes its bindings, membership, and metadata snapshot with source
   revisions.
-- [ ] Validation results carry typed reason codes; missing metadata never affects package
+- [x] Validation results carry typed reason codes; missing metadata never affects package
   completeness.
-- [ ] Staleness is derived at read time from package-revision advance or packaging
+- [x] Staleness is derived at read time from package-revision advance or packaging
   revocation; stored rows never change.
-- [ ] Approval is human, append-only, and only for valid, current, non-stale revisions.
-- [ ] Migration `0013` is additive and reverses before `0012`.
-- [ ] No rendering, metadata editing, automation activation, or Kernel/Packaging Asset
+- [x] Approval is human, append-only, and only for valid, current, non-stale revisions.
+- [x] Migration `0013` is additive and reverses before `0012`.
+- [x] No rendering, metadata editing, automation activation, or Kernel/Packaging Asset
   mutation is introduced.
-- [ ] Full backend suite, Ruff, and Pyright pass, apart from known environmental failures.
+- [x] Full backend suite, Ruff, and Pyright pass, apart from known environmental failures
+  (sandbox temporary-directory setup failures; see completion record).
 
 ## Rollback or reversal
 
@@ -217,4 +219,72 @@ Kernel are untouched.
 
 ## Completion record
 
-_(To be filled in by whoever implements this plan.)_
+Implemented 2026-09-25 under ED-0077, Green authority, on
+`codex/ed-0077-session-assembly-foundation`; changes remain uncommitted for owner review.
+
+- Added immutable contracts, pure resolver/validator, synchronous idempotent service,
+  in-memory test repository, PostgreSQL repository, additive migration `0013`, startup
+  schema verification/composition, and authenticated command/read routes on the existing
+  Assembly router. Updated glossary, persistence, capability-layer and directive/plan
+  indexes. No dependency, lockfile, frontend, Kernel/Packaging table or semantic change.
+- Bounded choices: template keys are versioned within an Event; Session ID is the stable
+  Assembly-history identity; effective intervals are start-inclusive/end-exclusive;
+  unknown media timing or unavailable completion membership yields invalidity; equal
+  media-start times sort by asset ID. Optional unresolved slots remain visible without
+  blocking validation; explicit ineligible selections fail even for optional slots.
+  Metadata display strings are source data, not participant identities or billing order.
+- Approval guards use the displayed per-revision decision count, while append sequence
+  numbers remain Session-wide. Independent review found and reproduced an initial
+  mismatch between these two counts; both adapters were corrected and a regression test
+  added. Independent review reported no remaining correctness findings.
+- Focused validation: `uv run --no-sync pytest tests/test_session_assembly_foundation.py
+  -p no:cacheprovider -ra` — **61 passed**, including real PostgreSQL persistence,
+  reconstruction, replay, concurrent proposal single-winner behavior, immutable-trigger
+  rejection, upstream preservation, and `0013` reverse/reapply; one existing Starlette
+  TestClient/httpx deprecation warning.
+- `uv run --no-sync ruff check .` passed. `uv run --no-sync pyright` reported
+  **0 errors, 0 warnings** (tool update notice only). Full diff and independent review
+  completed; `git diff --check` passed (Git LF/CRLF conversion notices only).
+- Final full suite: `uv run --no-sync pytest -p no:cacheprovider --tb=no -r s` —
+  **1804 passed, 0 failed, 1 skipped, 178 setup errors, 1 warning**. All setup errors
+  stem from WinError 5 on pytest temporary directories under `.codex-tmp`; the skip is
+  the POSIX-only descriptor-bound scandir case. The four known turnover checkpoint
+  cases errored at fixture setup, so their encoding assertions neither passed nor
+  failed. Frontend checks were not run because no frontend file changed.
+  An initial full run had
+  1802 passed, 1 failed, 1 skipped and 178 temporary-directory setup errors. The one
+  change-caused failure was the timestamp guard detecting a UTC sorting sentinel; the
+  sentinel was removed. A fresh explicit `--basetemp` retry also hit WinError 5 and
+  aborted pytest's final summary during temporary-directory cleanup. No test or safety
+  controls were weakened, and no unrelated test code was changed.
+- Environment: every test process clears `STAGEFLOW_API_SHARED_SECRET`; `TMP` and `TEMP`
+  point to the worktree's `.codex-tmp`. UV cache is also routed there after the system UV
+  cache denied access, and `VIRTUAL_ENV` points to this worktree's existing `.venv`.
+  Pytest cache provider and bytecode writes are disabled for validation. Temporary output
+  is retained for owner removal as directed; no forced cleanup was attempted.
+- No open product/architecture decision. Full-suite validation outside this sandbox
+  remains an owner action; this foundation is not an event-readiness claim.
+
+### Owner validation addendum (2026-09-25)
+
+Host full suite, outside the sandbox, with the inherited `STAGEFLOW_API_SHARED_SECRET` and
+`VIRTUAL_ENV` cleared and `uv run --no-sync`: **1,977 passed, 4 failed, 2 skipped.** The 4
+failures are the known Windows console-encoding cases in
+`test_validation_controller.py::test_turnover_boundaries_emit_exact_live_operation_checkpoints`.
+Ruff and Pyright were clean.
+
+Owner review confirmed the plan's hard constraints:
+
+- The Session Assembly repository writes only to the seven tables `0013` creates, and only
+  by `INSERT`; it issues no `UPDATE` or `DELETE`, and no Kernel or Packaging Asset table is
+  written.
+- `0013` alters no existing table.
+- The binding resolver in `resolution.py` is pure: it imports only contracts and IDs.
+- Staleness and approval state are derived; neither is stored.
+- Approval is human-only by construction: `authority_kind` is typed `Literal["human"]` and
+  validated, so no ADR-0026 automation path exists.
+- An incomplete package yields a typed `INELIGIBLE_PACKAGE` validation result.
+- The one change to `test_packaging_asset_foundation.py` updates the expected migration
+  reverse order to reverse `0013` before `0012`, as the plan requires.
+- Fixtures carry no event, organizer, or host identities.
+

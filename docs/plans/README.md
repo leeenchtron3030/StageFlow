@@ -134,7 +134,7 @@ or architecture document unless those documents are explicitly updated.
 | [Demo 2 promotion closure and plan-status reconciliation](demo2-promotion-closure.md) | Completed - Green documentation reconciliation | StageFlow Demo Operations / Governance | ED-0071 closure; ED-0074 |
 | [Transcription distribution boundary](transcription-distribution-boundary.md) | Completed - Green documentation and guard | StageFlow Engineering / Security | ED-0066 option 3 selection; ED-0075 |
 | [Packaging Asset foundation](packaging-asset-foundation.md) | Completed - Green Packaging Asset foundation | StageFlow Assembly / Backend | ADR-0030; delivery-sequence step 5; ED-0076 |
-| [Session Assembly foundation](session-assembly-foundation.md) | Approved | StageFlow Assembly / Backend | Delivery-sequence step 5; ADR-0030; ED-0077 |
+| [Session Assembly foundation](session-assembly-foundation.md) | Completed - Green Session Assembly foundation | StageFlow Assembly / Backend | Delivery-sequence step 5; ADR-0030; ED-0077 |
 | [Native FFmpeg render benchmark](native-ffmpeg-render-benchmark.md) | Approved | StageFlow Validation / Backend | ED-0073 follow-up; ADR-0029; ED-0078 |
 | [Provider-neutral program source](provider-neutral-program-source.md) | Completed - Green provider-neutral program source | StageFlow Integration / Backend | ADR-0031; ED-0079 |
 | [White-label presentation pass](white-label-presentation-pass.md) | Completed - Green white-label presentation pass | StageFlow Frontend / Operations | ADR-0031; ED-0080 |
