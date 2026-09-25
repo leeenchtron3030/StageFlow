@@ -28,11 +28,13 @@ from app.contexts.assembly.service import PackagingAssetService
 from app.contexts.assembly.session_contracts import (
     AssemblyAction,
     AssemblyApprovalDecision,
+    AssemblyMetadataOverride,
     AssemblyRevision,
     AssemblySlot,
     AssemblyTemplate,
     ExplicitBinding,
     MetadataField,
+    MetadataOverrideAction,
     PlacementRole,
 )
 from app.contexts.assembly.session_repository import (
@@ -346,6 +348,61 @@ class AssemblyDecisionCommand(HumanCommand):
     expected_decision_count: Annotated[int, Field(ge=0, le=MAX_INTEGER - 1, strict=True)]
     action: AssemblyAction
     reason: Annotated[str, Field(min_length=1, max_length=500)]
+
+
+class MetadataOverrideCommand(HumanCommand):
+    field: MetadataField
+    action: MetadataOverrideAction
+    values: Annotated[
+        tuple[Annotated[str, Field(min_length=1, max_length=1000)], ...], Field(max_length=100)
+    ] = ()
+    expected_sequence: Annotated[int, Field(ge=0, le=MAX_INTEGER - 1, strict=True)]
+    reason: Annotated[str, Field(min_length=1, max_length=500)]
+
+
+def _metadata_override(entry: AssemblyMetadataOverride) -> dict[str, object]:
+    return {
+        "override_id": entry.id.value, "session_id": entry.session_id.value,
+        "field": entry.field.value, "action": entry.action.value, "values": entry.values,
+        "sequence": entry.sequence, "actor_id": entry.actor_id.value,
+        "recorded_at": entry.recorded_at, "reason": entry.reason,
+        "authority_kind": entry.authority_kind,
+    }
+
+
+@router.post("/sessions/{session_id}/metadata-overrides")
+def record_metadata_override(
+    session_id: UUID, command: MetadataOverrideCommand, request: Request,
+) -> dict[str, object]:
+    try:
+        return _metadata_override(_assemblies(request).record_metadata_override(
+            operation_id=EntityId(str(command.operation_id)),
+            actor_id=EntityId(str(command.actor_id)), session_id=EntityId(str(session_id)),
+            field=command.field, action=command.action, values=command.values,
+            expected_sequence=command.expected_sequence, reason=command.reason,
+        ))
+    except _ERRORS as exc:
+        raise _error(exc) from exc
+
+
+@router.get("/events/{event_id}/sessions/{session_id}/metadata-overrides")
+def list_metadata_overrides(
+    event_id: UUID, session_id: UUID, request: Request,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    after: Annotated[int, Query(ge=0, le=MAX_INTEGER)] = 0,
+) -> dict[str, object]:
+    try:
+        page = _assemblies(request).repository.list_metadata_overrides(
+            EntityId(str(event_id)), EntityId(str(session_id)), after=after, limit=limit,
+        )
+        return {
+            "event_id": str(event_id), "session_id": str(session_id),
+            "items": [_metadata_override(entry) for entry in page.items],
+            "total_count": page.total_count, "next_after": page.next_after,
+            "items_truncated": page.next_after is not None, "limit": limit,
+        }
+    except _ERRORS as exc:
+        raise _error(exc) from exc
 
 
 def _assemblies(request: Request) -> SessionAssemblyService:

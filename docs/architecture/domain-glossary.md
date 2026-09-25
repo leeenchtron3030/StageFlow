@@ -252,6 +252,25 @@ authorized by this document.
 - **Example:** Replacing a sponsor outro creates Assembly revision 4 while Session
   package revision 2 remains unchanged.
 
+### Assembly metadata override
+
+- **Definition:** An immutable human `set` or `clear` entry for `session_title` or
+  `participant_names`, local to a Session's Assembly history (ED-0086).
+- **Provenance:** Override ID, Session, field, values, Session-wide append sequence,
+  actor, aware injected-clock recording time, and reason. Values are display strings;
+  they introduce no participant identity or observed-presence authority.
+- **Resolution:** The latest entry per field wins by sequence. `set` supplies a frozen
+  `operator_override` value with override ID and sequence as source lineage; `clear`
+  restores the current linked Program Expectation value, or absence if unavailable.
+- **Distinction:** It never edits Program Expectations, Session/package authority, or
+  Packaging Assets. An existing Assembly revision establishes the command's scope.
+- **Migration:** Additive `0014` stores override history and separate override snapshot
+  references; existing Program-sourced snapshots remain unchanged. Staleness is derived
+  only when the override governing a field has changed since the revision was proposed;
+  Program Expectation refreshes never make a revision stale.
+- **Example:** An operator corrects a display title for the next Assembly proposal while
+  retaining the schedule's original title and all earlier Assembly revisions.
+
 ### Operational State
 
 - **Definition:** A versioned accepted assertion or projection of a subject's operational

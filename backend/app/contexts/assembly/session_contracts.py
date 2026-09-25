@@ -35,6 +35,56 @@ class MetadataField(StrEnum):
     PARTICIPANT_NAMES = "participant_names"
 
 
+class MetadataOverrideAction(StrEnum):
+    SET = "set"
+    CLEAR = "clear"
+
+
+@dataclass(frozen=True, slots=True)
+class AssemblyMetadataOverride:
+    id: EntityId
+    session_id: EntityId
+    field: MetadataField
+    action: MetadataOverrideAction
+    values: tuple[str, ...]
+    sequence: int
+    actor_id: EntityId
+    recorded_at: datetime
+    reason: str
+    authority_kind: Literal["human"] = "human"
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "field", MetadataField(self.field))
+        object.__setattr__(self, "action", MetadataOverrideAction(self.action))
+        if isinstance(self.values, str):
+            raise ValueError("values must be a sequence of display strings")
+        object.__setattr__(self, "values", tuple(self.values))
+        if self.action == MetadataOverrideAction.SET:
+            if not 1 <= len(self.values) <= 100:
+                raise ValueError("set requires 1..100 values")
+            for value in self.values:
+                if type(value) is not str:
+                    raise ValueError("values must contain display strings")
+                bounded_text(value, "value", 1000)
+        elif self.values:
+            raise ValueError("clear must not contain values")
+        positive(self.sequence, "sequence")
+        bounded_text(self.reason, "reason", 500)
+        require_aware_datetime(self.recorded_at, "recorded_at")
+        if self.authority_kind != "human":
+            raise ValueError("assembly authority must be human")
+
+
+@dataclass(frozen=True, slots=True)
+class MetadataOverridePage:
+    items: tuple[AssemblyMetadataOverride, ...]
+    total_count: int
+    next_after: int | None
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "items", tuple(self.items))
+
+
 class ValidationReason(StrEnum):
     INELIGIBLE_PACKAGE = "ineligible_package"
     COMPLETION_MEMBERSHIP_UNAVAILABLE = "completion_membership_unavailable"
@@ -107,13 +157,13 @@ class MetadataValue:
     values: tuple[str, ...]
     source_id: EntityId
     source_revision: int
-    source: Literal["program_expectation"] = "program_expectation"
+    source: Literal["program_expectation", "operator_override"] = "program_expectation"
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "field", MetadataField(self.field))
         object.__setattr__(self, "values", tuple(self.values))
         positive(self.source_revision, "source_revision")
-        if self.source != "program_expectation":
+        if self.source not in ("program_expectation", "operator_override"):
             raise ValueError("unsupported metadata source")
 
 

@@ -6,16 +6,40 @@ from app.shared.ids import EntityId
 from .contracts import ApprovalState, CommandIdentity
 from .session_contracts import (
     AssemblyInputs,
+    AssemblyMetadataOverride,
     AssemblyRevision,
     AssemblyTemplate,
     AssemblyValidation,
     ExplicitBinding,
+    MetadataField,
+    MetadataOverrideAction,
+    MetadataValue,
     PackagingCandidate,
     PlacementRole,
     SlotBinding,
     ValidationIssue,
     ValidationReason,
 )
+
+
+def resolve_metadata(
+    inputs: AssemblyInputs, overrides: Iterable[AssemblyMetadataOverride],
+) -> tuple[MetadataValue, ...]:
+    """Resolve by append sequence, never by clocks or input iteration order."""
+    latest: dict[MetadataField, AssemblyMetadataOverride] = {}
+    for entry in overrides:
+        if entry.session_id != inputs.session_id:
+            continue
+        previous = latest.get(entry.field)
+        if previous is None or entry.sequence > previous.sequence:
+            latest[entry.field] = entry
+    selected = {value.field: value for value in inputs.metadata}
+    for field, entry in latest.items():
+        if entry.action == MetadataOverrideAction.SET:
+            selected[field] = MetadataValue(
+                field, entry.values, entry.id, entry.sequence, "operator_override",
+            )
+    return tuple(selected[field] for field in sorted(selected))
 
 
 def resolve_bindings(
@@ -104,8 +128,17 @@ def build_revision(
 
 def is_stale(
     revision: AssemblyRevision, current_package_revision: int, approved_ids: frozenset[EntityId],
+    current_metadata: tuple[MetadataValue, ...] | None = None,
 ) -> bool:
-    return current_package_revision > revision.package_revision or any(
+    # ED-0077 design decision 7 (preserved by ED-0086): Program Expectation refreshes never
+    # make a revision stale. Metadata staleness compares only the operator override, if any,
+    # that governs each field.
+    def governing(values: tuple[MetadataValue, ...]) -> dict[MetadataField, EntityId]:
+        return {m.field: m.source_id for m in values if m.source == "operator_override"}
+
+    return (current_metadata is not None and governing(revision.metadata) != governing(
+        current_metadata,
+    )) or current_package_revision > revision.package_revision or any(
         b.packaging_revision_id is not None and b.packaging_revision_id not in approved_ids
         for b in revision.bindings
     )

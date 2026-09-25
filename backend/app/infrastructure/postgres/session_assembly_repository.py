@@ -1,6 +1,7 @@
 """Append-only Assembly persistence, reading Kernel and Packaging authority in one transaction."""
 from collections.abc import Generator
 from contextlib import contextmanager
+from dataclasses import replace
 from typing import Any, LiteralString
 
 import psycopg
@@ -20,11 +21,12 @@ from app.contexts.assembly.contracts import (
     nonnegative,
     validate_page,
 )
-from app.contexts.assembly.resolution import build_revision, is_stale
+from app.contexts.assembly.resolution import build_revision, is_stale, resolve_metadata
 from app.contexts.assembly.session_contracts import (
     AssemblyAction,
     AssemblyApprovalDecision,
     AssemblyInputs,
+    AssemblyMetadataOverride,
     AssemblyPage,
     AssemblyRevision,
     AssemblySlot,
@@ -33,6 +35,8 @@ from app.contexts.assembly.session_contracts import (
     CompletionMember,
     ExplicitBinding,
     MetadataField,
+    MetadataOverrideAction,
+    MetadataOverridePage,
     MetadataValue,
     PackagingCandidate,
     SessionAssembly,
@@ -69,6 +73,14 @@ def _decision(row: Row) -> AssemblyApprovalDecision:
         _id(row["decision_id"]), _id(row["session_id"]), _id(row["revision_id"]), row["sequence"],
         _id(row["actor_id"]), row["decided_at"], AssemblyAction(row["action"]), row["reason"],
         row["authority_kind"],
+    )
+
+
+def _override(row: Row) -> AssemblyMetadataOverride:
+    return AssemblyMetadataOverride(
+        _id(row["override_id"]), _id(row["session_id"]), MetadataField(row["field"]),
+        MetadataOverrideAction(row["action"]), tuple(row["values_json"]), row["sequence"],
+        _id(row["actor_id"]), row["recorded_at"], row["reason"], row["authority_kind"],
     )
 
 
@@ -109,6 +121,69 @@ class PostgresSessionAssemblyRepository:
         if receipt["command_kind"] != kind or receipt["request_digest"] != command.request_digest:
             raise AssemblyConflictError("human_command_operation_id_conflict")
         return _id(receipt["result_id"])
+
+    def record_metadata_override(
+        self, command: CommandIdentity, entry: AssemblyMetadataOverride, expected_sequence: int,
+    ) -> AssemblyMetadataOverride:
+        with self._transaction() as conn:
+            # The new row owns its receipt: 0013's command-kind constraint stays unchanged.
+            conn.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
+                         ("assembly_metadata_override:" + command.operation_id.value,))
+            receipt = conn.execute(
+                "SELECT * FROM stageflow.assembly_metadata_override WHERE operation_id=%s",
+                (command.operation_id.value,),
+            ).fetchone()
+            if receipt is not None:
+                if receipt["request_digest"] != command.request_digest:
+                    raise AssemblyConflictError("human_command_operation_id_conflict")
+                return _override(receipt)
+            self._session(conn, entry.session_id, lock=True)
+            if self._current(conn, entry.session_id) is None:
+                raise AssemblyNotFoundError("session_assembly_not_found")
+            current = conn.execute(
+                """SELECT COALESCE(max(sequence),0) AS sequence
+                   FROM stageflow.assembly_metadata_override WHERE session_id=%s""",
+                (entry.session_id.value,),
+            ).fetchone()
+            assert current is not None
+            if current["sequence"] != expected_sequence or entry.sequence != expected_sequence + 1:
+                raise AssemblyConflictError("metadata_override_sequence_conflict")
+            conn.execute(
+                """INSERT INTO stageflow.assembly_metadata_override
+                   (override_id,session_id,field,action,values_json,sequence,actor_id,recorded_at,
+                    reason,authority_kind,operation_id,request_digest)
+                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                (entry.id.value, entry.session_id.value, entry.field.value, entry.action.value,
+                 Jsonb(list(entry.values)), entry.sequence, entry.actor_id.value, entry.recorded_at,
+                 entry.reason, entry.authority_kind, command.operation_id.value,
+                 command.request_digest),
+            )
+            return entry
+
+    def list_metadata_overrides(
+        self, event_id: EntityId, session_id: EntityId, *, after: int = 0, limit: int = 50,
+    ) -> MetadataOverridePage:
+        validate_page(limit)
+        nonnegative(after, "after")
+        with self._transaction(read=True) as conn:
+            session = self._session(conn, session_id)
+            if _id(session["event_id"]) != event_id:
+                raise AssemblyNotFoundError("session_not_in_event")
+            if self._current(conn, session_id) is None:
+                raise AssemblyNotFoundError("session_assembly_not_found")
+            count = conn.execute(
+                """SELECT count(*) AS total FROM stageflow.assembly_metadata_override
+                   WHERE session_id=%s""", (session_id.value,),
+            ).fetchone()
+            assert count is not None
+            rows = conn.execute(
+                """SELECT * FROM stageflow.assembly_metadata_override
+                   WHERE session_id=%s AND sequence>%s ORDER BY sequence LIMIT %s""",
+                (session_id.value, after, limit + 1),
+            ).fetchall()
+            items = tuple(_override(row) for row in rows[:limit])
+            return MetadataOverridePage(items, count["total"],
+                                        items[-1].sequence if len(rows) > limit else None)
 
     def create_template(
         self, command: CommandIdentity, template: AssemblyTemplate, expected_version: int,
@@ -197,13 +272,19 @@ class PostgresSessionAssemblyRepository:
                                   source_id, version),
                     MetadataValue(MetadataField.SESSION_TITLE, (row["title"],), source_id, version),
                 )
-        return AssemblyInputs(
+        inputs = AssemblyInputs(
             _id(session["session_id"]), _id(session["event_id"]), _id(session["stage_id"]),
             session["authoritative_start"], session["package_revision"],
             session["package_state"] == "complete",
             None if completion is None else _id(completion["completion_decision_id"]),
             members, metadata,
         )
+        # At most one latest entry for each of the two supported fields.
+        overrides = tuple(_override(r) for r in conn.execute(
+            """SELECT DISTINCT ON (field) * FROM stageflow.assembly_metadata_override
+               WHERE session_id=%s ORDER BY field, sequence DESC""", (session["session_id"],),
+        ))
+        return replace(inputs, metadata=resolve_metadata(inputs, overrides))
 
     def _candidates(self, conn: Connection, event_id: EntityId) -> tuple[PackagingCandidate, ...]:
         # Packaging commands lock these same roots. Deterministic order prevents lock inversion.
@@ -288,7 +369,14 @@ class PostgresSessionAssemblyRepository:
                    (revision_id,field,values_json,source,source_id,source_revision)
                    VALUES (%s,%s,%s,%s,%s,%s)""",
                 [(r.id.value, m.field.value, Jsonb(list(m.values)), m.source, m.source_id.value,
-                  m.source_revision) for m in r.metadata],
+                  m.source_revision) for m in r.metadata if m.source == "program_expectation"],
+            )
+
+            cursor.executemany(
+                """INSERT INTO stageflow.assembly_metadata_override_snapshot
+                   (revision_id,field,override_id) VALUES (%s,%s,%s)""",
+                [(r.id.value, m.field.value, m.source_id.value) for m in r.metadata
+                 if m.source == "operator_override"],
             )
 
     def _get_revision(self, conn: Connection, revision_id: EntityId) -> AssemblyRevision:
@@ -314,8 +402,16 @@ class PostgresSessionAssemblyRepository:
                 b["slot_key"], None if b["packaging_revision_id"] is None
                 else _id(b["packaging_revision_id"]), b["outcome"],
             ))
-        for m in conn.execute("""SELECT * FROM stageflow.assembly_metadata_snapshot
-                                 WHERE revision_id=ANY(%s::uuid[]) ORDER BY field""", (ids,)):
+        for m in conn.execute("""SELECT revision_id,field,values_json,source,
+                                        source_id,source_revision
+                                 FROM stageflow.assembly_metadata_snapshot
+                                 WHERE revision_id=ANY(%s::uuid[])
+                                 UNION ALL
+                                 SELECT s.revision_id,s.field,o.values_json,'operator_override',
+                                        o.override_id,o.sequence
+                                 FROM stageflow.assembly_metadata_override_snapshot s
+                                 JOIN stageflow.assembly_metadata_override o USING (override_id)
+                                 WHERE s.revision_id=ANY(%s::uuid[]) ORDER BY field""", (ids, ids)):
             metadata.setdefault(_id(m["revision_id"]), []).append(MetadataValue(
                 MetadataField(m["field"]), tuple(m["values_json"]), _id(m["source_id"]),
                 m["source_revision"], m["source"],
@@ -361,6 +457,7 @@ class PostgresSessionAssemblyRepository:
             approved = frozenset(c.revision.id for c in self._candidates(conn, revision.event_id))
             if revision.validation.state != "valid" or is_stale(
                 revision, session["package_revision"], approved,
+                self._inputs(conn, session).metadata,
             ):
                 raise AssemblyConflictError("assembly_not_approvable")
             decision = AssemblyApprovalDecision(
@@ -429,6 +526,7 @@ class PostgresSessionAssemblyRepository:
                      ORDER BY decision_sequence DESC LIMIT 1) d ON d.action='approve'
                    WHERE r.revision_id=ANY(%s::uuid[])""", (ids,),
             ))
+            metadata = self._inputs(conn, session).metadata
             items: list[SessionAssembly] = []
             for revision, row in zip(revisions, rows[:limit], strict=True):
                 latest = None if row["decision_id"] is None else _decision({
@@ -439,7 +537,7 @@ class PostgresSessionAssemblyRepository:
                     else ApprovalState.REJECTED
                 )
                 items.append(SessionAssembly(revision, count["total"], is_stale(
-                    revision, session["package_revision"], approved,
+                    revision, session["package_revision"], approved, metadata,
                 ), state, row["decision_count"], latest))
             return AssemblyPage(tuple(items), count["total"],
                                 items[-1].revision.revision_number if len(rows) > limit else None)

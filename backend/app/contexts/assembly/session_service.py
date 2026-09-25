@@ -7,11 +7,13 @@ from .contracts import CommandIdentity, bounded_text, nonnegative
 from .session_contracts import (
     AssemblyAction,
     AssemblyApprovalDecision,
+    AssemblyMetadataOverride,
     AssemblyRevision,
     AssemblySlot,
     AssemblyTemplate,
     ExplicitBinding,
     MetadataField,
+    MetadataOverrideAction,
     positive,
 )
 from .session_repository import SessionAssemblyRepository
@@ -21,6 +23,28 @@ class SessionAssemblyService:
     def __init__(self, repository: SessionAssemblyRepository, clock: Clock) -> None:
         self.repository = repository
         self.clock = clock
+
+    def record_metadata_override(
+        self, *, operation_id: EntityId, actor_id: EntityId, session_id: EntityId,
+        field: MetadataField, action: MetadataOverrideAction, expected_sequence: int,
+        reason: str, values: tuple[str, ...] = (),
+    ) -> AssemblyMetadataOverride:
+        nonnegative(expected_sequence, "expected_sequence")
+        field, action = MetadataField(field), MetadataOverrideAction(action)
+        reason = reason.strip()
+        if isinstance(values, str):
+            raise ValueError("values must be a sequence of display strings")
+        values = tuple(values)
+        command = self._command(operation_id, actor_id, {
+            "kind": "assembly_metadata_override", "session_id": session_id.value,
+            "field": field.value, "action": action.value, "values": list(values),
+            "expected_sequence": expected_sequence, "reason": reason,
+        })
+        entry = AssemblyMetadataOverride(
+            EntityId.new(), session_id, field, action, values, expected_sequence + 1,
+            actor_id, command.recorded_at, reason,
+        )
+        return self.repository.record_metadata_override(command, entry, expected_sequence)
 
     def _command(
         self, operation_id: EntityId, actor_id: EntityId, document: dict[str, object],
