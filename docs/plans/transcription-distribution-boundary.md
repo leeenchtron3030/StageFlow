@@ -210,3 +210,12 @@ No architecture decision remains open for this directive. The licensing question
 deferred. Rollback is removal of these documentation/comment/test changes, with no data
 or runtime reversal. A full-suite run in an environment with usable temporary-directory
 permissions remains outstanding; this record does not claim event readiness.
+
+### Owner validation addendum (2026-09-24)
+
+The sandbox limitation above applied only to Codex's run. After review, the owner re-ran the
+full backend suite outside the sandbox with `uv run --no-sync`. Every failure was
+environmental: 11 caused by an operator `STAGEFLOW_API_SHARED_SECRET` inherited from the
+shell, and the 4 known Windows console-encoding cases. All 38 tests in the affected files
+passed with that secret cleared. Ruff and Pyright were clean. Validation is therefore
+complete rather than environment-limited.
