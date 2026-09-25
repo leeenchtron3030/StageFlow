@@ -4,6 +4,10 @@ Use `StageFlow-Demo.ps1` for the local Demo rehearsal. It is a thin operator
 controller around the existing Python Demo CLI, loopback APIs, and
 `Start-StageFlowDemo.ps1`; it does not implement alternate application behavior.
 
+Run the controller from PowerShell 7.3 or later (`pwsh`). `start` launches the stack
+under the same PowerShell host, and the launcher requires 7.3+; under Windows PowerShell
+5.1 it stops immediately with a version error.
+
 ## One-time external configuration
 
 The controller never prints these values. It reads Process scope first and Windows User
@@ -78,3 +82,58 @@ until a provider-neutral Delivery context is designed. Publication is absent fro
 supported action set. The retired publication action refuses with an ADR-0031 message
 and a non-zero exit before configuration, credential access, or network calls. The backend
 Devcon adapter remains dormant; no replacement delivery workflow is introduced.
+
+## Demo 2 autonomous Event Node
+
+Demo 2 uses the same guarded launcher and `demo-single-stage` application stack. Copy
+`examples/demo2-autonomous-event-node.toml.example` to the controlled external Demo
+configuration location, set unique Event/deployment values and the external recordings
+path, and enable:
+
+```toml
+[autonomous_event_node]
+enabled = true
+media_reconciliation_interval_seconds = 5
+program_refresh_interval_seconds = 120
+```
+
+The setting is default-off, non-secret, and does not alter Demo 1. The backend lifespan
+owns one non-daemon coordinator thread. PostgreSQL advisory ownership prevents two
+backend processes for the same deployment from running cycles concurrently. Shutdown
+signals and joins that thread before readiness is cleared; process death releases the
+database lock, and the next owned process reconstructs freshness and work from durable
+state.
+
+Healthy automatic operation stays quiet in the Producer UI. `status` reports bounded
+cycle counts, last successful media/Program times, failure codes, enqueue totals, and
+worker currentness/capacity without paths, transcripts, credentials, or DSNs. `Process
+Media Now` and `Refresh Program` remain idempotent fallback/diagnostic actions. Automatic
+operation never starts or ends a Session, marks a Moment, changes package authority, or
+performs external publication.
+
+Media registered before a safely eligible Session remains unresolved until the material
+Session input set changes. Demo 2 then reevaluates only the existing deterministic
+unresolved association through the accepted policy; unchanged inputs create no revision,
+and human or conflict associations remain protected.
+
+For offline qualification, copy `examples/local-schedule.example.json` to the external
+schedule path in the Demo 2 example and customize its placeholder Event and Stage keys
+together. The optional `rehearsal_fault_media_cycle = 6` setting belongs under
+`[autonomous_event_node]` and requires `event_mode = "rehearsal"`. It injects one
+unexpected failure on that media attempt per coordinator process. Subsequent successful
+media or Program cycles restore `running`; status retains the last failure code and time.
+The setting is absent by default and has no API trigger.
+
+The qualification helper replays existing external blocks without changing their sources:
+
+```powershell
+cd backend
+uv run --no-sync python tests/qualification/block_replay.py --source C:/ExampleCorpus/blocks --watched C:/ExampleRehearsal/recordings --count 10 --cadence-seconds 60
+```
+
+Both directories must already exist outside the repository and must not overlap. The
+helper selects supported media files in name order, refuses existing destination names,
+and publishes each complete copy by renaming a temporary file in the watched directory.
+It accepts 1–1,000 blocks, 0.1–3,600 seconds between scheduled copies, and at most 24 hours
+of scheduled replay. A failed copy leaves no partial media block; already published blocks
+remain. These are qualification tools, not evidence that the owner-run gates have passed.

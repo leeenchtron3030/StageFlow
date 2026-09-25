@@ -344,34 +344,16 @@ def test_local_configuration_forbids_provider_fields() -> None:
         LocalScheduleConfiguration.model_validate({"path": "C:/schedule.json", "provider": "x"})
 
 
-def test_composition_uses_local_source_and_aliases(tmp_path: Path) -> None:
+def test_composition_uses_local_source(tmp_path: Path) -> None:
     path = tmp_path / "schedule.json"
     _write(path, _schedule(_session()))
     composed = build_kernel_components(_configuration(path), clock=FixedClock(NOW))
     assert isinstance(composed.program_source, LocalScheduleFileSource)
     assert composed.program_source.probe() == 1
     components = _components(path)
-    assert components.devcon_program_sync is components.program_source
-    assert components.sync_devcon_program().added == 1
+    assert components.sync_program().added == 1
     assert components.sync_program().unchanged == 1
-    legacy = KernelComponents(
-        configuration=components.configuration, repository=components.repository,
-        kernel=components.kernel, devcon_program_sync=components.program_source,
-    )
-    assert legacy.program_source is components.program_source
-    assert legacy.sync_devcon_program().unchanged == 1
-    assert legacy.sync_program().unchanged == 1
-    assert replace(legacy).program_source is legacy.program_source
-    with pytest.raises(ValueError, match="conflicting_program_source_aliases"):
-        KernelComponents(
-            configuration=components.configuration, repository=components.repository,
-            kernel=components.kernel, devcon_program_sync=components.program_source,
-            program_source=composed.program_source,
-        )
-    components.devcon_program_sync = None
-    assert components.program_source is None
-    components.devcon_program_sync = composed.program_source
-    assert components.program_source is composed.program_source
+    assert replace(components).program_source is components.program_source
 
 
 class _ExternalSource:

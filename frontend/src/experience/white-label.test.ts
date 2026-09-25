@@ -88,3 +88,26 @@ for (const provider of ["local_file", "example_provider"]) {
     assert.match(start, /External session · example-session/);
   });
 }
+
+test("automatic refresh recovers while preserving the last failure and time", () => {
+  const automation = {
+    enabled: true, owner: true, state: "running",
+    programLastFailureCode: "unexpected_cycle_failure",
+    programLastFailureAt: "2026-08-20T19:59:00Z",
+    programLastSuccessAt: "2026-08-20T20:01:00Z",
+  };
+  const props = {
+    enabled: true, currentExpectations: [], withdrawnExpectations: [], automation,
+    synchronization: { provider: "local_file" },
+  };
+  const recovered = renderComponent("demo-program-refresh-control", props);
+  assert.match(recovered, /Automatic refresh running/);
+  assert.doesNotMatch(recovered, /Refresh unavailable/);
+  assert.match(recovered, /unexpected cycle failure/);
+  assert.match(recovered, /2026-08-20T19:59:00Z/);
+  const failed = renderComponent("demo-program-refresh-control", {
+    ...props,
+    automation: { ...automation, programLastSuccessAt: "2026-08-20T19:57:00Z" },
+  });
+  assert.match(failed, /Refresh unavailable/);
+});

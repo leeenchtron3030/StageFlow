@@ -251,6 +251,7 @@ function Test-RecordedLauncherLive {
 
 function Start-DemoStack {
     param($Configuration)
+    Import-RequiredSecret "STAGEFLOW_API_SHARED_SECRET"
     New-Item -ItemType Directory -Path $script:StateRoot -Force | Out-Null
     $existing = Read-ControllerState
     if (Test-RecordedLauncherLive $existing) { throw "controller_launcher_already_running" }
@@ -351,6 +352,7 @@ function Stop-DemoStack {
 }
 
 function Show-DemoStatus {
+    Import-RequiredSecret "STAGEFLOW_API_SHARED_SECRET"
     $payload = Invoke-DemoPython -Arguments @("status") -Capture | ConvertFrom-Json
     "STAGEFLOW DEMO STATUS"
     "Event: $($payload.event.event_key) [$($payload.event.event_id)]"
@@ -367,46 +369,61 @@ function Show-DemoStatus {
         ForEach-Object { "$($_.Name)=$($_.Value)" })
     "Operations: $($operationPairs -join ', ')"
     "Terminal failures: $(@($payload.operations.terminal_failures).Count)"
-    "Worker: $($payload.worker.state) available=$($payload.worker.available)"
+    "Worker: $($payload.worker.state) current=$($payload.worker.current) available=$($payload.worker.available) capacity=$($payload.worker.capacity) gpu_transcription=$($payload.worker.gpu_transcription)"
     "Transcription Evidence: complete=$($payload.transcript_evidence.complete) total=$($payload.transcript_evidence.count) (evidence only)"
     "Moments: $($payload.moments.count)"
+    $automationProperty = $payload.PSObject.Properties["automation"]
+    if ($null -ne $automationProperty -and $null -ne $automationProperty.Value) {
+        $automation = $automationProperty.Value
+        "Automation: $($automation.state) owner=$($automation.owner)"
+        "Media reconciliation: cycles=$($automation.media_cycle_count) last=$($automation.media_last_success_at) failure=$($automation.media_last_failure_code) failure_at=$($automation.media_last_failure_at)"
+        "Transcription enqueue: total=$($automation.transcription_operations_enqueued) failures=$($automation.transcription_enqueue_failures)"
+        "Program refresh: cycles=$($automation.program_refresh_count) last=$($automation.program_last_success_at) failure=$($automation.program_last_failure_code) failure_at=$($automation.program_last_failure_at)"
+    }
+    "Program: current=$($payload.devcon.current) withdrawn=$($payload.devcon.withdrawn) status=$($payload.devcon.status) last=$($payload.devcon.last_successful_refresh)"
     "Program cached expectations: $($payload.devcon.cached_program_expectations)"
 }
 
-if ($Action -eq "stop") {
-    Stop-DemoStack
-    exit 0
-}
-$configuration = Initialize-DemoEnvironment
-switch ($Action) {
-    "prepare" {
-        Invoke-WithCudaRuntime -RuntimePath $configuration.CudaRuntimePath -Operation {
-            Invoke-DemoPython -Arguments @("prepare")
-        }
+try {
+    if ($Action -eq "stop") {
+        Stop-DemoStack
+        exit 0
     }
-    "start" { Start-DemoStack $configuration }
-    "status" { Show-DemoStatus }
-    "diagnose" {
-        Invoke-DemoPython -Arguments @("verify-database") | Out-Null
-        Invoke-WithCudaRuntime -RuntimePath $configuration.CudaRuntimePath -Operation {
-            Push-Location $script:BackendRoot
-            try {
-                $uv = Resolve-UvCommand
-                & $uv run --group transcription python -m app.demo.cli preflight
-                if ($LASTEXITCODE -ne 0) { throw "demo_diagnose_preflight_failed" }
+    $configuration = Initialize-DemoEnvironment
+    switch ($Action) {
+        "prepare" {
+            Invoke-WithCudaRuntime -RuntimePath $configuration.CudaRuntimePath -Operation {
+                Invoke-DemoPython -Arguments @("prepare")
             }
-            finally { Pop-Location }
         }
-        "Demo diagnosis passed: config present, Demo database verified, CUDA inference available, program source available."
-    }
-    "rehearsal-report" {
-        if ([string]::IsNullOrWhiteSpace($ReportPath)) {
-            New-Item -ItemType Directory -Path $script:StateRoot -Force | Out-Null
-            $ReportPath = Join-Path $script:StateRoot (
-                "rehearsal-report-{0}.json" -f [DateTimeOffset]::UtcNow.ToString("yyyyMMdd-HHmmss")
-            )
+        "start" { Start-DemoStack $configuration }
+        "status" { Show-DemoStatus }
+        "diagnose" {
+            Invoke-DemoPython -Arguments @("verify-database") | Out-Null
+            Invoke-WithCudaRuntime -RuntimePath $configuration.CudaRuntimePath -Operation {
+                Push-Location $script:BackendRoot
+                try {
+                    $uv = Resolve-UvCommand
+                    & $uv run --group transcription python -m app.demo.cli preflight
+                    if ($LASTEXITCODE -ne 0) { throw "demo_diagnose_preflight_failed" }
+                }
+                finally { Pop-Location }
+            }
+            "Demo diagnosis passed: config present, Demo database verified, CUDA inference available, program source available."
         }
-        Invoke-DemoPython -Arguments @("rehearsal-report", "--output", $ReportPath) | Out-Null
-        "Sanitized rehearsal report written."
+        "rehearsal-report" {
+            Import-RequiredSecret "STAGEFLOW_API_SHARED_SECRET"
+            if ([string]::IsNullOrWhiteSpace($ReportPath)) {
+                New-Item -ItemType Directory -Path $script:StateRoot -Force | Out-Null
+                $ReportPath = Join-Path $script:StateRoot (
+                    "rehearsal-report-{0}.json" -f [DateTimeOffset]::UtcNow.ToString("yyyyMMdd-HHmmss")
+                )
+            }
+            Invoke-DemoPython -Arguments @("rehearsal-report", "--output", $ReportPath) | Out-Null
+            "Sanitized rehearsal report written."
+        }
     }
+}
+finally {
+    $env:STAGEFLOW_API_SHARED_SECRET = $null
 }

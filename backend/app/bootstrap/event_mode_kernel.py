@@ -4,6 +4,7 @@ import os
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
+from threading import Lock
 
 import psycopg
 
@@ -65,7 +66,7 @@ class KernelStartupProgress:
     runtime_composed: bool = False
 
 
-@dataclass(slots=True, init=False)
+@dataclass(slots=True)
 class KernelComponents:
     configuration: EffectiveKernelConfiguration
     repository: EventModeKernelRepository
@@ -82,46 +83,8 @@ class KernelComponents:
     editorial_moments: EditorialMomentService | None = None
     packaging_assets: PackagingAssetService | None = None
     session_assemblies: SessionAssemblyService | None = None
-
-    def __init__(
-        self,
-        configuration: EffectiveKernelConfiguration,
-        repository: EventModeKernelRepository,
-        kernel: DurableEventModeKernel,
-        runtime: StageFlowRuntime | None = None,
-        media_cycle: BoundedMediaCycle | None = None,
-        source_availability: dict[str, bool] | None = None,
-        startup_error: str | None = None,
-        postgresql_recovery_required: bool = False,
-        media_timing_evidence_repository: MediaTimingEvidenceRepository | None = None,
-        devcon_program_sync: ProgramScheduleSource | None = None,
-        editorial_moments: EditorialMomentService | None = None,
-        packaging_assets: PackagingAssetService | None = None,
-        *,
-        program_source: ProgramScheduleSource | None = None,
-        session_assemblies: SessionAssemblyService | None = None,
-    ) -> None:
-        # Retain the old positional/keyword constructor as well as attribute access.
-        # Remove this compatibility constructor once Demo 2 no longer calls the alias.
-        if (
-            program_source is not None
-            and devcon_program_sync is not None
-            and program_source is not devcon_program_sync
-        ):
-            raise ValueError("conflicting_program_source_aliases")
-        self.configuration = configuration
-        self.repository = repository
-        self.kernel = kernel
-        self.runtime = runtime
-        self.media_cycle = media_cycle
-        self.source_availability = {} if source_availability is None else source_availability
-        self.startup_error = startup_error
-        self.postgresql_recovery_required = postgresql_recovery_required
-        self.media_timing_evidence_repository = media_timing_evidence_repository
-        self.program_source = program_source if program_source is not None else devcon_program_sync
-        self.editorial_moments = editorial_moments
-        self.packaging_assets = packaging_assets
-        self.session_assemblies = session_assemblies
+    media_cycle_lock: Lock = field(default_factory=Lock, repr=False)
+    program_sync_lock: Lock = field(default_factory=Lock, repr=False)
 
     @property
     def event_key(self) -> str:
@@ -185,44 +148,33 @@ class KernelComponents:
         )
 
     def run_media_cycle(self, *, event_id: EntityId, scope: str = "scheduled") -> MediaCycleResult:
-        if self.media_cycle is None:
-            self.compose_media_cycle()
-        assert self.media_cycle is not None
-        try:
-            result = self.media_cycle.run(event_id=event_id, scope=scope)
-        except KernelStorageUnavailableError:
-            self.postgresql_recovery_required = True
-            raise
-        if not result.source_failures:
-            self.postgresql_recovery_required = False
-        return result
-
-    @property
-    def devcon_program_sync(self) -> ProgramScheduleSource | None:
-        """Compatibility alias; remove once the Demo 2 branch no longer calls it."""
-        return self.program_source
-
-    @devcon_program_sync.setter
-    def devcon_program_sync(self, source: ProgramScheduleSource | None) -> None:
-        self.program_source = source
-
-    def sync_devcon_program(self) -> ProgramSyncResult:
-        """Compatibility alias; remove once the Demo 2 branch no longer calls it."""
-        return self.sync_program()
+        with self.media_cycle_lock:
+            if self.media_cycle is None:
+                self.compose_media_cycle()
+            assert self.media_cycle is not None
+            try:
+                result = self.media_cycle.run(event_id=event_id, scope=scope)
+            except KernelStorageUnavailableError:
+                self.postgresql_recovery_required = True
+                raise
+            if not result.source_failures:
+                self.postgresql_recovery_required = False
+            return result
 
     def sync_program(self) -> ProgramSyncResult:
-        if self.program_source is None:
-            raise RuntimeError("program_source_not_configured")
-        event = self.repository.get_event_by_key(self.event_key)
-        if event is None:
-            raise RuntimeError("explicit_event_stage_bootstrap_required")
-        stages = self.repository.list_stages(event.id)
-        if len(stages) != 1:
-            raise RuntimeError("demo_single_stage_topology_invalid")
-        return self.program_source.synchronize(
-            event_id=event.id,
-            stage_id=stages[0].id,
-        )
+        with self.program_sync_lock:
+            if self.program_source is None:
+                raise RuntimeError("program_source_not_configured")
+            event = self.repository.get_event_by_key(self.event_key)
+            if event is None:
+                raise RuntimeError("explicit_event_stage_bootstrap_required")
+            stages = self.repository.list_stages(event.id)
+            if len(stages) != 1:
+                raise RuntimeError("demo_single_stage_topology_invalid")
+            return self.program_source.synchronize(
+                event_id=event.id,
+                stage_id=stages[0].id,
+            )
 
     def correct_session_boundary(
         self,

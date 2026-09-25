@@ -55,8 +55,8 @@ authorized by this document.
   `external_room_id` references take precedence over persisted `devcon_*` equivalents.
   The fallback is removable only when all writers use neutral keys and retained current
   and historical records no longer depend on the legacy keys. No history is rewritten.
-- **Composition aliases:** `devcon_program_sync` and `sync_devcon_program()` alias
-  `program_source` and `sync_program()` until the Demo 2 branch no longer calls them.
+- **Composition aliases:** removed under ED-0081. `program_source` and `sync_program()`
+  are the only composition names; the former Devcon aliases no longer exist.
 
 ### Production Event
 

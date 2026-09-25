@@ -10,6 +10,7 @@ import {
   type ProgramRefreshResult,
 } from "@/experience/demo-program-refresh.ts";
 import type {
+  AutomationView,
   ProgramExpectationView,
   ProgramSynchronizationView,
 } from "@/experience/model.ts";
@@ -80,12 +81,14 @@ export function DemoProgramRefreshControl({
   enabled,
   launchContext,
   synchronization,
+  automation,
   currentExpectations,
   withdrawnExpectations,
 }: {
   enabled: boolean;
   launchContext?: string;
   synchronization?: ProgramSynchronizationView;
+  automation?: AutomationView;
   currentExpectations: ProgramExpectationView[];
   withdrawnExpectations: ProgramExpectationView[];
 }) {
@@ -97,6 +100,12 @@ export function DemoProgramRefreshControl({
   if (!enabled) return null;
 
   const provider = programProviderDisplayName(result?.provider ?? synchronization?.provider);
+
+  const programFailureCurrent = Boolean(
+    automation?.programLastFailureCode &&
+      (!automation.programLastFailureAt || !automation.programLastSuccessAt ||
+        Date.parse(automation.programLastFailureAt) >= Date.parse(automation.programLastSuccessAt)),
+  );
 
   async function refreshProgram() {
     setBusy(true);
@@ -138,8 +147,45 @@ export function DemoProgramRefreshControl({
       <dl className="definition-grid">
         <dt>Provider</dt><dd>{provider}</dd>
         <dt>Last successful refresh</dt>
-        <dd>{relativeRefreshTime(synchronization?.synchronizedAt)}</dd>
-        <dt>Current expectations</dt><dd>{currentExpectations.length}</dd>
+        <dd>
+          {relativeRefreshTime(
+            automation?.programLastSuccessAt ?? synchronization?.synchronizedAt,
+          )}
+        </dd>
+        <dt>Status</dt>
+        <dd>
+          {programFailureCurrent
+            ? "Refresh unavailable · cached Program active"
+            : automation?.enabled && automation.owner
+              ? "Automatic refresh running"
+              : automation?.enabled
+                ? `Automatic refresh · ${automation.state}`
+                : "Manual refresh"}
+        </dd>
+        {automation?.programLastFailureCode ? (
+          <>
+            <dt>Last refresh failure</dt>
+            <dd>
+              {readable(automation.programLastFailureCode)}
+              {automation.programLastFailureAt ? ` · ${automation.programLastFailureAt}` : ""}
+            </dd>
+          </>
+        ) : null}
+        <dt>Program</dt>
+        <dd>
+          {currentExpectations.length} Current · {withdrawnExpectations.length} Withdrawn
+        </dd>
+        {automation?.enabled ? (
+          <>
+            <dt>Media reconciliation</dt>
+            <dd>
+              {automation.owner ? "Running" : automation.state} · every{" "}
+              {automation.mediaReconciliationIntervalSeconds} sec
+            </dd>
+            <dt>Last media cycle</dt>
+            <dd>{relativeRefreshTime(automation.mediaLastSuccessAt)}</dd>
+          </>
+        ) : null}
       </dl>
       <button
         disabled={busy || !launchContext}

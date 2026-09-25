@@ -1,0 +1,55 @@
+# Copy outside the repository and replace the event/source values for the rehearsal.
+# The referenced environment variable contains the DSN; never put the DSN in this file.
+schema_version = "1.0"
+deployment_id = "example-deployment"
+node_id = "example-node"
+runtime_profile = "demo-single-stage"
+node_role = "node"
+event_mode = "rehearsal"
+network_policy = "optional"
+postgres_dsn_secret_ref = "STAGEFLOW_DEMO_POSTGRES_DSN"
+schedule_source_reference = "C:/StageFlowDemo/local-schedule.json"
+
+# Copy examples/local-schedule.example.json here and customize its program.
+[local_schedule]
+path = "C:/StageFlowDemo/local-schedule.json"
+
+[local_transcription]
+provider = "faster-whisper"
+model_id = "large-v3-turbo"
+model_version = "0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf"
+model_path = "C:/StageFlowDemo/models/faster-whisper-large-v3-turbo"
+device = "cuda"
+compute_type = "float16"
+execution_profile_id = "faster-whisper-large-v3-turbo-cuda-float16"
+execution_profile_version = "1.0"
+
+[autonomous_event_node]
+enabled = true
+media_reconciliation_interval_seconds = 5
+program_refresh_interval_seconds = 120
+# Rehearsal only; unset by default. Inject one unexpected media failure per process.
+# rehearsal_fault_media_cycle = 6
+
+[resources]
+maximum_concurrent_assessments = 2
+maximum_cpu_percentage = 20
+maximum_memory_bytes = 536870912
+minimum_stable_seconds = 5
+
+[event]
+key = "example-event"
+name = "Example Event"
+external_references = { external_event_id = "example-event" }
+
+[[event.stages]]
+key = "main"
+name = "Main Stage"
+external_references = { external_room_id = "main" }
+
+[[event.stages.sources]]
+key = "vmix-recordings"
+# Use the local rehearsal directory or a controlled recorder UNC share.
+path = "C:/StageFlowDemo/recordings"
+maximum_candidates = 1000
+allowed_extensions = [".mov", ".mp4", ".mkv", ".mxf", ".wav"]

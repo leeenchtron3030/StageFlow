@@ -1,3 +1,7 @@
+#Requires -Version 7.3
+# The launch-context hand-off to child processes (the -Environment parameter) and
+# RandomNumberGenerator.Fill need PowerShell 7.3 or later; Windows PowerShell 5.1
+# cannot run this launcher.
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)]

@@ -72,8 +72,19 @@ def test_neutral_readiness_output_matches_controller_detection() -> None:
     assert "StageFlow Demo 1 is ready" not in launcher + controller
 
 
-def test_default_example_uses_matching_local_schedule_and_placeholder_identity() -> None:
-    config = tomllib.loads((ROOT / "examples/demo-single-stage.toml.example").read_text())
+@pytest.mark.parametrize("example", [
+    "demo-single-stage.toml.example", "demo2-autonomous-event-node.toml.example",
+])
+def test_default_example_uses_matching_local_schedule_and_placeholder_identity(
+    example: str,
+) -> None:
+    text = (ROOT / "examples" / example).read_text()
+    config = tomllib.loads(text)
+    assert config["node_id"] == "example-node"
+    assert config["event"]["external_references"] == {"external_event_id": "example-event"}
+    assert config["event"]["stages"][0]["external_references"] == {"external_room_id": "main"}
+    if example.startswith("demo2"):
+        assert not re.search(r"devcon|razer|wenceslas", text, re.IGNORECASE)
     schedule = json.loads((ROOT / "examples/local-schedule.example.json").read_text())
     assert config["deployment_id"] == "example-deployment"
     assert config["event"]["name"] == "Example Event"

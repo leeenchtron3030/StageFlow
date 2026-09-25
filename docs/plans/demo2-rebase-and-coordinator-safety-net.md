@@ -4,6 +4,9 @@
 
 Implementation complete on draft PR; live promotion gate pending
 
+*Status note 2026-09-25:* the safety net was proven live under ED-0081 — see
+[Demo 2 hardware rehearsal Run 002](../validation/results/demo2-hardware-rehearsal-002.md).
+
 ## Execution authority
 
 - Classification: Green autonomous

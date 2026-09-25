@@ -55,9 +55,9 @@ qualified by this single-Stage directive.
 
 Results and Kernel status attribute the source as `local_file` or `devcon`; file paths
 are not returned. API field names are unchanged. `KernelComponents.program_source` and
-`sync_program()` are the neutral composition surface. `devcon_program_sync` (read/write)
-and `sync_devcon_program()` are compatibility aliases, removable once the Demo 2 branch
-no longer calls them.
+`sync_program()` are the composition surface. The former `devcon_program_sync` and
+`sync_devcon_program()` compatibility aliases were removed under ED-0081 once Demo 2
+moved to the neutral names; `[devcon_read]` configuration is still accepted.
 
 New source records use `external_session_id`, `external_event_id`, and
 `external_room_id`. Reconciliation and Kernel status prefer these keys and fall back to
