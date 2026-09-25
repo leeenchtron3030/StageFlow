@@ -2,7 +2,9 @@
 
 ## Status
 
-Approved
+Completed (2026-09-25). Harness implemented and sandbox-validated; all measurement arms
+executed on the reference host. See the [result](../validation/results/render-benchmark-002.md)
+and the completion record.
 
 ## Execution authority
 
@@ -164,19 +166,19 @@ quality. GPU samples, if captured, are diagnostic only.
 
 ## Acceptance criteria
 
-- [ ] Native subcommands invoke FFmpeg through an explicit path and record its version,
+- [x] Native subcommands invoke FFmpeg through an explicit path and record its version,
   SHA-256, and GPL-configuration status; no `PATH` dependency.
-- [ ] Arms 1 and 2 are each measured three times over the Demo 2 corpus, with wall-clock
+- [x] Arms 1 and 2 are each measured three times over the Demo 2 corpus, with wall-clock
   time, real-time factor, frame count, output size, and SSIM/PSNR recorded.
-- [ ] The concurrency arm is measured with its actual overlap window reported.
-- [ ] The corpus is exactly the eleven 2026-08-26 live-run blocks; the unrelated later
+- [x] The concurrency arm is measured with its actual overlap window reported.
+- [x] The corpus is exactly the eleven 2026-08-26 live-run blocks; the unrelated later
   recording is excluded.
-- [ ] A same-run PyAV baseline is measured, and the result compares native arms with it and
+- [x] A same-run PyAV baseline is measured, and the result compares native arms with it and
   with ED-0073, and states whether the native pipeline changes the throughput conclusion.
-- [ ] The result states which arms were executed inside and outside any sandbox.
-- [ ] No production code, repository dependency, schema, migration, or runtime
+- [x] The result states which arms were executed inside and outside any sandbox.
+- [x] No production code, repository dependency, schema, migration, or runtime
   configuration changed.
-- [ ] The result explicitly states it is first-order sizing input, not a throughput
+- [x] The result explicitly states it is first-order sizing input, not a throughput
   guarantee or hardware qualification.
 
 ## Rollback or reversal
@@ -187,7 +189,73 @@ with `winget uninstall BtbN.FFmpeg.LGPL.8.1`; nothing in the repository depends 
 ## Open questions
 
 - Whether the operator will supply a full-Session corpus for the optional long-corpus arm.
+  *Resolved 2026-09-25:* none was supplied; the optional arm was not run.
 
 ## Completion record
 
-_(To be filled in by whoever implements this plan.)_
+Implemented 2026-09-25 under ED-0078, Green authority, on
+`codex/ed-0078-native-ffmpeg-render-benchmark`.
+
+**Harness (sandboxed implementer, no GPU, FFmpeg, or corpus access).**
+
+- Extended `render_benchmark.py` with `native-cpu-nvenc`, `native-cuda-nvenc`, and
+  `native-concurrent` subcommands. FFmpeg is invoked through an explicit `--ffmpeg` path
+  as an argument list and identified by version, SHA-256, and GPL-configuration flag; GPL
+  builds are refused and the path never reaches a report.
+- Repetitions default to 3 (bounded 1-10). Each writes its own output and records wall
+  clock, real-time factor, source speed, encoded frame count, output size, exit status,
+  and SSIM/PSNR through the ED-0073 measurement; failed repetitions are kept with typed
+  codes. Population variance is reported.
+- `native-concurrent` reuses the ED-0073 transcription job, barrier, and overlap
+  arithmetic, and rejects a baseline whose corpus, FFmpeg hash, bitrate, GOP, or GPU
+  pixel-conversion setting differs.
+- ED-0073 subcommands, defaults, and harness-1.0 reports are unchanged.
+
+**Independent review and corrections.**
+
+- An independent review returned FIX-FIRST with three findings:
+  - a logged CUDA hwaccel failure could fall back to software decode while reporting
+    success;
+  - the concurrency baseline was only partly validated;
+  - `real_time_factor` was inverted relative to ED-0073. The directive had stated the
+    inverse formula, which was an owner error; the legacy meaning now applies.
+- All three were fixed with tests, along with three minor items: LF concat lists,
+  terminal-only FFmpeg stderr on failure, and transcription-settings parity. A re-review
+  approved the result.
+- The fallback guard is log-based; its limit is stated in the result.
+
+**Validation.**
+
+- Focused `tests/qualification/test_render_benchmark.py`: **84 passed** in the sandbox
+  and on the host.
+- Ruff passed, and Pyright reported 0 errors and 0 warnings.
+- Host full suite, run with `STAGEFLOW_API_SHARED_SECRET` and `VIRTUAL_ENV` cleared and
+  `uv run --no-sync`, before the review fixes: **2,024 passed, 5 failed, 2 skipped.**
+  - Four failures are the known Windows console-encoding cases in
+    `test_validation_controller.py::test_turnover_boundaries_emit_exact_live_operation_checkpoints`.
+  - The fifth,
+    `test_devcon_session_publish.py::test_devcon_no_body_response_maps_to_bounded_reason_without_retry`,
+    is an intermittent local-HTTP-server test. It passed when rerun in isolation on both
+    this branch and `main`.
+  - The review fixes changed only the two qualification files, and the focused suite
+    covers them.
+- A real-FFmpeg smoke test on synthetic clips, in a folder whose path contains a space
+  and a single quote, succeeded for both native arms before the corpus run.
+
+**Measurement (owner, on the reference host outside any sandbox).**
+
+- All arms ran over the eleven-block corpus. Its fingerprint matches ED-0073's exactly.
+- Native CPU decode ran three times and native CUDA decode ran three times. The
+  concurrency arm and the same-run PyAV baseline ran once each.
+- Every arm succeeded, with no failed or discarded repetition and no fallback.
+- The sanitized result is
+  [render-benchmark-002](../validation/results/render-benchmark-002.md); the raw reports
+  stay outside the repository and are identified by SHA-256.
+- The optional long-corpus arm was not run.
+
+**Scope and remaining decisions.**
+
+- No production code, repository dependency, schema, migration, or runtime configuration
+  changed. The FFmpeg CLI remains a machine tool.
+- No product or architecture decision is open. The result names multi-encode
+  per-GPU scaling as the next sizing evidence gap, but does not authorize that work.
