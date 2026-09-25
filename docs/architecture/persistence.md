@@ -116,7 +116,30 @@ Decision concurrency guards count decisions for the target revision; decision se
 numbers are Session-wide. Approval and staleness are read projections, never stored
 status updates. Event-scoped template and per-Session revision reads use bounded keyset
 pages and batch child queries in a repeatable-read transaction. Runtime composition
-requires migration `0013`; no new configuration variable or dependency is introduced.
+requires migration `0014`; no new configuration variable or dependency is introduced.
+
+`0014_assembly_metadata_overrides` adds only `assembly_metadata_override` and
+`assembly_metadata_override_snapshot`. Both reuse the existing Assembly immutability
+trigger function to reject updates/deletes. The override row also owns its unique
+operation ID and canonical human-command digest receipt, in a separate override command
+namespace; the existing `assembly_command` kind constraint remains unchanged. Exact
+replay returns the original entry, including its original injected-clock timestamp.
+Transaction-scoped operation locks serialize replay and Session row locks serialize
+override sequence checks against proposals and approval. These locks never write Kernel
+state. Commands require an existing Assembly revision, reject stale Session-wide expected
+sequences, and append human-only `set`/`clear` facts with actor and reason.
+
+Program-sourced values still use `assembly_metadata_snapshot` without alteration.
+Override-sourced snapshots reference immutable override IDs in the new snapshot table;
+revision hydration combines both sources. Current resolution uses the latest sequence
+per field, with `clear` falling back to Program Expectation. Metadata staleness is derived
+at read and approval time only from which operator override governs each field; Program
+Expectation refreshes never make a revision stale (ED-0077 design decision 7). Reversing
+`0014` loses override history, and revisions proposed with an override are then rebuilt
+without that override-sourced field.
+Override history reads are Event-scoped, bounded to 1–100 entries, sequence-paginated,
+and use repeatable-read transactions with total counts and explicit continuation.
+There is no backfill, upstream write, participant model, or automatic authority.
 
 Registration is at least once and idempotent. It does not claim exactly-once delivery.
 Only a newly created ingress record is eligible for the included dispatcher path; an
@@ -148,7 +171,12 @@ table. `0002_event_mode_kernel_forward.sql`, `0003_kernel_projections_forward.sq
 Transcript Evidence objects. `0008` adds the Demo declaration base, `0009` adds Program
 Expectation reconciliation, `0010` adds Editorial location history, and `0011` adds
 Editorial review and Clip history. `0012` adds Packaging Asset identity, revision,
-approval, and command-receipt tables. `0013` adds Session Assembly and reverses before
+approval, and command-receipt tables. `0014` adds Assembly metadata overrides and their
+snapshot references and reverses before `0013`. Its reverse drops only its two tables
+(including their triggers/indexes) and ledger entry; override history and override
+snapshot references are lost, while all existing Program-sourced snapshots and upstream
+history remain. Reapply creates empty override tables, without backfill.
+`0013` adds Session Assembly and reverses before
 `0012`, preserving upstream identities and history. Reversal drops `0012` and its own receipts before
 `0011`, without modifying earlier tables or lineage. Reversal removes `0011` before `0010`,
 then removes

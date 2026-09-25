@@ -274,11 +274,12 @@ def verify_editorial_schema(dsn: str) -> None:
                     '0010_editorial_candidate_moment',
                     '0011_editorial_review_foundation',
                     '0012_packaging_asset_foundation',
-                    '0013_session_assembly_foundation'
+                    '0013_session_assembly_foundation',
+                    '0014_assembly_metadata_overrides'
                 )
                 """
             ).fetchone()
-            if row is None or row[0] != 5:
+            if row is None or row[0] != 6:
                 raise KernelSchemaMigrationRequiredError(
                     "editorial_schema_migration_required"
                 )

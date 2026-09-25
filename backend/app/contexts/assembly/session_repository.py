@@ -6,10 +6,12 @@ from .contracts import CommandIdentity
 from .session_contracts import (
     AssemblyAction,
     AssemblyApprovalDecision,
+    AssemblyMetadataOverride,
     AssemblyPage,
     AssemblyRevision,
     AssemblyTemplate,
     ExplicitBinding,
+    MetadataOverridePage,
     TemplatePage,
 )
 
@@ -27,6 +29,14 @@ class AssemblyStorageUnavailableError(RuntimeError):
 
 
 class SessionAssemblyRepository(Protocol):
+    def record_metadata_override(
+        self, command: CommandIdentity, entry: AssemblyMetadataOverride, expected_sequence: int,
+    ) -> AssemblyMetadataOverride: ...
+
+    def list_metadata_overrides(
+        self, event_id: EntityId, session_id: EntityId, *, after: int = 0, limit: int = 50,
+    ) -> MetadataOverridePage: ...
+
     def create_template(
         self, command: CommandIdentity, template: AssemblyTemplate, expected_version: int,
     ) -> AssemblyTemplate: ...

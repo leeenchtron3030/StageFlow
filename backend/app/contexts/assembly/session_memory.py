@@ -1,19 +1,22 @@
 """Non-durable test repository. Inputs are supplied snapshots, never a runtime fallback."""
 from collections.abc import Callable
+from dataclasses import replace
 from threading import RLock
 
 from app.shared.ids import EntityId
 
 from .contracts import ApprovalState, CommandIdentity, nonnegative, validate_page
-from .resolution import build_revision, is_stale
+from .resolution import build_revision, is_stale, resolve_metadata
 from .session_contracts import (
     AssemblyAction,
     AssemblyApprovalDecision,
     AssemblyInputs,
+    AssemblyMetadataOverride,
     AssemblyPage,
     AssemblyRevision,
     AssemblyTemplate,
     ExplicitBinding,
+    MetadataOverridePage,
     PackagingCandidate,
     SessionAssembly,
     TemplatePage,
@@ -33,7 +36,49 @@ class InMemorySessionAssemblyRepository:
         self._revisions: dict[EntityId, list[AssemblyRevision]] = {}
         self._decisions: dict[EntityId, list[AssemblyApprovalDecision]] = {}
         self._commands: dict[EntityId, tuple[str, object]] = {}
+        self._overrides: dict[EntityId, list[AssemblyMetadataOverride]] = {}
+        self._override_commands: dict[EntityId, tuple[str, AssemblyMetadataOverride]] = {}
         self._lock = RLock()
+
+    def _resolved_inputs(self, session_id: EntityId) -> AssemblyInputs:
+        inputs = self._inputs(session_id)
+        return replace(inputs, metadata=resolve_metadata(
+            inputs, self._overrides.get(session_id, ()),
+        ))
+
+    def record_metadata_override(
+        self, command: CommandIdentity, entry: AssemblyMetadataOverride, expected_sequence: int,
+    ) -> AssemblyMetadataOverride:
+        with self._lock:
+            receipt = self._override_commands.get(command.operation_id)
+            if receipt is not None:
+                if receipt[0] != command.request_digest:
+                    raise AssemblyConflictError("human_command_operation_id_conflict")
+                return receipt[1]
+            if not self._revisions.get(entry.session_id):
+                raise AssemblyNotFoundError("session_assembly_not_found")
+            history = self._overrides.get(entry.session_id, [])
+            if len(history) != expected_sequence or entry.sequence != expected_sequence + 1:
+                raise AssemblyConflictError("metadata_override_sequence_conflict")
+            self._overrides[entry.session_id] = [*history, entry]
+            self._override_commands[command.operation_id] = (command.request_digest, entry)
+            return entry
+
+    def list_metadata_overrides(
+        self, event_id: EntityId, session_id: EntityId, *, after: int = 0, limit: int = 50,
+    ) -> MetadataOverridePage:
+        validate_page(limit)
+        nonnegative(after, "after")
+        with self._lock:
+            if self._inputs(session_id).event_id != event_id:
+                raise AssemblyNotFoundError("session_not_in_event")
+            if not self._revisions.get(session_id):
+                raise AssemblyNotFoundError("session_assembly_not_found")
+            history = self._overrides.get(session_id, [])
+            selected = [entry for entry in history if entry.sequence > after]
+            items = tuple(selected[:limit])
+            return MetadataOverridePage(items, len(history),
+                                        items[-1].sequence if len(selected) > limit else None)
 
     def _replay[T](self, command: CommandIdentity, kind: type[T]) -> T | None:
         receipt = self._commands.get(command.operation_id)
@@ -70,7 +115,7 @@ class InMemorySessionAssemblyRepository:
             replay = self._replay(command, AssemblyRevision)
             if replay is not None:
                 return replay
-            inputs = self._inputs(session_id)
+            inputs = self._resolved_inputs(session_id)
             template = self._templates.get(template_id)
             if template is None or template.event_id != inputs.event_id:
                 raise AssemblyNotFoundError("template_not_in_session_event")
@@ -95,7 +140,7 @@ class InMemorySessionAssemblyRepository:
             replay = self._replay(command, AssemblyApprovalDecision)
             if replay is not None:
                 return replay
-            inputs = self._inputs(session_id)
+            inputs = self._resolved_inputs(session_id)
             revisions = self._revisions.get(session_id, [])
             decisions = self._decisions.get(session_id, [])
             decision_count = sum(d.revision_id == revisions[-1].id for d in decisions) if (
@@ -109,7 +154,7 @@ class InMemorySessionAssemblyRepository:
             approved = frozenset(c.revision.id for c in self._candidates()
                                  if c.approval_state == ApprovalState.APPROVED)
             if revision.validation.state != "valid" or is_stale(
-                revision, inputs.package_revision, approved,
+                revision, inputs.package_revision, approved, inputs.metadata,
             ):
                 raise AssemblyConflictError("assembly_not_approvable")
             decision = AssemblyApprovalDecision(
@@ -138,7 +183,7 @@ class InMemorySessionAssemblyRepository:
         validate_page(limit)
         nonnegative(after, "after")
         with self._lock:
-            inputs = self._inputs(session_id)
+            inputs = self._resolved_inputs(session_id)
             if inputs.event_id != event_id:
                 raise AssemblyNotFoundError("session_not_in_event")
             history = self._revisions.get(session_id, [])
@@ -155,7 +200,7 @@ class InMemorySessionAssemblyRepository:
                     else ApprovalState.REJECTED
                 )
                 items.append(SessionAssembly(revision, len(history), is_stale(
-                    revision, inputs.package_revision, approved,
+                    revision, inputs.package_revision, approved, inputs.metadata,
                 ), state, len(decisions), latest))
             return AssemblyPage(tuple(items), len(history),
                                 items[-1].revision.revision_number

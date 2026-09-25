@@ -16,7 +16,8 @@ bounded Event review-queue foundation. Machine-origin candidates remain future w
 ED-0076 implements ADR-0030's Packaging Asset identity, immutable content revisions,
 human approval lineage, and bounded authenticated reads in the new Assembly context.
 ED-0077 implements Session Assembly templates, proposals, revisions, validation, and
-human approval. Rendering remains future work.
+human approval. ED-0086 adds human-only, Session-local metadata overrides with frozen
+source provenance. Rendering remains future work.
 
 The Kernel remains the protected operational foundation. New capabilities reference its
 Business Event, Stage, Program Expectation, realized Session, media registration,
@@ -485,13 +486,15 @@ bindings must themselves qualify. Unresolved required slots fail validation; opt
 unresolved slots remain visible. Invalid explicit bindings fail even for optional slots.
 
 Metadata freezes title and speaker display strings from the current revision of the
-Session's linked Program Expectation. Each field retains source identity and revision.
+Session's linked Program Expectation unless an active Assembly metadata override supplies
+that field. Each field retains source identity and revision.
 Alphabetical display-string normalization conveys no participant identity or billing
 order. Missing metadata blocks only templates requiring it. Neither metadata changes nor
 new Packaging Asset content revisions rewrite an existing Assembly.
 
-Read-time staleness means a later Kernel package revision or a bound Packaging Asset
-revision whose latest decision is no longer approval. Human approve/reject decisions
+Read-time staleness means a later Kernel package revision, a bound Packaging Asset
+revision whose latest decision is no longer approval, or an operator override that now governs a field differently than when the revision was proposed (Program Expectation refreshes never make a revision stale; ED-0077 design decision 7, preserved by ED-0086).
+Human approve/reject decisions
 require a valid, current, non-stale revision and the displayed per-revision decision
 count. Decisions retain a Session-wide append sequence and `authority_kind=human`.
 Exact command replay returns its immutable original result. No automation is activated.
@@ -500,8 +503,27 @@ The existing authenticated `/api/v1/assembly` router now adds template creation,
 Session proposal and approval commands, Event-scoped template pages, and Event-scoped
 per-Session revision pages. Reads expose validation reasons, current revision, staleness,
 and decision lineage with limits 1–100 and explicit continuation. Migration `0013`
-persists this foundation; rendering, metadata overrides, and a participant model remain
-outside its scope.
+persists this foundation; rendering and a participant model remain outside its scope.
+
+ED-0086 adds `record_metadata_override` once a Session has an Assembly revision. Human
+commands append `set` or `clear` for `session_title` or `participant_names`, with immutable
+display values, actor, reason, injected-clock recording time, and a Session-wide sequence.
+The latest entry per field is selected by sequence, independent of clock ordering. A
+`set` takes precedence over Program Expectation; a `clear` restores its current value
+or absence. Required-metadata validation counts resolved override values. Each new
+proposal freezes `operator_override` provenance using the override ID and sequence;
+old proposals and approvals remain unchanged. Even equal text with a new source ID is
+a provenance change. A Program refresh never makes a revision stale; it only changes
+what the next proposal takes for fields that no override governs.
+No Program Expectation, Kernel, or Packaging Asset state is written.
+
+Authenticated `POST /api/v1/assembly/sessions/{session_id}/metadata-overrides` uses the
+existing human-confirmation boundary, digest replay, and `expected_sequence` guard.
+`GET /api/v1/assembly/events/{event_id}/sessions/{session_id}/metadata-overrides` exposes
+bounded history with `after` sequence, counts, and continuation. Revision reads expose
+each value's source. Additive migration `0014` preserves existing Program-snapshot
+storage and stores override snapshot references separately. Overrides add no participant
+identity, rendering, UI, or ADR-0026 authority.
 
 An Assembly proposal resolves the applicable template against a fixed package revision,
 selects approved packaging-asset versions, snapshots metadata, and records provenance.
