@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved
+Completed (2026-09-25).
 
 ## Execution authority
 
@@ -101,11 +101,11 @@ names for one action, or read as though accepted work is unselected or incomplet
 
 ## Acceptance criteria
 
-- [ ] Findings 1-8 corrected in current-state documents, with evidence citations where a
+- [x] Findings 1-8 corrected in current-state documents, with evidence citations where a
   claim is new.
-- [ ] Finding 9 corrected with a citation, or reported as unresolved.
-- [ ] No historical record body rewritten; dated notes only where needed.
-- [ ] `git diff --check` passes. No file outside `docs/`, `ENGINEERING_DIRECTIVES.md`, or
+- [x] Finding 9 corrected with a citation, or reported as unresolved.
+- [x] No historical record body rewritten; dated notes only where needed.
+- [x] `git diff --check` passes. No file outside `docs/`, `ENGINEERING_DIRECTIVES.md`, or
   `docs/plans/README.md` changes. The full backend suite still passes, because some tests
   read documentation.
 
@@ -115,4 +115,32 @@ Revert the documentation commit.
 
 ## Completion record
 
-_(Filled in on completion.)_
+- **Implemented revision:** branch `docs/ed-0082-post-merge-reconciliation`: the plan
+  commit, then one documentation commit. Codex implemented the edits in the sandbox, and
+  the owner committed them.
+- **Files changed:** documentation only.
+  - `ENGINEERING_DIRECTIVES.md` and `docs/plans/README.md` status cells.
+  - `docs/adr/README.md`.
+  - Architecture documents: `system-context.md`, `durable-event-mode-kernel.md`,
+    `durable-kernel-operations.md`, `post-kernel-capability-layer.md`, `principles.md`,
+    `domain-glossary.md`, and `transcription-evidence-readiness.md`.
+  - Dated status notes on four completed plans: `demo2-generalization.md`,
+    `demo2-autonomous-event-node.md`, `demo2-rebase-and-coordinator-safety-net.md`, and
+    `stable-ingress-identity.md`.
+  - No code, test, configuration, schema, or migration change.
+- **Commands and tests actually run:**
+  - `directive-reviewer` first returned FIX-FIRST: `system-context.md` had deleted caveats
+    that are still true and understated the HTTP routes, the automatic-enqueue scope was
+    missing, the ADR-0031 residual note lacked the launcher consumer, and some citations
+    were loose.
+  - After the fixes it returned APPROVE, with every new citation verified.
+  - Host: `uv run --no-sync pytest` on the final tree. The result is recorded with the
+    commit (see the PR).
+  - `git diff --check` passed.
+- **Results:** findings 1-9 corrected. Finding 9 (stable-ingress status) is supported by
+  `docs/reviews/contract-stabilization-final-verification.md:130`.
+- **Execution authority used:** Green.
+- **Approved deviations:** none.
+- **Rollback status:** revert the documentation commit.
+- **Remaining work:** a follow-up directive to neutralize the recorded ADR-0031 `devcon_*`
+  residual in the Demo CLI, the rehearsal report, and the launcher.

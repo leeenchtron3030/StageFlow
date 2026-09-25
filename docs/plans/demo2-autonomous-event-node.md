@@ -2,6 +2,9 @@
 
 ## Status and authority
 
+*Status note 2026-09-25:* Completed; PR #71 merged to `main` (`085e01f`, 2026-09-25).
+Merge evidence: commit `085e01f`. Completion evidence: `docs/validation/README.md:39` (Run 002 row): all ten ED-0071 criteria have passing evidence across Runs 001 and 002.
+
 In progress. Green autonomous under the explicit 2026-08-20 Demo 2 directive and
 the 2026-08-20 association-lifecycle decision.
 The milestone began under the explicit 2026-08-20 Demo 2 directive,

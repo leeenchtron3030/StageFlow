@@ -2,6 +2,9 @@
 
 ## Status
 
+*Status note 2026-09-25:* Completed; PR #71 merged to `main` (`085e01f`, 2026-09-25).
+Merge evidence: commit `085e01f`.
+
 Implementation complete on draft PR; live promotion gate pending
 
 *Status note 2026-09-25:* the safety net was proven live under ED-0081 — see

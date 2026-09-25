@@ -158,6 +158,17 @@ ADRs, or the authoritative architecture-baseline disposition. “Accepted” doe
   provider attribution from data. External publication is frozen pending Delivery design,
   and the backend publish adapter remains dormant. Provider payloads and authority remain
   outside the Kernel; no provider SDK or generic publication workflow is present.
+- **Known residual:** Demo CLI preflight still emits legacy `devcon_read_available` and
+  `devcon_program_items` keys (`backend/app/demo/cli.py:144`,
+  `backend/app/demo/cli.py:145`) and the `devcon_read_not_configured` /
+  `configured_devcon_program_empty` error codes outside adapters
+  (`backend/app/demo/cli.py:105`, `backend/app/demo/cli.py:108`). The Demo rehearsal-report
+  projection retains the `devcon` key (`backend/app/demo/controller.py:297`), consumed
+  through `payload.devcon.*` reads in `scripts/demo/StageFlow-Demo.ps1:383` and
+  `scripts/demo/StageFlow-Demo.ps1:384`. These compatibility names remain pending a
+  follow-up directive covering both producer and launcher consumer; ED-0082 records the residual
+  without renaming fields (`docs/plans/post-merge-documentation-reconciliation.md:78`,
+  `docs/plans/post-merge-documentation-reconciliation.md:98`).
 - **Related decisions:** ADR-0004, ADR-0005, ADR-0011, ADR-0028, ADR-0031, ABR-017 disposition.
 
 ## 10. Operator visibility grows with operational capability
