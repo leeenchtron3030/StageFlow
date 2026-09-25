@@ -15,6 +15,15 @@ from a fully successful standalone CUDA arm with matching binary hash and encode
 settings, and uses its mean process wall time. CUDA hwaccel setup failures in stderr
 invalidate a run even on exit 0; failed process diagnostics go only to the terminal.
 Supply a non-private model directory basename and model-version label for reports.
+
+native-parallel (harness 1.2) accepts a comma-separated --parallelism list including
+1 (default 1,2,3,4; maximum 8), sorted ascending, and 1-5 repetitions (default 2).
+Outputs use <stem>.parallel-N.encode-N.repetition-NN.mp4. The first successful N=1
+output hash is the reference; only differing outputs undergo SSIM/PSNR. Encode failures
+retain timing but invalidate group speed/efficiency. Variance uses successful encode
+groups only; verification failures remain separate. --discard-verified-outputs removes
+only successful, self-written non-reference outputs whose hashes match the reference.
+The reference is always retained. Hashing, quality and disposal are outside timing.
 """
 
 from __future__ import annotations
@@ -40,7 +49,7 @@ from dataclasses import dataclass
 from fractions import Fraction
 from itertools import chain, zip_longest
 from pathlib import Path
-from threading import Barrier
+from threading import Barrier, BrokenBarrierError
 from typing import Any, cast
 
 HARNESS_NAME = "stageflow-nvenc-render-benchmark"
@@ -56,6 +65,8 @@ DEFAULT_VIDEO_BIT_RATE = 8_000_000
 DEFAULT_GOP_SIZE = 60
 DEFAULT_PIXEL_FORMAT = "yuv420p"
 MAX_REPETITIONS = 10
+MAX_PARALLELISM = 8
+MAX_PARALLEL_REPETITIONS = 5
 NATIVE_ARMS = ("native-cpu-nvenc", "native-cuda-nvenc")
 SAFE_EXTENSION = re.compile(r"^\.[A-Za-z0-9]{1,10}$")
 SSIM_VALUE = re.compile(r"(?:^|\s)All:([0-9]+(?:\.[0-9]+)?)")
@@ -970,6 +981,7 @@ def cuda_decode_fallback(stderr: str) -> bool:
 def encode_native_video(
     ffmpeg: Path, concat_path: Path, output_path: Path, probe: CorpusProbe, *,
     arm: str, bit_rate: int, gop_size: int, convert_pixels: bool,
+    classify_session_refusal: bool = False,
 ) -> TimedResult:
     output = require_external_new_file(output_path, suffixes=frozenset({".mp4"}))
     command = build_native_command(
@@ -1010,8 +1022,13 @@ def encode_native_video(
             measurements["failure"] = native_failure(
                 BenchmarkError("native_cuda_decode_fallback"))
         elif result.returncode != 0:
+            session_refused = classify_session_refusal and any(
+                marker in stderr.casefold()
+                for marker in ("openencodesessionex failed", "no capable devices found")
+            )
             measurements["failure"] = native_failure(
-                BenchmarkError("native_encoder_execution_failed"))
+                BenchmarkError("nvenc_session_unavailable" if session_refused
+                               else "native_encoder_execution_failed"))
         elif frame_error is not None:
             measurements["failure"] = native_failure(frame_error)
         elif measurements["encoded_frame_count"] == 0:
@@ -1290,6 +1307,231 @@ def run_native_concurrent_arm(
     return report
 
 
+def validate_parallel_settings(parallelism: Sequence[int], repetitions: int) -> tuple[int, ...]:
+    if (not 1 <= len(parallelism) <= MAX_PARALLELISM
+            or any(type(n) is not int or not 1 <= n <= MAX_PARALLELISM for n in parallelism)
+            or len(set(parallelism)) != len(parallelism) or 1 not in parallelism):
+        raise BenchmarkError("parallelism_requires_unique_values_1_to_8_including_1")
+    if type(repetitions) is not int or not 1 <= repetitions <= MAX_PARALLEL_REPETITIONS:
+        raise BenchmarkError("parallel_repetitions_out_of_bounds")
+    return tuple(sorted(parallelism))
+
+
+def parse_parallelism(value: str) -> tuple[int, ...]:
+    try:
+        return validate_parallel_settings(tuple(int(n) for n in value.split(",")), 1)
+    except (ValueError, BenchmarkError) as exc:
+        raise argparse.ArgumentTypeError(
+            "use unique comma-separated integers from 1 to 8, including 1"
+        ) from exc
+
+
+def parallel_output_paths(
+    output: Path, parallelism: Sequence[int], repetitions: int,
+) -> dict[int, tuple[tuple[Path, ...], ...]]:
+    levels = validate_parallel_settings(parallelism, repetitions)
+    require_external_new_file(output, suffixes=frozenset({".mp4"}))
+    outputs: dict[int, tuple[tuple[Path, ...], ...]] = {}
+    # Preflight every output before starting any process, including later N values.
+    for n in levels:
+        encodes = [native_output_paths(output.with_name(
+            f"{output.stem}.parallel-{n}.encode-{index}{output.suffix}"), repetitions)
+            for index in range(1, n + 1)]
+        outputs[n] = tuple(tuple(paths[rep] for paths in encodes) for rep in range(repetitions))
+    return outputs
+
+
+def run_parallel_group(
+    binary: Path, concat: Path, outputs: Sequence[Path], probe: CorpusProbe, *,
+    bit_rate: int, gop_size: int, convert_pixels: bool,
+) -> tuple[dict[str, object], list[dict[str, object]]]:
+    barrier = Barrier(len(outputs))
+
+    def encode(output: Path) -> TimedResult:
+        # Preserve actual process timestamps, not the executor/barrier wrapper duration.
+        started = time.perf_counter()
+        try:
+            try:
+                barrier.wait(timeout=60)
+            except BrokenBarrierError as exc:
+                raise BenchmarkError("native_parallel_barrier_failed") from exc
+            return encode_native_video(
+                binary, concat, output, probe, arm="native-cuda-nvenc",
+                bit_rate=bit_rate, gop_size=gop_size, convert_pixels=convert_pixels,
+                classify_session_refusal=True,
+            )
+        except Exception as exc:
+            # Exception strings may contain paths. An unreturned encode cannot establish
+            # ownership, exit status, or a process window, so retain its output untouched.
+            return TimedResult(started, time.perf_counter(), {
+                "status": "failed", "failure": native_failure(
+                    exc if isinstance(exc, BenchmarkError)
+                    else BenchmarkError("native_parallel_encode_failed")),
+                "timing_scope": "worker_exception", "exit_status": None,
+                "encoded_frame_count": None, "output_size_bytes": None,
+                "wall_clock_seconds": None, "real_time_factor": None,
+                "source_seconds_per_wall_second": None, "quality": None,
+            })
+
+    with ThreadPoolExecutor(
+        max_workers=len(outputs), thread_name_prefix="parallel-benchmark",
+    ) as pool:
+        futures = [pool.submit(encode, output) for output in outputs]
+        results = [future.result() for future in futures]
+    origin = min(result.started for result in results)
+    wall = max(result.ended for result in results) - origin
+    succeeded = all(result.value["status"] == "succeeded" for result in results) and wall > 0
+    runs: list[dict[str, object]] = []
+    for index, result in enumerate(results, start=1):
+        runs.append({**result.value, "encode": index,
+            "timing_scope": result.value.get("timing_scope", "ffmpeg_process"),
+            "start_seconds_from_group_start": result.started - origin,
+            "end_seconds_from_group_start": result.ended - origin})
+    aggregate: dict[str, object] = {
+        "status": "succeeded" if succeeded else "failed",
+        "window_seconds_from_group_start": {"start": 0.0, "end": wall},
+        "wall_clock_seconds": wall,
+        "real_time_factor": wall / (len(outputs) * probe.total_duration_seconds)
+            if succeeded else None,
+        "source_seconds_per_wall_second": len(outputs) * probe.total_duration_seconds / wall
+            if succeeded else None,
+        "scaling_efficiency": None,
+    }
+    return aggregate, runs
+
+
+def parallel_output_stamp(output: Path) -> tuple[int, int, int, int, int]:
+    value = output.stat()
+    return value.st_dev, value.st_ino, value.st_size, value.st_mtime_ns, value.st_nlink
+
+
+def verify_parallel_output(
+    measurements: dict[str, object], blocks: Sequence[Path], output: Path,
+    probe: CorpusProbe, reference_hash: str | None, *, establish_reference: bool, discard: bool,
+) -> str | None:
+    measurements.update({"is_reference": False,
+                         "output_sha256": None, "byte_identical_to_reference": None,
+                         "quality_equivalent": None, "output_discarded": False})
+    if measurements["timing_scope"] != "ffmpeg_process":
+        return reference_hash
+    try:
+        # Returned native encodes exclusively reserved their output. Refuse substituted
+        # links and source aliases as an additional guard before reading or deleting it.
+        if output.is_symlink() or output.stat().st_nlink != 1 or any(
+            output.samefile(block) for block in blocks
+        ):
+            raise BenchmarkError("parallel_output_identity_unsafe")
+        before = parallel_output_stamp(output)
+        with output.open("rb") as handle:
+            digest = hashlib.file_digest(handle, "sha256").hexdigest()
+        if parallel_output_stamp(output) != before:
+            raise BenchmarkError("parallel_output_changed_during_verification")
+        measurements["output_sha256"] = digest
+        if measurements["status"] != "succeeded":
+            return reference_hash
+        if reference_hash is None and establish_reference:
+            measurements["is_reference"] = True
+            return digest
+        if reference_hash is None:
+            measurements["status"] = "failed"
+            measurements["failure"] = native_failure(
+                BenchmarkError("parallel_reference_unavailable"))
+            return None
+        identical = digest == reference_hash
+        measurements["byte_identical_to_reference"] = identical
+        measurements["quality_equivalent"] = identical
+        if not identical:
+            add_native_quality(measurements, blocks, output, probe)
+        elif discard:
+            # Retain any file changed since hashing; never delete unverified bytes.
+            if output.is_symlink() or parallel_output_stamp(output) != before:
+                raise BenchmarkError("parallel_output_changed_during_verification")
+            output.unlink()
+            measurements["output_discarded"] = True
+    except Exception:
+        measurements["status"] = "failed"
+        failure = native_failure(
+            BenchmarkError("parallel_output_verification_failed"))
+        measurements["verification_failure"] = failure
+        measurements.setdefault("failure", failure)
+    return reference_hash
+
+
+def run_native_parallel_arm(
+    blocks: Sequence[Path], output_path: Path, *, ffmpeg: Path, parallelism: Sequence[int],
+    repetitions: int, bit_rate: int, gop_size: int, discard_verified_outputs: bool = False,
+) -> dict[str, object]:
+    outputs = parallel_output_paths(output_path, parallelism, repetitions)
+    binary = require_ffmpeg_binary(ffmpeg)
+    identity = identify_ffmpeg(binary)
+    probe = probe_corpus(blocks)
+    convert = native_needs_pixel_conversion(blocks)
+    report = native_report("native-parallel", probe, identity, bit_rate=bit_rate,
+                           gop_size=gop_size, convert_pixels=convert)
+    report["harness"] = {"name": HARNESS_NAME, "version": "1.2"}
+    settings = cast(dict[str, object], report["settings"])
+    settings.update({
+        "parallelism": list(outputs), "repetitions": repetitions,
+        "discard_verified_outputs": discard_verified_outputs,
+        "aggregate_source_speed_definition": "N * corpus_duration_seconds / aggregate_wall_seconds",
+        "aggregate_real_time_factor_definition": (
+            "aggregate_wall_seconds / (N * corpus_duration_seconds)"),
+        "scaling_efficiency_definition": "aggregate_source_speed / (N * mean_successful_N_1_speed)",
+        "reference_selection": "first_successful_N_1_output_in_this_run",
+        "timing_origin": "first_process_start_in_each_group; worker_window_on_exception",
+    })
+    report["limitations"] = [*cast(list[str], report["limitations"]),
+        "first_order_sizing_only_for_this_gpu_driver_corpus_and_settings",
+        "failed_encode_groups_have_no_speed_or_efficiency_and_are_excluded_from_variance",
+        "verification_failures_do_not_erase_successful_encode_throughput",
+        "efficiency_unavailable_without_successful_N_1_baseline",
+        "hash_identity_is_relative_to_same_run_reference_not_a_product_quality_threshold",
+        "cuda_fallback_guard_cannot_prove_every_frame_used_gpu_decode",
+        "barrier_release_does_not_guarantee_all_processes_overlap",
+        "hashing_quality_and_disposal_excluded_from_process_timing",
+        "mixed_workloads_long_corpora_other_gpus_and_session_limits_above_requested_N_not_measured",
+    ]
+    reference_hash: str | None = None
+    baseline_speed: float | None = None
+    levels: list[dict[str, object]] = []
+    with native_concat_list(blocks, output_path.parent) as concat:
+        for n, groups in outputs.items():
+            aggregates: list[Mapping[str, object]] = []
+            runs: list[dict[str, object]] = []
+            for repetition, group_outputs in enumerate(groups, start=1):
+                aggregate, encodes = run_parallel_group(
+                    binary, concat, group_outputs, probe, bit_rate=bit_rate,
+                    gop_size=gop_size, convert_pixels=convert,
+                )
+                for output, encode in zip(group_outputs, encodes, strict=True):
+                    reference_hash = verify_parallel_output(
+                        encode, blocks, output, probe, reference_hash,
+                        establish_reference=n == 1, discard=discard_verified_outputs,
+                    )
+                # Quality/hash failures remain visible but do not erase encode throughput.
+                aggregates.append(aggregate)
+                runs.append({"repetition": repetition, "aggregate": aggregate, "encodes": encodes,
+                    "status": "succeeded" if all(e["status"] == "succeeded" for e in encodes)
+                              and aggregate["status"] == "succeeded" else "failed"})
+            variance = native_variance(aggregates)
+            if n == 1:
+                speed = cast(dict[str, float] | None, variance["source_seconds_per_wall_second"])
+                baseline_speed = speed["mean"] if speed else None
+            for aggregate in aggregates:
+                speed_value = cast(float | None, aggregate["source_seconds_per_wall_second"])
+                if baseline_speed is not None and speed_value is not None:
+                    cast(dict[str, object], aggregate)["scaling_efficiency"] = (
+                        speed_value / (n * baseline_speed))
+            levels.append({"parallelism": n, "repetitions": runs, "variance": variance})
+    report["measurements"] = {"levels": levels, "reference_output_sha256": reference_hash,
+        "baseline_mean_source_seconds_per_wall_second": baseline_speed}
+    report["status"] = "succeeded" if all(
+        run["status"] == "succeeded" for level in levels
+        for run in cast(list[dict[str, object]], level["repetitions"])
+    ) else "failed"
+    return report
+
+
 def _atomic_write_new(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     descriptor, temporary_name = tempfile.mkstemp(
@@ -1343,6 +1585,12 @@ def build_parser() -> argparse.ArgumentParser:
     native_concurrent = subparsers.add_parser("native-concurrent", parents=[common])
     native_concurrent.add_argument("--ffmpeg", type=Path, required=True)
     native_concurrent.add_argument("--baseline-native-cuda-report", type=Path, required=True)
+    parallel = subparsers.add_parser("native-parallel", parents=[common])
+    parallel.add_argument("--ffmpeg", type=Path, required=True)
+    parallel.add_argument("--parallelism", type=parse_parallelism, default=(1, 2, 3, 4))
+    parallel.add_argument("--repetitions", type=int, default=2,
+                          choices=range(1, MAX_PARALLEL_REPETITIONS + 1))
+    parallel.add_argument("--discard-verified-outputs", action="store_true")
     for concurrency_parser in (concurrent, native_concurrent):
         concurrency_parser.add_argument("--transcription-model", required=True)
         concurrency_parser.add_argument("--transcription-model-version", required=True)
@@ -1388,6 +1636,12 @@ def main(argv: Sequence[str] | None = None) -> int:
                 transcription_compute_type=str(args.transcription_compute_type),
                 transcription_language=args.transcription_language,
                 **native_arguments,
+            )
+        elif args.command == "native-parallel":
+            report = run_native_parallel_arm(
+                blocks, output_video, ffmpeg=args.ffmpeg, parallelism=args.parallelism,
+                repetitions=args.repetitions, bit_rate=args.video_bit_rate, gop_size=args.gop_size,
+                discard_verified_outputs=args.discard_verified_outputs,
             )
         elif args.command in NATIVE_ARMS:
             report = run_native_arm(

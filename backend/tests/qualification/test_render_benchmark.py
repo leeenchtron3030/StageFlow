@@ -7,6 +7,7 @@ import subprocess
 import sys
 from collections.abc import Callable, Mapping, Sequence
 from fractions import Fraction
+from io import BufferedReader
 from pathlib import Path
 from threading import Barrier
 from types import SimpleNamespace
@@ -900,3 +901,489 @@ def test_legacy_report_version_remains_unchanged(
     for kind in ("nvenc", "libx264", "concurrent_nvenc_cuda_transcription"):
         assert benchmark.base_report(kind, _probe())["harness"] == {
             "name": benchmark.HARNESS_NAME, "version": "1.0"}
+
+
+def _parallel_arguments() -> list[str]:
+    return ["native-parallel", "--input-directory", "source", "--output-video", "output.mp4",
+            "--output-report", "report.json", "--ffmpeg", "tool.exe"]
+
+
+@pytest.mark.parametrize("extra", [[], ["--parallelism", "8,1,3", "--repetitions", "5",
+                                       "--discard-verified-outputs"]])
+def test_parallel_cli_defaults_and_bounds(extra: list[str]) -> None:
+    args = benchmark.build_parser().parse_args([*_parallel_arguments(), *extra])
+    assert args.parallelism == ((1, 3, 8) if extra else (1, 2, 3, 4))
+    assert args.repetitions == (5 if extra else 2)
+    assert args.discard_verified_outputs == bool(extra)
+    assert args.video_bit_rate == 8_000_000 and args.gop_size == 60
+
+
+@pytest.mark.parametrize("extra", [
+    ["--parallelism", value] for value in ("", "0,1", "1,9", "1,1", "2,3", "1,x", "1,2,")
+] + [["--repetitions", value] for value in ("0", "6", "1.5")])
+def test_parallel_cli_rejects_invalid_settings(extra: list[str]) -> None:
+    with pytest.raises(SystemExit):
+        benchmark.build_parser().parse_args([*_parallel_arguments(), *extra])
+
+
+def test_parallel_requires_explicit_ffmpeg() -> None:
+    with pytest.raises(SystemExit):
+        benchmark.build_parser().parse_args(_parallel_arguments()[:-2])
+
+
+def _parallel_levels(report: Mapping[str, object]) -> list[dict[str, object]]:
+    return cast(list[dict[str, object]], cast(dict[str, object], report["measurements"])["levels"])
+
+
+def _parallel_runs(level: Mapping[str, object]) -> list[dict[str, object]]:
+    return cast(list[dict[str, object]], level["repetitions"])
+
+
+def _parallel_encodes(run: Mapping[str, object]) -> list[dict[str, object]]:
+    return cast(list[dict[str, object]], run["encodes"])
+
+
+def _fake_parallel_process(command: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+    if command[-1] == "-version":
+        return subprocess.CompletedProcess(command, 0,
+            "ffmpeg version n8.1.2\nconfiguration: --disable-gpl\n", "")
+    Path(command[-1]).write_bytes(b"synthetic identical bytes")
+    return subprocess.CompletedProcess(command, 0, "frame=42\n", "")
+
+
+def _run_parallel(
+    binary: Path, *, parallelism: tuple[int, ...] = (1, 2, 3), repetitions: int = 1,
+    discard: bool = False,
+) -> dict[str, object]:
+    return benchmark.run_native_parallel_arm(
+        (), binary.parent / "render.mp4", ffmpeg=binary,
+        parallelism=parallelism, repetitions=repetitions, bit_rate=8_000_000, gop_size=60,
+        discard_verified_outputs=discard,
+    )
+
+
+def test_parallel_process_windows_efficiency_variance_and_barrier(
+    native_setup: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(benchmark.subprocess, "run", _fake_parallel_process)
+    barriers: list[Barrier] = []
+    arrivals: list[int] = []
+    real_barrier = Barrier
+
+    def barrier(parties: int) -> Barrier:
+        result = real_barrier(parties, action=lambda: arrivals.append(parties), timeout=5)
+        barriers.append(result)
+        return result
+
+    calls: list[Path] = []
+
+    def encode(binary: Path, concat: Path, output: Path, probe: CorpusProbe,
+               **kwargs: object) -> TimedResult:
+        n = int(output.name.split(".parallel-")[1].split(".")[0])
+        index = int(output.name.split(".encode-")[1].split(".")[0])
+        rep = int(output.stem.split("repetition-")[1])
+        assert arrivals[-1] == n  # Every worker crossed the same barrier before encoding.
+        assert kwargs["classify_session_refusal"] is True
+        assert kwargs["arm"] == "native-cuda-nvenc"
+        calls.append(output)
+        output.write_bytes(b"synthetic identical bytes")
+        start = 100.0 + index - 1
+        wall = 10.0 if rep == 1 else 20.0
+        return TimedResult(start, start + wall, {
+            "status": "succeeded", "exit_status": 0, "wall_clock_seconds": wall,
+            "real_time_factor": wall / 660, "source_seconds_per_wall_second": 660 / wall,
+            "encoded_frame_count": 42, "output_size_bytes": output.stat().st_size,
+            "quality": None,
+        })
+
+    monkeypatch.setattr(benchmark, "Barrier", barrier)
+    monkeypatch.setattr(benchmark, "encode_native_video", encode)
+    report = _run_parallel(native_setup, parallelism=(2, 1), repetitions=2)
+    assert report["status"] == "succeeded"
+    assert arrivals == [1, 1, 2, 2] and len(barriers) == 4 and len(calls) == 6
+    first, second = _parallel_levels(report)
+    variance = cast(dict[str, object], first["variance"])
+    assert variance["wall_clock_seconds"] == {
+        "min": 10.0, "max": 20.0, "mean": 15.0, "standard_deviation": 5.0}
+    assert variance["source_seconds_per_wall_second"] == {
+        "min": 33.0, "max": 66.0, "mean": 49.5, "standard_deviation": 16.5}
+    run = _parallel_runs(second)[0]
+    aggregate = cast(dict[str, object], run["aggregate"])
+    assert aggregate["window_seconds_from_group_start"] == {"start": 0.0, "end": 11.0}
+    assert aggregate["source_seconds_per_wall_second"] == 120.0
+    assert aggregate["scaling_efficiency"] == 120 / (2 * 49.5)
+    assert _parallel_encodes(run)[1]["start_seconds_from_group_start"] == 1.0
+    assert _parallel_encodes(run)[1]["end_seconds_from_group_start"] == 11.0
+    assert report["harness"] == {"name": benchmark.HARNESS_NAME, "version": "1.2"}
+
+
+@pytest.mark.parametrize("diagnostic,code", [
+    ("OpenEncodeSessionEx failed: out of memory", "nvenc_session_unavailable"),
+    ("No capable devices found", "nvenc_session_unavailable"),
+    ("synthetic encoder failure", "native_encoder_execution_failed"),
+    ("Failed setup for format cuda", "native_cuda_decode_fallback"),
+])
+def test_parallel_refusal_and_fallback_continue_without_retry(
+    native_setup: Path, monkeypatch: pytest.MonkeyPatch, diagnostic: str, code: str,
+) -> None:
+    calls: list[str] = []
+
+    def run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        result = _fake_parallel_process(command, **kwargs)
+        if command[-1] != "-version":
+            calls.append(command[-1])
+        if ".parallel-2.encode-1." in command[-1]:
+            return subprocess.CompletedProcess(command,
+                0 if code == "native_cuda_decode_fallback" else 1, result.stdout, diagnostic)
+        return result
+
+    monkeypatch.setattr(benchmark.subprocess, "run", run)
+    report = _run_parallel(native_setup, discard=True)
+    levels = _parallel_levels(report)
+    failed = _parallel_runs(levels[1])[0]
+    assert report["status"] == "failed" and len(calls) == 6
+    failure = _parallel_encodes(failed)[0]
+    assert cast(dict[str, object], failure["failure"])["code"] == code
+    assert failure["exit_status"] == (0 if code == "native_cuda_decode_fallback" else 1)
+    assert failure["output_sha256"] is not None and failure["output_discarded"] is False
+    assert cast(dict[str, object], failed["aggregate"])["source_seconds_per_wall_second"] is None
+    assert cast(dict[str, object], levels[1]["variance"])["successful_repetitions"] == 0
+    assert _parallel_runs(levels[2])[0]["status"] == "succeeded"
+    assert len(list(native_setup.parent.glob("render.*.mp4"))) == 2
+    encoded = json.dumps(report)
+    assert diagnostic not in encoded and str(native_setup.parent) not in encoded
+
+
+@pytest.mark.parametrize("discard", [False, True])
+def test_parallel_hash_identity_quality_fallback_and_discard(
+    native_setup: Path, monkeypatch: pytest.MonkeyPatch, discard: bool,
+) -> None:
+    calls: list[Path] = []
+
+    def run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        result = _fake_parallel_process(command, **kwargs)
+        if ".parallel-2.encode-2." in command[-1]:
+            Path(command[-1]).write_bytes(b"different synthetic bytes")
+        return result
+
+    def quality(_: Sequence[Path], output: Path, __: CorpusProbe) -> dict[str, object]:
+        calls.append(output)
+        return {"ssim_mean_frame_all": 0.98, "psnr_mean_frame_average_db": 40.0}
+
+    source = native_setup.parent / "source.mp4"
+    source.write_bytes(b"synthetic identical bytes")
+    unrelated = native_setup.parent / "unrelated.mp4"
+    unrelated.write_bytes(source.read_bytes())
+    monkeypatch.setattr(benchmark.subprocess, "run", run)
+    monkeypatch.setattr(benchmark, "measure_quality", quality)
+    report = benchmark.run_native_parallel_arm(
+        (source,), native_setup.parent / "render.mp4", ffmpeg=native_setup,
+        parallelism=(1, 2), repetitions=1, bit_rate=8_000_000, gop_size=60,
+        discard_verified_outputs=discard,
+    )
+    levels = _parallel_levels(report)
+    identical, different = _parallel_encodes(_parallel_runs(levels[1])[0])
+    assert identical["is_reference"] is False and different["is_reference"] is False
+    assert identical["quality_equivalent"] is True and identical["quality"] is None
+    assert identical["output_discarded"] is discard
+    assert different["quality_equivalent"] is False and different["output_discarded"] is False
+    assert different["quality"] == {"ssim_mean_frame_all": 0.98, "psnr_mean_frame_average_db": 40.0}
+    assert len(calls) == 1 and calls[0].exists()
+    assert source.read_bytes() == unrelated.read_bytes() == b"synthetic identical bytes"
+    data = cast(dict[str, object], report["measurements"])
+    assert data["reference_output_sha256"] == hashlib.sha256(source.read_bytes()).hexdigest()
+    assert len(list(native_setup.parent.glob("render.*.mp4"))) == (2 if discard else 3)
+    assert cast(dict[str, object], report["ffmpeg"]) == {
+        "version": "n8.1.2", "sha256": hashlib.sha256(native_setup.read_bytes()).hexdigest(),
+        "gpl_enabled": False}
+    destination = native_setup.parent / "report.json"
+    benchmark.write_report(destination, report)
+    assert str(native_setup.parent) not in destination.read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("error_type,code", [
+    (BenchmarkError, "native_output_reservation_failed"),
+    (RuntimeError, "native_parallel_encode_failed"),
+])
+def test_parallel_worker_exception_retains_unowned_file_and_other_workers_finish(
+    native_setup: Path, monkeypatch: pytest.MonkeyPatch,
+    error_type: type[Exception], code: str,
+) -> None:
+    monkeypatch.setattr(benchmark.subprocess, "run", _fake_parallel_process)
+    original = benchmark.encode_native_video
+    outsider = native_setup.parent / "render.parallel-2.encode-1.repetition-01.mp4"
+
+    def encode(binary: Path, concat: Path, output: Path, probe: CorpusProbe, *,
+               arm: str, bit_rate: int, gop_size: int, convert_pixels: bool,
+               classify_session_refusal: bool = False) -> TimedResult:
+        if output == outsider:
+            output.write_bytes(b"synthetic identical bytes")
+            raise error_type(f"native_output_reservation_failed:{output}")
+        return original(binary, concat, output, probe, arm=arm, bit_rate=bit_rate,
+                        gop_size=gop_size, convert_pixels=convert_pixels,
+                        classify_session_refusal=classify_session_refusal)
+
+    monkeypatch.setattr(benchmark, "encode_native_video", encode)
+    report = _run_parallel(native_setup, discard=True)
+    assert report["status"] == "failed" and outsider.exists()
+    failure = _parallel_encodes(_parallel_runs(_parallel_levels(report)[1])[0])[0]
+    assert failure["output_sha256"] is None and failure["exit_status"] is None
+    assert failure["timing_scope"] == "worker_exception"
+    assert cast(dict[str, object], failure["failure"])["code"] == code
+    assert _parallel_runs(_parallel_levels(report)[2])[0]["status"] == "succeeded"
+    assert str(outsider) not in json.dumps(report)
+
+
+@pytest.mark.parametrize("reference_repetition", [1, 2])
+def test_parallel_reference_survives_discard(
+    native_setup: Path, monkeypatch: pytest.MonkeyPatch, reference_repetition: int,
+) -> None:
+    def run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        result = _fake_parallel_process(command, **kwargs)
+        if reference_repetition == 2 and ".parallel-1.encode-1.repetition-01." in command[-1]:
+            return subprocess.CompletedProcess(command, 1, result.stdout,
+                                               "OpenEncodeSessionEx failed")
+        return result
+
+    monkeypatch.setattr(benchmark.subprocess, "run", run)
+    report = _run_parallel(native_setup, parallelism=(1, 2), repetitions=2, discard=True)
+    baseline_runs = _parallel_runs(_parallel_levels(report)[0])
+    reference = _parallel_encodes(baseline_runs[reference_repetition - 1])[0]
+    assert reference["is_reference"] is True
+    assert reference["byte_identical_to_reference"] is None
+    assert reference["quality_equivalent"] is None and reference["quality"] is None
+    assert reference["output_discarded"] is False
+    output = native_setup.parent / (
+        f"render.parallel-1.encode-1.repetition-{reference_repetition:02d}.mp4")
+    assert hashlib.sha256(output.read_bytes()).hexdigest() == reference["output_sha256"]
+    data = cast(dict[str, object], report["measurements"])
+    assert data["reference_output_sha256"] == reference["output_sha256"]
+    encodes = [encode for level in _parallel_levels(report)
+               for run in _parallel_runs(level) for encode in _parallel_encodes(run)]
+    assert sum(encode["is_reference"] is True for encode in encodes) == 1
+    assert all(encode["output_discarded"] is True for encode in encodes
+               if encode is not reference and encode["status"] == "succeeded")
+    assert len(list(native_setup.parent.glob("render.*.mp4"))) == reference_repetition
+
+
+def test_parallel_barrier_timeout_records_failures_and_continues(
+    native_setup: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    waits: list[tuple[int, float | None]] = []
+    calls: list[str] = []
+
+    class ExpiringBarrier(Barrier):
+        def wait(self, timeout: float | None = None) -> int:
+            waits.append((self.parties, timeout))
+            # Expire immediately for N=2; exercise a real broken barrier without a delay.
+            return super().wait(timeout=0 if self.parties == 2 else timeout)
+
+    def run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        calls.append(command[-1])
+        return _fake_parallel_process(command, **kwargs)
+
+    monkeypatch.setattr(benchmark, "Barrier", ExpiringBarrier)
+    monkeypatch.setattr(benchmark.subprocess, "run", run)
+    report = _run_parallel(native_setup, discard=True)
+    assert sorted(waits) == [(1, 60), (2, 60), (2, 60), (3, 60), (3, 60), (3, 60)]
+    assert len(calls) == 5  # Identity probe, one baseline, three later encodes; no retry.
+    assert not any(".parallel-2." in call for call in calls)
+    first, failed, later = [_parallel_runs(level)[0] for level in _parallel_levels(report)]
+    assert first["status"] == later["status"] == "succeeded"
+    assert report["status"] == failed["status"] == "failed"
+    aggregate = cast(dict[str, object], failed["aggregate"])
+    assert aggregate["source_seconds_per_wall_second"] is None
+    assert aggregate["scaling_efficiency"] is None
+    for encode in _parallel_encodes(failed):
+        assert encode["status"] == "failed" and encode["timing_scope"] == "worker_exception"
+        assert cast(dict[str, object], encode["failure"])["code"] == (
+            "native_parallel_barrier_failed")
+        assert encode["exit_status"] is None and encode["output_sha256"] is None
+        assert encode["output_discarded"] is False
+
+
+def test_parallel_failed_baseline_has_no_reference_or_efficiency(
+    native_setup: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        result = _fake_parallel_process(command, **kwargs)
+        if ".parallel-1." in command[-1]:
+            return subprocess.CompletedProcess(
+                command, 1, result.stdout, "No capable devices found")
+        return result
+
+    monkeypatch.setattr(benchmark.subprocess, "run", run)
+    report = _run_parallel(native_setup, discard=True)
+    data = cast(dict[str, object], report["measurements"])
+    assert data["reference_output_sha256"] is None
+    assert data["baseline_mean_source_seconds_per_wall_second"] is None
+    for level in _parallel_levels(report):
+        repetition = _parallel_runs(level)[0]
+        assert cast(dict[str, object], repetition["aggregate"])["scaling_efficiency"] is None
+        assert all(e["output_discarded"] is False for e in _parallel_encodes(repetition))
+    assert report["status"] == "failed"
+
+
+def test_parallel_preflights_all_outputs_and_refuses_collisions(native_setup: Path) -> None:
+    output = native_setup.parent / "render.mp4"
+    existing = native_setup.parent / "render.parallel-3.encode-3.repetition-02.mp4"
+    existing.write_bytes(b"existing synthetic bytes")
+    with pytest.raises(BenchmarkError, match="already_exists"):
+        benchmark.parallel_output_paths(output, (1, 2, 3), 2)
+    assert list(native_setup.parent.glob("render.*.mp4")) == [existing]
+    assert existing.read_bytes() == b"existing synthetic bytes"
+
+
+@pytest.mark.parametrize("path", [Path("relative.mp4"), benchmark.REPOSITORY_ROOT / "render.mp4"])
+def test_parallel_rejects_nonexternal_outputs(path: Path) -> None:
+    with pytest.raises(BenchmarkError, match="absolute|outside_repository"):
+        benchmark.parallel_output_paths(path, (1, 2), 2)
+
+
+@pytest.mark.parametrize("gpl", [False, True])
+def test_parallel_cli_dispatch_identity_and_gpl_refusal(
+    native_setup: Path, monkeypatch: pytest.MonkeyPatch, gpl: bool,
+) -> None:
+    original_input = benchmark.require_external_input_directory
+
+    def input_directory(path: Path) -> Path:
+        return original_input(path, repository_root=native_setup.parent / "repository")
+
+    calls: list[list[str]] = []
+
+    def run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        calls.append(command)
+        if gpl:
+            return subprocess.CompletedProcess(command, 0,
+                "ffmpeg version n8.1.2\nconfiguration: --enable-gpl\n", "")
+        return _fake_parallel_process(command, **kwargs)
+
+    source = native_setup.parent / "source"
+    source.mkdir()
+    (source / "block.mp4").write_bytes(b"synthetic source")
+    report = native_setup.parent / "report.json"
+    monkeypatch.setattr(benchmark, "require_external_input_directory", input_directory)
+    monkeypatch.setattr(benchmark.subprocess, "run", run)
+    result = benchmark.main(["native-parallel", "--input-directory", str(source),
+        "--output-video", str(native_setup.parent / "render.mp4"), "--output-report", str(report),
+        "--ffmpeg", str(native_setup), "--parallelism", "1,2", "--repetitions", "1"])
+    assert result == (2 if gpl else 0)
+    assert len(calls) == (1 if gpl else 4)
+    assert report.exists() is not gpl
+    assert (source / "block.mp4").read_bytes() == b"synthetic source"
+
+
+@pytest.mark.parametrize("fault", ["hash", "changed", "quality", "source_alias"])
+def test_parallel_verification_faults_preserve_files_and_continue(
+    native_setup: Path, monkeypatch: pytest.MonkeyPatch, fault: str,
+) -> None:
+    source = native_setup.parent / "source.mp4"
+    source.write_bytes(b"synthetic identical bytes")
+    affected = native_setup.parent / "render.parallel-2.encode-2.repetition-01.mp4"
+    original_digest = hashlib.file_digest
+
+    def run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        if command[-1] == str(affected) and fault == "source_alias":
+            # Model a substituted source alias after the native encoder reserves a file.
+            # The empty reservation is the only file replaced, never the source.
+            affected.unlink()
+            affected.hardlink_to(source)
+            return subprocess.CompletedProcess(command, 0, "frame=42\n", "")
+        result = _fake_parallel_process(command, **kwargs)
+        if command[-1] == str(affected) and fault == "quality":
+            affected.write_bytes(b"different synthetic bytes")
+        return result
+
+    def digest(handle: BufferedReader, algorithm: str) -> object:
+        if getattr(handle, "name", None) == str(affected):
+            if fault == "hash":
+                raise OSError(str(affected))
+            result = original_digest(handle, algorithm)
+            if fault == "changed":
+                affected.write_bytes(b"changed synthetic bytes after hashing")
+            return result
+        return original_digest(handle, algorithm)
+
+    def quality(*_: object) -> dict[str, object]:
+        raise RuntimeError(str(affected))
+
+    monkeypatch.setattr(benchmark.subprocess, "run", run)
+    monkeypatch.setattr(benchmark.hashlib, "file_digest", digest)
+    monkeypatch.setattr(benchmark, "measure_quality", quality)
+    report = _run_parallel(native_setup, discard=True)
+    failure = _parallel_encodes(_parallel_runs(_parallel_levels(report)[1])[0])[1]
+    assert failure["status"] == "failed" and failure["output_discarded"] is False
+    assert affected.exists() and source.read_bytes() == b"synthetic identical bytes"
+    assert report["status"] == "failed"
+    assert _parallel_runs(_parallel_levels(report)[2])[0]["status"] == "succeeded"
+    assert str(affected) not in json.dumps(report)
+
+
+def test_parallel_uses_later_successful_baseline_repetition_without_retry(
+    native_setup: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[str] = []
+
+    def run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        calls.append(command[-1])
+        result = _fake_parallel_process(command, **kwargs)
+        if ".parallel-1.encode-1.repetition-01." in command[-1]:
+            return subprocess.CompletedProcess(command, 1, result.stdout,
+                                               "OpenEncodeSessionEx failed")
+        return result
+
+    monkeypatch.setattr(benchmark.subprocess, "run", run)
+    report = _run_parallel(native_setup, parallelism=(1, 2), repetitions=2)
+    first, second = _parallel_levels(report)
+    assert cast(dict[str, object], first["variance"])["successful_repetitions"] == 1
+    assert _parallel_runs(first)[0]["status"] == "failed"
+    assert _parallel_runs(first)[1]["status"] == "succeeded"
+    assert all(run["status"] == "succeeded" for run in _parallel_runs(second))
+    assert len(calls) == 7  # One identity probe, six encodes; no retry.
+
+
+@pytest.mark.parametrize("command", ["native-parallel", *benchmark.NATIVE_ARMS])
+def test_session_refusal_classification_is_opt_in_for_earlier_arms(
+    native_setup: Path, monkeypatch: pytest.MonkeyPatch, command: str,
+) -> None:
+    def run(arguments: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        result = _fake_parallel_process(arguments, **kwargs)
+        if arguments[-1] == "-version":
+            return result
+        return subprocess.CompletedProcess(arguments, 1, result.stdout, "No capable devices found")
+
+    monkeypatch.setattr(benchmark.subprocess, "run", run)
+    if command == "native-parallel":
+        report = _run_parallel(native_setup, parallelism=(1,))
+        encode = _parallel_encodes(_parallel_runs(_parallel_levels(report)[0])[0])[0]
+    else:
+        report = benchmark.run_native_arm((), native_setup.parent / "render.mp4",
+            ffmpeg=native_setup, arm=command, repetitions=1, bit_rate=8_000_000, gop_size=60)
+        data = cast(dict[str, object], report["measurements"])
+        encode = cast(list[dict[str, object]], data["repetitions"])[0]
+    assert cast(dict[str, object], encode["failure"])["code"] == (
+        "nvenc_session_unavailable" if command == "native-parallel"
+        else "native_encoder_execution_failed")
+    assert report["harness"] == {"name": benchmark.HARNESS_NAME,
+                                 "version": "1.2" if command == "native-parallel" else "1.1"}
+
+
+def test_parallel_hash_failure_does_not_hide_session_refusal(
+    native_setup: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        result = _fake_parallel_process(command, **kwargs)
+        if ".parallel-2.encode-1." in command[-1]:
+            # A failed process whose reserved output is also unavailable to the verifier.
+            Path(command[-1]).unlink()
+            return subprocess.CompletedProcess(command, 1, result.stdout,
+                                               "OpenEncodeSessionEx failed")
+        return result
+
+    monkeypatch.setattr(benchmark.subprocess, "run", run)
+    report = _run_parallel(native_setup)
+    failure = _parallel_encodes(_parallel_runs(_parallel_levels(report)[1])[0])[0]
+    assert cast(dict[str, object], failure["failure"])["code"] == "nvenc_session_unavailable"
+    assert cast(dict[str, object], failure["verification_failure"])["code"] == (
+        "parallel_output_verification_failed")
+    assert _parallel_runs(_parallel_levels(report)[2])[0]["status"] == "succeeded"
