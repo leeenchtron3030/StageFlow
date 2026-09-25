@@ -152,6 +152,32 @@ one short overlap with real CUDA transcription showed no material contention. Th
 absolute encode speed did not validate the packaging-speed assumption and warrants
 further renderer-path investigation before any production capability claim.
 
+## Review note — interpreting the speed ratio
+
+*Added during owner review on 2026-09-24. The measurements above are unchanged.*
+
+Both encoder arms pay the same fixed per-frame costs inside the timed region: software
+decode, per-frame `reformat()`, Python/PyAV frame iteration, and muxing. When a large shared
+cost dominates both arms, the ratio between them is compressed toward 1.0. The measured
+**1.415x NVENC advantage is therefore a lower bound on the encoder difference, not a
+measurement of it.** It should not be used to argue that NVENC offers only a modest speedup.
+
+The same reasoning limits the concurrency result. The encode arm spent most of its time in
+CPU-side decode and frame marshalling rather than in the NVENC hardware block, and the
+overlap covered 5.08% of the encode. Observing no material contention in that window is
+not evidence about how a native pipeline — where NVENC and CUDA would both be heavily
+exercised — would behave.
+
+What this run does establish independently of the harness path:
+
+- NVENC is available on the reference host with no session-limit or fallback finding.
+- At matched target bitrate, NVENC's quality cost is negligible: mean SSIM 0.99689 vs
+  0.99758, measured outside the timed region.
+
+A native FFmpeg pipeline arm (decode, scale, and encode kept inside FFmpeg, optionally with
+CUDA hardware decode) is required before any encode-throughput or fleet-sizing figure is
+derived. That follow-up is tracked separately and is not part of ED-0073.
+
 ## External sanitized artifact hashes
 
 | Artifact | SHA-256 |
