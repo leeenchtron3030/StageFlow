@@ -23,12 +23,17 @@ without saying so in the final report.
   `env -u STAGEFLOW_API_SHARED_SECRET -u VIRTUAL_ENV uv run --no-sync pytest -p no:cacheprovider -q --tb=line`.
   Count outcomes from the progress lines only. Never use plain `uv run`, which strips the
   transcription group.
-- **Known host failures:**
-  - Four `test_validation_controller.py::test_turnover_boundaries_emit_exact_live_operation_checkpoints`
-    cases (Windows console encoding) always fail.
-  - `test_devcon_session_publish.py::test_devcon_no_body_response_maps_to_bounded_reason_without_retry`
-    is intermittent; rerun it in isolation before calling it a regression.
-  - Anything else is new until proven otherwise.
+- **Known host failures:** none since ED-0083; the Windows host suite is fully green.
+  `test_devcon_session_publish.py::test_devcon_no_body_response_maps_to_bounded_reason_without_retry`
+  is intermittent; rerun it in isolation before calling it a regression. Anything else is new
+  until proven otherwise.
+- **Codex sandbox PATH:** if PowerShell 7 is installed as a Windows app, sandboxed shell calls fail
+  with `CreateProcessAsUserW failed: 5`. Launch `codex exec` with `WindowsApps` removed from
+  `PATH`. To test whether the sandbox works, run `echo probe-ok` with `--skip-git-repo-check` in
+  an empty folder.
+- **Tests that run PowerShell:** they use `pwsh` 7 when it is present, as CI on Linux does.
+  PowerShell 7 re-renders ISO-date-shaped strings in `ConvertFrom-Json`, so fixtures that
+  should pass through unchanged must not be date-shaped.
 
 ## Procedure
 

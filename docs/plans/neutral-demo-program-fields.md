@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved
+Completed (2026-09-25).
 
 ## Execution authority
 
@@ -86,15 +86,15 @@ old codes must update.
 
 ## Acceptance criteria
 
-- [ ] Preflight emits the neutral keys, with the legacy aliases identical. The neutral
+- [x] Preflight emits the neutral keys, with the legacy aliases identical. The neutral
   error codes are used.
-- [ ] The report and status summary carry `program`, with `devcon` identical. The schema
+- [x] The report and status summary carry `program`, with `devcon` identical. The schema
   version is unchanged.
-- [ ] The launcher displays the same text, read from `program`.
-- [ ] Tests cover the neutral keys, alias identity, error codes, and the launcher read.
-- [ ] The ADR-0031 residual is marked resolved, with the aliases and removal criteria
+- [x] The launcher displays the same text, read from `program`.
+- [x] Tests cover the neutral keys, alias identity, error codes, and the launcher read.
+- [x] The ADR-0031 residual is marked resolved, with the aliases and removal criteria
   documented.
-- [ ] The full backend suite, Ruff, and Pyright pass on the host. No API, schema, or
+- [x] The full backend suite, Ruff, and Pyright pass on the host. No API, schema, or
   stored-data change.
 
 ## Rollback
@@ -103,4 +103,28 @@ Revert the commit. The legacy keys were never removed.
 
 ## Completion record
 
-_(Filled in on completion.)_
+- **Implemented revision:** branch `codex/ed-0084-neutral-demo-program-fields`. Codex
+  implemented it in the sandbox, and the owner committed it.
+- **Files changed:**
+  - `backend/app/demo/cli.py`, `backend/app/demo/controller.py`, and
+    `scripts/demo/StageFlow-Demo.ps1`;
+  - `backend/tests/test_demo_preflight.py`, `backend/tests/test_demo_rehearsal_controller.py`,
+    and `backend/tests/test_demo_rehearsal_controller_script.py`;
+  - `docs/adr/README.md` and `docs/architecture/principles.md`.
+
+  No HTTP API, schema, migration, stored-data, adapter, or dependency change.
+- **Commands and tests actually run:**
+  - `directive-reviewer` first returned FIX-FIRST. The new launcher test failed under
+    PowerShell 7, the supported runtime, because `ConvertFrom-Json` re-rendered an
+    ISO-date fixture. The fixture now uses a non-date marker.
+  - After the fix, the reviewer re-reviewed and returned APPROVE: 44 focused tests passed,
+    and Ruff and Pyright were clean.
+  - Host full suite: **2,130 passed, 0 failed, 2 skipped**; Ruff and Pyright clean.
+- **Execution authority:** Green.
+- **Deviations:** none. An environmental issue arose and was resolved: after PowerShell 7
+  was installed as a Windows app, the Codex sandbox could not start processes until
+  `WindowsApps` was removed from its `PATH`.
+- **Remaining work:**
+  - Remove the legacy aliases after one release, once the removal criteria are met.
+  - Possible follow-up: under PowerShell 7, the launcher shows `last=` as a locale-formatted
+    date. This predates this change.
