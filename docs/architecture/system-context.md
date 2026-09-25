@@ -22,16 +22,17 @@ foundation is closure-validated but is not event-ready software.
 | Marketing user | No implemented workflow | Consumes approved clips, assembled outputs, metadata, and delivery state rather than raw candidate intelligence |
 | AI/media Event Worker | No implementation | Claims approved PostgreSQL-backed work for transcription, analysis, vision, proxy, or rendering without owning Session/media authority |
 | Recording/shared-storage system | Files may be inspected only by an explicit one-shot local discovery call | Remains source of media; StageFlow registers completed assets by reference |
-| Schedule/conference system | Optional bounded Devcon public-program read reconciles one configured Event/room into External Program Expectations | Remains source of planned conference data and external identifiers |
+| Schedule/conference system | Provider-neutral program source reconciles a complete Stage snapshot from an offline local schedule file or optional Devcon public-program read into External Program Expectations | Remains source of planned conference data and external identifiers |
 | Transcript/vision providers | Adapter/interpreter contracts only | Optional providers behind adapters; unavailable service must not stop local event work |
-| Publishing/delivery destinations | Guarded Demo controller can perform one explicitly confirmed Devcon transcript/duration enrichment write | Future provider-neutral durable operations with idempotency and reconciliation |
+| Publishing/delivery destinations | External publication frozen under ADR-0031; no operator action | Future provider-neutral durable operations with idempotency and reconciliation |
 
 An application caller can create a durable human-authorized Session, register media
 through the Kernel service, and declare an unreviewed Editorial Candidate Moment. The
-bounded Demo controller can explicitly publish approved transcript/duration enrichment
-to one matched Devcon Session under ADR-0028; it is not a general publication or
-delivery workflow and cannot control a recorder. No actor can create an Editorial review
-decision or Clip, publish editorial output, or deliver an output through this slice.
+Demo controller refuses the retired publication action before any network call under
+ADR-0031. The backend Devcon publish adapter remains dormant pending provider-neutral
+Delivery design. The controller cannot control a recorder. No actor can create an
+Editorial review decision or Clip, publish editorial output, or deliver an output
+through this slice.
 
 ## Current runtime components
 
@@ -46,7 +47,8 @@ decision or Clip, publish editorial output, or deliver an output through this sl
 | Durable Kernel repository | Event/Stage, Program Expectation, Session, media registry/association, completion snapshots, reconciliation, human-command replay, and typed history | Normalized PostgreSQL current state plus typed append-only history |
 | Media Timing Evidence repository | Append/retrieve immutable asset-linked Observed facts, Derived intervals, qualification state, and exact application replay | Additive PostgreSQL revision/history authority; advisory only |
 | Durable Kernel service | Explicit bootstrap, idempotent human Session boundaries/assignment/completion, readiness/asset adapters, stable ingress, and provenance-bearing categorical association | Direct synchronous application boundary |
-| Devcon integration | Optional bounded public-program read/reconciliation plus one guarded human-confirmed transcript/duration enrichment write and separated durability/cache verification | Devcon remains external authority; network failure does not replace local Kernel state |
+| Program schedule sources | `ProgramScheduleSource` composes strict offline JSON (`local_file`) or optional public-program reads (`devcon`); results/status retain provider attribution | Existing PostgreSQL snapshot reconciliation/cache; failed reads preserve the last successful program and never realize Sessions |
+| Publication integration | Backend Devcon adapter retained dormant; operator publication is frozen with no action | ADR-0031 freezes external publication pending provider-neutral Delivery design |
 | Editorial Candidate Moment repository/service | Idempotent declared Candidate creation, bounded per-Session reads, and append-only boundary-conflict evaluation | PostgreSQL declaration and location-history authority; no in-memory runtime fallback |
 | Evidence/reasoning/state policies | Deterministic transformation and transition contracts | Caller-invoked; no orchestrator or durable lineage store |
 | In-memory Operational State repository | Atomic accepted Recording/Session state, lineage, revision, and operation replay | Thread-safe and explicitly process-local |
@@ -109,11 +111,13 @@ There is no watcher, broker, worker, or uncontrolled loop.
 - The composed path performs `stat`/`lstat`/`scandir`-style inspection plus one bounded
   open/read access check. It does not decode media, watch, poll, recurse, transfer, alter,
   or delete source media.
-- No provider SDK is present. The bounded Devcon adapters use the standard-library HTTP
-  client for optional program GETs and the explicitly invoked guarded enrichment PUT;
-  they do not participate in the local event-critical media path. The selected local
-  transcription adapter uses separately documented model/media dependencies. No FFmpeg,
-  model execution, or delivery side effect exists in the Editorial Candidate Moment slice.
+- No provider SDK is present. The optional Devcon read adapter uses the standard-library
+  HTTP client for program GETs; the offline local schedule file is the default. The
+  retained publish adapter is dormant and the Demo controller refuses publication under
+  ADR-0031. These adapters do not participate in the local event-critical media path. The
+  selected local transcription adapter uses separately documented model/media dependencies.
+  No FFmpeg, model execution, or delivery side effect exists in the Editorial Candidate
+  Moment slice.
 - HTTP exposes process liveness, read-only Kernel operational status, bounded
   asset-specific MTE history, and an authenticated idempotent `Mark Moment` command plus
   bounded Editorial reads; authoritative mutation remains an application boundary rather

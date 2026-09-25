@@ -70,6 +70,27 @@ class PostgresMigrationRunner:
             "0010_editorial_candidate_moment_forward.sql",
             version="0010_editorial_candidate_moment",
         )
+        self.apply_editorial_review_foundation_v1()
+
+    def apply_editorial_review_foundation_v1(self) -> None:
+        self._execute_if_missing(
+            "0011_editorial_review_foundation_forward.sql",
+            version="0011_editorial_review_foundation",
+        )
+        self.apply_packaging_asset_foundation_v1()
+
+    def apply_packaging_asset_foundation_v1(self) -> None:
+        self._execute_if_missing(
+            "0012_packaging_asset_foundation_forward.sql",
+            version="0012_packaging_asset_foundation",
+        )
+        self.apply_session_assembly_foundation_v1()
+
+    def apply_session_assembly_foundation_v1(self) -> None:
+        self._execute_if_missing(
+            "0013_session_assembly_foundation_forward.sql",
+            version="0013_session_assembly_foundation",
+        )
 
     def reverse_event_mode_kernel_v1(self) -> None:
         self.reverse_demo_vertical_slice_v1()
@@ -114,9 +135,30 @@ class PostgresMigrationRunner:
         )
 
     def reverse_editorial_candidate_moment_v1(self) -> None:
+        self.reverse_editorial_review_foundation_v1()
         self._execute_if_present(
             "0010_editorial_candidate_moment_reverse.sql",
             version="0010_editorial_candidate_moment",
+        )
+
+    def reverse_editorial_review_foundation_v1(self) -> None:
+        self.reverse_packaging_asset_foundation_v1()
+        self._execute_if_present(
+            "0011_editorial_review_foundation_reverse.sql",
+            version="0011_editorial_review_foundation",
+        )
+
+    def reverse_packaging_asset_foundation_v1(self) -> None:
+        self.reverse_session_assembly_foundation_v1()
+        self._execute_if_present(
+            "0012_packaging_asset_foundation_reverse.sql",
+            version="0012_packaging_asset_foundation",
+        )
+
+    def reverse_session_assembly_foundation_v1(self) -> None:
+        self._execute_if_present(
+            "0013_session_assembly_foundation_reverse.sql",
+            version="0013_session_assembly_foundation",
         )
 
     def _execute(self, filename: str) -> None:

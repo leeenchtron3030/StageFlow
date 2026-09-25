@@ -2,7 +2,8 @@
 
 ## Status and scope
 
-**Status:** Completed evidence pass under ED-0066; dependency decision still required.
+**Status:** Completed evidence pass under ED-0066; PyAV/FFmpeg GPL provenance confirmed
+2026-08-28 (see below); dependency decision still required.
 
 This pass inventories the checked-in backend and frontend dependency graphs, records
 declared license metadata, and preserves machine-readable CycloneDX artifacts. It makes
@@ -69,10 +70,24 @@ The installed PyAV wheel reports `av 18.1.0` and loads FFmpeg-family libraries
 `faster-whisper`, but that evidence does not disclose the wheel's FFmpeg configuration
 or settle the earlier audit's potential GPL-2.0-compatible codec/build exposure.
 
+**2026-08-28 update — provenance established.** Direct inspection of the installed
+backend `.venv` (`backend/.venv/Lib/site-packages/av.libs/`) confirms the bundled FFmpeg
+build includes `libx264-165-....dll` and `libx265-....dll` as separate vendored DLLs.
+FFmpeg can only include those encoders when built with
+`--enable-gpl --enable-libx264 --enable-libx265`; there is no LGPL configuration that
+bundles them. This is direct evidence the installed FFmpeg build is GPL-licensed, not an
+unknown build. `faster-whisper` uses PyAV only to decode audio out of arbitrary input
+containers; it does not call the bundled encoders. Decode-only use does not require
+`libx264`/`libx265` at all — an LGPL-only rebuild (Decision option 1 below) would still
+satisfy the actual transcription use case.
+
 Treat any distributed backend bundle that includes the transcription group as
-**license review pending** until the FFmpeg/PyAV binary provenance is established and
-counsel confirms the obligations. Passing `pip-licenses` is not clearance for the
-native wheel.
+**license review pending, now with confirmed GPL exposure** until an option below is
+selected and, where required, counsel confirms the obligations. Passing `pip-licenses`
+is not clearance for the native wheel. See
+[ADR-0029](../adr/ADR-0029-nvenc-rendering-and-gpu-worker-requirement.md) for the related
+decision to keep this exposure from spreading to the separate future rendering capability
+by using NVENC hardware encoding instead of a second `libx264` dependency there.
 
 ### Frontend
 
@@ -102,7 +117,31 @@ scanner output. That does not eliminate the unresolved PyAV/FFmpeg binary questi
 
 ## Decision options for the PyAV/FFmpeg exposure
 
-ED-0066 records options but does not select one:
+**2026-08-28 — Option 3 selected.** The repository owner accepted option 3 below: do not
+distribute the transcription group while the licensing question is open. An operator who
+wants local transcription installs that dependency group themselves on their own machine,
+which is not distribution and therefore triggers no GPL obligation.
+
+This is materially cheap because the exposure is already structurally isolated:
+`backend/pyproject.toml` declares `transcription` under `[dependency-groups]`, so a default
+`uv sync` does not install `faster-whisper`, `ctranslate2`, or the FFmpeg-carrying `av`
+wheel at all — only an explicit `--group transcription` or `--all-groups` does. The
+accepted decision therefore requires documenting and guarding the existing boundary rather
+than restructuring dependencies. ED-0075 implements it.
+
+The ED-0075 distribution constraint is documented in the
+[root installation guidance](../../README.md),
+[backend Local Setup](../../backend/README.md#local-setup), and
+[agent dependency guidance](../../AGENTS.md#data-compatibility-and-dependencies).
+The bounded configuration guard and validation are recorded in the
+[implementation plan](../plans/transcription-distribution-boundary.md).
+This exclusion defers rather than resolves the licensing question and is not legal clearance.
+
+Option 1 (own an auditable LGPL-only build) remains the recommended answer for the first
+genuinely distributed artifact, and is recorded as the intended future direction rather
+than a rejected alternative. Option 2 remains available only after counsel review.
+
+ED-0066 records the options but did not select one:
 
 1. **Own an auditable LGPL-only FFmpeg/PyAV build.** Pin the build inputs and configure
    only LGPL-compatible codecs/features. This gives the clearest provenance and can

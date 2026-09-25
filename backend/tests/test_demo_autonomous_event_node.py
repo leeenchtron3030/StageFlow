@@ -1,14 +1,19 @@
 from __future__ import annotations
 
+import inspect
+import json
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, cast
 
+import psycopg
 import pytest
+from pydantic import ValidationError
 
 from app.bootstrap.event_mode_kernel import KernelComponents
-from app.contexts.integration.devcon import DevconProgramSync, ExternalProgramItem
+from app.contexts.integration.local_schedule import LocalScheduleFileSource
+from app.contexts.integration.program_source import ProgramSourceUnavailableError
 from app.contexts.production.event_mode_kernel import (
     DurableEventModeKernel,
     InMemoryEventModeKernelRepository,
@@ -25,9 +30,8 @@ from app.core.config.deployment import (
     EffectiveKernelConfiguration,
     load_kernel_deployment_configuration,
 )
-from app.demo.autonomous import AutonomousEventNodeCoordinator
+from app.demo.autonomous import AutonomousEventNodeCoordinator, AutonomousEventNodeStatus
 from app.demo.service import DemoApplication, ProcessTranscriptionRequest
-from app.infrastructure.devcon import DevconReadError
 from app.infrastructure.postgres import PostgresWorkExecutionRepository
 from app.shared.ids import EntityId
 
@@ -91,34 +95,15 @@ class MemoryWorkRepository:
         return operation
 
 
-class SnapshotSource:
-    provider = "devcon"
-    event_id = "test-devcon-8"
-    room_id = "stage-1"
-
-    def __init__(self, items: tuple[ExternalProgramItem, ...]) -> None:
-        self.items = items
-        self.available = True
-        self.fetch_count = 0
-
-    def fetch_program(self) -> tuple[ExternalProgramItem, ...]:
-        self.fetch_count += 1
-        if not self.available:
-            raise DevconReadError("devcon_read_unavailable")
-        return self.items
-
-
-def _item(session_id: str, *, title: str = "Opening") -> ExternalProgramItem:
-    return ExternalProgramItem(
-        event_id="test-devcon-8",
-        session_id=session_id,
-        room_id="stage-1",
-        room_name="Stage 1",
-        title=title,
-        speakers=("Ada",),
-        planned_start=NOW,
-        planned_end=NOW + timedelta(minutes=30),
-    )
+def _write_schedule(path: Path, *, title: str = "Opening") -> None:
+    path.write_text(json.dumps({
+        "schema_version": "1.0", "event_key": "example-event",
+        "sessions": [{
+            "session_key": "opening", "stage_key": "main", "title": title,
+            "speakers": ["Example Speaker"], "planned_start": NOW.isoformat(),
+            "planned_end": (NOW + timedelta(minutes=30)).isoformat(),
+        }],
+    }), encoding="utf-8")
 
 
 def _configuration(tmp_path: Path, source_path: Path) -> EffectiveKernelConfiguration:
@@ -126,18 +111,17 @@ def _configuration(tmp_path: Path, source_path: Path) -> EffectiveKernelConfigur
     path.write_text(
         f"""
 schema_version = "1.0"
-deployment_id = "razer-demo2-test"
-node_id = "razer-event-node"
+deployment_id = "example-deployment"
+node_id = "example-node"
 runtime_profile = "demo-single-stage"
 node_role = "node"
 event_mode = "rehearsal"
 network_policy = "optional"
 postgres_dsn_secret_ref = "DEMO2_DSN"
-schedule_source_reference = "https://api.devcon.org"
+schedule_source_reference = "{(tmp_path / "schedule.json").as_posix()}"
 
-[devcon_read]
-event_id = "test-devcon-8"
-room_id = "stage-1"
+[local_schedule]
+path = "{(tmp_path / "schedule.json").as_posix()}"
 
 [local_transcription]
 model_version = "0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf"
@@ -152,8 +136,8 @@ program_refresh_interval_seconds = 120
 minimum_stable_seconds = 5
 
 [event]
-key = "demo2-automatic-test"
-name = "Demo 2 Automatic Test"
+key = "example-event"
+name = "Example Event"
 
 [[event.stages]]
 key = "main"
@@ -187,6 +171,12 @@ def _components(
     kernel = DurableEventModeKernel(repository=repository, clock=clock)
     components = KernelComponents(configuration, repository, kernel)
     components.explicit_bootstrap(operation_id=EntityId.new(), actor_id=ACTOR_ID)
+    schedule_path = tmp_path / "schedule.json"
+    _write_schedule(schedule_path)
+    components.program_source = LocalScheduleFileSource(
+        path=schedule_path, event_key=components.event_key, stage_keys=("main",),
+        repository=repository, clock=clock,
+    )
     return components, repository, clock, source_path
 
 
@@ -434,12 +424,6 @@ def test_periodic_program_refresh_preserves_session_authority_and_cached_snapsho
     event = repository.get_event_by_key(components.event_key)
     assert event is not None
     stage = repository.list_stages(event.id)[0]
-    source = SnapshotSource((_item("opening"),))
-    components.devcon_program_sync = DevconProgramSync(
-        repository=repository,
-        source=source,
-        clock=clock,
-    )
     coordinator = AutonomousEventNodeCoordinator(components)
 
     coordinator.run_program_refresh()
@@ -455,11 +439,11 @@ def test_periodic_program_refresh_preserves_session_authority_and_cached_snapsho
     original_session = repository.get_session(session.id)
 
     clock.current += timedelta(minutes=2)
-    components.sync_devcon_program()
+    components.sync_program()
     repeated = repository.list_program_expectations(event.id)[0]
     assert repeated.revision == 1
 
-    source.items = (_item("opening", title="Opening updated"),)
+    _write_schedule(tmp_path / "schedule.json", title="Opening updated")
     clock.current += timedelta(minutes=2)
     coordinator.run_program_refresh()
     changed = repository.list_program_expectations(event.id)[0]
@@ -467,8 +451,7 @@ def test_periodic_program_refresh_preserves_session_authority_and_cached_snapsho
     successful = repository.get_latest_program_reconciliation(event.id, stage.id)
     assert successful is not None
 
-    source.items = ()
-    source.available = False
+    (tmp_path / "schedule.json").unlink()
     clock.current += timedelta(minutes=2)
     coordinator.run_program_refresh()
 
@@ -479,7 +462,6 @@ def test_periodic_program_refresh_preserves_session_authority_and_cached_snapsho
     assert coordinator.status().program_last_failure_code == (
         "provider_refresh_unavailable"
     )
-    assert source.fetch_count == 4
 
     restarted = AutonomousEventNodeCoordinator(components)
     assert restarted.status().program_last_success_at == successful.synchronized_at
@@ -596,3 +578,365 @@ def test_default_configuration_keeps_automation_disabled(tmp_path: Path) -> None
     assert disabled.autonomous_event_node.enabled is False
     assert disabled.autonomous_event_node.media_reconciliation_interval_seconds == 5
     assert disabled.autonomous_event_node.program_refresh_interval_seconds == 120
+    assert disabled.autonomous_event_node.rehearsal_fault_media_cycle is None
+
+
+@pytest.mark.parametrize("mode", ["event", "development", "rehearsal"])
+def test_fault_configuration_is_rehearsal_only(tmp_path: Path, mode: str) -> None:
+    components, _, _, _ = _components(tmp_path)
+    raw = components.configuration.deployment.model_dump()
+    raw["event_mode"] = mode
+    raw["autonomous_event_node"]["rehearsal_fault_media_cycle"] = 2
+    configuration_type = type(components.configuration.deployment)
+    if mode == "rehearsal":
+        validated = configuration_type.model_validate(raw)
+        assert validated.autonomous_event_node.rehearsal_fault_media_cycle == 2
+    else:
+        with pytest.raises(ValidationError, match="requires rehearsal"):
+            configuration_type.model_validate(raw)
+
+
+@pytest.mark.parametrize("value", [0, -1, 1.5, True, "2"])
+def test_fault_configuration_requires_positive_integer(tmp_path: Path, value: object) -> None:
+    components, _, _, _ = _components(tmp_path)
+    raw = components.configuration.deployment.model_dump()
+    raw["autonomous_event_node"]["rehearsal_fault_media_cycle"] = value
+    with pytest.raises(ValidationError):
+        type(components.configuration.deployment).model_validate(raw)
+
+
+def test_environment_override_cannot_enable_fault_outside_rehearsal(tmp_path: Path) -> None:
+    _components(tmp_path)
+    path = tmp_path / "demo2.toml"
+    path.write_text(path.read_text().replace(
+        "enabled = true", "enabled = true\nrehearsal_fault_media_cycle = 2",
+    ))
+    with pytest.raises(ValidationError, match="requires rehearsal"):
+        load_kernel_deployment_configuration(path, environment={
+            "DEMO2_DSN": "postgresql://not-used-by-memory-test", "STAGEFLOW_EVENT_MODE": "event",
+        })
+
+
+def test_program_source_unavailable_maps_to_bounded_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    components, _, clock, _ = _components(tmp_path)
+    source = components.program_source
+    assert source is not None
+
+    def unavailable(**_: object) -> None:
+        raise ProgramSourceUnavailableError("synthetic source unavailable")
+
+    monkeypatch.setattr(source, "synchronize", unavailable)
+    coordinator = AutonomousEventNodeCoordinator(components)
+    coordinator.run_program_refresh()
+    assert coordinator.status().program_last_failure_code == "provider_refresh_unavailable"
+    assert coordinator.status().program_last_failure_at == clock.now()
+
+
+@pytest.mark.parametrize("kind", ["media", "program"])
+def test_owned_loop_recovers_and_retains_failure_until_same_kind_fails_again(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, kind: str,
+) -> None:
+    components, _, clock, _ = _components(tmp_path)
+    application = _application(components, MemoryWorkRepository())
+    _install_application(monkeypatch, application)
+    coordinator = AutonomousEventNodeCoordinator(components)
+    coordinator._update(state="running", owner=True)  # type: ignore[reportPrivateUsage]
+    original = application.reconcile_media if kind == "media" else components.sync_program
+    attempts = 0
+
+    def failing_once(*args: Any, **kwargs: Any) -> Any:
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise LookupError("synthetic unexpected failure")
+        return original(*args, **kwargs)
+
+    if kind == "media":
+        def reconcile_media(_: DemoApplication, *args: Any, **kwargs: Any) -> Any:
+            return failing_once(*args, **kwargs)
+
+        monkeypatch.setattr(DemoApplication, "reconcile_media", reconcile_media)
+        monkeypatch.setattr(coordinator, "run_program_refresh", lambda: None)
+    else:
+        def sync_program(_: KernelComponents) -> Any:
+            return failing_once()
+
+        monkeypatch.setattr(KernelComponents, "sync_program", sync_program)
+        monkeypatch.setattr(coordinator, "run_media_cycle", lambda: None)
+    snapshots: list[AutonomousEventNodeStatus] = []
+
+    class StopAfterThreeCycles:
+        def is_set(self) -> bool:
+            return len(snapshots) >= 3
+
+        def wait(self, timeout: float) -> None:
+            snapshots.append(coordinator.status())
+            clock.current += timedelta(minutes=2)
+
+    class Connection:
+        def execute(self, query: str) -> None:
+            assert query == "SELECT 1"
+
+    monkeypatch.setattr(coordinator, "_stop", StopAfterThreeCycles())
+    monkeypatch.setattr("app.demo.autonomous.time.monotonic", iter(range(0, 10_000, 120)).__next__)
+    coordinator._run_owned(Connection())  # type: ignore[arg-type]
+    assert [status.state for status in snapshots] == ["degraded", "running", "running"]
+    for status in snapshots:
+        assert getattr(status, f"{kind}_last_failure_code") == "unexpected_cycle_failure"
+        assert getattr(status, f"{kind}_last_failure_at") == NOW
+    assert attempts == 3
+
+    def anticipated_failure(*args: Any, **kwargs: Any) -> Any:
+        raise ValueError("synthetic anticipated failure")
+
+    if kind == "media":
+        monkeypatch.setattr(DemoApplication, "reconcile_media", anticipated_failure)
+        coordinator.run_media_cycle()
+    else:
+        monkeypatch.setattr(KernelComponents, "sync_program", anticipated_failure)
+        coordinator.run_program_refresh()
+    assert getattr(coordinator.status(), f"{kind}_last_failure_at") == clock.now()
+    assert getattr(coordinator.status(), f"{kind}_last_failure_code") == (
+        "media_reconciliation_failed" if kind == "media" else "program_refresh_failed"
+    )
+
+
+def test_rehearsal_fault_fires_once_through_owned_loop_and_recovers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    components, _, clock, _ = _components(tmp_path)
+    raw = components.configuration.deployment.model_dump()
+    raw["autonomous_event_node"]["rehearsal_fault_media_cycle"] = 2
+    components.configuration = components.configuration.model_copy(update={
+        "deployment": type(components.configuration.deployment).model_validate(raw),
+    })
+    _install_application(monkeypatch, _application(components, MemoryWorkRepository()))
+    coordinator = AutonomousEventNodeCoordinator(components)
+    coordinator._update(state="running", owner=True)  # type: ignore[reportPrivateUsage]
+    monkeypatch.setattr(coordinator, "run_program_refresh", lambda: None)
+    snapshots: list[AutonomousEventNodeStatus] = []
+
+    class StopAfterFourCycles:
+        def is_set(self) -> bool:
+            return len(snapshots) >= 4
+
+        def wait(self, timeout: float) -> None:
+            snapshots.append(coordinator.status())
+            clock.current += timedelta(seconds=5)
+
+    class Connection:
+        def execute(self, query: str) -> None:
+            assert query == "SELECT 1"
+
+    monkeypatch.setattr(coordinator, "_stop", StopAfterFourCycles())
+    monkeypatch.setattr("app.demo.autonomous.time.monotonic", iter(range(0, 10_000, 120)).__next__)
+    coordinator._run_owned(Connection())  # type: ignore[arg-type]
+    assert [status.state for status in snapshots] == ["running", "degraded", "running", "running"]
+    assert [status.media_cycle_count for status in snapshots] == [1, 1, 2, 3]
+    assert snapshots[0].media_last_failure_code is None
+    for status in snapshots[1:]:
+        assert status.media_last_failure_code == "unexpected_cycle_failure"
+        assert status.media_last_failure_at == NOW + timedelta(seconds=5)
+
+
+def test_kernel_components_expose_only_neutral_program_names(tmp_path: Path) -> None:
+    components, _, _, _ = _components(tmp_path)
+    assert "devcon_program_sync" not in inspect.signature(KernelComponents).parameters
+    assert not hasattr(components, "devcon_program_sync")
+    assert not hasattr(components, "sync_devcon_program")
+    assert components.sync_program().added == 1
+    assert components.sync_program().unchanged == 1
+
+
+@pytest.mark.parametrize("media_failures,program_failures", [(2, 0), (2, 1), (1, 2)])
+def test_recovery_requires_success_from_each_degraded_cycle_kind(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    media_failures: int, program_failures: int,
+) -> None:
+    components, _, clock, _ = _components(tmp_path)
+    application = _application(components, MemoryWorkRepository())
+    _install_application(monkeypatch, application)
+    coordinator = AutonomousEventNodeCoordinator(components)
+    coordinator._update(state="running", owner=True)  # type: ignore[reportPrivateUsage]
+    original_media = application.reconcile_media
+    original_program = components.sync_program
+    media_attempts = program_attempts = 0
+
+    def reconcile_media(_: DemoApplication, *args: Any, **kwargs: Any) -> Any:
+        nonlocal media_attempts
+        media_attempts += 1
+        if media_attempts <= media_failures:
+            raise LookupError("synthetic media fault")
+        return original_media(*args, **kwargs)
+
+    def sync_program(_: KernelComponents) -> Any:
+        nonlocal program_attempts
+        program_attempts += 1
+        if program_attempts <= program_failures:
+            raise LookupError("synthetic program fault")
+        return original_program()
+
+    snapshots: list[AutonomousEventNodeStatus] = []
+
+    class StopAfterThreeCycles:
+        def is_set(self) -> bool:
+            return len(snapshots) >= 3
+
+        def wait(self, timeout: float) -> None:
+            snapshots.append(coordinator.status())
+            clock.current += timedelta(minutes=2)
+
+    class Connection:
+        def execute(self, query: str) -> None:
+            assert query == "SELECT 1"
+
+    monkeypatch.setattr(DemoApplication, "reconcile_media", reconcile_media)
+    monkeypatch.setattr(KernelComponents, "sync_program", sync_program)
+    monkeypatch.setattr(coordinator, "_stop", StopAfterThreeCycles())
+    monkeypatch.setattr("app.demo.autonomous.time.monotonic", iter(range(0, 10_000, 120)).__next__)
+    coordinator._run_owned(Connection())  # type: ignore[arg-type]
+
+    assert [status.state for status in snapshots] == ["degraded", "degraded", "running"]
+    assert media_attempts == program_attempts == 3
+    assert snapshots[-1].media_last_failure_code == "unexpected_cycle_failure"
+    assert snapshots[-1].media_last_failure_at == NOW + timedelta(minutes=2 * (media_failures - 1))
+    if program_failures:
+        assert snapshots[-1].program_last_failure_code == "unexpected_cycle_failure"
+        assert snapshots[-1].program_last_failure_at == NOW + timedelta(
+            minutes=2 * (program_failures - 1),
+        )
+
+
+@pytest.mark.parametrize("kind", ["media", "program"])
+@pytest.mark.parametrize("initial_state", ["running", "degraded"])
+@pytest.mark.parametrize("stop_state", ["stopping", "stopped", "timeout"])
+def test_success_cannot_overwrite_stop_after_reading_status(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    kind: str, initial_state: str, stop_state: str,
+) -> None:
+    components, _, clock, _ = _components(tmp_path)
+    _install_application(monkeypatch, _application(components, MemoryWorkRepository()))
+    coordinator = AutonomousEventNodeCoordinator(components)
+    coordinator._update(state=initial_state, owner=True)  # type: ignore[reportPrivateUsage]
+    if initial_state == "degraded":
+        coordinator._record_cycle_outcome(  # type: ignore[reportPrivateUsage]
+            "media" if kind == "media" else "program", failed=True,
+        )
+    original_update = coordinator._update  # type: ignore[reportPrivateUsage]
+    success_field = "media_cycle_count" if kind == "media" else "program_refresh_count"
+
+    class TimedOutThread:
+        def join(self, timeout: float) -> None:
+            pass
+
+        def is_alive(self) -> bool:
+            return True
+
+    def stop_before_success_update(**changes: object) -> None:
+        if success_field in changes:
+            if stop_state == "stopping":
+                original_update(state="stopping")
+                coordinator._stop.set()  # type: ignore[reportPrivateUsage]
+            else:
+                if stop_state == "timeout":
+                    monkeypatch.setattr(coordinator, "_thread", TimedOutThread())
+                coordinator.stop(timeout_seconds=0.1)
+        original_update(**changes)
+
+    monkeypatch.setattr(coordinator, "_update", stop_before_success_update)
+    if kind == "media":
+        coordinator.run_media_cycle()
+    else:
+        coordinator.run_program_refresh()
+
+    status = coordinator.status()
+    assert coordinator._stop.is_set()  # type: ignore[reportPrivateUsage]
+    assert status.state == ("degraded" if stop_state == "timeout" else stop_state)
+    assert getattr(status, success_field) == 1
+    if stop_state == "timeout":
+        assert status.media_last_failure_code == "coordinator_stop_timeout"
+        assert status.media_last_failure_at == clock.now()
+        assert status.owner is False
+
+
+def test_outer_loop_recovers_postgresql_ownership_without_clearing_cycle_faults(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    components, _, clock, _ = _components(tmp_path)
+    _install_application(monkeypatch, _application(components, MemoryWorkRepository()))
+    coordinator = AutonomousEventNodeCoordinator(components)
+    coordinator._record_cycle_outcome("media", failed=True)  # type: ignore[reportPrivateUsage]
+    coordinator._record_cycle_outcome("program", failed=True)  # type: ignore[reportPrivateUsage]
+    snapshots: list[AutonomousEventNodeStatus] = []
+    connections = 0
+    unlocked = closed = False
+
+    class RetryStop:
+        stopped = False
+
+        def is_set(self) -> bool:
+            return self.stopped
+
+        def set(self) -> None:
+            self.stopped = True
+
+        def wait(self, timeout: float) -> None:
+            assert timeout == 5.0
+            snapshots.append(coordinator.status())
+            clock.current += timedelta(seconds=5)
+
+    class Connection:
+        def __enter__(self) -> Connection:
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            nonlocal closed
+            closed = True
+
+        def execute(self, query: str, parameters: tuple[str]) -> Connection:
+            nonlocal unlocked
+            assert parameters == ("stageflow:autonomous-event-node:example-deployment",)
+            assert query in {
+                "SELECT pg_try_advisory_lock(hashtextextended(%s, 0))",
+                "SELECT pg_advisory_unlock(hashtextextended(%s, 0))",
+            }
+            unlocked = "pg_advisory_unlock" in query
+            return self
+
+        def fetchone(self) -> tuple[bool]:
+            return (True,)
+
+    def connect(*args: object, **kwargs: object) -> Connection:
+        nonlocal connections
+        connections += 1
+        if connections == 1:
+            raise psycopg.OperationalError("synthetic PostgreSQL outage")
+        assert connections == 2
+        return Connection()
+
+    def run_owned(connection: object) -> None:
+        snapshots.append(coordinator.status())
+        # A fresh media catch-all still requires recovery of the earlier program fault.
+        coordinator._record_cycle_outcome("media", failed=True)  # type: ignore[reportPrivateUsage]
+        coordinator.run_media_cycle()
+        assert coordinator.status().state == "degraded"
+        coordinator.run_program_refresh()
+        assert coordinator.status().state == "running"
+        coordinator.stop()
+
+    monkeypatch.setattr(coordinator, "_stop", RetryStop())
+    monkeypatch.setattr("app.demo.autonomous.psycopg.connect", connect)
+    monkeypatch.setattr(coordinator, "_run_owned", run_owned)
+    coordinator._run()  # type: ignore[reportPrivateUsage]
+
+    assert connections == 2
+    assert [status.state for status in snapshots] == ["degraded", "running"]
+    assert [status.owner for status in snapshots] == [False, True]
+    for status in snapshots:
+        assert status.media_last_failure_code == "postgresql_unavailable"
+        assert status.media_last_failure_at == NOW
+    assert coordinator.status().state == "stopped"
+    assert coordinator.status().owner is False
+    assert unlocked and closed

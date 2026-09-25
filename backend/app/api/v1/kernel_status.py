@@ -19,6 +19,7 @@ from app.contexts.events import (
     ProgramExpectation,
     ProgramExpectationReconciliation,
 )
+from app.contexts.events.program_references import program_reference
 from app.contexts.production.event_mode_kernel.contracts import (
     EventOperationalStatus,
     SessionOperationalProjection,
@@ -185,6 +186,7 @@ class AutomationStatusResponse(BaseModel):
     media_last_attempt_at: datetime | None
     media_last_success_at: datetime | None
     media_last_failure_code: str | None
+    media_last_failure_at: datetime | None = None
     media_candidates_seen: int
     media_assets_registered: int
     transcription_operations_enqueued: int
@@ -193,6 +195,7 @@ class AutomationStatusResponse(BaseModel):
     program_last_attempt_at: datetime | None
     program_last_success_at: datetime | None
     program_last_failure_code: str | None
+    program_last_failure_at: datetime | None = None
 
 class KernelStatusResponse(BaseModel):
     model_config = ConfigDict(frozen=True)
@@ -374,9 +377,11 @@ def _response(
                 revision=item.revision,
                 recorded_at=item.recorded_at,
                 provider=item.external_references.get("provider"),
-                external_event_id=item.external_references.get("devcon_event_id"),
-                external_session_id=item.external_references.get("devcon_session_id"),
-                external_room_id=item.external_references.get("devcon_room_id"),
+                external_event_id=program_reference(item.external_references, "external_event_id"),
+                external_session_id=program_reference(
+                    item.external_references, "external_session_id"
+                ),
+                external_room_id=program_reference(item.external_references, "external_room_id"),
                 lifecycle_state=item.lifecycle_state.value,
                 synchronization_scope=item.synchronization_scope,
                 last_observed_at=item.last_observed_at or item.recorded_at,

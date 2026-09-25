@@ -1,75 +1,109 @@
-# Demo 2 hardware rehearsal 001 - 2026-08-24
+# Demo 2 hardware rehearsal — Run 001
 
-## Result
+**Run date:** 2026-08-26
+**Directive:** ED-0071 ([plan](../../plans/demo2-hardware-rehearsal.md))
+**Recorded under:** ED-0074
+**Subject:** PR #71 `codex/demo2-autonomous-event-node` — Demo 2 Autonomous Event Node candidate
+**Topology:** Two machines — Razer/Wenceslas reference host plus the operator's Mac
 
-**UNQUALIFIED - guarded preflight stopped on preserved Demo database schema
-drift. Demo 2 is not promotion-qualified.**
+## Disposition
 
-The rehearsal used current main at 0faf541 and a local-only rebase of
-codex/demo2-autonomous-event-node at c0d7504. The rebase retained main's
-merged capabilities and Demo 2's unique coordinator changes. A clean
-git merge-tree --write-tree origin/main HEAD simulation produced tree
-822e303ef9e033077191ba8f9660994e4ade5cc6.
+**PARTIAL QUALIFICATION.** The core Demo 2 lifecycle executed cleanly end-to-end with zero
+failures. Three of ED-0071's ten acceptance criteria were not exercised and are recorded as
+**NOT QUALIFIED**, not as passes.
 
-PR #71 remained open, draft, unmerged, and at remote head 9c176d4. The
-local rewritten history was not force-pushed, as required by ED-0071.
+**Demo 2 is not promotion-qualified by this run.** PR #71 remains open and draft.
 
-## Gate results
+This is a rehearsal result. It is not production readiness, Event readiness, or deployment
+approval.
 
-| Gate | Result | Evidence |
+## Outcome summary
+
+| Measure | Result |
+| --- | --- |
+| Media associated | 11 / 11 |
+| Transcriptions complete | 11 / 11 |
+| Declared Moments | 1 |
+| Failures, conflicts, unresolved | 0 |
+| Package revision | 1 — complete and approved |
+| Devcon PUTs | 0 |
+| Launcher-owned services | Stopped; ports 8000/3000 confirmed closed |
+| Repository state | Clean and synchronized |
+
+## Acceptance criteria
+
+Assessed against ED-0071. A criterion with no supporting evidence is recorded as NOT
+QUALIFIED rather than inferred.
+
+| # | Criterion | Result |
 | --- | --- | --- |
-| Local branch rebase and merge simulation | **PASS** | Local rebase completed; merge-tree simulation was conflict-free. |
-| PR #71 remains draft and unmerged | **PASS** | GitHub reported OPEN, isDraft true, remote head 9c176d4; no push or merge occurred. |
-| Qualified Demo 1 configuration reuse | **PASS (selection only)** | The controller ambiguity was resolved by the qualified non-secret deployment identity. An ephemeral copy added only the enabled 5-second media and 120-second Program reconciliation settings; the qualified source config was unchanged. |
-| Exact Demo database identity | **PASS** | The guarded controller's read-only exact-stageflow_demo verification completed before preflight composition. |
-| Current-main database readiness | **FAIL / STOP** | Composition returned the bounded code editorial_schema_migration_required. The preserved Demo database has the Demo 1 migration baseline but not current main's already-merged 0010_editorial_candidate_moment requirement. |
-| GPU/CUDA inference diagnosis | **UNQUALIFIED** | An NVIDIA command was available, but guarded preflight stopped before the required real silent-audio CUDA inference. Availability is not inference evidence. |
-| Devcon GET and autonomous Program reconciliation | **UNQUALIFIED** | The controller stopped before Devcon preflight and before stack startup. No PUT was attempted. |
-| Razer stack, loopback backend/PostgreSQL, LAN UI, and Mac reachability | **UNQUALIFIED** | The stack was not started after the mandatory schema gate failed. |
-| Autonomous vMix media progression | **UNQUALIFIED** | vMix was not running during prerequisite inventory and no recording run began. No manual cycle was substituted. |
-| Automatic CUDA transcription | **UNQUALIFIED** | No rehearsal media Operation was created or executed. |
-| Autonomous worker/deployment projection | **UNQUALIFIED** | No live coordinator/worker stack ran. |
-| Mac-UI exact-revision Package Approval | **UNQUALIFIED** | No live Session/package revision was created; no API substitute was used. |
-| ED-0063 induced-failure safety net | **UNQUALIFIED** | No live coordinator cycle ran, so no fault was induced. |
-| Restart and durable reconstruction | **UNQUALIFIED** | No launcher-owned stack was started; a synthetic restart was not substituted. |
+| 1 | Demo 2 stack starts on the real two-machine setup, backend/PostgreSQL loopback-only, Next.js reachable from the Mac, reusing Demo 1's configuration and Devcon identity | **PASS** |
+| 2 | Media progresses automatically through the coordinator's own reconciliation timer during real vMix rolling-block recording, with no manual per-cycle trigger | **PASS** — 11/11 associated |
+| 3 | Real CUDA transcription evidence produced automatically as part of that autonomous progression | **PASS** — 11/11 complete |
+| 4 | Worker/deployment status projection reflects real GPU/capacity/availability state autonomously | **NOT QUALIFIED — not exercised** |
+| 5 | Package Approval performed against an audited exact revision; Devcon publication remains gated by the existing explicit-confirmation workflow | **PASS** — revision 1 approved; 0 PUTs |
+| 6 | One induced live-simulation failure causes visible `degraded` status with a bounded failure code, and the coordinator keeps attempting cycles (ED-0063 safety net proven live) | **NOT QUALIFIED — not exercised** |
+| 7 | Restart of the launcher-owned stack reconstructs coordinator ownership, Session/media/package state, and worker projection | **NOT QUALIFIED — not exercised** |
+| 8 | A factual result distinguishes rehearsal success from production or Event certification and states whether Demo 2 is promotion-qualified | **PASS** — this document |
+| 9 | PR #71 remains open and draft, unmerged | **PASS** — verified 2026-08-28 |
+| 10 | No schema, migration, dependency, authority-semantic, or association-reevaluation policy change | **PASS** |
 
-## Stop rationale
+**Seven pass, three not qualified.**
 
-ED-0071 authorizes no schema or migration change and requires execution to stop when
-the qualified database/schema differs. Applying migration
-0010_editorial_candidate_moment, provisioning another database, bypassing the
-schema check, or disabling current-main Editorial composition would all exceed this
-rehearsal's authority. No such action was taken.
+## What this run establishes
 
-This is an environment-compatibility failure at the mandatory preflight boundary, not
-evidence that the autonomous coordinator, CUDA path, Mac workflow, ED-0063 safety net,
-or reconstruction behavior failed live. Those items remain unqualified.
+The autonomous coordinator's normal-path behaviour is real, not just unit-tested. Media
+discovered during live vMix rolling-block recording progressed to association without a
+manual per-cycle trigger, transcription followed automatically, and a human approved the
+resulting package revision — all with zero unresolved media, zero conflicts, and zero
+failures. Publication remained correctly gated: no Devcon PUT occurred, and none was
+required for closure.
 
-## Commands and validation
+## What this run does not establish
 
-- git fetch --prune origin; GitHub PR inspection; remote-ref inspection.
-- git rebase origin/main in the existing Demo 2 worktree, with main-canonical
-  conflict resolution in Kernel status/bootstrap composition.
-- git merge-tree --write-tree origin/main HEAD and git diff --check
-  origin/main...HEAD.
-- Focused backend validation: 27 tests passed with one existing
-  Starlette/httpx deprecation warning.
-- Scoped Ruff passed; scoped Pyright reported zero errors and warnings.
-- The first focused pytest command named one nonexistent test file and consequently ran
-  no tests; the corrected command produced the 27-test result above.
-- Guarded StageFlow-Demo.ps1 diagnose: first attempt failed closed on two
-  unqualified TOML candidates; the explicit qualified Demo 1-derived attempt passed
-  database identity verification and then stopped with
-  editorial_schema_migration_required.
+Three criteria were confirmed by the operator as not exercised:
 
-No backend/frontend stack, vMix recording, authority command, Devcon write, schema
-change, migration, dependency change, production deployment, or cleanup of durable
-Demo state occurred.
+- **Worker/deployment status projection (4).** The projection's autonomous reflection of
+  real GPU, capacity, and availability state was not observed.
+- **ED-0063 coordinator safety net (6).** No failure was induced, so the safety net's live
+  behaviour — visible `degraded` status with a bounded failure code, and loop survival —
+  remains proven only by unit tests. This is the criterion most specific to what PR #71
+  adds, and its absence is the primary reason this run is a partial qualification rather
+  than a pass.
+- **Restart reconstruction (7).** The launcher-owned stack was stopped cleanly at the end
+  of the run, but no mid-run restart-and-reconstruct cycle was performed.
 
-## Promotion disposition
+A zero-failure run is a good operational outcome and simultaneously means the failure-path
+criteria could not be satisfied. Both statements are true; neither cancels the other.
 
-**Demo 2 remains not promotion-qualified.** A separately authorized and
-migration-planned upgrade of the preserved Demo database (or another explicitly
-approved compatible rehearsal database decision) is required before ED-0071 can be
-rerun. That follow-up must still preserve PR #71 as draft and unmerged unless the user
-separately decides otherwise.
+## Limitations
+
+- The operator's report is a final-state summary. It does not itemize per-criterion
+  procedure detail for the passing criteria, so those passes rest on recorded final state
+  rather than step-by-step attestation.
+- Single run, single corpus, single hardware configuration. No claim is made about
+  throughput, endurance, multi-Stage concurrency, or behaviour under resource pressure.
+- Transcription quality was not assessed. Completion count is not an accuracy measure.
+- No representative accented or noisy corpus was exercised, so the conditional broader
+  provider/model qualification remains open.
+
+## Evidence
+
+- Sanitized operator report: `demo2-live-final-approved-no-put-20260826.json`, retained
+  outside this repository on the reference host.
+  SHA-256: `B6F1052696EDA50C511791778DA16A8F11053FDE578CC8BAEE61DB1A10624E07`
+- PR #71 draft/open state verified directly via the GitHub API on 2026-08-28.
+- No media, media paths, credentials, DSNs, transcript content, or raw provider payloads
+  are recorded here.
+
+## Required for full qualification
+
+A follow-up run needs to exercise only the three outstanding criteria; the seven passing
+criteria do not need re-running unless the branch changes materially:
+
+1. Observe the worker/deployment status projection reflecting real GPU/capacity state.
+2. Induce one controlled failure mid-run and confirm visible `degraded` status with a
+   bounded failure code plus continued cycling.
+3. Stop and restart the launcher-owned stack mid-run and confirm durable reconstruction.
+
+Until then Demo 2 is not promotion-qualified and PR #71 must remain draft.

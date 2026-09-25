@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { programProviderDisplayName } from "@/experience/program-provider.ts";
 
 import {
   submitDemoProgramRefresh,
@@ -44,7 +45,7 @@ async function responseDetail(response: Response): Promise<string> {
 function ResultSummary({ result }: { result: ProgramRefreshResult }) {
   return (
     <div className="program-refresh-result" role="status">
-      <strong>Program refreshed · Devcon · just now</strong>
+      <strong>Program refreshed · {programProviderDisplayName(result.provider)} · just now</strong>
       <span>
         {result.observed} observed · {result.added} added · {result.changed} changed ·{" "}
         {result.withdrawn} withdrawn · {result.restored} restored · {result.unchanged}{" "}
@@ -58,7 +59,7 @@ function ResultSummary({ result }: { result: ProgramRefreshResult }) {
               <li key={`${change.kind}-${change.expectation_id}`}>
                 <strong>{changeLabel(change)} · {change.title}</strong>
                 {change.external_session_id ? (
-                  <span>Devcon session · {change.external_session_id}</span>
+                  <span>External session · {change.external_session_id}</span>
                 ) : null}
                 {change.fields.map((field) => (
                   <span key={field.field}>
@@ -98,6 +99,14 @@ export function DemoProgramRefreshControl({
 
   if (!enabled) return null;
 
+  const provider = programProviderDisplayName(result?.provider ?? synchronization?.provider);
+
+  const programFailureCurrent = Boolean(
+    automation?.programLastFailureCode &&
+      (!automation.programLastFailureAt || !automation.programLastSuccessAt ||
+        Date.parse(automation.programLastFailureAt) >= Date.parse(automation.programLastSuccessAt)),
+  );
+
   async function refreshProgram() {
     setBusy(true);
     setFailure(undefined);
@@ -129,14 +138,14 @@ export function DemoProgramRefreshControl({
     <section className="detail-panel" aria-labelledby="program-refresh-title">
       <div className="section-heading">
         <h2 id="program-refresh-title">External Program Expectations</h2>
-        <span>Devcon · external evidence</span>
+        <span>{provider} · external evidence</span>
       </div>
       <p>
         Current items may be selected for a new Session. Withdrawn upstream items remain
         durable historical evidence and are never Session authority.
       </p>
       <dl className="definition-grid">
-        <dt>Provider</dt><dd>Devcon</dd>
+        <dt>Provider</dt><dd>{provider}</dd>
         <dt>Last successful refresh</dt>
         <dd>
           {relativeRefreshTime(
@@ -145,7 +154,7 @@ export function DemoProgramRefreshControl({
         </dd>
         <dt>Status</dt>
         <dd>
-          {automation?.programLastFailureCode
+          {programFailureCurrent
             ? "Refresh unavailable · cached Program active"
             : automation?.enabled && automation.owner
               ? "Automatic refresh running"
@@ -153,6 +162,15 @@ export function DemoProgramRefreshControl({
                 ? `Automatic refresh · ${automation.state}`
                 : "Manual refresh"}
         </dd>
+        {automation?.programLastFailureCode ? (
+          <>
+            <dt>Last refresh failure</dt>
+            <dd>
+              {readable(automation.programLastFailureCode)}
+              {automation.programLastFailureAt ? ` · ${automation.programLastFailureAt}` : ""}
+            </dd>
+          </>
+        ) : null}
         <dt>Program</dt>
         <dd>
           {currentExpectations.length} Current · {withdrawnExpectations.length} Withdrawn
@@ -176,7 +194,7 @@ export function DemoProgramRefreshControl({
       >
         {busy ? "Refreshing…" : "Refresh Program"}
       </button>
-      <p>Performs one provider GET and local reconciliation only. It never publishes to Devcon.</p>
+      <p>Reads the configured program source and reconciles locally. External publication is frozen.</p>
       {result ? <ResultSummary result={result} /> : null}
       {failure ? <p role="alert">{failure}</p> : null}
       {withdrawnExpectations.length ? (
@@ -186,9 +204,9 @@ export function DemoProgramRefreshControl({
             {withdrawnExpectations.map((expectation) => (
               <li key={expectation.id}>
                 <strong>{expectation.title}</strong>
-                <span>External · withdrawn · revision {expectation.revision}</span>
+                <span>{programProviderDisplayName(expectation.provider)} · external · withdrawn · revision {expectation.revision}</span>
                 {expectation.externalSessionId ? (
-                  <span>Devcon session · {expectation.externalSessionId}</span>
+                  <span>External session · {expectation.externalSessionId}</span>
                 ) : null}
               </li>
             ))}

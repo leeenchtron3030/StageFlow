@@ -130,6 +130,15 @@ Every specification should reference the Product Constitution.
 
 Development Workflow
 
+For backend dependency installation, see [Local Setup](backend/README.md#local-setup)
+(`uv sync --dev` from `backend/`). Local transcription is an optional, operator-installed
+capability, explicitly installed locally with `uv sync --group transcription`. ED-0075
+excludes the `transcription` group and its runtime dependencies from every distributable
+StageFlow artifact because the confirmed PyAV wheel bundles a GPL-configured FFmpeg build.
+Do not promote them into the default installation or use `--all-groups` for distribution.
+This defers rather than resolves the licensing question and is not legal clearance. See
+the [SBOM decision record](docs/security/dependency-license-sbom-2026-08-21.md#decision-options-for-the-pyavffmpeg-exposure).
+
 All new functionality follows the same lifecycle:
 
 Vision
@@ -234,6 +243,17 @@ Kernel, deterministic Production-domain contracts and policies, bounded local me
 discovery, durable advisory Media Timing Evidence, a durable transcription-worker
 substrate, and a Demo single-stage application flow. The Next.js frontend includes
 producer-facing and Demo workflows backed by fixture or Kernel data.
+
+StageFlow is white-label: Event identity comes from deployment configuration and program
+labels come from provider-attributed data. The default development and rehearsal source
+is an offline [local schedule file](examples/local-schedule.example.json); Devcon is one
+optional read adapter. The [example Demo configuration](examples/demo-single-stage.toml.example)
+uses placeholder identities and `[local_schedule]` by default.
+
+External publication is frozen under
+[ADR-0031](docs/adr/ADR-0031-white-label-identity-and-provider-neutral-program-sources.md)
+until a provider-neutral Delivery context is designed. The backend publish adapter is
+retained dormant, and the operator workflow exposes no publication action.
 
 This is an operational foundation, not an event-readiness claim. Demo hardware rehearsal,
 real deployment qualification, and broader workflow composition remain active work; a

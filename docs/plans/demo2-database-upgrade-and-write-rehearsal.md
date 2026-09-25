@@ -2,6 +2,10 @@
 
 ## Status
 
+Numbering note (2026-09-25): The "ED-0072" cited here was a branch-local number
+that collides with `main`'s ED-0072 (Editorial Review Foundation). It was not
+reassigned; the collision is recorded under ED-0081.
+
 Completed - core write-bearing flow qualified; PR promotion unqualified
 
 ## Execution authority
@@ -23,7 +27,7 @@ Completed - core write-bearing flow qualified; PR promotion unqualified
 
 ## Related findings or ADRs
 
-- Finding/disposition: [ED-0071 result](../validation/results/demo2-hardware-rehearsal-001.md)
+- Finding/disposition: [ED-0071 result](../validation/results/demo2-branch-rehearsal-2026-08-24.md)
   stopped before stack startup because exact database `stageflow_demo` lacked migration
   `0010_editorial_candidate_moment`; ED-0071 intentionally prohibited fixing it.
 - ADR: ADR-0022 through ADR-0025, ADR-0027, ADR-0028.
@@ -130,7 +134,7 @@ through the existing single-write controller and verify durable upstream accepta
 | `ENGINEERING_DIRECTIVES.md` | Record ED-0072 authority and status |
 | `docs/plans/README.md` | Index this plan |
 | `docs/plans/demo2-database-upgrade-and-write-rehearsal.md` | Plan and completion record |
-| `docs/validation/results/demo2-hardware-rehearsal-002.md` | Sanitized factual evidence |
+| `docs/validation/results/demo2-branch-rehearsal-2026-08-25-a.md` | Sanitized factual evidence |
 | External `stageflow_demo` PostgreSQL database | Apply accepted migration 0010 only |
 | External rehearsal configuration | Ephemeral Demo 2 timer enablement only; never committed |
 

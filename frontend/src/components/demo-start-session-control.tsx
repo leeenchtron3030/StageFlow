@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { programProviderDisplayName } from "@/experience/program-provider.ts";
 
 import {
   submitDemoStartSession,
@@ -149,14 +150,14 @@ export function DemoStartSessionControl({
                 <span className="program-expectation-title-row">
                   <strong>{expectation.title}</strong>
                   <span className="advisory-badge">
-                    {index === 0 ? "Next · " : ""}External · {expectation.provider ?? "provider unknown"}
+                    {index === 0 ? "Next · " : ""}External · {programProviderDisplayName(expectation.provider)}
                   </span>
                 </span>
                 <span>{expectation.speakers.length ? expectation.speakers.join(" · ") : "Speakers not reported"}</span>
                 <span>{plannedWindow(expectation)}</span>
                 {expectation.externalSessionId ? (
                   <span className="program-expectation-external-id">
-                    Devcon session · {expectation.externalSessionId}
+                    External session · {expectation.externalSessionId}
                   </span>
                 ) : null}
               </span>

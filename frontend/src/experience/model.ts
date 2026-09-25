@@ -121,6 +121,7 @@ export interface AutomationView {
   mediaLastAttemptAt?: string;
   mediaLastSuccessAt?: string;
   mediaLastFailureCode?: string;
+  mediaLastFailureAt?: string;
   mediaCandidatesSeen: number;
   mediaAssetsRegistered: number;
   transcriptionOperationsEnqueued: number;
@@ -129,6 +130,7 @@ export interface AutomationView {
   programLastAttemptAt?: string;
   programLastSuccessAt?: string;
   programLastFailureCode?: string;
+  programLastFailureAt?: string;
 }
 
 export interface ProgramSynchronizationView {

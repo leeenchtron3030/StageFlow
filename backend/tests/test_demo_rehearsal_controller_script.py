@@ -22,7 +22,6 @@ def test_controller_exposes_only_the_bounded_action_set() -> None:
         "diagnose",
         "stop",
         "rehearsal-report",
-        "publish-devcon",
     ):
         assert f'"{action}"' in source
     assert "cleanup" not in source.casefold()
@@ -41,11 +40,10 @@ def test_controller_imports_only_named_user_values_without_printing_them() -> No
         "STAGEFLOW_DEMO_CONFIG_PATH",
         "STAGEFLOW_DEMO_CUDA_RUNTIME_PATH",
         "STAGEFLOW_DEMO_OPERATOR_ID",
-        "STAGEFLOW_DEMO_DEVCON_API_KEY",
     ):
         assert name in source
     assert "STAGEFLOW_TEST_POSTGRES_DSN" not in source
-    assert source.count('Import-RequiredSecret "STAGEFLOW_API_SHARED_SECRET"') == 4
+    assert source.count('Import-RequiredSecret "STAGEFLOW_API_SHARED_SECRET"') == 3
     assert "$env:STAGEFLOW_API_SHARED_SECRET = $null" in source
     assert "STAGEFLOW_VALIDATION_DSN" not in source
     assert "postgresql://" not in source.casefold()
@@ -88,20 +86,14 @@ def test_controller_resolves_operator_and_session_without_uuid_copy_paste() -> N
     assert "session_id" not in source[parameter_start:parameter_end]
 
 
-def test_publish_requires_explicit_confirmation_and_never_follows_session_end() -> None:
+def test_publication_is_absent_from_supported_workflow() -> None:
     source = _source()
 
-    assert 'Read-Host "Publish this StageFlow enrichment to Devcon? [y/N]"' in source
-    assert "$ConfirmHumanAuthority.IsPresent" in source
-    assert '"publish", "--expected-digest"' in source
-    assert '"--confirmed"' in source
+    assert "Publish-Devcon" not in source
+    assert '"publish", "--expected-digest"' not in source
+    assert "STAGEFLOW_DEMO_DEVCON_API_KEY" not in source
+    assert "publish-devcon" not in source.split("#>", 1)[0]
     assert "publish-devcon" not in LAUNCHER.read_text(encoding="utf-8")
-    assert source.count("Publish-Devcon") == 2
-    assert source.count('"publish", "--expected-digest"') == 1
-    assert "Devcon write accepted:" in source
-    assert "Devcon durable Git persistence verified:" in source
-    assert "Devcon public API convergence:" in source
-    assert "Devcon publication status:" in source
 
 
 def test_stop_targets_only_the_recorded_launcher_tree() -> None:
@@ -143,6 +135,8 @@ def test_status_surfaces_bounded_autonomy_program_and_worker_currentness() -> No
     assert '"Automation: $($automation.state) owner=$($automation.owner)"' in source
     assert '"Media reconciliation: cycles=$($automation.media_cycle_count)' in source
     assert '"Program refresh: cycles=$($automation.program_refresh_count)' in source
-    assert '"Devcon Program: current=$($payload.devcon.current) withdrawn=$($payload.devcon.withdrawn)' in source  # noqa: E501
+    assert '"Program: current=$($payload.devcon.current) withdrawn=$($payload.devcon.withdrawn)' in source  # noqa: E501
     assert 'current=$($payload.worker.current)' in source
     assert 'gpu_transcription=$($payload.worker.gpu_transcription)' in source
+    assert 'failure_at=$($automation.media_last_failure_at)' in source
+    assert 'failure_at=$($automation.program_last_failure_at)' in source

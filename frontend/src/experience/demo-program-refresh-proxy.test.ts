@@ -27,7 +27,7 @@ afterEach(() => {
   else process.env.STAGEFLOW_DEMO_LAUNCH_CONTEXT = originalLaunchContext;
 });
 
-test("current launch can refresh Program through the loopback proxy without a Devcon write", async () => {
+test("current launch can refresh Program through the loopback proxy without an external publication", async () => {
   process.env.STAGEFLOW_DEMO_API_BASE_URL = "http://127.0.0.1:8123/api/v1/demo";
   process.env.STAGEFLOW_DEMO_LAUNCH_CONTEXT = launchContext;
   const logs: string[] = [];
@@ -35,7 +35,7 @@ test("current launch can refresh Program through the loopback proxy without a De
   console.info = (message?: unknown) => logs.push(String(message));
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     upstream = { method: init?.method, body: init?.body, url: input.toString() };
-    return Response.json({ provider: "devcon", observed: 4, withdrawn: 1 });
+    return Response.json({ provider: "local_file", observed: 4, withdrawn: 1 });
   }) as typeof fetch;
 
   const response = await POST(

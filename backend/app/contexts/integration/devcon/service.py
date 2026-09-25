@@ -3,9 +3,9 @@ from __future__ import annotations
 from app.contexts.events import (
     ProgramExpectation,
     ProgramExpectationLifecycle,
-    ProgramExpectationReconciliation,
     ProgramExpectationSnapshot,
 )
+from app.contexts.integration.program_source import ProgramSyncResult
 from app.contexts.production.event_mode_kernel.repository import (
     EventModeKernelRepository,
     KernelConflictError,
@@ -15,8 +15,6 @@ from app.shared.ids import EntityId
 from app.shared.time import Clock
 
 from .contracts import ExternalProgramSource
-
-ProgramSyncResult = ProgramExpectationReconciliation
 
 
 class DevconProgramSync:
@@ -64,9 +62,9 @@ class DevconProgramSync:
                     planned_end=item.planned_end,
                     external_references={
                         "provider": "devcon",
-                        "devcon_event_id": item.event_id,
-                        "devcon_session_id": item.session_id,
-                        "devcon_room_id": item.room_id,
+                        "external_event_id": item.event_id,
+                        "external_session_id": item.session_id,
+                        "external_room_id": item.room_id,
                         "devcon_room_name": item.room_name,
                     },
                     revision=1,

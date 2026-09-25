@@ -14,6 +14,7 @@ from app.contexts.events import (
     ProgramExpectationReconciliation,
     ProgramExpectationSnapshot,
 )
+from app.contexts.events.program_references import program_reference
 
 _CHANGE_LIMIT = 100
 
@@ -86,7 +87,9 @@ def _change(
         expectation_id=expectation.id,
         expectation_key=expectation.key,
         title=expectation.title,
-        external_session_id=expectation.external_references.get("devcon_session_id"),
+        external_session_id=program_reference(
+            expectation.external_references, "external_session_id"
+        ),
         fields=fields,
     )
 

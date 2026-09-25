@@ -5,8 +5,10 @@ from typing import cast
 from test_demo_api import NOW, _client  # pyright: ignore[reportPrivateUsage]
 
 from app.contexts.events import ProgramExpectationReconciliation
-from app.contexts.integration.devcon import DevconProgramSync
-from app.infrastructure.devcon import DevconReadError
+from app.contexts.integration.program_source import (
+    ProgramScheduleSource,
+    ProgramSourceUnavailableError,
+)
 from app.shared.ids import EntityId
 
 
@@ -27,7 +29,7 @@ class FailingSync:
         self, *, event_id: EntityId, stage_id: EntityId
     ) -> ProgramExpectationReconciliation:
         del event_id, stage_id
-        raise DevconReadError("devcon_read_unavailable")
+        raise ProgramSourceUnavailableError("program_source_unavailable")
 
 
 def test_manual_refresh_returns_bounded_external_result_without_session_authority() -> None:
@@ -37,8 +39,8 @@ def test_manual_refresh_returns_bounded_external_result_without_session_authorit
     reconciliation = ProgramExpectationReconciliation(
         event_id=event.id,
         stage_id=EntityId(stage_id),
-        provider="devcon",
-        synchronization_scope="devcon:test-devcon-8:stage-1",
+        provider="local_file",
+        synchronization_scope="local_file:example-event:stage-1",
         synchronized_at=NOW,
         observed=4,
         added=1,
@@ -49,14 +51,14 @@ def test_manual_refresh_returns_bounded_external_result_without_session_authorit
         expectations=(),
         changes=(),
     )
-    components.devcon_program_sync = cast(DevconProgramSync, StaticSync(reconciliation))
+    components.program_source = cast(ProgramScheduleSource, StaticSync(reconciliation))
 
     response = client.post("/demo/program/refresh", json={})
 
     assert response.status_code == 200
     assert response.headers["cache-control"] == "no-store, max-age=0"
     assert response.json() == {
-        "provider": "devcon",
+        "provider": "local_file",
         "observed": 4,
         "added": 1,
         "changed": 1,
@@ -76,7 +78,7 @@ def test_manual_refresh_returns_bounded_external_result_without_session_authorit
 def test_failed_manual_refresh_uses_last_successful_snapshot_semantics() -> None:
     client, stage_id, components = _client()
 
-    components.devcon_program_sync = cast(DevconProgramSync, FailingSync())
+    components.program_source = cast(ProgramScheduleSource, FailingSync())
 
     response = client.post("/demo/program/refresh", json={})
 

@@ -1,22 +1,18 @@
 # Copy outside the repository and replace the event/source values for the rehearsal.
 # The referenced environment variable contains the DSN; never put the DSN in this file.
 schema_version = "1.0"
-deployment_id = "razer-demo2"
-node_id = "razer-event-node"
+deployment_id = "example-deployment"
+node_id = "example-node"
 runtime_profile = "demo-single-stage"
 node_role = "node"
 event_mode = "rehearsal"
 network_policy = "optional"
 postgres_dsn_secret_ref = "STAGEFLOW_DEMO_POSTGRES_DSN"
-schedule_source_reference = "https://api.devcon.org"
+schedule_source_reference = "C:/StageFlowDemo/local-schedule.json"
 
-[devcon_read]
-base_url = "https://api.devcon.org"
-event_id = "test-devcon-8"
-room_id = "stage-1"
-page_size = 500
-maximum_catalog_sessions = 5000
-timeout_seconds = 10
+# Copy examples/local-schedule.example.json here and customize its program.
+[local_schedule]
+path = "C:/StageFlowDemo/local-schedule.json"
 
 [local_transcription]
 provider = "faster-whisper"
@@ -32,6 +28,8 @@ execution_profile_version = "1.0"
 enabled = true
 media_reconciliation_interval_seconds = 5
 program_refresh_interval_seconds = 120
+# Rehearsal only; unset by default. Inject one unexpected media failure per process.
+# rehearsal_fault_media_cycle = 6
 
 [resources]
 maximum_concurrent_assessments = 2
@@ -40,18 +38,18 @@ maximum_memory_bytes = 536870912
 minimum_stable_seconds = 5
 
 [event]
-key = "stageflow-demo-2"
-name = "StageFlow Demo 2"
-external_references = { devcon_event_id = "test-devcon-8" }
+key = "example-event"
+name = "Example Event"
+external_references = { external_event_id = "example-event" }
 
 [[event.stages]]
 key = "main"
 name = "Main Stage"
-external_references = { devcon_room_id = "stage-1" }
+external_references = { external_room_id = "main" }
 
 [[event.stages.sources]]
 key = "vmix-recordings"
-# Use the Razer-local rehearsal directory or the controlled vMix UNC share.
+# Use the local rehearsal directory or a controlled recorder UNC share.
 path = "C:/StageFlowDemo/recordings"
 maximum_candidates = 1000
 allowed_extensions = [".mov", ".mp4", ".mkv", ".mxf", ".wav"]

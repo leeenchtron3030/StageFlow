@@ -8,10 +8,11 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 from app.contexts.integration.devcon import ExternalProgramItem
-from app.core.config.deployment import DevconReadConfiguration
+from app.contexts.integration.devcon.configuration import DevconReadConfiguration
+from app.contexts.integration.program_source import ProgramSourceUnavailableError
 
 
-class DevconReadError(RuntimeError):
+class DevconReadError(ProgramSourceUnavailableError):
     """The bounded public Devcon read could not complete."""
 
 

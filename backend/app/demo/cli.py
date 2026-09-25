@@ -14,13 +14,13 @@ from app.bootstrap.event_mode_kernel import (
     KernelComponents,
     load_kernel_components_from_environment,
 )
+from app.contexts.integration.program_source import ProgramSourceUnavailableError
 from app.contexts.transcription_evidence import (
     TranscriptionExecutionError,
     TranscriptionExecutionRequest,
 )
 from app.contexts.work_execution import TranscriptionOperationInput
 from app.core.config.deployment import LocalTranscriptionConfiguration, RuntimeProfile
-from app.infrastructure.devcon import DevconReadError
 from app.infrastructure.transcription import FasterWhisperExecutionAdapter
 from app.shared.ids import EntityId
 from app.shared.time import SystemClock
@@ -101,9 +101,9 @@ def _preflight() -> int:
     )
     if not source_available:
         raise RuntimeError("configured_media_source_unavailable")
-    if components.devcon_program_sync is None:
+    if components.program_source is None:
         raise RuntimeError("devcon_read_not_configured")
-    fetched_count = components.devcon_program_sync.probe()
+    fetched_count = components.program_source.probe()
     if fetched_count == 0:
         raise RuntimeError("configured_devcon_program_empty")
     transcription = deployment.local_transcription
@@ -184,14 +184,14 @@ def _bootstrap() -> int:
 
 def _sync_program() -> int:
     components = _components()
-    result = components.sync_devcon_program()
+    result = components.sync_program()
     _safe_write(
         {
             "command": "sync-program",
             "event_id": result.event_id.value,
             "stage_id": result.stage_id.value,
             "expectations_synchronized": len(result.expectations),
-            "provider": "devcon",
+            "provider": result.provider,
             "evidence_kind": "external",
         }
     )
@@ -215,7 +215,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         if arguments.command == "bootstrap":
             return _bootstrap()
         return _sync_program()
-    except (DevconReadError, OSError, RuntimeError, ValueError, subprocess.SubprocessError) as exc:
+    except (
+        ProgramSourceUnavailableError, OSError, RuntimeError, ValueError, subprocess.SubprocessError
+    ) as exc:
         sys.stderr.write(f"stageflow_demo_error={exc}\n")
         return 1
 

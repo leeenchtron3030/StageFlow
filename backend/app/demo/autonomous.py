@@ -3,19 +3,19 @@ from __future__ import annotations
 import logging
 import threading
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Literal
 
 import psycopg
 
 from app.bootstrap.event_mode_kernel import KernelComponents
+from app.contexts.integration.program_source import ProgramSourceUnavailableError
 from app.contexts.production.event_mode_kernel.repository import (
     KernelStorageUnavailableError,
 )
 from app.contexts.work_execution import WorkExecutionStorageUnavailableError
 from app.demo.service import DemoApplication, ReconcileMediaRequest
-from app.infrastructure.devcon import DevconReadError
 
 _logger = logging.getLogger(__name__)
 
@@ -31,6 +31,7 @@ class AutonomousEventNodeStatus:
     media_last_attempt_at: datetime | None
     media_last_success_at: datetime | None
     media_last_failure_code: str | None
+    media_last_failure_at: datetime | None
     media_candidates_seen: int
     media_assets_registered: int
     transcription_operations_enqueued: int
@@ -39,6 +40,7 @@ class AutonomousEventNodeStatus:
     program_last_attempt_at: datetime | None
     program_last_success_at: datetime | None
     program_last_failure_code: str | None
+    program_last_failure_at: datetime | None
 
 
 class AutonomousEventNodeCoordinator:
@@ -52,6 +54,8 @@ class AutonomousEventNodeCoordinator:
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._started = False
+        self._media_attempt_count = 0
+        self._degraded_cycle_kinds: set[Literal["media", "program"]] = set()
         self._state: AutonomousEventNodeStatus = self._initial_status()
 
     def _initial_status(self) -> AutonomousEventNodeStatus:
@@ -88,6 +92,7 @@ class AutonomousEventNodeCoordinator:
             media_last_attempt_at=None,
             media_last_success_at=media_last_success_at,
             media_last_failure_code=None,
+            media_last_failure_at=None,
             media_candidates_seen=0,
             media_assets_registered=0,
             transcription_operations_enqueued=0,
@@ -96,6 +101,7 @@ class AutonomousEventNodeCoordinator:
             program_last_attempt_at=None,
             program_last_success_at=program_last_success_at,
             program_last_failure_code=None,
+            program_last_failure_at=None,
         )
 
     def status(self) -> AutonomousEventNodeStatus:
@@ -126,6 +132,20 @@ class AutonomousEventNodeCoordinator:
             thread = self._thread
         thread.start()
 
+    def _record_cycle_outcome(
+        self, kind: Literal["media", "program"], *, failed: bool,
+    ) -> None:
+        with self._state_lock:
+            if self._stop.is_set() or self._state.state in {"stopping", "stopped"}:
+                return
+            if failed:
+                self._degraded_cycle_kinds.add(kind)
+                self._state = replace(self._state, state="degraded")
+            elif kind in self._degraded_cycle_kinds:
+                self._degraded_cycle_kinds.remove(kind)
+                if not self._degraded_cycle_kinds and self._state.state == "degraded":
+                    self._state = replace(self._state, state="running")
+
     def stop(self, *, timeout_seconds: float = 10.0) -> None:
         if not self.configuration.enabled:
             return
@@ -139,6 +159,7 @@ class AutonomousEventNodeCoordinator:
                 state="degraded",
                 owner=False,
                 media_last_failure_code="coordinator_stop_timeout",
+                media_last_failure_at=self.components.kernel.clock.now(),
             )
             return
         self._update(state="stopped", owner=False)
@@ -181,6 +202,7 @@ class AutonomousEventNodeCoordinator:
                     state="degraded",
                     owner=False,
                     media_last_failure_code="postgresql_unavailable",
+                    media_last_failure_at=self.components.kernel.clock.now(),
                 )
                 self._stop.wait(5.0)
         if self.status().state != "degraded":
@@ -208,9 +230,10 @@ class AutonomousEventNodeCoordinator:
                         type(error).__name__,
                     )
                     self._update(
-                        state="degraded",
                         program_last_failure_code="unexpected_cycle_failure",
+                        program_last_failure_at=self.components.kernel.clock.now(),
                     )
+                    self._record_cycle_outcome("program", failed=True)
                 finally:
                     next_program = (
                         time.monotonic()
@@ -229,9 +252,10 @@ class AutonomousEventNodeCoordinator:
                         type(error).__name__,
                     )
                     self._update(
-                        state="degraded",
                         media_last_failure_code="unexpected_cycle_failure",
+                        media_last_failure_at=self.components.kernel.clock.now(),
                     )
+                    self._record_cycle_outcome("media", failed=True)
                 finally:
                     next_media = (
                         time.monotonic()
@@ -246,6 +270,10 @@ class AutonomousEventNodeCoordinator:
     def run_media_cycle(self) -> None:
         attempted_at = self.components.kernel.clock.now()
         self._update(media_last_attempt_at=attempted_at)
+        self._media_attempt_count += 1
+        if self._media_attempt_count == self.configuration.rehearsal_fault_media_cycle:
+            # LookupError bypasses the anticipated media failures and reaches ED-0063.
+            raise LookupError("rehearsal_media_cycle_fault")
         try:
             result = DemoApplication.from_components(
                 self.components
@@ -256,16 +284,21 @@ class AutonomousEventNodeCoordinator:
                 )
             )
         except (KernelStorageUnavailableError, WorkExecutionStorageUnavailableError):
-            self._update(media_last_failure_code="postgresql_unavailable")
+            self._update(
+                media_last_failure_code="postgresql_unavailable",
+                media_last_failure_at=self.components.kernel.clock.now(),
+            )
             return
         except (OSError, RuntimeError, ValueError):
-            self._update(media_last_failure_code="media_reconciliation_failed")
+            self._update(
+                media_last_failure_code="media_reconciliation_failed",
+                media_last_failure_at=self.components.kernel.clock.now(),
+            )
             return
         current = self.status()
         self._update(
             media_cycle_count=current.media_cycle_count + 1,
             media_last_success_at=self.components.kernel.clock.now(),
-            media_last_failure_code=None,
             media_candidates_seen=result.candidates_seen,
             media_assets_registered=result.assets_registered,
             transcription_operations_enqueued=(
@@ -277,27 +310,37 @@ class AutonomousEventNodeCoordinator:
                 + len(result.enqueue_failures)
             ),
         )
+        self._record_cycle_outcome("media", failed=False)
 
     def run_program_refresh(self) -> None:
         attempted_at = self.components.kernel.clock.now()
         self._update(program_last_attempt_at=attempted_at)
         try:
-            result = self.components.sync_devcon_program()
-        except DevconReadError:
-            self._update(program_last_failure_code="provider_refresh_unavailable")
+            result = self.components.sync_program()
+        except ProgramSourceUnavailableError:
+            self._update(
+                program_last_failure_code="provider_refresh_unavailable",
+                program_last_failure_at=self.components.kernel.clock.now(),
+            )
             return
         except KernelStorageUnavailableError:
-            self._update(program_last_failure_code="postgresql_unavailable")
+            self._update(
+                program_last_failure_code="postgresql_unavailable",
+                program_last_failure_at=self.components.kernel.clock.now(),
+            )
             return
         except (OSError, RuntimeError, ValueError):
-            self._update(program_last_failure_code="program_refresh_failed")
+            self._update(
+                program_last_failure_code="program_refresh_failed",
+                program_last_failure_at=self.components.kernel.clock.now(),
+            )
             return
         current = self.status()
         self._update(
             program_refresh_count=current.program_refresh_count + 1,
             program_last_success_at=result.synchronized_at,
-            program_last_failure_code=None,
         )
+        self._record_cycle_outcome("program", failed=False)
 
 
 __all__ = [

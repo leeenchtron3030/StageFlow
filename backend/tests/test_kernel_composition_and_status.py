@@ -80,14 +80,14 @@ def configuration(
     path.write_text(
         f"""
 schema_version = "1.0"
-deployment_id = "razer"
-node_id = "razer-node"
+deployment_id = "example"
+node_id = "example-node"
 node_role = "node"
 network_policy = "local_only"
 postgres_dsn_secret_ref = "KERNEL_DSN"
 [event]
-key = "razer-event"
-name = "Razer Reference Event"
+key = "example-event"
+name = "Example Event"
 [[event.stages]]
 key = "main"
 name = "Main Stage"

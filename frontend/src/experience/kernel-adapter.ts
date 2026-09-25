@@ -97,6 +97,7 @@ export interface KernelAutomationStatus {
   media_last_attempt_at: string | null;
   media_last_success_at: string | null;
   media_last_failure_code: string | null;
+  media_last_failure_at?: string | null;
   media_candidates_seen: number;
   media_assets_registered: number;
   transcription_operations_enqueued: number;
@@ -105,6 +106,7 @@ export interface KernelAutomationStatus {
   program_last_attempt_at: string | null;
   program_last_success_at: string | null;
   program_last_failure_code: string | null;
+  program_last_failure_at?: string | null;
 }
 
 export interface KernelStatusPayload {
@@ -623,18 +625,18 @@ function infrastructure(payload: KernelStatusPayload): InfrastructureItemView[] 
   if (demo) {
     items.push(
       {
-        id: "devcon-read",
-        label: "Devcon program read",
+        id: "program-read",
+        label: "Program read",
         health: programCount > 0 ? "ready" : "unknown",
         state: `${programCount} cached Program Expectations`,
         impact: "Read-only external evidence; cached data does not create Session authority.",
       },
       {
-        id: "devcon-write",
-        label: "Devcon publication",
+        id: "publication",
+        label: "Publication",
         health: "unknown",
-        state: "Disabled",
-        impact: "No Devcon write capability is exposed; the upstream durability gate remains unqualified.",
+        state: "Frozen — awaiting Delivery design",
+        impact: "External publication is frozen under ADR-0031.",
       },
     );
   }
@@ -793,6 +795,7 @@ export function adaptKernelStatus(
           mediaLastAttemptAt: payload.automation.media_last_attempt_at ?? undefined,
           mediaLastSuccessAt: payload.automation.media_last_success_at ?? undefined,
           mediaLastFailureCode: payload.automation.media_last_failure_code ?? undefined,
+          mediaLastFailureAt: payload.automation.media_last_failure_at ?? undefined,
           mediaCandidatesSeen: payload.automation.media_candidates_seen,
           mediaAssetsRegistered: payload.automation.media_assets_registered,
           transcriptionOperationsEnqueued:
@@ -806,6 +809,8 @@ export function adaptKernelStatus(
             payload.automation.program_last_success_at ?? undefined,
           programLastFailureCode:
             payload.automation.program_last_failure_code ?? undefined,
+          programLastFailureAt:
+            payload.automation.program_last_failure_at ?? undefined,
         }
       : undefined,
     sessions: [...sessionMap.values()],

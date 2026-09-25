@@ -20,6 +20,7 @@ from app.contexts.editorial import (
     EditorialMomentStorageUnavailableError,
 )
 from app.contexts.events import ProgramExpectationReconciliation
+from app.contexts.integration.program_source import ProgramSourceUnavailableError
 from app.contexts.production.event_mode_kernel import (
     KernelConflictError,
     KernelNotFoundError,
@@ -37,11 +38,17 @@ from app.demo.service import (
     ProcessTranscriptionRequest,
     ProcessTranscriptionResult,
 )
-from app.infrastructure.devcon import DevconReadError
 from app.infrastructure.postgres import PostgresWorkExecutionRepository
 from app.shared.ids import EntityId
 
 router = APIRouter(prefix="/demo", tags=["demo"])
+type EditorialReviewStateValue = Literal[
+    "unreviewed",
+    "approved",
+    "rejected",
+    "revision_requested",
+    "deferred",
+]
 _TRANSCRIPT_ASSET_LIMIT = 4
 _TRANSCRIPT_SEGMENT_LIMIT = 50
 _TRANSCRIPT_WORD_LIMIT = 50
@@ -147,7 +154,7 @@ class EditorialMomentResponse(BaseModel):
     epistemic_kind: Literal["declared"]
     reason_code: Literal["human_mark_moment"]
     source_kind: Literal["producer_declaration"]
-    review_state: Literal["unreviewed"]
+    review_state: EditorialReviewStateValue
     actor_id: str
     note: str | None
     declared_at: datetime
@@ -290,7 +297,7 @@ def _moment_response(moment: EditorialCandidateMoment) -> EditorialMomentRespons
         epistemic_kind="declared",
         reason_code="human_mark_moment",
         source_kind="producer_declaration",
-        review_state="unreviewed",
+        review_state=moment.review_state.value,
         actor_id=moment.actor_id.value,
         note=moment.note,
         declared_at=moment.declared_at,
@@ -347,8 +354,8 @@ def refresh_program(request: Request, response: Response) -> ProgramRefreshRespo
     response.headers["Pragma"] = "no-cache"
     components = _components(request)
     try:
-        return _program_refresh_response(components.sync_devcon_program())
-    except (DevconReadError, KernelStorageUnavailableError) as exc:
+        return _program_refresh_response(components.sync_program())
+    except (ProgramSourceUnavailableError, KernelStorageUnavailableError) as exc:
         raise HTTPException(
             status_code=503,
             detail="program_refresh_failed_using_last_successful_snapshot",

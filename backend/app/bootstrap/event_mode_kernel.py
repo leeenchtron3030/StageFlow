@@ -3,13 +3,18 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 from datetime import datetime
+from pathlib import Path
 from threading import Lock
 
 import psycopg
 
+from app.contexts.assembly.service import PackagingAssetService
+from app.contexts.assembly.session_service import SessionAssemblyService
 from app.contexts.editorial import EditorialMomentService
 from app.contexts.events import EventStageBootstrapRequest, StageBootstrapDefinition
-from app.contexts.integration.devcon import DevconProgramSync, ProgramSyncResult
+from app.contexts.integration.devcon import DevconProgramSync
+from app.contexts.integration.local_schedule import LocalScheduleFileSource
+from app.contexts.integration.program_source import ProgramScheduleSource, ProgramSyncResult
 from app.contexts.production.event_mode_kernel import DurableEventModeKernel
 from app.contexts.production.event_mode_kernel.contracts import (
     EventOperationalStatus,
@@ -33,6 +38,10 @@ from app.infrastructure.postgres import (
     PostgresEventModeKernelRepository,
     PostgresIngressRepository,
     PostgresMediaTimingEvidenceRepository,
+)
+from app.infrastructure.postgres.packaging_asset_repository import PostgresPackagingAssetRepository
+from app.infrastructure.postgres.session_assembly_repository import (
+    PostgresSessionAssemblyRepository,
 )
 from app.shared.ids import EntityId
 from app.shared.time import Clock, SystemClock
@@ -70,8 +79,10 @@ class KernelComponents:
     startup_error: str | None = None
     postgresql_recovery_required: bool = False
     media_timing_evidence_repository: MediaTimingEvidenceRepository | None = None
-    devcon_program_sync: DevconProgramSync | None = None
+    program_source: ProgramScheduleSource | None = None
     editorial_moments: EditorialMomentService | None = None
+    packaging_assets: PackagingAssetService | None = None
+    session_assemblies: SessionAssemblyService | None = None
     media_cycle_lock: Lock = field(default_factory=Lock, repr=False)
     program_sync_lock: Lock = field(default_factory=Lock, repr=False)
 
@@ -150,17 +161,17 @@ class KernelComponents:
                 self.postgresql_recovery_required = False
             return result
 
-    def sync_devcon_program(self) -> ProgramSyncResult:
+    def sync_program(self) -> ProgramSyncResult:
         with self.program_sync_lock:
-            if self.devcon_program_sync is None:
-                raise RuntimeError("devcon_read_not_configured")
+            if self.program_source is None:
+                raise RuntimeError("program_source_not_configured")
             event = self.repository.get_event_by_key(self.event_key)
             if event is None:
                 raise RuntimeError("explicit_event_stage_bootstrap_required")
             stages = self.repository.list_stages(event.id)
             if len(stages) != 1:
                 raise RuntimeError("demo_single_stage_topology_invalid")
-            return self.devcon_program_sync.synchronize(
+            return self.program_source.synchronize(
                 event_id=event.id,
                 stage_id=stages[0].id,
             )
@@ -260,11 +271,14 @@ def verify_editorial_schema(dsn: str) -> None:
                 SELECT count(*) FROM stageflow.schema_migration
                 WHERE version IN (
                     '0008_demo_vertical_slice',
-                    '0010_editorial_candidate_moment'
+                    '0010_editorial_candidate_moment',
+                    '0011_editorial_review_foundation',
+                    '0012_packaging_asset_foundation',
+                    '0013_session_assembly_foundation'
                 )
                 """
             ).fetchone()
-            if row is None or row[0] != 2:
+            if row is None or row[0] != 5:
                 raise KernelSchemaMigrationRequiredError(
                     "editorial_schema_migration_required"
                 )
@@ -285,10 +299,32 @@ def build_kernel_components(
         asset_ingress_publisher=StableAssetIngressPublisher(ingress),
     )
     devcon_configuration = configuration.deployment.devcon_read
+    local_configuration = configuration.deployment.local_schedule
+    program_source: ProgramScheduleSource | None = None
+    if local_configuration is not None:
+        program_source = LocalScheduleFileSource(
+            path=Path(local_configuration.path),
+            event_key=configuration.deployment.event.key,
+            stage_keys=tuple(stage.key for stage in configuration.deployment.event.stages),
+            repository=repository,
+            clock=kernel.clock,
+        )
+    elif devcon_configuration is not None:
+        program_source = DevconProgramSync(
+            repository=repository,
+            source=DevconPublicProgramAdapter(devcon_configuration),
+            clock=kernel.clock,
+        )
     return KernelComponents(
         configuration=configuration,
         repository=repository,
         kernel=kernel,
+        packaging_assets=PackagingAssetService(
+            PostgresPackagingAssetRepository(configuration.postgres_dsn), kernel.clock,
+        ),
+        session_assemblies=SessionAssemblyService(
+            PostgresSessionAssemblyRepository(configuration.postgres_dsn), kernel.clock,
+        ),
         editorial_moments=EditorialMomentService(
             PostgresEditorialMomentRepository(configuration.postgres_dsn),
             kernel.clock,
@@ -296,15 +332,7 @@ def build_kernel_components(
         media_timing_evidence_repository=PostgresMediaTimingEvidenceRepository(
             configuration.postgres_dsn
         ),
-        devcon_program_sync=(
-            None
-            if devcon_configuration is None
-            else DevconProgramSync(
-                repository=repository,
-                source=DevconPublicProgramAdapter(devcon_configuration),
-                clock=kernel.clock,
-            )
-        ),
+        program_source=program_source,
     )
 
 

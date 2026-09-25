@@ -117,9 +117,10 @@ ADRs, or the authoritative architecture-baseline disposition. “Accepted” doe
   verified reasoning.
 - **Non-goals:** Autonomous publication, opaque cross-domain inference in interpreters,
   or waiting for an entire Session when partial work is safe.
-- **Current alignment:** **Partially aligned.** Contracts and policies exist, and ED-0067
-  adds durable human-declared Editorial Candidate Moments. No Editorial review/Clip or
-  orchestrated reasoning workflow exists.
+- **Current alignment:** **Partially aligned.** Contracts and policies exist; ED-0067
+  adds durable human-declared Editorial Candidate Moments; ED-0072 adds append-only
+  human review decisions, derived review state, and approval-created Editorial Clips.
+  No machine candidate generation or orchestrated reasoning workflow exists.
 - **Related decisions:** ADR-0009, ADR-0011, ADR-0015, Product Constitution principles
   4–6 and 22–25.
 
@@ -151,12 +152,13 @@ ADRs, or the authoritative architecture-baseline disposition. “Accepted” doe
   report source facts; provider payloads do not become core models.
 - **Non-goals:** Implementing placeholder integrations, hard-coding a conference, or
   rejecting all external services.
-- **Current alignment:** **Aligned for the bounded Devcon integration.** A configured
-  public-program adapter reconciles External Program Expectations, and a separate guarded
-  Demo controller can perform one explicitly human-confirmed transcript/duration
-  enrichment write. Devcon payloads and authority remain outside the Kernel; no provider
-  SDK or generic publication workflow is present.
-- **Related decisions:** ADR-0004, ADR-0005, ADR-0011, ADR-0028, ABR-017 disposition.
+- **Current alignment:** **Aligned for bounded program sources.** The offline local
+  schedule file is the default; Devcon is one optional read adapter. Both reconcile
+  External Program Expectations behind the provider-neutral port. Operator labels use
+  provider attribution from data. External publication is frozen pending Delivery design,
+  and the backend publish adapter remains dormant. Provider payloads and authority remain
+  outside the Kernel; no provider SDK or generic publication workflow is present.
+- **Related decisions:** ADR-0004, ADR-0005, ADR-0011, ADR-0028, ADR-0031, ABR-017 disposition.
 
 ## 10. Operator visibility grows with operational capability
 

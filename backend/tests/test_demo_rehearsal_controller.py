@@ -51,7 +51,7 @@ def _kernel(*, sessions: list[dict[str, object]] | None = None) -> dict[str, obj
         "ready": True,
         "database_available": True,
         "event_id": "10000000-0000-0000-0000-000000000001",
-        "event_key": "stageflow-demo-1",
+        "event_key": "example-event",
         "stages": [
             {
                 "stage_id": "10000000-0000-0000-0000-000000000002",
@@ -72,8 +72,8 @@ def _kernel(*, sessions: list[dict[str, object]] | None = None) -> dict[str, obj
         "program_expectations": [
             {
                 "expectation_id": EXPECTATION_ID,
-                "external_event_id": "test-devcon-8",
-                "external_session_id": "a-dacc-vision-for-decentralized-ai",
+                "external_event_id": "example-event",
+                "external_session_id": "example-session",
             }
         ],
         "recent_media": [
@@ -301,7 +301,7 @@ class FakeDevconAdapter:
         self.get_calls += 1
         return RemoteDevconSession(
             session_id=session_id,
-            event_id="test-devcon-8",
+            event_id="example-event",
             transcript_text=transcript,
             duration_seconds=duration,
         )
@@ -335,8 +335,8 @@ def test_publish_preview_and_execution_distinguish_verification_states() -> None
     )
 
     assert preview == {
-        "event": "test-devcon-8",
-        "target_session": "a-dacc-vision-for-decentralized-ai",
+        "event": "example-event",
+        "target_session": "example-session",
         "fields": ("transcript_text", "duration"),
         "remote_identity_verified": True,
         "package_approved": True,
@@ -368,7 +368,7 @@ def test_publish_preview_and_execution_distinguish_verification_states() -> None
 
     assert adapter.get_calls == 2
     assert adapter.durable_calls == [
-        ("test-devcon-8", "a-dacc-vision-for-decentralized-ai")
+        ("example-event", "example-session")
     ]
     assert len(adapter.put_calls) == 1
     assert set(adapter.put_calls[0]) == {
@@ -523,8 +523,8 @@ def test_publish_remains_blocked_before_approval_and_eligible_afterward() -> Non
         build_devcon_publish_candidate(kernel, _workspace())
 
     candidate = build_devcon_publish_candidate(_kernel(), _workspace())
-    assert candidate.event_id == "test-devcon-8"
-    assert candidate.remote_session_id == "a-dacc-vision-for-decentralized-ai"
+    assert candidate.event_id == "example-event"
+    assert candidate.remote_session_id == "example-session"
 
 
 def test_publish_digest_prevents_stale_confirmation() -> None:
@@ -585,6 +585,7 @@ def test_summary_projects_bounded_automation_and_program_freshness() -> None:
     kernel["automation"]["private_path"] = "C:/private/recordings"
     kernel["automation"]["dsn"] = "postgresql://user:password@example.invalid/demo"
     kernel["program_synchronization"] = {
+        "provider": "local_file",
         "synchronized_at": "2026-08-20T19:59:00Z",
     }
     program = kernel["program_expectations"]
@@ -602,21 +603,45 @@ def test_summary_projects_bounded_automation_and_program_freshness() -> None:
         "cached_program_expectations": 1,
         "current": 1,
         "withdrawn": 0,
-        "provider": "devcon",
+        "provider": "local_file",
         "last_successful_refresh": "2026-08-20T19:59:00Z",
         "last_failure_code": None,
         "status": "current",
     }
 
 
-def testworker_summary_scopes_current_available_gpu_worker_to_live_event(
+@pytest.mark.parametrize("recovered", [False, True])
+def test_summary_distinguishes_current_failure_from_retained_history(recovered: bool) -> None:
+    kernel = _kernel()
+    failure_at = "2026-08-20T19:59:00Z"
+    kernel["automation"] = {
+        "program_last_failure_code": "unexpected_cycle_failure",
+        "program_last_failure_at": failure_at,
+        "program_last_success_at": (
+            "2026-08-20T20:01:00Z" if recovered else "2026-08-20T19:57:00Z"
+        ),
+    }
+    summary = summarize_demo_state(kernel, _workspace())
+    program = summary["devcon"]
+    assert isinstance(program, dict)
+    assert program["provider"] is None
+    assert program["last_failure_code"] == "unexpected_cycle_failure"
+    assert program["status"] == (
+        "current" if recovered else "refresh_unavailable_cached_program_active"
+    )
+    automation = summary["automation"]
+    assert isinstance(automation, dict)
+    assert automation["program_last_failure_at"] == failure_at
+
+
+def test_worker_summary_scopes_current_available_gpu_worker_to_live_event(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     captured: dict[str, object] = {}
 
     class Result:
         def fetchall(self) -> list[tuple[object, ...]]:
-            return [("razer-event-node", True, False, "available", 1, True, True)]
+            return [("example-node", True, False, "available", 1, True, True)]
 
     class Connection:
         def __enter__(self) -> Connection:
@@ -644,7 +669,7 @@ def testworker_summary_scopes_current_available_gpu_worker_to_live_event(
     assert summary == {
         "state": "available",
         "current": True,
-        "node": "razer-event-node",
+        "node": "example-node",
         "registered": 1,
         "available": 1,
         "capacity": 1,

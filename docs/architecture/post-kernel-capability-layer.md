@@ -10,9 +10,13 @@ Kernel. It covers live Session intelligence, bounded AI/media worker execution, 
 Assembly, and progressive approval automation. It remains planning authority for those
 broader capabilities. Only the bounded transcription Work Execution and evidence slice
 explicitly authorized by ADR-0025 and its implementation-ready plan is currently
-implemented. ED-0067 also implements the bounded Phase 1 human-declared Editorial
-Candidate Moment slice; review decisions, Clips, and machine-origin candidates remain
-future work.
+implemented. ED-0067 implements the bounded Phase 1 human-declared Editorial Candidate
+Moment slice, and ED-0072 implements the append-only human review, Editorial Clip, and
+bounded Event review-queue foundation. Machine-origin candidates remain future work.
+ED-0076 implements ADR-0030's Packaging Asset identity, immutable content revisions,
+human approval lineage, and bounded authenticated reads in the new Assembly context.
+ED-0077 implements Session Assembly templates, proposals, revisions, validation, and
+human approval. Rendering remains future work.
 
 The Kernel remains the protected operational foundation. New capabilities reference its
 Business Event, Stage, Program Expectation, realized Session, media registration,
@@ -283,12 +287,12 @@ status map keeps the boundary explicit:
 | --- | --- | --- | --- |
 | One shared Session ID, Event, Stage, boundaries, package revision, and Program Expectation link | Kernel Session and bounded operational projection | Role-specific projections reference the same IDs/revisions | Kernel basis implemented; role projections future |
 | Producer Sessions list and unresolved-human Work Queue | Kernel exposes bounded Stage/recent Session/media/package status plus the ED-0068 Event-scoped package/association Work Queue API | Separate bounded All Sessions projection and later frontend workflow; expand Work Items only from implemented authority | Kernel-derived first Work Queue slice implemented; frontend workflow future |
-| Editorial Live Triage and Review Queue | No Editorial workflow implementation | Bounded cross-Session Candidate queue with stable ordering, mode, cursor, counts, selection continuity, and freshness | Proposed read model |
-| Candidate, Producer-mark, unreviewed, and approved counts per Session | Durable declared Candidate store plus bounded count/latest/conflict projection; no review decisions | Candidate/review projection derived from authoritative candidate and append-only decision records | Phase 1 declared count implemented; reviewed/approved counts future |
+| Editorial Live Triage and Review Queue | ED-0072 exposes an authenticated Event-scoped bounded Candidate queue with deterministic keyset pagination, counts, oldest-pending age, derived review state, and bounded decision/Clip history | Add richer modes, selection continuity, and controlled refresh in the frontend | Backend foundation implemented; frontend workflow future |
+| Candidate, Producer-mark, unreviewed, and approved counts per Session | Durable declared Candidate store, append-only review decisions, derived per-Candidate review state, and Event queue counts | Add reviewed/approved counts to bounded per-Session projections when a consumer requires them | Candidate review projection implemented; per-Session reviewed/approved counts future |
 | Producer-mark priority | Idempotent authenticated `Mark Moment` command persists declared, unreviewed Candidates | Declared Candidate provenance plus explicit priority signal; never automatic Editorial approval | Phase 1 implemented; cross-Session priority future |
 | Candidate rationale and provenance | Observation/Evidence provenance and epistemic vocabulary exist | Candidate source/input, policy/model, actor, reason, and evidence references become first-class | Accepted semantic direction; persistence future |
 | Intelligence-processing lag | Transcription Operation timestamps and bounded status projection implemented | Operation/artifact timestamps and backlog projected as transcript/Moment lag | First-worker basis implemented; product read model and calibration remain future |
-| Human Editorial review lag | No Editorial queue implementation | Derived age of the oldest eligible priority Candidate, separate from compute lag | Proposed read-model calculation |
+| Human Editorial review lag | ED-0072 exposes oldest-pending Candidate time and measured age, separate from compute lag | Add operational threshold calibration and frontend presentation | Backend calculation implemented; calibration/frontend future |
 | Selected review position versus live edge | Timeline contracts exist but no Editorial playback state | Preserve Session-relative review/playback position independently from current live position; expose explicit behind-live and return-to-live state | Proposed frontend/read-model contract |
 | Stable queue interaction | No Editorial queue implementation | Preserve selected Candidate, mode, filters, ordering generation, and return position while arrivals accumulate behind an explicit refresh signal | Proposed frontend/read-model contract |
 | Package-revision basis and downstream impact | Kernel package revision/history and late-media reopening are implemented | Candidate/Clip/Assembly/output references retain their historical basis and expose unaffected, revalidate, outside-boundary, or missing-source impact | Historical-basis requirement accepted; impact policy future |
@@ -418,18 +422,29 @@ Completed Media Asset and packaging identity have different meanings. A Complete
 Asset proves finalized, safe-to-read production media. A packaging asset adds curated
 role, applicability, version, approval/trust, and effective-context semantics.
 
-The recommended Yellow decision is a separate `PackagingAsset` aggregate whose immutable
-content revision references a stable media manifest or, when appropriate, a Completed
-Media Asset. This composes existing resource/readiness semantics without pretending that
-all registered production media is branding or that branding approval is media
-completion. Media blobs remain outside PostgreSQL; raw filesystem paths are not product
-identity.
+Accepted [ADR-0030](../adr/ADR-0030-packaging-asset-identity.md) resolves ownership and
+identity as a separate Assembly-owned `PackagingAsset`; ED-0076 implements that first
+slice. An asset has stable ID, Event scope, optional Stage scope, name, and one of the
+roles `opening_bumper`, `title_card`, `sponsor_card`, or `outro`. Track applicability
+remains deferred until a domain track concept exists.
 
-Minimum packaging-asset facts are ID, name, role/category, content reference/version,
-optional measured duration, Event/Stage/track applicability, effective interval,
-approval/trust state and decision lineage. The exact aggregate ownership and whether all
-content must first become a Completed Media Asset require explicit approval before the
-Assembly persistence design.
+Immutable numbered content revisions reference either external content (opaque content
+key, SHA-256 digest, byte size, declared media type) or an existing Completed Media Asset
+ID. Optional measured duration and aware effective endpoints are revision facts. Media
+blobs remain outside PostgreSQL; filesystem paths are not accepted as identity.
+
+Append-only human decisions approve, reject, or revoke one exact revision. The latest
+append sequence derives that revision's approval state; new revisions start unreviewed.
+The synchronous service uses command digest replay and an expected current revision
+guard. The approval target revision is separate from that guard, so a human with a fresh
+view can revoke an older revision. Registration starts at revision count zero; adding
+the first content revision requires `expected_revision=0`.
+
+Authenticated `/api/v1/assembly` routes register assets, append revisions and decisions,
+and provide Event-scoped asset and revision pages with limits 1–100, keyset continuation,
+counts, and explicit truncation. Session Assembly references those revisions through the
+ED-0077 foundation below. The reserved
+`packaging` context and the unrelated Runtime asset assembly plan remain unchanged.
 
 ### Metadata-driven graphics
 
@@ -448,11 +463,51 @@ it required; it does not make the Session package incomplete.
 
 ### Proposal and approval
 
+ED-0077 implements the bounded human-only foundation. Template versions are immutable
+within an Event and template key; each has 1–100 ordered, uniquely keyed slots and
+declares required `session_title` and/or `participant_names` metadata. A Session's ID
+also identifies its Assembly history; proposals append numbered revisions, superseding
+the prior revision, with optimistic Assembly and package-revision guards.
+
+Proposals require a `complete` Kernel package and pin its completion decision and exact
+`session_completion_asset` membership, including association revisions. Ineligible
+packages produce a persisted invalid revision. Members sort by registered media start,
+then asset ID for ties; missing timing or unavailable membership blocks validation.
+No live association membership or media content is read. Each `session_media` slot
+references that one frozen membership sequence.
+
+For each packaging slot, only approved revisions with matching role and Event, matching
+or unset Stage, and an effective interval covering authoritative Session start qualify.
+Intervals are start-inclusive and end-exclusive; an absent endpoint is unbounded.
+Exactly one candidate binds; zero or multiple candidates remain unresolved. Explicit
+bindings must themselves qualify. Unresolved required slots fail validation; optional
+unresolved slots remain visible. Invalid explicit bindings fail even for optional slots.
+
+Metadata freezes title and speaker display strings from the current revision of the
+Session's linked Program Expectation. Each field retains source identity and revision.
+Alphabetical display-string normalization conveys no participant identity or billing
+order. Missing metadata blocks only templates requiring it. Neither metadata changes nor
+new Packaging Asset content revisions rewrite an existing Assembly.
+
+Read-time staleness means a later Kernel package revision or a bound Packaging Asset
+revision whose latest decision is no longer approval. Human approve/reject decisions
+require a valid, current, non-stale revision and the displayed per-revision decision
+count. Decisions retain a Session-wide append sequence and `authority_kind=human`.
+Exact command replay returns its immutable original result. No automation is activated.
+
+The existing authenticated `/api/v1/assembly` router now adds template creation,
+Session proposal and approval commands, Event-scoped template pages, and Event-scoped
+per-Session revision pages. Reads expose validation reasons, current revision, staleness,
+and decision lineage with limits 1–100 and explicit continuation. Migration `0013`
+persists this foundation; rendering, metadata overrides, and a participant model remain
+outside its scope.
+
 An Assembly proposal resolves the applicable template against a fixed package revision,
 selects approved packaging-asset versions, snapshots metadata, and records provenance.
 Validation checks references, versions, template resolution, required bindings, package
-eligibility, and prohibited unresolved conditions. Approval then follows the scoped
-automation policy. Rendering remains a separate future Durable Operation.
+eligibility, and prohibited unresolved conditions. Future automatic approval requires an
+explicitly activated scoped policy under ADR-0026. Rendering remains a separate future
+Durable Operation.
 
 ## Progressive approval automation
 
@@ -552,16 +607,18 @@ Use a bounded sequence C:
    declaration lineage, `Mark Moment` application command, bounded Session/Stage
    projections, boundary-exclusion warning, and restart/replay tests. No model, worker,
    review UI, or clip rendering.
-2. **Editorial review foundation:** bounded candidate query and append-only review
-   decision that can create an Editorial Clip contract. No export/publishing.
+2. **Editorial review foundation (implemented by ED-0072):** bounded candidate query and
+   append-only review decision that can create an Editorial Clip contract. No
+   export/publishing.
 3. **Concrete transcription execution (bounded substrate implemented):** migration 0007
    and its internal contracts/repository implement the Durable Operation/Attempt/Worker
    pieces, provider-neutral transcript evidence, and bounded status projection. A real
    provider/model and deployment qualification remain separate Yellow work.
 4. **Machine candidate generation:** deterministic and then inferred candidates consume
    versioned transcript/analysis artifacts with provenance and idempotent outputs.
-5. **Assembly foundation:** after packaging-asset identity is approved, add templates,
-   proposals, independent revisions, validation, and manual approval.
+5. **Assembly foundation:** ADR-0030 identity and the ED-0076 Packaging Asset foundation
+   are implemented. Templates, proposals, independent Session Assembly revisions,
+   validation, and manual Assembly approval remain ED-0077 work.
 6. **Scoped automation:** after ADR-0026 acceptance and sufficient measured evidence,
    enable one low-risk decision type at a time. Rendering and publishing remain later
    consumers.
@@ -621,8 +678,9 @@ itself. Each slice still needs a bounded implementation-ready plan and objective
 
 1. **ADR-0026:** accept versioned, policy-scoped automatic decision authority and
    activation/provenance semantics.
-2. **Packaging asset identity:** approve the recommended separate Packaging Asset
-   aggregate and its composition with Completed Media Asset before Assembly persistence.
+
+Packaging asset identity was resolved by accepted ADR-0030 and implemented in the
+bounded ED-0076 slice; it is no longer a Yellow decision.
 
 Moment naming is not Yellow at this baseline because the current qualified glossary
 already establishes Editorial Candidate Moment, Editorial Clip, and Hot urgency. A

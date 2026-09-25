@@ -70,6 +70,53 @@ Moment declaration record and command replay used by Demo 1.
 evaluations, preserving the declaration record while making contained, partially
 excluded, and excluded locations restart-safe and queryable. It does not alter Kernel
 Session tables or add review, Clip, worker, model, or automatic authority.
+`0011_editorial_review_foundation` adds append-only human review decisions with
+digest-based exact/conflicting replay, deterministic append ordering, and immutable
+Editorial Clips created only by approval. Current review state and the bounded
+Event-scoped queue derive from decision history; no Session, package, render, export, or
+publishing state is added.
+
+`0012_packaging_asset_foundation` adds only Assembly-owned Packaging Asset identities,
+immutable content revisions, append-only human approval decisions, and command receipts.
+It reuses the canonical human-command digest mechanism with a capability-local receipt
+table, as existing command-kind constraints remain unchanged. Registration/revision/
+approval receipts and results commit atomically; exact replay returns the original
+immutable result even after later activity. A per-asset row lock serializes revision
+numbering and decision ordering; stale expected revisions fail explicitly. Revision and
+decision tables additionally reject updates/deletes with append-only triggers.
+
+Event and optional Stage foreign keys enforce applicability; a Completed Media Asset
+reference must exist at write time. External content uses an opaque alphanumeric/hyphen/
+underscore key, lowercase SHA-256, byte size, and declared media type; no path or media
+blob is accepted or persisted. Effective endpoints are optional aware timestamps and,
+when both are supplied, form a nonempty interval. ED-0077 resolves applicability using
+start-inclusive, end-exclusive effective intervals.
+Bounded Event-scoped asset and revision pages use batch SQL with a repeatable-read snapshot,
+counts and explicit continuation/truncation. Approval derives from the latest append
+sequence for each revision, independent of decision clock ordering. The in-memory
+implementation is a non-durable test repository, never a runtime fallback.
+
+`0013_session_assembly_foundation` adds only Assembly-owned template, revision, member,
+binding, metadata snapshot, approval decision, and command receipt tables. Templates are
+versioned within `(event_id, template_key)` and retain ordered slot configuration.
+Revision columns pin Session, package revision, template version identity, supersession,
+completion decision, validation, and actor/time. Child rows freeze completion membership
+and association revisions in media-start order (asset ID breaks equal-time ties), exact
+Packaging Asset revision references, and Program Expectation metadata source revisions.
+Missing media start or unavailable completion membership produces typed invalidity.
+No live association projection supplies proposal membership.
+
+All seven new tables reject updates/deletes. Command receipts and append-only results
+commit atomically. Event row locks serialize template versions; Session row locks
+serialize proposals and decisions against Kernel package changes. Packaging root share
+locks coordinate candidate/approval reads with ED-0076's decision/revision locks. These
+locks do not mutate upstream rows. Exact replay reads the original result before current
+eligibility checks; conflicting replay and stale expected revisions fail explicitly.
+Decision concurrency guards count decisions for the target revision; decision sequence
+numbers are Session-wide. Approval and staleness are read projections, never stored
+status updates. Event-scoped template and per-Session revision reads use bounded keyset
+pages and batch child queries in a repeatable-read transaction. Runtime composition
+requires migration `0013`; no new configuration variable or dependency is introduced.
 
 Registration is at least once and idempotent. It does not claim exactly-once delivery.
 Only a newly created ingress record is eligible for the included dispatcher path; an
@@ -99,8 +146,13 @@ table. `0002_event_mode_kernel_forward.sql`, `0003_kernel_projections_forward.sq
 `0006_media_timing_evidence_forward.sql` add bounded Production-owned objects.
 `0007_transcription_worker_forward.sql` adds the bounded first Work Execution and
 Transcript Evidence objects. `0008` adds the Demo declaration base, `0009` adds Program
-Expectation reconciliation, and `0010` adds Editorial location history. Reversal removes
-`0010` before its `0008` dependency, then removes `0009`, `0008`, `0007`, `0006`,
+Expectation reconciliation, `0010` adds Editorial location history, and `0011` adds
+Editorial review and Clip history. `0012` adds Packaging Asset identity, revision,
+approval, and command-receipt tables. `0013` adds Session Assembly and reverses before
+`0012`, preserving upstream identities and history. Reversal drops `0012` and its own receipts before
+`0011`, without modifying earlier tables or lineage. Reversal removes `0011` before `0010`,
+then removes
+`0010` before its `0008` dependency, followed by `0009`, `0008`, `0007`, `0006`,
 `0005`, `0004`, `0003`, then `0002` and their ledger rows while preserving ingress and the shared
 schema. The `0005` reverse removes only membership tagged as its legacy reconstruction
 before dropping its additive columns.

@@ -147,12 +147,12 @@ test("Kernel adapter keeps stabilizing quiet and maps unresolved media to Review
         planned_end: "2026-08-12T02:45:00Z",
         revision: 1,
         recorded_at: "2026-08-12T01:00:00Z",
-        provider: "devcon",
+        provider: "local_file",
         external_event_id: "event-8",
         external_session_id: "session-12",
         external_room_id: "stage-1",
         lifecycle_state: "current",
-        synchronization_scope: "devcon:event-8:stage-1",
+        synchronization_scope: "local_file:event-8:stage-1",
         last_observed_at: "2026-08-12T01:00:00Z",
         lifecycle_changed_at: "2026-08-12T01:00:00Z",
         evidence_kind: "external",
@@ -166,12 +166,12 @@ test("Kernel adapter keeps stabilizing quiet and maps unresolved media to Review
         planned_end: "2026-08-12T01:45:00Z",
         revision: 1,
         recorded_at: "2026-08-12T01:00:00Z",
-        provider: "devcon",
+        provider: "local_file",
         external_event_id: "event-8",
         external_session_id: "opening-program",
         external_room_id: "stage-1",
         lifecycle_state: "current",
-        synchronization_scope: "devcon:event-8:stage-1",
+        synchronization_scope: "local_file:event-8:stage-1",
         last_observed_at: "2026-08-12T01:00:00Z",
         lifecycle_changed_at: "2026-08-12T01:00:00Z",
         evidence_kind: "external",
@@ -185,12 +185,12 @@ test("Kernel adapter keeps stabilizing quiet and maps unresolved media to Review
         planned_end: "2026-08-12T03:30:00Z",
         revision: 1,
         recorded_at: "2026-08-12T01:00:00Z",
-        provider: "devcon",
+        provider: "local_file",
         external_event_id: "event-8",
         external_session_id: "later-program",
         external_room_id: "stage-1",
         lifecycle_state: "current",
-        synchronization_scope: "devcon:event-8:stage-1",
+        synchronization_scope: "local_file:event-8:stage-1",
         last_observed_at: "2026-08-12T01:00:00Z",
         lifecycle_changed_at: "2026-08-12T01:00:00Z",
         evidence_kind: "external",
@@ -204,12 +204,12 @@ test("Kernel adapter keeps stabilizing quiet and maps unresolved media to Review
         planned_end: null,
         revision: 1,
         recorded_at: "2026-08-12T01:00:00Z",
-        provider: "devcon",
+        provider: "local_file",
         external_event_id: "event-8",
         external_session_id: "unscheduled-program",
         external_room_id: "stage-1",
         lifecycle_state: "current",
-        synchronization_scope: "devcon:event-8:stage-1",
+        synchronization_scope: "local_file:event-8:stage-1",
         last_observed_at: "2026-08-12T01:00:00Z",
         lifecycle_changed_at: "2026-08-12T01:00:00Z",
         evidence_kind: "external",
@@ -241,11 +241,11 @@ test("Kernel adapter keeps stabilizing quiet and maps unresolved media to Review
     ["expectation-2", "expectation-1", "expectation-3", "expectation-4"],
   );
   assert.equal(expectations.every((expectation) => expectation.evidenceKind === "external"), true);
-  assert.equal(expectations.every((expectation) => expectation.provider === "devcon"), true);
+  assert.equal(expectations.every((expectation) => expectation.provider === "local_file"), true);
   assert.equal(expectations[0].externalSessionId, "opening-program");
   assert.equal(workspace.stages[0].nextExpectation, "Opening Program");
   assert.deepEqual(workspace.stages[0].nextExpectationSpeakers, ["First Speaker"]);
-  assert.equal(workspace.stages[0].nextExpectationProvider, "devcon");
+  assert.equal(workspace.stages[0].nextExpectationProvider, "local_file");
   assert.equal(workspace.stages[0].nextExpectationPlannedStart, "2026-08-12T01:30:00Z");
   assert.equal(workspace.stages[0].nextExpectationPlannedEnd, "2026-08-12T01:45:00Z");
   assert.equal(workspace.transcriptState.state, "evidence_available");
@@ -255,13 +255,16 @@ test("Kernel adapter keeps stabilizing quiet and maps unresolved media to Review
     "Configured · presence not projected",
   );
   assert.equal(
-    workspace.infrastructure.find((item) => item.id === "devcon-read")?.state,
+    workspace.infrastructure.find((item) => item.id === "program-read")?.state,
     "4 cached Program Expectations",
   );
   assert.equal(
-    workspace.infrastructure.find((item) => item.id === "devcon-write")?.state,
-    "Disabled",
+    workspace.infrastructure.find((item) => item.id === "publication")?.state,
+    "Frozen — awaiting Delivery design",
   );
+  const publication = workspace.infrastructure.find((item) => item.id === "publication");
+  assert.equal(publication?.label, "Publication");
+  assert.equal(Object.hasOwn(publication ?? {}, "action"), false);
   assert.equal(authorityActionsEnabled(workspace), false);
 });
 

@@ -246,6 +246,7 @@ def summarize_demo_state(
             "media_last_attempt_at",
             "media_last_success_at",
             "media_last_failure_code",
+            "media_last_failure_at",
             "media_candidates_seen",
             "media_assets_registered",
             "transcription_operations_enqueued",
@@ -254,9 +255,18 @@ def summarize_demo_state(
             "program_last_attempt_at",
             "program_last_success_at",
             "program_last_failure_code",
+            "program_last_failure_at",
         )
         if key in automation
     }
+    program_failure_current = bool(automation.get("program_last_failure_code"))
+    failed_at = automation.get("program_last_failure_at")
+    succeeded_at = automation.get("program_last_success_at")
+    if isinstance(failed_at, str) and isinstance(succeeded_at, str):
+        program_failure_current = program_failure_current and (
+            _parse_aware(failed_at, "demo_program_failure_time_invalid")
+            >= _parse_aware(succeeded_at, "demo_program_success_time_invalid")
+        )
     report: dict[str, object] = {
         "schema_version": "stageflow-demo-rehearsal-report-v1",
         "runtime_profile": kernel_status.get("runtime_profile"),
@@ -292,12 +302,12 @@ def summarize_demo_state(
             "withdrawn": sum(
                 item.get("lifecycle_state") == "withdrawn" for item in program_items
             ),
-            "provider": "devcon",
+            "provider": program_sync.get("provider"),
             "last_successful_refresh": program_sync.get("synchronized_at"),
             "last_failure_code": automation.get("program_last_failure_code"),
             "status": (
                 "refresh_unavailable_cached_program_active"
-                if automation.get("program_last_failure_code")
+                if program_failure_current
                 else "current"
             ),
         },

@@ -16,7 +16,7 @@ authorized by this document.
 - **Current aliases/legacy names:** Older documents use unqualified `Event`.
 - **Migration:** The Kernel implements the qualified `BusinessEvent` contract and
   normalized PostgreSQL identity; continue qualifying new schemas/APIs.
-- **Example:** “Devcon 2026” is a Business Event; “media asset registered” is a
+- **Example:** “Example Conference” is a Business Event; “media asset registered” is a
   Production Event.
 
 ### Program Expectation
@@ -31,7 +31,8 @@ authorized by this document.
   but absent from that successful snapshot. Withdrawn records remain durable external
   evidence and cannot be selected for new Session realization; linked realized Sessions
   remain unchanged.
-- **Scope limit:** Demo reconciliation is currently one Devcon Event/room to one Stage.
+- **Scope limit:** Demo reconciliation is one configured program source to one Stage.
+  ED-0079 supports an offline local schedule file and the optional Devcon adapter.
   A future multi-Stage design must distinguish removal from the Business Event from a
   move to another room before broadening reconciliation.
 - **Current aliases/legacy names:** `ScheduledActivity` is the existing schedule-adapter
@@ -41,6 +42,21 @@ authorized by this document.
   import or linkage as Session creation.
 - **Example:** A program expects a keynote on Main Stage from 10:00 to 10:45; observation
   later determines whether, where, and when a Session actually occurred.
+
+### Program Schedule Source
+
+- **Definition:** The provider-neutral `ProgramScheduleSource` port synchronizes one
+  Stage's complete planned program, probes availability, and reads the durable cache.
+- **Implementations:** `local_file` is the offline development/rehearsal default choice;
+  `devcon` remains an optional provider. Results carry this provider attribution.
+- **Distinction:** File input and external API input remain External Program Expectations;
+  neither creates a realized Session nor changes its authoritative boundaries.
+- **Compatibility:** Neutral `external_session_id`, `external_event_id`, and
+  `external_room_id` references take precedence over persisted `devcon_*` equivalents.
+  The fallback is removable only when all writers use neutral keys and retained current
+  and historical records no longer depend on the legacy keys. No history is rewritten.
+- **Composition aliases:** removed under ED-0081. `program_source` and `sync_program()`
+  are the only composition names; the former Devcon aliases no longer exist.
 
 ### Production Event
 
@@ -128,6 +144,26 @@ authorized by this document.
 - **Example:** A finalized recording segment registered after sufficient resource
   observations support `safe_to_read`.
 
+### Packaging Asset
+
+- **Definition:** An Assembly-owned stable identity for curated packaging content scoped
+  to a Business Event and optionally one of its Stages, with a name and role:
+  `opening_bumper`, `title_card`, `sponsor_card`, or `outro`.
+- **Distinction:** A Completed Media Asset proves production-media completion/readiness;
+  a Packaging Asset records human curation and applicability. Neither implies the other.
+- **Revision and approval:** `PackagingAssetRevision` is immutable and numbered per asset.
+  It references either external content (opaque key, SHA-256, byte size, declared media
+  type) or an existing Completed Media Asset ID, with optional measured duration and
+  aware effective interval. `PackagingAssetApprovalDecision` appends an attributable
+  approve/reject/revoke decision targeting exactly one revision. Approval state is derived
+  per revision and never inherited by another revision.
+- **Migration:** ADR-0030 and ED-0076 implement this boundary in `contexts/assembly/`
+  and additive migration `0012`. Paths are not accepted as identity. Track applicability
+  remains deferred; ED-0077 implements Session Assembly. `contexts/packaging/` stays
+  reserved for delivery.
+- **Example:** A sponsor card's second content revision starts unreviewed even when its
+  first revision was approved.
+
 ### Media Timing Evidence
 
 - **Definition:** An immutable, durable, asset-linked revision containing sanitized
@@ -148,7 +184,8 @@ authorized by this document.
 - **Distinction:** Not a Media Asset Candidate, Timeline Window Candidate, or approved
   Editorial Clip.
 - **Current aliases/legacy names:** Foundational documents use `Candidate Moment`; ED-0067
-  implements only the human-declared, unreviewed Phase 1 aggregate.
+  implements the human-declared aggregate and ED-0072 derives its current review state
+  from append-only decisions.
 - **Migration:** Canonical contracts and APIs use the qualified term. The Demo 1 import
   surface remains a compatibility alias, and simple UI copy may remain "Candidate Moment"
   when context is unambiguous.
@@ -159,9 +196,11 @@ authorized by this document.
 - **Definition:** A human-approved editorial selection intended for downstream rendering
   or publication workflows.
 - **Distinction:** It is not an ingest file, source segment, candidate, or rendered Export.
-- **Current aliases/legacy names:** Foundational documents use `Clip`; no implementation
-  exists.
-- **Migration:** Use the qualified term at cross-context boundaries when implemented.
+- **Current aliases/legacy names:** Foundational documents use `Clip`; ED-0072 implements
+  the qualified immutable selection contract.
+- **Migration:** Migration `0011_editorial_review_foundation` persists stable Clip
+  identity, approved Session-timeline range, candidate/revision lineage, review-decision
+  lineage, and Clip revision. Rendering and publication remain separate.
 - **Example:** A reviewer approves a 45-second range from an Editorial Candidate Moment.
 
 ### Hot Moment
@@ -188,8 +227,15 @@ authorized by this document.
   branding settings but do not define this separate aggregate. The existing Runtime
   asset assembly plan is a Completed Media Asset manifest mapping and is not Session
   Assembly.
-- **Migration:** No implementation exists. Assembly revision must remain independent of
-  Session package revision when introduced.
+- **Implementation:** ED-0077 implements immutable Event-scoped `AssemblyTemplate`
+  versions, ordered slots, Session-numbered `AssemblyRevision`s, frozen completion
+  membership and metadata values with Program Expectation source revisions, typed
+  validation, and append-only human `AssemblyApprovalDecision`s. `SessionAssembly` is a
+  read projection using the Session ID as its stable identity. Current revision,
+  approval, and staleness derive from authoritative inputs/history.
+- **Migration:** Additive migration `0013`; reverses before Packaging Assets (`0012`).
+  Assembly revision remains independent of Session package revision. No rendering or
+  Runtime asset assembly plan change is included.
 - **Example:** Replacing a sponsor outro creates Assembly revision 4 while Session
   package revision 2 remains unchanged.
 
@@ -300,7 +346,6 @@ authorized by this document.
 | Job / Durable Operation / Task | ADR-0025 and migration 0007 implement the internal `Durable Operation`/Attempt/Worker schema for transcription | Public API aliases and any generalized operation kinds remain unresolved |
 | Post-Kernel Session evolution | Human Session realization and reassignment are implemented | Automated realization, merge, and split policy |
 | Package and publication milestones | Distinct milestones are accepted | Aggregate names and detailed state machines remain deferred |
-| Packaging Asset / Event Asset | Session Assembly needs reusable approved presentation media distinct from package correctness | Aggregate name/owner and whether content composes a Completed Media Asset or a separate manifest |
 | Session Transcript composition | Transcript Evidence Revision is the implemented internal asset-scoped evidence aggregate; the foundational Session Transcript is a later cross-asset product concept | Accept correction/stitching policy, public naming, and relationship to asset-scoped evidence revisions |
 | Wall-Clock Transcript Alignment | MTE can derive advisory wall-clock intervals from immutable asset-relative transcript offsets | Accept aggregate name/owner and authorized consumers; automatic Session/media authority remains prohibited |
 | Automation Policy / Approval Policy | Evidence -> Policy -> Authority and per-decision activation are proposed in ADR-0026 | Acceptance, public term, scope storage, and activation authority |

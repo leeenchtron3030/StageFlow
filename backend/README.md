@@ -23,6 +23,15 @@ cd backend
 uv sync --dev
 ```
 
+Local transcription is an optional, operator-installed capability: an operator can
+explicitly install it locally with `uv sync --group transcription`. Under ED-0075, the
+`transcription` group and its runtime dependencies must be excluded from every
+distributable StageFlow artifact because the confirmed PyAV wheel bundles a GPL-configured
+FFmpeg build. Do not promote these dependencies into the default installation or use
+`--all-groups` for distribution. This defers rather than resolves the licensing question
+and is not legal clearance. See the
+[SBOM decision record](../docs/security/dependency-license-sbom-2026-08-21.md#decision-options-for-the-pyavffmpeg-exposure).
+
 ## Run the Backend
 
 ```bash

@@ -8,23 +8,27 @@ Runs the guarded StageFlow Demo hardware-rehearsal lifecycle.
 .EXAMPLE
 .\scripts\demo\StageFlow-Demo.ps1 start
 
-.EXAMPLE
-.\scripts\demo\StageFlow-Demo.ps1 publish-devcon
+.PARAMETER Action
+Supported actions: prepare, start, status, diagnose, stop, rehearsal-report.
 #>
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true, Position = 0)]
-    [ValidateSet(
-        "prepare", "start", "status", "diagnose", "stop",
-        "rehearsal-report", "publish-devcon"
-    )]
+    [ValidateScript({
+        if ($_ -eq "publish-devcon") {
+            throw "External publication is frozen under ADR-0031; awaiting Delivery design. No network call was made."
+        }
+        if ($_ -notin @("prepare", "start", "status", "diagnose", "stop", "rehearsal-report")) {
+            throw "Unsupported action. Use prepare, start, status, diagnose, stop, or rehearsal-report."
+        }
+        return $true
+    })]
     [string]$Action,
     [string]$ConfigPath,
     [string]$CudaRuntimePath,
     [guid]$OperatorId,
     [string]$ProducerAddress,
-    [string]$ReportPath,
-    [switch]$ConfirmHumanAuthority
+    [string]$ReportPath
 )
 
 $ErrorActionPreference = "Stop"
@@ -297,7 +301,7 @@ function Start-DemoStack {
                 $output = Get-Content -LiteralPath $script:StdoutPath -Raw -Encoding UTF8
                 $ready = [regex]::Match(
                     $output,
-                    'StageFlow Demo 1 is ready at (http://[^/\s]+:\d+/)'
+                    'StageFlow is ready at (http://[^/\s]+:\d+/)'
                 )
                 if ($ready.Success) {
                     $state.status = "ready"
@@ -372,57 +376,14 @@ function Show-DemoStatus {
     if ($null -ne $automationProperty -and $null -ne $automationProperty.Value) {
         $automation = $automationProperty.Value
         "Automation: $($automation.state) owner=$($automation.owner)"
-        "Media reconciliation: cycles=$($automation.media_cycle_count) last=$($automation.media_last_success_at) failure=$($automation.media_last_failure_code)"
+        "Media reconciliation: cycles=$($automation.media_cycle_count) last=$($automation.media_last_success_at) failure=$($automation.media_last_failure_code) failure_at=$($automation.media_last_failure_at)"
         "Transcription enqueue: total=$($automation.transcription_operations_enqueued) failures=$($automation.transcription_enqueue_failures)"
-        "Program refresh: cycles=$($automation.program_refresh_count) last=$($automation.program_last_success_at) failure=$($automation.program_last_failure_code)"
+        "Program refresh: cycles=$($automation.program_refresh_count) last=$($automation.program_last_success_at) failure=$($automation.program_last_failure_code) failure_at=$($automation.program_last_failure_at)"
     }
-    "Devcon Program: current=$($payload.devcon.current) withdrawn=$($payload.devcon.withdrawn) status=$($payload.devcon.status) last=$($payload.devcon.last_successful_refresh)"
+    "Program: current=$($payload.devcon.current) withdrawn=$($payload.devcon.withdrawn) status=$($payload.devcon.status) last=$($payload.devcon.last_successful_refresh)"
+    "Program cached expectations: $($payload.devcon.cached_program_expectations)"
 }
 
-function Publish-Devcon {
-    Import-RequiredSecret "STAGEFLOW_API_SHARED_SECRET"
-    $apiKey = Get-ProcessOrUserValue "STAGEFLOW_DEMO_DEVCON_API_KEY"
-    if (-not [string]::IsNullOrWhiteSpace($apiKey)) {
-        $env:STAGEFLOW_DEMO_DEVCON_API_KEY = $apiKey
-    }
-    $preview = Invoke-DemoPython -Arguments @("publish-preview") -Capture |
-        ConvertFrom-Json
-    "DEVCON PUBLISH"
-    ""
-    "Event:"
-    $preview.event
-    ""
-    "Target session:"
-    $preview.target_session
-    ""
-    "Fields:"
-    @($preview.fields) | ForEach-Object { $_ }
-    ""
-    "Remote identity verified: $(if ($preview.remote_identity_verified) { 'YES' } else { 'NO' })"
-    "Package approved: $(if ($preview.package_approved) { 'YES' } else { 'NO' })"
-    "Credential available: $(if ($preview.credential_available) { 'YES' } else { 'NO' })"
-    if (-not $preview.credential_available) {
-        throw "required_secret_unavailable: STAGEFLOW_DEMO_DEVCON_API_KEY (presence only)"
-    }
-    $confirmed = $ConfirmHumanAuthority.IsPresent
-    if (-not $confirmed) {
-        $answer = Read-Host "Publish this StageFlow enrichment to Devcon? [y/N]"
-        $confirmed = $answer -in @("y", "Y", "yes", "YES", "Yes")
-    }
-    if (-not $confirmed) {
-        "Devcon publish cancelled; no PUT was sent."
-        return
-    }
-    $result = Invoke-DemoPython -Arguments @(
-        "publish", "--expected-digest", [string]$preview.candidate_digest, "--confirmed"
-    ) -Capture | ConvertFrom-Json
-    "Devcon write accepted: $(if ($result.write_accepted) { 'YES' } else { 'NO' })"
-    "Devcon durable Git persistence verified: $(if ($result.durable_persistence_verified) { 'YES' } else { 'NO' })"
-    "Devcon public API convergence: $([string]$result.public_api_state)"
-    "Devcon publication status: $([string]$result.publication_status)"
-}
-
-$configuration = $null
 try {
     if ($Action -eq "stop") {
         Stop-DemoStack
@@ -448,7 +409,7 @@ try {
                 }
                 finally { Pop-Location }
             }
-            "Demo diagnosis passed: config present, Demo database verified, CUDA inference available, Devcon GET available."
+            "Demo diagnosis passed: config present, Demo database verified, CUDA inference available, program source available."
         }
         "rehearsal-report" {
             Import-RequiredSecret "STAGEFLOW_API_SHARED_SECRET"
@@ -461,10 +422,8 @@ try {
             Invoke-DemoPython -Arguments @("rehearsal-report", "--output", $ReportPath) | Out-Null
             "Sanitized rehearsal report written."
         }
-        "publish-devcon" { Publish-Devcon }
     }
 }
 finally {
     $env:STAGEFLOW_API_SHARED_SECRET = $null
-    $env:STAGEFLOW_DEMO_DEVCON_API_KEY = $null
 }

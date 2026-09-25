@@ -104,12 +104,12 @@ re-enters the same flow from PostgreSQL plus a new bounded source reconciliation
 
 The Demo 2 Event Node implementation adds an optional, default-off lifespan coordinator
 for the existing `demo-single-stage` profile. When enabled, it runs the same bounded
-media cycle and Devcon Program GET reconciliation at configured cadences. A PostgreSQL
+media cycle and program-source reconciliation at configured cadences. A PostgreSQL
 session advisory lock keyed by deployment permits one owning coordinator; a second
 backend remains standby. The lock, process thread, and stop signal are runtime
 coordination only. PostgreSQL records, stable transcription Operation identity, and the
 existing deterministic policies remain authoritative. The coordinator has no Session,
-Moment, package, or publication command path, and Program refresh has no Devcon write
+Moment, package, or publication command path, and Program refresh has no external publication
 path.
 
 A registered asset with an existing deterministic `unresolved` association is reevaluated
