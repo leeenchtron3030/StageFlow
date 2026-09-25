@@ -133,7 +133,7 @@ or architecture document unless those documents are explicitly updated.
 | [NVENC render benchmark spike](nvenc-render-benchmark-spike.md) | Approved | StageFlow Validation / Backend | ADR-0029 recommended evidence step; ED-0073 |
 | [Demo 2 promotion closure and plan-status reconciliation](demo2-promotion-closure.md) | Completed - Green documentation reconciliation | StageFlow Demo Operations / Governance | ED-0071 closure; ED-0074 |
 | [Transcription distribution boundary](transcription-distribution-boundary.md) | Completed - Green documentation and guard | StageFlow Engineering / Security | ED-0066 option 3 selection; ED-0075 |
-| [Packaging Asset foundation](packaging-asset-foundation.md) | Approved | StageFlow Assembly / Backend | ADR-0030; delivery-sequence step 5; ED-0076 |
+| [Packaging Asset foundation](packaging-asset-foundation.md) | Completed - Green Packaging Asset foundation | StageFlow Assembly / Backend | ADR-0030; delivery-sequence step 5; ED-0076 |
 | [Native FFmpeg render benchmark](native-ffmpeg-render-benchmark.md) | Approved | StageFlow Validation / Backend | ED-0073 follow-up; ADR-0029; ED-0078 |
 | [Provider-neutral program source](provider-neutral-program-source.md) | Approved | StageFlow Integration / Backend | ADR-0031; ED-0079 |
 | [White-label presentation pass](white-label-presentation-pass.md) | Approved - sequenced after ED-0079 | StageFlow Frontend / Operations | ADR-0031; ED-0080 |

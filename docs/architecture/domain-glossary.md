@@ -128,6 +128,25 @@ authorized by this document.
 - **Example:** A finalized recording segment registered after sufficient resource
   observations support `safe_to_read`.
 
+### Packaging Asset
+
+- **Definition:** An Assembly-owned stable identity for curated packaging content scoped
+  to a Business Event and optionally one of its Stages, with a name and role:
+  `opening_bumper`, `title_card`, `sponsor_card`, or `outro`.
+- **Distinction:** A Completed Media Asset proves production-media completion/readiness;
+  a Packaging Asset records human curation and applicability. Neither implies the other.
+- **Revision and approval:** `PackagingAssetRevision` is immutable and numbered per asset.
+  It references either external content (opaque key, SHA-256, byte size, declared media
+  type) or an existing Completed Media Asset ID, with optional measured duration and
+  aware effective interval. `PackagingAssetApprovalDecision` appends an attributable
+  approve/reject/revoke decision targeting exactly one revision. Approval state is derived
+  per revision and never inherited by another revision.
+- **Migration:** ADR-0030 and ED-0076 implement this boundary in `contexts/assembly/`
+  and additive migration `0012`. Paths are not accepted as identity. Track applicability
+  and Session Assembly remain deferred; `contexts/packaging/` stays reserved for delivery.
+- **Example:** A sponsor card's second content revision starts unreviewed even when its
+  first revision was approved.
+
 ### Media Timing Evidence
 
 - **Definition:** An immutable, durable, asset-linked revision containing sanitized
@@ -303,7 +322,6 @@ authorized by this document.
 | Job / Durable Operation / Task | ADR-0025 and migration 0007 implement the internal `Durable Operation`/Attempt/Worker schema for transcription | Public API aliases and any generalized operation kinds remain unresolved |
 | Post-Kernel Session evolution | Human Session realization and reassignment are implemented | Automated realization, merge, and split policy |
 | Package and publication milestones | Distinct milestones are accepted | Aggregate names and detailed state machines remain deferred |
-| Packaging Asset / Event Asset | Session Assembly needs reusable approved presentation media distinct from package correctness | Aggregate name/owner and whether content composes a Completed Media Asset or a separate manifest |
 | Session Transcript composition | Transcript Evidence Revision is the implemented internal asset-scoped evidence aggregate; the foundational Session Transcript is a later cross-asset product concept | Accept correction/stitching policy, public naming, and relationship to asset-scoped evidence revisions |
 | Wall-Clock Transcript Alignment | MTE can derive advisory wall-clock intervals from immutable asset-relative transcript offsets | Accept aggregate name/owner and authorized consumers; automatic Session/media authority remains prohibited |
 | Automation Policy / Approval Policy | Evidence -> Policy -> Authority and per-decision activation are proposed in ADR-0026 | Acceptance, public term, scope storage, and activation authority |

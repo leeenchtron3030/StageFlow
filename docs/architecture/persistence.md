@@ -76,6 +76,25 @@ Editorial Clips created only by approval. Current review state and the bounded
 Event-scoped queue derive from decision history; no Session, package, render, export, or
 publishing state is added.
 
+`0012_packaging_asset_foundation` adds only Assembly-owned Packaging Asset identities,
+immutable content revisions, append-only human approval decisions, and command receipts.
+It reuses the canonical human-command digest mechanism with a capability-local receipt
+table, as existing command-kind constraints remain unchanged. Registration/revision/
+approval receipts and results commit atomically; exact replay returns the original
+immutable result even after later activity. A per-asset row lock serializes revision
+numbering and decision ordering; stale expected revisions fail explicitly. Revision and
+decision tables additionally reject updates/deletes with append-only triggers.
+
+Event and optional Stage foreign keys enforce applicability; a Completed Media Asset
+reference must exist at write time. External content uses an opaque alphanumeric/hyphen/
+underscore key, lowercase SHA-256, byte size, and declared media type; no path or media
+blob is accepted or persisted. Effective endpoints are optional aware timestamps and,
+when both are supplied, form a nonempty interval. Future resolvability is ED-0077's concern.
+Bounded Event-scoped asset and revision pages use batch SQL with a repeatable-read snapshot,
+counts and explicit continuation/truncation. Approval derives from the latest append
+sequence for each revision, independent of decision clock ordering. The in-memory
+implementation is a non-durable test repository, never a runtime fallback.
+
 Registration is at least once and idempotent. It does not claim exactly-once delivery.
 Only a newly created ingress record is eligible for the included dispatcher path; an
 exact replay does not repeat that caller-visible dispatch path. The asset-registration
@@ -105,7 +124,10 @@ table. `0002_event_mode_kernel_forward.sql`, `0003_kernel_projections_forward.sq
 `0007_transcription_worker_forward.sql` adds the bounded first Work Execution and
 Transcript Evidence objects. `0008` adds the Demo declaration base, `0009` adds Program
 Expectation reconciliation, `0010` adds Editorial location history, and `0011` adds
-Editorial review and Clip history. Reversal removes `0011` before `0010`, then removes
+Editorial review and Clip history. `0012` adds Packaging Asset identity, revision,
+approval, and command-receipt tables. Reversal drops `0012` and its own receipts before
+`0011`, without modifying earlier tables or lineage. Reversal removes `0011` before `0010`,
+then removes
 `0010` before its `0008` dependency, followed by `0009`, `0008`, `0007`, `0006`,
 `0005`, `0004`, `0003`, then `0002` and their ledger rows while preserving ingress and the shared
 schema. The `0005` reverse removes only membership tagged as its legacy reconstruction

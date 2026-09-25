@@ -2,7 +2,9 @@
 
 ## Status
 
-Approved
+Completed (2026-09-24). Focused and real-PostgreSQL validation passed in the sandbox; the
+owner's full-suite host validation passed (see the addendum at the end). This is not a
+production-event-readiness claim.
 
 ## Execution authority
 
@@ -84,6 +86,30 @@ build on them:
    revision that references a Completed Media Asset records the reference only.
    Resolvability and staleness of that reference are validated by Assembly (ED-0077),
    which is where ADR-0030 placed those semantics.
+
+Implementation details recorded during ED-0076:
+
+- Registration creates identity without content (current revision count zero). Revision
+  commands append the next number with an expected-current-revision guard. Approval
+  commands name both the target revision and expected current revision, permitting a
+  fresh human decision to revoke an older revision without changing newer approval state.
+- External content keys are opaque ASCII alphanumeric/hyphen/underscore tokens, 1–200
+  characters, starting with an alphanumeric character; path, URI, extension, and escape
+  syntax are rejected. Optional effective endpoints may be open-ended; when both are
+  supplied, the end must be later than the start. Numeric facts fit signed PostgreSQL
+  `bigint`. No file is opened, uploaded, or inspected.
+- The canonical Editorial human-command digest helper is extracted unchanged into
+  `app/shared/human_commands.py`. Migration `0012` owns a separate command-receipt table,
+  following ED-0072's capability-local replay approach without widening the existing
+  Kernel command-kind constraint. Receipts and immutable results commit together.
+- Event-scoped assets and per-asset revision summaries have separate keyset pages
+  (limits 1–100), total counts, continuation positions, and explicit API truncation.
+  Revision summaries include the latest decision and a full decision count; current
+  approval state derives from all decisions, never a truncated history subset.
+- PostgreSQL serializes appends with the asset row lock and uses repeatable-read
+  transactions for bounded batch projections. Database triggers protect revision and
+  decision rows from accidental updates/deletes. Runtime composition uses PostgreSQL
+  only; the in-memory repository is explicitly non-durable and intended for tests.
 
 ## In scope
 
@@ -188,21 +214,21 @@ paths or actor secrets.
 
 ## Acceptance criteria
 
-- [ ] A new `assembly` bounded context holds the Packaging Asset contracts, repository
+- [x] A new `assembly` bounded context holds the Packaging Asset contracts, repository
   port, and service; the reserved `packaging` context is untouched.
-- [ ] `PackagingAssetRevision` is immutable and numbered per asset; content references are
+- [x] `PackagingAssetRevision` is immutable and numbered per asset; content references are
   either `external_content` (key, SHA-256, size, media type) or `completed_media_asset`.
-- [ ] No filesystem path is stored, accepted, or used as identity.
-- [ ] `PackagingAssetApprovalDecision` is append-only, targets exactly one revision, and
+- [x] No filesystem path is stored, accepted, or used as identity.
+- [x] `PackagingAssetApprovalDecision` is append-only, targets exactly one revision, and
   supports `approve`, `reject`, and `revoke`.
-- [ ] Approval state is derived per revision; approving one revision never approves
+- [x] Approval state is derived per revision; approving one revision never approves
   another.
-- [ ] Stale-revision commands are rejected explicitly; replay is idempotent.
-- [ ] Migration `0012` is additive, reverses cleanly, and reverses before `0011`.
-- [ ] New routes sit behind the existing ED-0055 shared-secret dependency.
-- [ ] Domain glossary distinguishes Packaging Asset from Completed Media Asset.
-- [ ] Full backend suite, Ruff, and Pyright pass, apart from known environmental failures.
-- [ ] No Assembly template/proposal/revision, rendering, track, automatic approval, or
+- [x] Stale-revision commands are rejected explicitly; replay is idempotent.
+- [x] Migration `0012` is additive, reverses cleanly, and reverses before `0011`.
+- [x] New routes sit behind the existing ED-0055 shared-secret dependency.
+- [x] Domain glossary distinguishes Packaging Asset from Completed Media Asset.
+- [x] Full backend suite, Ruff, and Pyright pass, apart from known environmental failures.
+- [x] No Assembly template/proposal/revision, rendering, track, automatic approval, or
   Completed Media Asset/Session/package change is introduced.
 
 ## Rollback or reversal
@@ -217,4 +243,93 @@ router, and tests. No existing behavior depends on it.
 
 ## Completion record
 
-_(To be filled in by whoever implements this plan.)_
+Implemented under ED-0076 as Green autonomous work on
+`codex/ed-0076-packaging-asset-foundation`, left uncommitted for owner review.
+
+### Delivered
+
+- New Assembly contracts, synchronous service, repository port, and thread-safe in-memory
+  test implementation; PostgreSQL remains the only composed runtime authority.
+- Stable Event/optional Stage identity, both content-reference kinds, immutable per-asset
+  revisions, attributable append-only approve/reject/revoke decisions, and per-revision
+  derived approval state. Content changes and human approval remain separate meanings.
+- Atomic capability-local command receipts using the extracted, unchanged canonical
+  human-command digest helper; exact delayed replay, conflicting replay, stale revision
+  rejection, and serialized concurrent appends.
+- Additive migration `0012` with four new tables, indexes, append-only triggers, explicit
+  reversal before `0011`, migration-runner registration, and bootstrap schema check.
+- Authenticated `/api/v1/assembly` commands and bounded Event-scoped asset/revision pages.
+- Glossary, persistence, capability-layer, ADR implementation index, directive index,
+  and plan-index updates. No dependency, existing schema/table, runtime configuration
+  file, frontend, reserved Packaging context, or Runtime asset assembly plan changes.
+  Production code and bootstrap composition changed; the new schema/migration is additive.
+
+### Validation actually run
+
+All commands ran in `C:/Dev/StageFlow-codex`; backend commands used `backend/.venv`
+via `uv run --no-sync`. Final results:
+
+| Command | Result |
+| --- | --- |
+| `uv run --no-sync pytest tests/test_packaging_asset_foundation.py -p no:cacheprovider --tb=short` | 33 passed, 0 failed, 0 skipped; 1 existing Starlette/httpx deprecation warning |
+| `uv run --no-sync pytest -p no:cacheprovider --tb=line -r s` | 1,725 passed, 0 test assertion failures, 1 skipped, 136 setup errors, 1 warning; not a green full-suite result |
+| `uv run --no-sync ruff check . --no-cache` | All checks passed |
+| `uv run --no-sync pyright` | 0 errors, 0 warnings, 0 informations; tool printed an available-version notice |
+| `git diff --check` | Passed |
+| `git diff` and `git diff --no-index -- NUL <new-file>` | Complete tracked/new-file diff reviewed; all changes belong to ED-0076 |
+
+The focused PostgreSQL test actually ran against the supplied isolated test DSN. It
+proved persistence and service reconstruction, original-result replay after newer state,
+conflicting replay, concurrent revision serialization, both content-reference kinds,
+unknown Completed Media Asset rejection, approval-history preservation, source-asset
+preservation, bounded revision projection, and migration reverse/reapply. Earlier
+implementation-time testing found the shared command-kind constraint rejected new kinds;
+the final implementation uses its own additive receipt table, with no existing constraint
+change. Subsequent focused runs passed (30, then 32, then final 33 cases).
+
+The full-suite setup errors were `PermissionError [WinError 5]` accessing
+`.codex-tmp/pytest-of-jmsln`. A prior full run reported 1,724 passed, 1 skipped, and
+136 setup errors before the final additional text-validation test. A retry using
+`--basetemp=C:/Dev/StageFlow-codex/.codex-tmp/ed0076-full-20260924-a` also encountered
+permission errors and terminated during teardown without a final summary. No test
+controls or filesystem permissions were changed to bypass this sandbox limitation.
+The four known parametrized turnover checkpoint tests also errored at setup; their
+em-dash assertions were not reached, so no pass/fail claim is made for those assertions.
+The single full-suite skip is the POSIX descriptor-bound `scandir` test on Windows.
+
+Process-local environment adjustments: cleared inherited `STAGEFLOW_API_SHARED_SECRET`
+for every pytest process so the synthetic test fixture could supply its value; set
+`TMP` and `TEMP` to the requested workspace `.codex-tmp`; redirected `UV_CACHE_DIR`
+to `.codex-tmp/uv-cache` after the system uv cache was denied; cleared inherited
+`VIRTUAL_ENV` so it could not refer to the owner's other worktree; disabled Python
+bytecode and pytest/Ruff cache output for validation. Temporary output is ignored locally
+inside `.codex-tmp` and retained for owner cleanup, as requested. No dependency install,
+frontend check, git metadata write, commit, push, merge, or PR action ran.
+
+### Review and remaining qualification
+
+A deliberate self-review covered every changed/new file. Independent Codex review
+identified a signed-bigint input/storage mismatch; matching domain/API bounds and
+behavioral regression tests fixed it, and independent follow-up confirmed no remaining
+correctness blockers. Self-review also added NUL text validation before PostgreSQL writes.
+
+All implementation criteria are delivered. The validation criterion is qualified by the
+explicit environmental exception above: the full suite is **not claimed to pass**.
+Owner full-suite verification outside the sandbox remains required. No Yellow/Red
+architecture decision appeared. Track applicability and Completed Media Asset lifecycle
+validation remain deliberately deferred to their approved future scopes.
+
+### Owner validation addendum (2026-09-24)
+
+The owner re-ran the full backend suite on the host, outside the sandbox, with the
+inherited `STAGEFLOW_API_SHARED_SECRET` and `VIRTUAL_ENV` cleared and `uv run --no-sync`:
+**1,856 passed, 4 failed, 2 skipped.** The 4 failures are the known Windows
+console-encoding cases in
+`test_validation_controller.py::test_turnover_boundaries_emit_exact_live_operation_checkpoints`,
+pre-existing and unrelated. Ruff and Pyright were clean. The sandbox temporary-directory
+errors recorded above do not occur on the host. Owner review also confirmed: no
+`UPDATE`/`DELETE` on revision or decision tables; the reserved `packaging` context and
+`runtime_asset_assembly_plan` are untouched; migration `0012` alters no existing table
+(its composite Stage/Event foreign key uses the unique constraint created in `0002`); and
+the shared `human_command_digest` extraction is behaviour-preserving for the editorial
+context.

@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import hashlib
-import json
 from datetime import UTC
 
+from app.shared.human_commands import human_command_digest as _human_command_digest
 from app.shared.ids import EntityId
 from app.shared.time import Clock
 
@@ -19,15 +18,6 @@ from .contracts import (
     ReviewEditorialMoment,
 )
 from .repository import EditorialMomentRepository
-
-
-def _human_command_digest(document: dict[str, object]) -> str:
-    serialized = json.dumps(
-        document,
-        sort_keys=True,
-        separators=(',', ':'),
-    )
-    return hashlib.sha256(serialized.encode('utf-8')).hexdigest()
 
 
 class EditorialMomentService:
