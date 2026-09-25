@@ -12,6 +12,10 @@ dependencies = [
 ]
 
 [dependency-groups]
+# ED-0075: licensing decision — exclude this optional operator-installed group from
+# every distributable StageFlow artifact due to the confirmed PyAV/FFmpeg GPL exposure.
+# See ../docs/security/dependency-license-sbom-2026-08-21.md (option 3).
+# This defers the licensing question; it is not legal clearance.
 transcription = [
   "ctranslate2==4.8.1",
   "faster-whisper==1.2.1",

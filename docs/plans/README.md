@@ -132,4 +132,4 @@ or architecture document unless those documents are explicitly updated.
 | [Editorial review foundation](editorial-review-foundation.md) | Completed | StageFlow Editorial / Backend | Post-Kernel delivery sequence step 2; ED-0072 |
 | [NVENC render benchmark spike](nvenc-render-benchmark-spike.md) | Approved | StageFlow Validation / Backend | ADR-0029 recommended evidence step; ED-0073 |
 | [Demo 2 promotion closure and plan-status reconciliation](demo2-promotion-closure.md) | Completed - Green documentation reconciliation | StageFlow Demo Operations / Governance | ED-0071 closure; ED-0074 |
-| [Transcription distribution boundary](transcription-distribution-boundary.md) | Approved | StageFlow Engineering / Security | ED-0066 option 3 selection; ED-0075 |
+| [Transcription distribution boundary](transcription-distribution-boundary.md) | Completed - Green documentation and guard; full-suite validation environment-limited | StageFlow Engineering / Security | ED-0066 option 3 selection; ED-0075 |

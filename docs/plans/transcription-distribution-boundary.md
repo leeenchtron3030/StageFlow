@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved
+Completed — Green documentation and guard; full-suite validation environment-limited.
 
 ## Execution authority
 
@@ -132,17 +132,18 @@ Not applicable.
 
 ## Acceptance criteria
 
-- [ ] `backend/pyproject.toml` records the licensing rationale beside the `transcription`
+- [x] `backend/pyproject.toml` records the licensing rationale beside the `transcription`
   group without changing any dependency.
-- [ ] `backend/README.md` and root `README.md` document local transcription as an
+- [x] `backend/README.md` and root `README.md` document local transcription as an
   operator-installed optional capability and say why.
-- [ ] `AGENTS.md` records the constraint where dependency guidance already lives.
-- [ ] A bounded check or documented release-checklist item asserts `transcription` remains
+- [x] `AGENTS.md` records the constraint where dependency guidance already lives.
+- [x] A bounded check or documented release-checklist item asserts `transcription` remains
   a non-default group.
-- [ ] The documentation states plainly that this defers rather than resolves the licensing
+- [x] The documentation states plainly that this defers rather than resolves the licensing
   question and is not legal clearance.
-- [ ] No dependency, lockfile, resolution, or execution behavior changed.
+- [x] No dependency, lockfile, resolution, or execution behavior changed.
 - [ ] Full backend suite, Ruff, and Pyright pass.
+  Ruff and Pyright pass; full-suite limitations are recorded below without claiming success.
 
 ## Rollback or reversal
 
@@ -150,9 +151,62 @@ Documentation and one check; directly revertible with no dependency or runtime e
 
 ## Open questions
 
-- Does the owner want the same note surfaced in `CONTRIBUTING.md`, or is `AGENTS.md` plus
-  the READMEs sufficient reach?
+- Resolved by the owner's ED-0075 execution directive: `AGENTS.md` and the two READMEs
+  are sufficient; leave `CONTRIBUTING.md` unchanged. No implementation decision remains open.
 
 ## Completion record
 
-_(To be filled in by whoever implements this plan.)_
+Implemented 2026-09-24 on `codex/ed-0075-transcription-distribution-boundary`, as
+uncommitted changes over `543d1c8` for owner review and commit.
+
+- Added the licensing comment in `backend/pyproject.toml`, installation guidance in
+  `backend/README.md` and root `README.md`, and the dependency constraint in `AGENTS.md`.
+- Added `backend/tests/test_transcription_distribution_boundary.py`: one `tomllib` guard
+  checks group declaration, explicit and all-group defaults, included default groups,
+  and direct promotion of transcription packages (including PyAV) into default dependencies.
+- Cross-linked the SBOM decision section and updated this plan and the ED-0075 rows in
+  `ENGINEERING_DIRECTIVES.md` and `docs/plans/README.md`.
+- No production code, dependency declarations, lockfiles, resolution, installed packages,
+  schemas, migrations, runtime configuration, or execution behavior changed.
+  `CONTRIBUTING.md` remains unchanged. No legal interpretation or clearance is supplied.
+
+Validation (from `backend/` unless noted; no installation or synchronization ran):
+
+| Command | Observed result |
+| --- | --- |
+| `uv run --no-sync pytest -p no:cacheprovider tests/test_transcription_distribution_boundary.py` | First attempt: shared uv cache access denied; retry with worktree cache: 1 passed, 0 failed, 0 skipped |
+| `uv run --no-sync pytest -p no:cacheprovider` | 1686 passed, 6 failed, 1 skipped, 136 errors, 1 warning |
+| `uv run --no-sync pytest -p no:cacheprovider --basetemp=.ed0075-pytest-temp --tb=short -ra` | Reached 100%, then temp-directory cleanup raised access denied before a summary |
+| `uv run --no-sync pytest -p no:cacheprovider --basetemp=.ed0075-diagnostic-temp --tb=short -x` | One pass and one setup error reported, then the same cleanup exception; no final summary |
+| `uv run --no-sync pytest -p no:cacheprovider --tb=line -ra` | Inherited API secret cleared for this process: 1691 passed, 1 failed, 1 skipped, 136 errors, 1 warning |
+| `uv run --no-sync pytest -p no:cacheprovider tests/test_devcon_session_publish.py::test_devcon_no_body_response_maps_to_bounded_reason_without_retry --tb=short` | Isolated retry of remaining failure: 1 passed, 0 failed, 0 skipped |
+| `uv run --no-sync ruff check --no-cache .` | All checks passed |
+| `uv run --no-sync pyright` | 0 errors, 0 warnings, 0 informations; newer-version notice |
+| Inline Python comparison of parsed current `pyproject.toml` with `git show HEAD:backend/pyproject.toml` (root) | Equal; configuration unchanged |
+| `git diff`, new-test inspection, and `git diff --check` (root) | Deliberate scope/self-review; no whitespace errors (Git line-ending notices only) |
+
+Environment and remaining validation limits:
+
+- `PYTHONDONTWRITEBYTECODE=1` and disabled pytest/Ruff caches avoided additional test caches.
+  `UV_CACHE_DIR` was redirected to `backend/.ed0075-uv-cache` after the default cache
+  access denial. The inherited `VIRTUAL_ENV` pointed outside this worktree; uv ignored it
+  on the focused run, and it was cleared for subsequent processes. That environment was
+  never targeted. The API secret was cleared only in the final suite/retry processes.
+- All 136 final setup errors were `WinError 5` on pytest's temporary directory. An explicit
+  worktree `--basetemp` also produced inaccessible directories. These are environmental,
+  not caused by the dependency comment or configuration guard.
+- The four known turnover checkpoint cases errored during temporary-directory setup;
+  their em-dash assertions were not reached. They were not investigated or changed.
+- The remaining Devcon assertion failure passed in isolation; it is recorded as an
+  unrelated intermittent failure, not a resolved defect or a passing full suite.
+- The single skip is the POSIX descriptor-bound `scandir` case. The warning is the
+  existing Starlette/httpx deprecation. Frontend checks were intentionally not run.
+- Windows denied access to and cleanup of `backend/.ed0075-pytest-temp` and
+  `backend/.ed0075-diagnostic-temp`, including scoped ACL-reset and non-recursive delete
+  attempts. These temporary directories require owner cleanup outside this sandbox;
+  Git reports permission warnings for them. No safety or test control was disabled.
+
+No architecture decision remains open for this directive. The licensing question remains
+deferred. Rollback is removal of these documentation/comment/test changes, with no data
+or runtime reversal. A full-suite run in an environment with usable temporary-directory
+permissions remains outstanding; this record does not claim event readiness.

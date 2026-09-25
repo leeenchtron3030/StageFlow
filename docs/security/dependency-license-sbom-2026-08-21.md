@@ -129,6 +129,14 @@ wheel at all — only an explicit `--group transcription` or `--all-groups` does
 accepted decision therefore requires documenting and guarding the existing boundary rather
 than restructuring dependencies. ED-0075 implements it.
 
+The ED-0075 distribution constraint is documented in the
+[root installation guidance](../../README.md),
+[backend Local Setup](../../backend/README.md#local-setup), and
+[agent dependency guidance](../../AGENTS.md#data-compatibility-and-dependencies).
+The bounded configuration guard and validation are recorded in the
+[implementation plan](../plans/transcription-distribution-boundary.md).
+This exclusion defers rather than resolves the licensing question and is not legal clearance.
+
 Option 1 (own an auditable LGPL-only build) remains the recommended answer for the first
 genuinely distributed artifact, and is recorded as the intended future direction rather
 than a rejected alternative. Option 2 remains available only after counsel review.
