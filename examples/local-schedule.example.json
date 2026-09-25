@@ -1,0 +1,14 @@
+{
+  "schema_version": "1.0",
+  "event_key": "example-event",
+  "sessions": [
+    {
+      "session_key": "opening-discussion",
+      "title": "Opening discussion",
+      "speakers": ["Example Speaker"],
+      "stage_key": "main",
+      "planned_start": "2026-09-24T12:00:00Z",
+      "planned_end": "2026-09-24T12:30:00Z"
+    }
+  ]
+}

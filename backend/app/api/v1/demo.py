@@ -20,6 +20,7 @@ from app.contexts.editorial import (
     EditorialMomentStorageUnavailableError,
 )
 from app.contexts.events import ProgramExpectationReconciliation
+from app.contexts.integration.program_source import ProgramSourceUnavailableError
 from app.contexts.production.event_mode_kernel import (
     KernelConflictError,
     KernelNotFoundError,
@@ -37,7 +38,6 @@ from app.demo.service import (
     ProcessTranscriptionRequest,
     ProcessTranscriptionResult,
 )
-from app.infrastructure.devcon import DevconReadError
 from app.infrastructure.postgres import PostgresWorkExecutionRepository
 from app.shared.ids import EntityId
 
@@ -348,8 +348,8 @@ def refresh_program(request: Request, response: Response) -> ProgramRefreshRespo
     response.headers["Pragma"] = "no-cache"
     components = _components(request)
     try:
-        return _program_refresh_response(components.sync_devcon_program())
-    except (DevconReadError, KernelStorageUnavailableError) as exc:
+        return _program_refresh_response(components.sync_program())
+    except (ProgramSourceUnavailableError, KernelStorageUnavailableError) as exc:
         raise HTTPException(
             status_code=503,
             detail="program_refresh_failed_using_last_successful_snapshot",

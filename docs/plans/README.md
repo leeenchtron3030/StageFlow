@@ -136,5 +136,5 @@ or architecture document unless those documents are explicitly updated.
 | [Packaging Asset foundation](packaging-asset-foundation.md) | Completed - Green Packaging Asset foundation | StageFlow Assembly / Backend | ADR-0030; delivery-sequence step 5; ED-0076 |
 | [Session Assembly foundation](session-assembly-foundation.md) | Approved | StageFlow Assembly / Backend | Delivery-sequence step 5; ADR-0030; ED-0077 |
 | [Native FFmpeg render benchmark](native-ffmpeg-render-benchmark.md) | Approved | StageFlow Validation / Backend | ED-0073 follow-up; ADR-0029; ED-0078 |
-| [Provider-neutral program source](provider-neutral-program-source.md) | Approved | StageFlow Integration / Backend | ADR-0031; ED-0079 |
+| [Provider-neutral program source](provider-neutral-program-source.md) | Completed; sandbox validation limitations recorded | StageFlow Integration / Backend | ADR-0031; ED-0079 |
 | [White-label presentation pass](white-label-presentation-pass.md) | Approved - sequenced after ED-0079 | StageFlow Frontend / Operations | ADR-0031; ED-0080 |

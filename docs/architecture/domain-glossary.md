@@ -31,7 +31,8 @@ authorized by this document.
   but absent from that successful snapshot. Withdrawn records remain durable external
   evidence and cannot be selected for new Session realization; linked realized Sessions
   remain unchanged.
-- **Scope limit:** Demo reconciliation is currently one Devcon Event/room to one Stage.
+- **Scope limit:** Demo reconciliation is one configured program source to one Stage.
+  ED-0079 supports an offline local schedule file and the optional Devcon adapter.
   A future multi-Stage design must distinguish removal from the Business Event from a
   move to another room before broadening reconciliation.
 - **Current aliases/legacy names:** `ScheduledActivity` is the existing schedule-adapter
@@ -41,6 +42,21 @@ authorized by this document.
   import or linkage as Session creation.
 - **Example:** A program expects a keynote on Main Stage from 10:00 to 10:45; observation
   later determines whether, where, and when a Session actually occurred.
+
+### Program Schedule Source
+
+- **Definition:** The provider-neutral `ProgramScheduleSource` port synchronizes one
+  Stage's complete planned program, probes availability, and reads the durable cache.
+- **Implementations:** `local_file` is the offline development/rehearsal default choice;
+  `devcon` remains an optional provider. Results carry this provider attribution.
+- **Distinction:** File input and external API input remain External Program Expectations;
+  neither creates a realized Session nor changes its authoritative boundaries.
+- **Compatibility:** Neutral `external_session_id`, `external_event_id`, and
+  `external_room_id` references take precedence over persisted `devcon_*` equivalents.
+  The fallback is removable only when all writers use neutral keys and retained current
+  and historical records no longer depend on the legacy keys. No history is rewritten.
+- **Composition aliases:** `devcon_program_sync` and `sync_devcon_program()` alias
+  `program_source` and `sync_program()` until the Demo 2 branch no longer calls them.
 
 ### Production Event
 
