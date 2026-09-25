@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 import re
+import shutil
+import subprocess
 from pathlib import Path
+
+import pytest
 
 ROOT = Path(__file__).parents[2]
 CONTROLLER = ROOT / "scripts" / "demo" / "StageFlow-Demo.ps1"
@@ -140,3 +144,30 @@ def test_status_surfaces_bounded_autonomy_program_and_worker_currentness() -> No
     assert 'gpu_transcription=$($payload.worker.gpu_transcription)' in source
     assert 'failure_at=$($automation.media_last_failure_at)' in source
     assert 'failure_at=$($automation.program_last_failure_at)' in source
+
+
+@pytest.mark.skipif(
+    shutil.which("powershell.exe") is None,
+    reason="Windows PowerShell 5.1 is only available on Windows hosts",
+)
+def test_launcher_refuses_windows_powershell_with_version_error() -> None:
+    result = subprocess.run(
+        [
+            "powershell.exe",
+            "-NoProfile",
+            "-NonInteractive",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(LAUNCHER),
+            "-ConfigPath",
+            "unused.toml",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+    )
+    assert result.returncode != 0
+    assert "7.3" in result.stderr
+    assert "Start-StageFlowDemo.ps1" in result.stderr

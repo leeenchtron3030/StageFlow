@@ -4,6 +4,10 @@ Use `StageFlow-Demo.ps1` for the local Demo rehearsal. It is a thin operator
 controller around the existing Python Demo CLI, loopback APIs, and
 `Start-StageFlowDemo.ps1`; it does not implement alternate application behavior.
 
+Run the controller from PowerShell 7.3 or later (`pwsh`). `start` launches the stack
+under the same PowerShell host, and the launcher requires 7.3+; under Windows PowerShell
+5.1 it stops immediately with a version error.
+
 ## One-time external configuration
 
 The controller never prints these values. It reads Process scope first and Windows User
