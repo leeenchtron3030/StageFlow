@@ -409,7 +409,7 @@ def test_migration_runner_orders_0012_before_0011(monkeypatch: pytest.MonkeyPatc
         executed.append(version)
     monkeypatch.setattr(PostgresMigrationRunner, "_execute_if_present", record)
     PostgresMigrationRunner("unused").reverse_editorial_review_foundation_v1()
-    assert executed == ["0014_assembly_metadata_overrides",
+    assert executed == ["0015_render_durable_operation", "0014_assembly_metadata_overrides",
                         "0013_session_assembly_foundation", "0012_packaging_asset_foundation",
                         "0011_editorial_review_foundation"]
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import replace
 from datetime import datetime, timedelta
-from typing import Any, cast
+from typing import Any, cast, overload
 
 import psycopg
 from psycopg.rows import dict_row
@@ -32,9 +32,11 @@ from app.contexts.work_execution import (
     OperationAttempt,
     OperationClaim,
     OperationFailure,
+    OperationInput,
     OperationStatus,
     OperationStatusCount,
     PendingOperation,
+    RenderOperationInput,
     TranscriptionOperationInput,
     Worker,
     WorkerCapability,
@@ -53,17 +55,45 @@ from app.shared.ids import EntityId
 Row = dict[str, Any]
 
 
-class PostgresWorkExecutionRepository(WorkExecutionRepository):
+class PostgresWorkExecutionRepository[
+    InputT: OperationInput = TranscriptionOperationInput
+](WorkExecutionRepository[InputT]):
     """PostgreSQL operation journal, worker registry, leases, and result commit."""
 
-    def __init__(self, dsn: str) -> None:
+    @overload
+    def __init__(
+        self: PostgresWorkExecutionRepository[TranscriptionOperationInput], dsn: str,
+    ) -> None: ...
+
+    @overload
+    def __init__(self, dsn: str, *, input_types: tuple[type[InputT], ...]) -> None: ...
+
+    def __init__(
+        self, dsn: str, *, input_types: tuple[type[OperationInput], ...] | None = None,
+    ) -> None:
+        if input_types is None:
+            input_types = (TranscriptionOperationInput,)
+        # The default preserves the existing transcription-only typed repository view.
+        # General callers explicitly opt into the closed union; workers may opt into one kind.
+        if not input_types or any(
+            value not in (TranscriptionOperationInput, RenderOperationInput)
+            for value in input_types
+        ):
+            raise ValueError("unsupported operation input type")
         self._dsn = dsn
+        self._input_types = input_types
+        self._operation_kinds = tuple(
+            "transcription" if value is TranscriptionOperationInput else "render"
+            for value in input_types
+        )
 
     def _connect(self) -> psycopg.Connection[Row]:
         return psycopg.Connection[Row].connect(self._dsn, row_factory=dict_row)
 
-    def enqueue(self, pending: PendingOperation) -> DurableOperation:
+    def enqueue(self, pending: PendingOperation[InputT]) -> DurableOperation[InputT]:
         request = pending.request
+        if not isinstance(request.input, self._input_types):
+            raise WorkExecutionConflictError("operation_kind_not_supported")
         try:
             with self._connect() as connection:
                 connection.execute(
@@ -78,7 +108,7 @@ class PostgresWorkExecutionRepository(WorkExecutionRepository):
                     "SELECT pg_advisory_xact_lock(hashtextextended(%s, 2))",
                     (request.operation_id.value,),
                 )
-                replay = connection.execute(
+                replays = connection.execute(
                     """
                     SELECT * FROM stageflow.work_operation
                     WHERE operation_id = %s OR idempotency_key = %s OR work_key = %s
@@ -89,8 +119,21 @@ class PostgresWorkExecutionRepository(WorkExecutionRepository):
                         request.idempotency_key,
                         pending.work_key,
                     ),
-                ).fetchone()
+                ).fetchall()
+                if len(replays) > 1:
+                    raise WorkExecutionConflictError("transcription_enqueue_identity_conflict")
+                replay = replays[0] if replays else None
                 if replay is not None:
+                    if (
+                        isinstance(request.input, RenderOperationInput)
+                        and replay["operation_kind"] == "render"
+                        and str(replay["work_key"]) == pending.work_key
+                        and str(replay["operation_id"]) != request.operation_id.value
+                        and replay["idempotency_key"] != request.idempotency_key
+                        and replay["deployment_id"] == request.deployment_id
+                        and _optional_entity(replay["event_id"]) == request.event_id
+                    ):
+                        return self._operation(replay, connection)
                     if (
                         str(replay["operation_id"]) != request.operation_id.value
                         or str(replay["idempotency_key"]) != request.idempotency_key
@@ -100,25 +143,26 @@ class PostgresWorkExecutionRepository(WorkExecutionRepository):
                         raise WorkExecutionConflictError(
                             "transcription_enqueue_identity_conflict"
                         )
-                    return _operation(replay)
+                    return self._operation(replay, connection)
 
-                asset = connection.execute(
-                    """
-                    SELECT manifest_id
-                    FROM stageflow.completed_media_asset_registry
-                    WHERE asset_id = %s
-                    FOR UPDATE
-                    """,
-                    (request.input.asset_id.value,),
-                ).fetchone()
-                if asset is None:
-                    raise WorkExecutionNotFoundError(
-                        "completed_media_asset_not_found"
-                    )
-                if str(asset["manifest_id"]) != request.input.manifest_id.value:
-                    raise WorkExecutionConflictError(
-                        "asset_manifest_identity_conflict"
-                    )
+                if isinstance(request.input, TranscriptionOperationInput):
+                    asset = connection.execute(
+                        """
+                        SELECT manifest_id
+                        FROM stageflow.completed_media_asset_registry
+                        WHERE asset_id = %s
+                        FOR UPDATE
+                        """,
+                        (request.input.asset_id.value,),
+                    ).fetchone()
+                    if asset is None:
+                        raise WorkExecutionNotFoundError(
+                            "completed_media_asset_not_found"
+                        )
+                    if str(asset["manifest_id"]) != request.input.manifest_id.value:
+                        raise WorkExecutionConflictError(
+                            "asset_manifest_identity_conflict"
+                        )
                 row = connection.execute(
                     """
                     INSERT INTO stageflow.work_operation (
@@ -132,7 +176,7 @@ class PostgresWorkExecutionRepository(WorkExecutionRepository):
                         operation_status, max_attempts, retry_delay_microseconds,
                         created_at, updated_at
                     ) VALUES (
-                        %s, 'transcription', 'v1', %s, %s, %s, %s, %s, %s,
+                        %s, %s, 'v1', %s, %s, %s, %s, %s, %s,
                         %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
                         'pending', %s, %s, %s, %s
                     )
@@ -140,17 +184,25 @@ class PostgresWorkExecutionRepository(WorkExecutionRepository):
                     """,
                     (
                         request.operation_id.value,
+                        request.input.kind,
                         request.deployment_id,
                         None if request.event_id is None else request.event_id.value,
-                        request.input.asset_id.value,
-                        request.input.manifest_id.value,
-                        request.input.manifest_version,
-                        request.input.asset_format,
+                        (request.input.asset_id.value
+                         if isinstance(request.input, TranscriptionOperationInput) else None),
+                        (request.input.manifest_id.value
+                         if isinstance(request.input, TranscriptionOperationInput) else None),
+                        (request.input.manifest_version
+                         if isinstance(request.input, TranscriptionOperationInput) else None),
+                        (request.input.asset_format
+                         if isinstance(request.input, TranscriptionOperationInput) else None),
                         request.input.execution_profile_id,
                         request.input.execution_profile_version,
-                        request.input.requested_language,
-                        request.input.request_word_timing,
-                        request.input.request_speaker_labels,
+                        (request.input.requested_language
+                         if isinstance(request.input, TranscriptionOperationInput) else None),
+                        (request.input.request_word_timing
+                         if isinstance(request.input, TranscriptionOperationInput) else False),
+                        (request.input.request_speaker_labels
+                         if isinstance(request.input, TranscriptionOperationInput) else False),
                         request.input.requires_cloud,
                         request.required_for_event,
                         request.idempotency_key,
@@ -165,11 +217,32 @@ class PostgresWorkExecutionRepository(WorkExecutionRepository):
                     ),
                 ).fetchone()
                 assert row is not None
-                return _operation(row)
+                if isinstance(request.input, RenderOperationInput):
+                    connection.execute(
+                        """
+                        INSERT INTO stageflow.render_operation_input (
+                            operation_id, assembly_revision_id, render_profile_id,
+                            render_profile_version, output_token
+                        ) VALUES (%s, %s, %s, %s, %s)
+                        """,
+                        (request.operation_id.value, request.input.assembly_revision_id.value,
+                         request.input.execution_profile_id,
+                         request.input.execution_profile_version,
+                         request.input.output_token),
+                    )
+                return self._operation(row, connection)
         except (psycopg.InterfaceError, psycopg.OperationalError) as exc:
             raise WorkExecutionStorageUnavailableError(
                 "postgresql_work_execution_unavailable"
             ) from exc
+
+    def _operation(
+        self, row: Mapping[str, object], connection: psycopg.Connection[Row],
+    ) -> DurableOperation[InputT]:
+        operation = _operation(row, connection)
+        if not isinstance(operation.input, self._input_types):
+            raise WorkExecutionNotFoundError("operation_kind_not_supported")
+        return cast(DurableOperation[InputT], operation)
 
     def register_worker(self, worker: Worker) -> Worker:
         try:
@@ -298,7 +371,8 @@ class PostgresWorkExecutionRepository(WorkExecutionRepository):
                         capability.execution_profile_id,
                         capability.execution_profile_version,
                         capability.locality.value,
-                        list(capability.accepted_asset_formats),
+                        (None if capability.accepted_asset_formats is None
+                         else list(capability.accepted_asset_formats)),
                         capability.supports_word_timing,
                         capability.supports_speaker_labels,
                         capability.provider_id,
@@ -372,7 +446,7 @@ class PostgresWorkExecutionRepository(WorkExecutionRepository):
                 "postgresql_work_execution_unavailable"
             ) from exc
 
-    def claim_next(self, request: ClaimRequest) -> OperationClaim | None:
+    def claim_next(self, request: ClaimRequest) -> OperationClaim[InputT] | None:
         try:
             with self._connect() as connection:
                 worker = connection.execute(
@@ -422,6 +496,8 @@ class PostgresWorkExecutionRepository(WorkExecutionRepository):
                     "worker_id": request.worker_id.value,
                     "deployment_id": str(worker["deployment_id"]),
                     "event_id": worker["event_id"],
+                    "operation_kind": request.operation_kind,
+                    "operation_kinds": list(self._operation_kinds),
                 }
                 connection.execute(
                     """
@@ -473,6 +549,9 @@ class PostgresWorkExecutionRepository(WorkExecutionRepository):
                     WHERE o.deployment_id = %(deployment_id)s
                       AND {event_condition}
                       AND o.operation_status = 'eligible'
+                      AND o.operation_kind = ANY(%(operation_kinds)s)
+                      AND (%(operation_kind)s::text IS NULL
+                           OR o.operation_kind = %(operation_kind)s)
                       AND (
                           NOT o.requires_cloud
                           OR %(network_permitted)s
@@ -493,8 +572,8 @@ class PostgresWorkExecutionRepository(WorkExecutionRepository):
                                 o.execution_profile_id
                             AND c.execution_profile_version =
                                 o.execution_profile_version
-                            AND o.asset_format =
-                                ANY(c.accepted_asset_formats)
+                            AND (o.operation_kind = 'render' OR o.asset_format =
+                                ANY(c.accepted_asset_formats))
                             AND (
                                 NOT o.request_word_timing
                                 OR c.supports_word_timing
@@ -579,7 +658,7 @@ class PostgresWorkExecutionRepository(WorkExecutionRepository):
                 ).fetchone()
                 assert attempt is not None and operation is not None
                 return OperationClaim(
-                    operation=_operation(operation),
+                    operation=self._operation(operation, connection),
                     attempt=_attempt(attempt),
                 )
         except (psycopg.InterfaceError, psycopg.OperationalError) as exc:
@@ -587,7 +666,7 @@ class PostgresWorkExecutionRepository(WorkExecutionRepository):
                 "postgresql_work_execution_unavailable"
             ) from exc
 
-    def mark_running(self, claim: OperationClaim) -> OperationClaim:
+    def mark_running(self, claim: OperationClaim[InputT]) -> OperationClaim[InputT]:
         return self._advance_active_claim(
             claim,
             operation_status=OperationStatus.RUNNING,
@@ -597,10 +676,10 @@ class PostgresWorkExecutionRepository(WorkExecutionRepository):
 
     def renew(
         self,
-        claim: OperationClaim,
+        claim: OperationClaim[InputT],
         *,
         lease_duration: timedelta,
-    ) -> OperationClaim:
+    ) -> OperationClaim[InputT]:
         return self._advance_active_claim(
             claim,
             operation_status=claim.operation.status,
@@ -610,12 +689,14 @@ class PostgresWorkExecutionRepository(WorkExecutionRepository):
 
     def _advance_active_claim(
         self,
-        claim: OperationClaim,
+        claim: OperationClaim[InputT],
         *,
         operation_status: OperationStatus,
         attempt_status: AttemptStatus,
         lease_duration: timedelta | None,
-    ) -> OperationClaim:
+    ) -> OperationClaim[InputT]:
+        if not isinstance(claim.operation.input, self._input_types):
+            raise WorkExecutionConflictError("operation_kind_not_supported")
         try:
             with self._connect() as connection:
                 operation_row = connection.execute(
@@ -674,7 +755,7 @@ class PostgresWorkExecutionRepository(WorkExecutionRepository):
                     ).fetchone()
                 assert attempt_row is not None and operation_row is not None
                 return OperationClaim(
-                    operation=_operation(operation_row),
+                    operation=self._operation(operation_row, connection),
                     attempt=_attempt(attempt_row),
                 )
         except (psycopg.InterfaceError, psycopg.OperationalError) as exc:
@@ -684,9 +765,11 @@ class PostgresWorkExecutionRepository(WorkExecutionRepository):
 
     def record_failure(
         self,
-        claim: OperationClaim,
+        claim: OperationClaim[InputT],
         failure: OperationFailure,
-    ) -> DurableOperation:
+    ) -> DurableOperation[InputT]:
+        if not isinstance(claim.operation.input, self._input_types):
+            raise WorkExecutionConflictError("operation_kind_not_supported")
         try:
             with self._connect() as connection:
                 row = connection.execute(
@@ -759,7 +842,7 @@ class PostgresWorkExecutionRepository(WorkExecutionRepository):
                     ),
                 ).fetchone()
                 assert updated is not None
-                return _operation(updated)
+                return self._operation(updated, connection)
         except (psycopg.InterfaceError, psycopg.OperationalError) as exc:
             raise WorkExecutionStorageUnavailableError(
                 "postgresql_work_execution_unavailable"
@@ -767,9 +850,13 @@ class PostgresWorkExecutionRepository(WorkExecutionRepository):
 
     def apply_transcript_result(
         self,
-        claim: OperationClaim,
+        claim: OperationClaim[InputT],
         pending: PendingTranscriptEvidence,
     ) -> TranscriptEvidenceRevision:
+        if not isinstance(claim.operation.input, TranscriptionOperationInput):
+            raise WorkExecutionConflictError("transcript_result_requires_transcription")
+        if not isinstance(claim.operation.input, self._input_types):
+            raise WorkExecutionConflictError("operation_kind_not_supported")
         try:
             with self._connect() as connection:
                 connection.execute(
@@ -1039,7 +1126,7 @@ class PostgresWorkExecutionRepository(WorkExecutionRepository):
         self,
         *,
         limit: int = 100,
-    ) -> tuple[DurableOperation, ...]:
+    ) -> tuple[DurableOperation[InputT], ...]:
         if not 1 <= limit <= 1000:
             raise ValueError("reconcile limit must be between 1 and 1000.")
         try:
@@ -1065,14 +1152,15 @@ class PostgresWorkExecutionRepository(WorkExecutionRepository):
                     SELECT o.*, statement_timestamp() AS database_now
                     FROM stageflow.work_operation o
                     WHERE operation_status IN ('leased', 'running', 'cancel_requested')
+                      AND operation_kind = ANY(%s)
                       AND lease_expires_at <= statement_timestamp()
                     ORDER BY lease_expires_at
                     FOR UPDATE SKIP LOCKED
                     LIMIT %s
                     """,
-                    (limit,),
+                    (list(self._operation_kinds), limit),
                 ).fetchall()
-                reconciled: list[DurableOperation] = []
+                reconciled: list[DurableOperation[InputT]] = []
                 for row in rows:
                     evidence = connection.execute(
                         """
@@ -1082,6 +1170,14 @@ class PostgresWorkExecutionRepository(WorkExecutionRepository):
                         """,
                         (str(row["operation_id"]),),
                     ).fetchone()
+                    rendered = None
+                    if row["operation_kind"] == "render":
+                        rendered = connection.execute(
+                            "SELECT output_id FROM stageflow.rendered_output "
+                            "WHERE operation_id = %s",
+                            (str(row["operation_id"]),),
+                        ).fetchone()
+                    has_result = evidence is not None or rendered is not None
                     attempt_id = row["current_attempt_id"]
                     if attempt_id is not None:
                         connection.execute(
@@ -1099,24 +1195,39 @@ class PostgresWorkExecutionRepository(WorkExecutionRepository):
                             (
                                 (
                                     AttemptOutcome.RESULT_RECONCILED.value
-                                    if evidence is not None
+                                    if has_result
                                     else AttemptOutcome.LEASE_LOST.value
                                 ),
-                                evidence is None,
+                                not has_result,
                                 (
                                     "result_reconciled"
-                                    if evidence is not None
+                                    if has_result
                                     else "lease_expired"
                                 ),
                                 (
                                     "durable result reconciled"
-                                    if evidence is not None
+                                    if has_result
                                     else "operation lease expired"
                                 ),
                                 str(attempt_id),
                             ),
                         )
-                    if evidence is not None:
+                    if rendered is not None:
+                        updated = connection.execute(
+                            """
+                            UPDATE stageflow.work_operation
+                            SET operation_status = 'succeeded', current_attempt_id = NULL,
+                                lease_owner_worker_id = NULL, lease_expires_at = NULL,
+                                terminal_result_type = 'rendered_output',
+                                terminal_result_rendered_output_id = %s,
+                                last_reason_code = 'result_reconciled',
+                                row_revision = row_revision + 1,
+                                updated_at = statement_timestamp()
+                            WHERE operation_id = %s RETURNING *
+                            """,
+                            (str(rendered["output_id"]), str(row["operation_id"])),
+                        ).fetchone()
+                    elif evidence is not None:
                         updated = connection.execute(
                             """
                             UPDATE stageflow.work_operation
@@ -1173,7 +1284,7 @@ class PostgresWorkExecutionRepository(WorkExecutionRepository):
                             ),
                         ).fetchone()
                     assert updated is not None
-                    reconciled.append(_operation(updated))
+                    reconciled.append(self._operation(updated, connection))
                 return tuple(reconciled)
         except (psycopg.InterfaceError, psycopg.OperationalError) as exc:
             raise WorkExecutionStorageUnavailableError(
@@ -1186,7 +1297,7 @@ class PostgresWorkExecutionRepository(WorkExecutionRepository):
         deployment_id: str,
         event_id: EntityId | None,
         limit: int = 100,
-    ) -> tuple[DurableOperation, ...]:
+    ) -> tuple[DurableOperation[OperationInput], ...]:
         if limit < 1 or limit > 500:
             raise ValueError("limit must be between 1 and 500")
         try:
@@ -1205,7 +1316,7 @@ class PostgresWorkExecutionRepository(WorkExecutionRepository):
                         limit,
                     ),
                 ).fetchall()
-                return tuple(_operation(row) for row in rows)
+                return tuple(_operation(row, connection) for row in rows)
         except (psycopg.InterfaceError, psycopg.OperationalError) as exc:
             raise WorkExecutionStorageUnavailableError(
                 "postgresql_work_execution_unavailable"
@@ -1243,7 +1354,7 @@ class PostgresWorkExecutionRepository(WorkExecutionRepository):
                 "postgresql_work_execution_unavailable"
             ) from exc
 
-    def get_operation(self, operation_id: EntityId) -> DurableOperation:
+    def get_operation(self, operation_id: EntityId) -> DurableOperation[InputT]:
         try:
             with self._connect() as connection:
                 row = connection.execute(
@@ -1255,7 +1366,7 @@ class PostgresWorkExecutionRepository(WorkExecutionRepository):
                 ).fetchone()
                 if row is None:
                     raise WorkExecutionNotFoundError("operation_not_found")
-                return _operation(row)
+                return self._operation(row, connection)
         except (psycopg.InterfaceError, psycopg.OperationalError) as exc:
             raise WorkExecutionStorageUnavailableError(
                 "postgresql_work_execution_unavailable"
@@ -1472,8 +1583,8 @@ class PostgresWorkExecutionRepository(WorkExecutionRepository):
                                     o.execution_profile_id
                                 AND c.execution_profile_version =
                                     o.execution_profile_version
-                                AND o.asset_format =
-                                    ANY(c.accepted_asset_formats)
+                                AND (o.operation_kind = 'render' OR o.asset_format =
+                                    ANY(c.accepted_asset_formats))
                           )
                     ) AS attention
                     """,
@@ -1503,7 +1614,7 @@ class PostgresWorkExecutionRepository(WorkExecutionRepository):
 
 def _require_active_claim(
     row: Mapping[str, object] | None,
-    claim: OperationClaim,
+    claim: OperationClaim[OperationInput],
 ) -> None:
     if (
         row is None
@@ -1519,14 +1630,29 @@ def _require_active_claim(
         raise WorkExecutionLeaseLostError("operation_lease_lost")
 
 
-def _operation(row: Mapping[str, object]) -> DurableOperation:
+def _operation(
+    row: Mapping[str, object], connection: psycopg.Connection[Row],
+) -> DurableOperation[OperationInput]:
+    render = None
+    if row["operation_kind"] == "render":
+        render = connection.execute(
+            "SELECT * FROM stageflow.render_operation_input WHERE operation_id = %s",
+            (str(row["operation_id"]),),
+        ).fetchone()
+        if render is None:
+            raise WorkExecutionNotFoundError("render_operation_input_not_found")
     return DurableOperation(
         id=_entity(row["operation_id"]),
         kind=str(row["operation_kind"]),
         schema_version=str(row["operation_schema_version"]),
         deployment_id=str(row["deployment_id"]),
         event_id=_optional_entity(row["event_id"]),
-        input=TranscriptionOperationInput(
+        input=(RenderOperationInput(
+            assembly_revision_id=_entity(render["assembly_revision_id"]),
+            execution_profile_id=str(render["render_profile_id"]),
+            execution_profile_version=str(render["render_profile_version"]),
+            output_token=str(render["output_token"]),
+        ) if render is not None else TranscriptionOperationInput(
             asset_id=_entity(row["asset_id"]),
             manifest_id=_entity(row["manifest_id"]),
             manifest_version=str(row["manifest_version"]),
@@ -1537,7 +1663,7 @@ def _operation(row: Mapping[str, object]) -> DurableOperation:
             request_word_timing=bool(row["request_word_timing"]),
             request_speaker_labels=bool(row["request_speaker_labels"]),
             requires_cloud=bool(row["requires_cloud"]),
-        ),
+        )),
         idempotency_key=str(row["idempotency_key"]),
         request_digest=str(row["request_digest"]),
         work_key=str(row["work_key"]),
@@ -1560,6 +1686,9 @@ def _operation(row: Mapping[str, object]) -> DurableOperation:
         ),
         terminal_result_type=cast(str | None, row["terminal_result_type"]),
         terminal_result_id=_optional_entity(row["terminal_result_id"]),
+        terminal_result_rendered_output_id=_optional_entity(
+            row.get("terminal_result_rendered_output_id"),
+        ),
         terminal_result_revision=cast(
             int | None,
             row["terminal_result_revision"],
@@ -1619,7 +1748,8 @@ def _capability(row: Mapping[str, object]) -> WorkerCapability:
         execution_profile_id=str(row["execution_profile_id"]),
         execution_profile_version=str(row["execution_profile_version"]),
         locality=ExecutionLocality(str(row["locality"])),
-        accepted_asset_formats=tuple(cast(list[str], row["accepted_asset_formats"])),
+        accepted_asset_formats=(None if row["accepted_asset_formats"] is None
+                                else tuple(cast(list[str], row["accepted_asset_formats"]))),
         supports_word_timing=bool(row["supports_word_timing"]),
         supports_speaker_labels=bool(row["supports_speaker_labels"]),
         provider_id=cast(str | None, row["provider_id"]),

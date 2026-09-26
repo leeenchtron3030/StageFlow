@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import StrEnum
+from typing import Generic, Literal, TypeVar
 
 from app.shared.ids import EntityId
 from app.shared.time import require_aware_datetime
@@ -102,6 +103,7 @@ class EventNetworkPolicy(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class TranscriptionOperationInput:
+    kind: Literal["transcription"] = field(default="transcription", init=False)
     asset_id: EntityId
     manifest_id: EntityId
     manifest_version: str
@@ -133,12 +135,35 @@ class TranscriptionOperationInput:
 
 
 @dataclass(frozen=True, slots=True)
-class EnqueueTranscriptionOperation:
+class RenderOperationInput:
+    assembly_revision_id: EntityId
+    execution_profile_id: str
+    execution_profile_version: str
+    output_token: str
+    kind: Literal["render"] = field(default="render", init=False)
+    requires_cloud: Literal[False] = field(default=False, init=False)
+
+    def __post_init__(self) -> None:
+        for name in ("execution_profile_id", "execution_profile_version"):
+            object.__setattr__(self, name, _identifier(getattr(self, name), name))
+        if not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", self.output_token):
+            raise ValueError("output_token must be an opaque token, never a path.")
+
+
+type OperationInput = TranscriptionOperationInput | RenderOperationInput
+
+InputT = TypeVar(
+    "InputT", bound=OperationInput, covariant=True, default=TranscriptionOperationInput,
+)
+
+
+@dataclass(frozen=True, slots=True)
+class EnqueueOperation(Generic[InputT]):
     operation_id: EntityId
     idempotency_key: str
     deployment_id: str
     event_id: EntityId | None
-    input: TranscriptionOperationInput
+    input: InputT
     priority: int
     eligible_at: datetime
     max_attempts: int
@@ -171,8 +196,18 @@ class EnqueueTranscriptionOperation:
 
 
 @dataclass(frozen=True, slots=True)
-class PendingOperation:
-    request: EnqueueTranscriptionOperation
+class EnqueueTranscriptionOperation(EnqueueOperation[TranscriptionOperationInput]):
+    pass
+
+
+@dataclass(frozen=True, slots=True)
+class EnqueueRenderOperation(EnqueueOperation[RenderOperationInput]):
+    pass
+
+
+@dataclass(frozen=True, slots=True)
+class PendingOperation(Generic[InputT]):
+    request: EnqueueOperation[InputT]
     request_digest: str
     work_key: str
 
@@ -186,13 +221,13 @@ class PendingOperation:
 
 
 @dataclass(frozen=True, slots=True)
-class DurableOperation:
+class DurableOperation(Generic[InputT]):
     id: EntityId
     kind: str
     schema_version: str
     deployment_id: str
     event_id: EntityId | None
-    input: TranscriptionOperationInput
+    input: InputT
     idempotency_key: str
     request_digest: str
     work_key: str
@@ -215,8 +250,11 @@ class DurableOperation:
     revision: int
     created_at: datetime
     updated_at: datetime
+    terminal_result_rendered_output_id: EntityId | None = None
 
     def __post_init__(self) -> None:
+        if self.kind != self.input.kind:
+            raise ValueError("operation kind must match its tagged input.")
         for field_name in (
             "kind",
             "schema_version",
@@ -334,7 +372,7 @@ class WorkerCapability:
     execution_profile_id: str
     execution_profile_version: str
     locality: ExecutionLocality
-    accepted_asset_formats: tuple[str, ...]
+    accepted_asset_formats: tuple[str, ...] | None
     supports_word_timing: bool
     supports_speaker_labels: bool
     provider_id: str | None
@@ -376,13 +414,16 @@ class WorkerCapability:
             sorted(
                 {
                     _identifier(value, "accepted_asset_format")
-                    for value in self.accepted_asset_formats
+                    for value in self.accepted_asset_formats or ()
                 }
             )
         )
-        if not formats:
+        if not formats and self.operation_kind == "transcription":
             raise ValueError("A worker capability requires an accepted asset format.")
-        object.__setattr__(self, "accepted_asset_formats", formats)
+        object.__setattr__(
+            self, "accepted_asset_formats",
+            None if self.accepted_asset_formats is None else formats,
+        )
         require_aware_datetime(self.effective_from, "effective_from")
         if self.effective_until is not None:
             require_aware_datetime(self.effective_until, "effective_until")
@@ -413,6 +454,7 @@ class ClaimRequest:
     worker_id: EntityId
     network_policy: EventNetworkPolicy
     lease_duration: timedelta
+    operation_kind: Literal["transcription", "render"] | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -423,8 +465,8 @@ class ClaimRequest:
 
 
 @dataclass(frozen=True, slots=True)
-class OperationClaim:
-    operation: DurableOperation
+class OperationClaim(Generic[InputT]):
+    operation: DurableOperation[InputT]
     attempt: OperationAttempt
 
 
@@ -490,6 +532,10 @@ class WorkExecutionProjection:
 
 
 __all__ = [
+    "RenderOperationInput",
+    "OperationInput",
+    "EnqueueRenderOperation",
+    "EnqueueOperation",
     "AttemptOutcome",
     "AttemptStatus",
     "ClaimRequest",

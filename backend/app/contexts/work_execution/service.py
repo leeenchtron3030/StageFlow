@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import StrEnum
 
 from app.contexts.transcription_evidence import (
@@ -16,9 +16,11 @@ from app.shared.ids import EntityId
 from .contracts import (
     ClaimRequest,
     OperationFailure,
+    OperationInput,
     OperationStatus,
+    TranscriptionOperationInput,
 )
-from .repository import WorkExecutionRepository
+from .repository import WorkExecutionConflictError, WorkExecutionRepository
 
 
 class WorkerCycleOutcome(StrEnum):
@@ -37,12 +39,12 @@ class WorkerCycleResult:
 
 
 @dataclass(slots=True)
-class TranscriptionWorker:
-    repository: WorkExecutionRepository
+class TranscriptionWorker[InputT: OperationInput = OperationInput]:
+    repository: WorkExecutionRepository[InputT]
     execution_port: TranscriptionExecutionPort
 
     def run_once(self, request: ClaimRequest) -> WorkerCycleResult:
-        claimed = self.repository.claim_next(request)
+        claimed = self.repository.claim_next(replace(request, operation_kind="transcription"))
         if claimed is None:
             return WorkerCycleResult(outcome=WorkerCycleOutcome.IDLE)
         active_claim = self.repository.mark_running(claimed)
@@ -54,6 +56,8 @@ class TranscriptionWorker:
                 lease_duration=request.lease_duration,
             )
 
+        if not isinstance(active_claim.operation.input, TranscriptionOperationInput):
+            raise WorkExecutionConflictError("transcription_worker_requires_transcription")
         execution_request = TranscriptionExecutionRequest(
             operation_id=active_claim.operation.id,
             attempt_id=active_claim.attempt.id,

@@ -3,11 +3,16 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from hashlib import sha256
+from typing import cast
 
 from .contracts import (
     DurableOperation,
+    EnqueueRenderOperation,
     EnqueueTranscriptionOperation,
+    OperationInput,
     PendingOperation,
+    RenderOperationInput,
+    TranscriptionOperationInput,
 )
 from .repository import WorkExecutionRepository
 
@@ -69,18 +74,57 @@ def enqueue_request_digest(request: EnqueueTranscriptionOperation) -> str:
     )
 
 
+def render_work_key(request: EnqueueRenderOperation) -> str:
+    value = request.input
+    return _sha({
+        "schema": "stageflow.render_operation.work-key.v1",
+        "assembly_revision_id": value.assembly_revision_id.value,
+        "execution_profile_id": value.execution_profile_id,
+        "execution_profile_version": value.execution_profile_version,
+    })
+
+
+def pending_render_operation(
+    request: EnqueueRenderOperation,
+) -> PendingOperation[RenderOperationInput]:
+    """Internal persistence envelope; human render authorization belongs to its command."""
+    return PendingOperation(
+        request=request,
+        work_key=render_work_key(request),
+        request_digest=_sha({
+            "schema": "stageflow.render_operation.enqueue.v1",
+            "operation_id": request.operation_id.value,
+            "idempotency_key": request.idempotency_key,
+            "deployment_id": request.deployment_id,
+            "event_id": None if request.event_id is None else request.event_id.value,
+            "work_key": render_work_key(request),
+            "output_token": request.input.output_token,
+            "priority": request.priority,
+            "eligible_at": request.eligible_at.isoformat(),
+            "max_attempts": request.max_attempts,
+            "retry_delay_microseconds": int(request.retry_delay.total_seconds() * 1_000_000),
+            "required_for_event": request.required_for_event,
+            "requested_at": request.requested_at.isoformat(),
+        }),
+    )
+
+
 @dataclass(frozen=True, slots=True)
-class TranscriptionOperationApplication:
-    repository: WorkExecutionRepository
+class TranscriptionOperationApplication[InputT: OperationInput = TranscriptionOperationInput]:
+    repository: WorkExecutionRepository[InputT]
 
     def enqueue(self, request: EnqueueTranscriptionOperation) -> DurableOperation:
-        return self.repository.enqueue(
+        repository = cast(WorkExecutionRepository[OperationInput], self.repository)
+        operation = repository.enqueue(
             PendingOperation(
                 request=request,
                 request_digest=enqueue_request_digest(request),
                 work_key=transcription_work_key(request),
             )
         )
+        if operation.input.kind != "transcription":
+            raise ValueError("transcription_enqueue_requires_transcription")
+        return cast(DurableOperation, operation)
 
 
 __all__ = [

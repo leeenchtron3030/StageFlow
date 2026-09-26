@@ -99,6 +99,14 @@ class PostgresMigrationRunner:
             version="0014_assembly_metadata_overrides",
         )
 
+        self.apply_render_durable_operation_v1()
+
+    def apply_render_durable_operation_v1(self) -> None:
+        self._execute_if_missing(
+            "0015_render_durable_operation_forward.sql",
+            version="0015_render_durable_operation",
+        )
+
     def reverse_event_mode_kernel_v1(self) -> None:
         self.reverse_demo_vertical_slice_v1()
         self.reverse_transcription_worker_v1()
@@ -122,6 +130,7 @@ class PostgresMigrationRunner:
         )
 
     def reverse_transcription_worker_v1(self) -> None:
+        self.reverse_render_durable_operation_v1()
         self._execute_if_present(
             "0007_transcription_worker_reverse.sql",
             version="0007_transcription_worker",
@@ -170,9 +179,16 @@ class PostgresMigrationRunner:
         )
 
     def reverse_assembly_metadata_overrides_v1(self) -> None:
+        self.reverse_render_durable_operation_v1()
         self._execute_if_present(
             "0014_assembly_metadata_overrides_reverse.sql",
             version="0014_assembly_metadata_overrides",
+        )
+
+    def reverse_render_durable_operation_v1(self) -> None:
+        self._execute_if_present(
+            "0015_render_durable_operation_reverse.sql",
+            version="0015_render_durable_operation",
         )
 
     def _execute(self, filename: str) -> None:

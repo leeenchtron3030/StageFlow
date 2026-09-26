@@ -31,6 +31,7 @@ from app.contexts.production.event_mode_kernel.contracts import (
     StartSessionRequest,
 )
 from app.contexts.transcription_evidence import TranscriptEvidenceRevision
+from app.contexts.work_execution import TranscriptionOperationInput
 from app.contexts.work_execution.repository import WorkExecutionStorageUnavailableError
 from app.core.config.deployment import RuntimeProfile
 from app.demo.service import (
@@ -618,7 +619,8 @@ def session_workspace(
         operations = tuple(
             operation
             for operation in event_operations
-            if operation.input.asset_id in asset_ids
+            if isinstance(operation.input, TranscriptionOperationInput)
+            and operation.input.asset_id in asset_ids
         )
         evidence = tuple(
             item
@@ -665,6 +667,7 @@ def session_workspace(
                 updated_at=operation.updated_at,
             )
             for operation in operations
+            if isinstance(operation.input, TranscriptionOperationInput)
         ),
         operations_truncated=len(event_operations) == _OPERATION_LIMIT,
         transcript_evidence=tuple(_transcript_response(item) for item in evidence),

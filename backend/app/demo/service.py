@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import cast
 from uuid import NAMESPACE_URL, uuid5
 
 from app.bootstrap.event_mode_kernel import KernelComponents
@@ -110,8 +111,9 @@ class DemoApplication:
                 operation.input.manifest_id,
                 operation.input.execution_profile_id,
                 operation.input.execution_profile_version,
-            ): operation
+            ): cast(DurableOperation, operation)
             for operation in existing
+            if isinstance(operation.input, TranscriptionOperationInput)
         }
         operations: list[DurableOperation] = []
         failures: list[str] = []
