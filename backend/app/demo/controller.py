@@ -726,6 +726,11 @@ def worker_summary(dsn: str, event_id: object, deployment_id: object) -> dict[st
                 FROM stageflow.work_worker w
                 LEFT JOIN stageflow.work_worker_presence p ON p.worker_id = w.worker_id
                 WHERE w.deployment_id = %s AND w.event_id = %s
+                  AND (NOT EXISTS (SELECT 1 FROM stageflow.work_worker_capability tc
+                                   WHERE tc.worker_id = w.worker_id)
+                       OR EXISTS (SELECT 1 FROM stageflow.work_worker_capability tc
+                                  WHERE tc.worker_id = w.worker_id
+                                    AND tc.operation_kind <> 'render'))
                 ORDER BY w.worker_id
                 LIMIT 20
                 """,

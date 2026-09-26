@@ -110,6 +110,33 @@ class LocalTranscriptionConfiguration(BaseModel):
         return self
 
 
+class LocalRenderConfiguration(BaseModel):
+    """Optional operator-installed local runtime. Absence leaves rendering disabled."""
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    enabled: bool = False
+    ffmpeg_path: str = Field(repr=False)
+    output_root: str = Field(repr=False)
+    packaging_content_root: str = Field(repr=False)
+
+    @field_validator("ffmpeg_path", "output_root", "packaging_content_root")
+    @classmethod
+    def external_absolute_path(cls, value: str) -> str:
+        path = Path(value)
+        windows = PureWindowsPath(value)
+        if (not path.is_absolute() or ".." in path.parts or ".." in windows.parts
+                or windows.drive.startswith("\\\\") or value.startswith("//")):
+            raise ValueError("local_render_requires_absolute_local_path")
+        repository = Path(__file__).resolve().parents[4]
+        resolved = path.resolve()
+        if resolved.is_relative_to(repository):
+            raise ValueError("local_render_requires_external_path")
+        for parent in (path, *path.parents):
+            if parent.exists() and (parent.is_symlink() or parent.is_junction()):
+                raise ValueError("local_render_refuses_links")
+        return value
+
+
 class SourceBindingConfiguration(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -242,6 +269,7 @@ class KernelDeploymentConfiguration(BaseModel):
     local_schedule: LocalScheduleConfiguration | None = None
     devcon_read: DevconReadConfiguration | None = None
     local_transcription: LocalTranscriptionConfiguration | None = None
+    local_render: LocalRenderConfiguration | None = None
     autonomous_event_node: AutonomousEventNodeConfiguration = Field(
         default_factory=AutonomousEventNodeConfiguration
     )

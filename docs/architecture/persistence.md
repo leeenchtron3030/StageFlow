@@ -141,12 +141,37 @@ Override history reads are Event-scoped, bounded to 1–100 entries, sequence-pa
 and use repeatable-read transactions with total counts and explicit continuation.
 There is no backfill, upstream write, participant model, or automatic authority.
 
+`0015_render_durable_operation` adds pinned `render_operation_input` and immutable
+`rendered_output` rows with Assembly, operation, attempt, opaque content, and FFmpeg
+identity, plus a required opaque sidecar-manifest key and SHA-256 for the frozen metadata
+snapshot. Render operations cannot set transcript-evidence terminal identity or revision.
+It makes the `0007` operation-kind, transcription-source, capability-format,
+and succeeded-result constraints kind-aware while retaining every existing foreign key.
+Transcription still requires its four source columns and nonempty capability formats;
+render can leave them null and uses `terminal_result_rendered_output_id` instead of the
+transcript result reference. Both kinds share claims, leases, attempts, and fencing.
+The render command, separate local worker, adapters and authenticated API now build on
+these tables. New requests validate approved, non-stale Assembly state in the enqueue
+transaction. Rendered Output and the operation's terminal output reference commit together
+under the shared attempt fence; a failed attempt registers no partial output.
+The work key remains revision plus profile ID and version. Exact replay returns the
+existing operation with its current state, including terminal failure or cancellation;
+conflicting command intent fails typed. Re-rendering the same revision/profile after
+terminal failure is out of scope; a new approved revision is the supported path.
+Transcription-facing operation listings and status projections filter by repository
+input types before counts and limits; explicitly multi-kind repositories retain both kinds.
+Render listings use a render-typed repository and Event/Session scope. Worker presence in
+the Demo controller excludes workers whose capability rows are all render before its limit;
+registered workers with no capability rows retain their previous classification.
+Reversal runs before `0014` (and before direct `0007` reversal), restores the original
+checks and nullability, and refuses while any render operations, inputs, outputs, or
+capabilities exist. It deletes no render history and requires no backfill on reapply.
+
 Registration is at least once and idempotent. It does not claim exactly-once delivery.
 Only a newly created ingress record is eligible for the included dispatcher path; an
 exact replay does not repeat that caller-visible dispatch path. The asset-registration
 bridge is stable and replay-safe, but it is a direct synchronous boundary rather than an
-outbox. Generalized operation kinds, a broker, automatic enqueue, and real execution
-providers remain outside this implementation.
+outbox. A broker and general automatic enqueue remain outside this persistence slice.
 
 ## Identity and time
 

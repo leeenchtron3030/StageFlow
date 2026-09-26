@@ -529,8 +529,25 @@ An Assembly proposal resolves the applicable template against a fixed package re
 selects approved packaging-asset versions, snapshots metadata, and records provenance.
 Validation checks references, versions, template resolution, required bindings, package
 eligibility, and prohibited unresolved conditions. Future automatic approval requires an
-explicitly activated scoped policy under ADR-0026. Rendering remains a separate future
-Durable Operation.
+explicitly activated scoped policy under ADR-0026. Rendering is a separate Durable
+Operation; see the render first slice below.
+
+## Render first slice
+
+The rendering context now turns an approved, non-stale Assembly revision into a
+Durable Operation through a human-only idempotent command. The pure planner consumes
+pinned bindings and completion membership, with frozen metadata and override provenance
+in a sidecar. The separate local render worker uses the shared ADR-0025 claims, leases,
+retries and fences, at one lease per worker. Output registration and operation success
+share a transaction. All failures after running are bounded typed attempt outcomes.
+
+The first profile is video-only CUDA decode to H.264 NVENC, p4, VBR 8 Mbit/s, GOP 60,
+1080p MP4. FFmpeg remains operator-installed and is identified and license-configuration
+checked at the infrastructure boundary. `[local_render]` is optional and disabled by
+default. The authenticated rendering API provides requests and Event/Session-scoped
+paginated operation/output reads. No automatic authority, audio, overlays, publication,
+delivery or frontend is introduced. Host GPU/playability and security qualification
+remain separate from implementation evidence.
 
 ## Progressive approval automation
 

@@ -88,6 +88,14 @@ class PostgresSessionAssemblyRepository:
     def __init__(self, dsn: str) -> None:
         self._dsn = dsn
 
+    def read_render_source(
+        self, conn: Connection, revision_id: EntityId, *, lock: bool,
+    ) -> tuple[AssemblyRevision, AssemblyInputs]:
+        """Read pinned facts and the existing staleness inputs in an enlisted transaction."""
+        revision = self._get_revision(conn, revision_id)
+        session = self._session(conn, revision.session_id, lock=lock)
+        return revision, self._inputs(conn, session)
+
     @contextmanager
     def _transaction(self, *, read: bool = False) -> Generator[Connection]:
         try:

@@ -14,6 +14,7 @@ from app.shared.time import require_aware_datetime
 if TYPE_CHECKING:
     from app.contexts.work_execution.contracts import (
         OperationClaim,
+        OperationInput,
         TranscriptionOperationInput,
     )
 
@@ -120,12 +121,14 @@ def transcript_result_digest(result: NormalizedTranscriptResult) -> str:
 
 
 def prepare_transcript_evidence(
-    claim: OperationClaim,
+    claim: OperationClaim[OperationInput],
     result: NormalizedTranscriptResult,
     *,
     alignments: tuple[DerivedTranscriptAlignment, ...] = (),
 ) -> PendingTranscriptEvidence:
     value = claim.operation.input
+    if value.kind != "transcription":
+        raise ValueError("transcript_result_requires_transcription")
     return PendingTranscriptEvidence(
         id=EntityId.new(),
         operation_id=claim.operation.id,

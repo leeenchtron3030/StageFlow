@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved
+Completed (2026-09-25).
 
 ## Execution authority
 
@@ -153,6 +153,24 @@ and a partial output is never registered.
     result is recorded as a sanitized validation result, and a `/security-review` pass is
     run on the PR.
 
+## Owner amendment
+
+*Owner amendment 2026-09-25 (during ED-0087 implementation):* the same kind-conditional
+nullability applies to every transcription-source column that `0007` makes required on
+`work_operation` or `work_worker_capability`: `asset_id`, `manifest_id`,
+`manifest_version`, `asset_format`, and any other such column the implementation finds.
+Checks still require these columns for transcription, and the reverse restores `NOT NULL`.
+
+*Owner amendment 2, 2026-09-25 (general kind-aware rule):*
+- Every `0007` constraint that assumes transcription stays exactly as it is for
+  transcription rows.
+- Render gets its own column or reference instead. For example, a
+  `terminal_result_rendered_output_id` foreign key to `rendered_output`, with the
+  succeeded-requires-result check made kind-aware.
+- No existing foreign key is dropped, and no placeholder data is used.
+- The reverse restores the originals, and only while no render rows exist.
+- Every changed constraint is listed in the implementation report and verified in review.
+
 ## Out of scope
 
 - Audio, overlays, burned-in titles, image slots, extra profiles, and bitrate ladders.
@@ -197,4 +215,54 @@ files stay in the operator's output root for manual removal.
 
 ## Completion record
 
-_(Filled in on completion.)_
+- **Implemented revision:** branch `codex/ed-0087-render-durable-operation`, in two phases.
+  Codex implemented both, and the owner committed them.
+  - Phase A (`036dcb6`): migration `0015` and the tagged operation-input union with
+    kind-isolated claims.
+  - Phase B: the rendering context, render-plan builder, request command, FFmpeg adapter,
+    packaging content resolver, output store, render worker, `[local_render]`
+    configuration, `/api/v1/rendering` routes, and documentation.
+- **Phase B decisions (owner defaults):**
+  - (a) Replaying a request returns the existing operation in any state. Re-rendering the
+    same revision and profile after a terminal failure is out of scope; the supported path
+    is a new approved revision.
+  - (b) Filtering by operation kind follows the repository's configured input types.
+    Transcription-facing listings, attempts, status projections, and the Demo worker
+    summary filter to transcription before counting or applying limits. Repositories
+    explicitly configured for several kinds stay multi-kind.
+  - (c) The render worker records a fenced, typed outcome and releases the lease for any
+    error after the attempt is marked running. The transcription worker is unchanged.
+- **Review:**
+  - Codex's first Phase B run stopped Yellow because decision (b) was worded too broadly.
+    The owner clarified it (the rule above), and Codex implemented it.
+  - The `directive-reviewer` returned FIX-FIRST:
+    - a Windows `fsync` on a read-only handle that broke every successful render on the
+      host;
+    - untested Session-media and PostgreSQL packaging-binding paths;
+    - a vacuous path-leakage assertion;
+    - orphaned files on definite failures;
+    - a Demo worker-summary regression;
+    - doc placement.
+  - Codex fixed these. The re-review found one remaining issue: an unlisted error during
+    commit was treated as definite, which could delete files a committed row references.
+    The owner fixed it so that only known rollback codes (`40001`, `40P01`) are definite,
+    added tests, and corrected one stale capability-layer line.
+  - A branch security review, following the `/security-review` method, found no
+    high-confidence vulnerabilities.
+- **Tests:** host full suite **2,303 passed, 0 failed, 2 skipped** (POSIX-only); Ruff and
+  Pyright are clean. No existing test assertion was changed in Phase B.
+- **Owner real-GPU render:** passed; see
+  [Run 001](../validation/results/render-durable-operation-001.md). It used a labelled
+  validation event, because discovered media has no start times.
+- **Execution authority:** Green, plus the owner's decisions above.
+- **Deviations:** none from the ADR or this plan.
+- **Remaining work:**
+  - Discovery does not populate media start times, so Assemblies from discovered media are
+    never approvable. This needs a timing-authority decision.
+  - Inputs with mixed frame rates produce duplicate presentation timestamps under
+    `-fps_mode passthrough`. The options are a profile-version change or a typed
+    ineligibility.
+  - The transcription worker does not record unexpected errors raised after an attempt is
+    marked running.
+  - Optional hardening: a per-input FFmpeg format whitelist.
+  - Producer UI for rendering, in a later directive.

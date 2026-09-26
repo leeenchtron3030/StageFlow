@@ -477,10 +477,11 @@ def test_migration_registration_order(monkeypatch: pytest.MonkeyPatch) -> None:
     runner = PostgresMigrationRunner("unused")
     runner.apply_packaging_asset_foundation_v1()
     assert applied == ["0012_packaging_asset_foundation", "0013_session_assembly_foundation",
-                       "0014_assembly_metadata_overrides"]
+                       "0014_assembly_metadata_overrides", "0015_render_durable_operation"]
     applied.clear()
     runner.reverse_packaging_asset_foundation_v1()
-    assert applied == ["0014_assembly_metadata_overrides", "0013_session_assembly_foundation",
+    assert applied == ["0015_render_durable_operation", "0014_assembly_metadata_overrides",
+                       "0013_session_assembly_foundation",
                        "0012_packaging_asset_foundation"]
 
 

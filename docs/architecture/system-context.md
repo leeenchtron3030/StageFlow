@@ -38,6 +38,17 @@ Rendering, publication, and delivery remain outside that review foundation
 
 ## Current runtime components
 
+The optional local render worker (`python -m app.demo.render_worker`) is a separate
+process in the same modular monolith. It claims one render operation at a time through
+the shared Work Execution journal, resolves pinned Assembly inputs, executes an explicitly
+configured operator-installed FFmpeg CLI, and atomically registers output and sidecar
+identities with operation success. Rendering uses local storage without network access.
+The default-off `[local_render]` section controls composition. Human requests enter through
+`/api/v1/rendering/requests`; bounded Event/Session operation and output reads expose
+opaque keys and hashes. Transcription-facing views exclude render work and capabilities
+before counting or limiting. These additions do not authorize publication or establish
+GPU/event-operational qualification.
+
 | Component | Current responsibility | State/durability |
 | --- | --- | --- |
 | FastAPI application | Preserve liveness; optionally load Kernel configuration, verify schema, reconcile, and serve bounded read-only Kernel/MTE projections | PostgreSQL authority; process state is composition only |

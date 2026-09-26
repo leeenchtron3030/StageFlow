@@ -12,7 +12,9 @@ from .contracts import (
     OperationAttempt,
     OperationClaim,
     OperationFailure,
+    OperationInput,
     PendingOperation,
+    TranscriptionOperationInput,
     Worker,
     WorkerCapability,
     WorkerHealth,
@@ -44,9 +46,9 @@ class WorkExecutionStorageUnavailableError(RuntimeError):
     pass
 
 
-class WorkExecutionRepository(ABC):
+class WorkExecutionRepository[InputT: OperationInput = TranscriptionOperationInput](ABC):
     @abstractmethod
-    def enqueue(self, pending: PendingOperation) -> DurableOperation: ...
+    def enqueue(self, pending: PendingOperation[InputT]) -> DurableOperation[InputT]: ...
 
     @abstractmethod
     def register_worker(self, worker: Worker) -> Worker: ...
@@ -66,38 +68,38 @@ class WorkExecutionRepository(ABC):
     ) -> WorkerPresence: ...
 
     @abstractmethod
-    def claim_next(self, request: ClaimRequest) -> OperationClaim | None: ...
+    def claim_next(self, request: ClaimRequest) -> OperationClaim[InputT] | None: ...
 
     @abstractmethod
-    def mark_running(self, claim: OperationClaim) -> OperationClaim: ...
+    def mark_running(self, claim: OperationClaim[InputT]) -> OperationClaim[InputT]: ...
 
     @abstractmethod
     def renew(
         self,
-        claim: OperationClaim,
+        claim: OperationClaim[InputT],
         *,
         lease_duration: timedelta,
-    ) -> OperationClaim: ...
+    ) -> OperationClaim[InputT]: ...
 
     @abstractmethod
     def record_failure(
         self,
-        claim: OperationClaim,
+        claim: OperationClaim[InputT],
         failure: OperationFailure,
-    ) -> DurableOperation: ...
+    ) -> DurableOperation[InputT]: ...
 
     @abstractmethod
     def apply_transcript_result(
         self,
-        claim: OperationClaim,
+        claim: OperationClaim[InputT],
         pending: PendingTranscriptEvidence,
     ) -> TranscriptEvidenceRevision: ...
 
     @abstractmethod
-    def reconcile_expired(self, *, limit: int = 100) -> tuple[DurableOperation, ...]: ...
+    def reconcile_expired(self, *, limit: int = 100) -> tuple[DurableOperation[InputT], ...]: ...
 
     @abstractmethod
-    def get_operation(self, operation_id: EntityId) -> DurableOperation: ...
+    def get_operation(self, operation_id: EntityId) -> DurableOperation[InputT]: ...
 
     @abstractmethod
     def list_attempts(self, operation_id: EntityId) -> tuple[OperationAttempt, ...]: ...
