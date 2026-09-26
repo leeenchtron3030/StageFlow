@@ -105,6 +105,16 @@ nullability applies to every transcription-source column that `0007` makes requi
 `manifest_version`, `asset_format`, and any other such column the implementation finds.
 Checks still require these columns for transcription, and the reverse restores `NOT NULL`.
 
+*Owner amendment 2, 2026-09-25 (general kind-aware rule):*
+- Every `0007` constraint that assumes transcription stays exactly as it is for
+  transcription rows.
+- Render gets its own column or reference instead. For example, a
+  `terminal_result_rendered_output_id` foreign key to `rendered_output`, with the
+  succeeded-requires-result check made kind-aware.
+- No existing foreign key is dropped, and no placeholder data is used.
+- The reverse restores the originals, and only while no render rows exist.
+- Every changed constraint is listed in the implementation report and verified in review.
+
 ## Alternatives
 
 - **A separate render-only operation substrate** (new operation, attempt, and worker tables
