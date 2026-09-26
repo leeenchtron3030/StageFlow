@@ -31,6 +31,7 @@ from app.contexts.assembly.session_contracts import (
     AssemblyTemplate,
     CompletionMember,
     ExplicitBinding,
+    MediaOrderSource,
     MetadataField,
     MetadataValue,
     PackagingCandidate,
@@ -69,7 +70,7 @@ from tests.test_packaging_asset_foundation import HEADERS, SyncHttpClient
 
 NOW = datetime(2026, 9, 25, 12, tzinfo=UTC)
 EVENT, STAGE, SESSION, ACTOR, SOURCE = (EntityId.new() for _ in range(5))
-MEDIA = CompletionMember(EntityId.new(), 3, NOW)
+MEDIA = CompletionMember(EntityId.new(), 3, NOW, NOW, MediaOrderSource.MEDIA_TIMING, NOW)
 SLOTS = (AssemblySlot("intro", PlacementRole.OPENING_BUMPER, True),
          AssemblySlot("media", PlacementRole.SESSION_MEDIA, True))
 METADATA = (
@@ -195,8 +196,15 @@ def test_package_and_membership_validation(case: str) -> None:
     elif case == "empty":
         inputs = replace(inputs, membership=())
     else:
-        inputs = replace(inputs, membership=(replace(MEDIA, media_started_at=None),))
-        code = ValidationReason.MEDIA_TIMING_UNAVAILABLE
+        inputs = replace(inputs, membership=(replace(
+            MEDIA, media_started_at=None, order_source=MediaOrderSource.REGISTRATION_TIME,
+        ),))
+        harness = Harness()
+        harness.inputs = inputs
+        revision = harness.propose()
+        assert revision.validation.state == "valid"
+        assert revision.membership[0].order_source == MediaOrderSource.REGISTRATION_TIME
+        return
     bindings = resolve_bindings(TEMPLATE, inputs, (candidate(),))
     assert code in {i.code for i in validate_assembly(TEMPLATE, inputs, bindings).issues}
 
@@ -272,7 +280,8 @@ def test_template_immutability_versions_and_replay(harness: Harness) -> None:
 
 
 def test_proposal_freezes_membership_metadata_and_supersedes(harness: Harness) -> None:
-    later = replace(MEDIA, asset_id=EntityId.new(), media_started_at=NOW + timedelta(seconds=2))
+    later = replace(MEDIA, asset_id=EntityId.new(), media_started_at=NOW + timedelta(seconds=2),
+                    order_key_at=NOW + timedelta(seconds=2))
     harness.inputs = replace(INPUT, membership=(later, MEDIA))
     original_inputs, original_candidates = harness.inputs, harness.candidates
     operation = EntityId.new()
@@ -477,10 +486,12 @@ def test_migration_registration_order(monkeypatch: pytest.MonkeyPatch) -> None:
     runner = PostgresMigrationRunner("unused")
     runner.apply_packaging_asset_foundation_v1()
     assert applied == ["0012_packaging_asset_foundation", "0013_session_assembly_foundation",
-                       "0014_assembly_metadata_overrides", "0015_render_durable_operation"]
+                       "0014_assembly_metadata_overrides", "0015_render_durable_operation",
+                       "0016_assembly_media_order"]
     applied.clear()
     runner.reverse_packaging_asset_foundation_v1()
-    assert applied == ["0015_render_durable_operation", "0014_assembly_metadata_overrides",
+    assert applied == ["0016_assembly_media_order", "0015_render_durable_operation",
+                       "0014_assembly_metadata_overrides",
                        "0013_session_assembly_foundation",
                        "0012_packaging_asset_foundation"]
 
@@ -565,7 +576,9 @@ def test_postgres_restart_lineage_replay_staleness_and_reverse_reapply(postgres_
                                    expected_package_revision=session.package_revision)
         revision = propose(service)
         assert revision.validation.state == "valid"
-        assert revision.membership == (CompletionMember(media_id, association.revision, NOW),)
+        assert revision.membership == (CompletionMember(
+            media_id, association.revision, NOW, NOW, MediaOrderSource.MEDIA_TIMING, NOW,
+        ),)
         assert revision.bindings[0].packaging_revision_id == packaging_revision.id
         assert revision.metadata[0].source_revision == program.revision
         assert revision.metadata[0].values == ("Speaker A", "Speaker B")

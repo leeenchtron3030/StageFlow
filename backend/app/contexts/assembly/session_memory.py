@@ -30,6 +30,7 @@ class InMemorySessionAssemblyRepository:
         candidates: Callable[[], tuple[PackagingCandidate, ...]],
     ) -> None:
         self._events = frozenset(event_ids)
+        # Supplied membership snapshots include the registry registration time.
         self._inputs = inputs
         self._candidates = candidates
         self._templates: dict[EntityId, AssemblyTemplate] = {}

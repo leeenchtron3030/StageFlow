@@ -252,6 +252,22 @@ authorized by this document.
 - **Example:** Replacing a sponsor outro creates Assembly revision 4 while Session
   package revision 2 remains unchanged.
 
+### Media order source
+
+- **Definition:** The frozen per-member basis for Session Assembly presentation order:
+  `media_timing` uses known `media_started_at`; `registration_time` uses the registry's
+  infrastructure-observed `registered_at`. The aware `order_key_at` records the selected
+  instant. New proposals sort by that key, then asset ID, across both sources.
+- **Authority:** Human Assembly approval confirms the proposed order. Registration time
+  does not assert captured-content timing or change completion membership, Session
+  boundaries, package authority, or advisory Media Timing Evidence (ADR-0027).
+- **Compatibility:** Additive `0016` preserves old positions. Legacy NULL ordering
+  columns hydrate as `media_timing` with the stored media start as key. A legacy invalid
+  untimed revision retains a null key and its stored validation; it is never approvable
+  or renderable. `MEDIA_TIMING_UNAVAILABLE` remains readable but is not newly emitted.
+- **Rendering:** Each `session_media` slot expands the frozen member sequence; rendering
+  never re-sorts it. Revision APIs expose source and key without filesystem paths.
+
 ### Assembly metadata override
 
 - **Definition:** An immutable human `set` or `clear` entry for `session_title` or

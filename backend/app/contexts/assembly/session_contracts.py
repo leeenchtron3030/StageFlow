@@ -139,14 +139,32 @@ class AssemblyTemplate:
         require_aware_datetime(self.created_at, "created_at")
 
 
+class MediaOrderSource(StrEnum):
+    MEDIA_TIMING = "media_timing"
+    REGISTRATION_TIME = "registration_time"
+
+
 @dataclass(frozen=True, slots=True)
 class CompletionMember:
     asset_id: EntityId
     association_revision: int
     media_started_at: datetime | None
+    registered_at: datetime
+    order_source: MediaOrderSource
+    # Only legacy invalid revisions may lack a media-timing key.
+    order_key_at: datetime | None
 
     def __post_init__(self) -> None:
         positive(self.association_revision, "association_revision")
+        object.__setattr__(self, "order_source", MediaOrderSource(self.order_source))
+        require_aware_datetime(self.registered_at, "registered_at")
+        if self.order_key_at is not None:
+            require_aware_datetime(self.order_key_at, "order_key_at")
+        if self.order_source == MediaOrderSource.MEDIA_TIMING:
+            if self.order_key_at != self.media_started_at:
+                raise ValueError("media_timing order key must equal media_started_at")
+        elif self.order_key_at is None:
+            raise ValueError("registration_time requires an order key")
         if self.media_started_at is not None:
             require_aware_datetime(self.media_started_at, "media_started_at")
 

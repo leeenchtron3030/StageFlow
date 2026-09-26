@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved
+Completed (2026-09-26).
 
 ## Execution authority
 
@@ -196,4 +196,36 @@ Revert the code and apply the `0016` reverse (only while no member records a
 
 ## Completion record
 
-_(Filled in on completion.)_
+- **Implemented revision:** branch `codex/ed-0088-assembly-media-order`. Codex implemented
+  the change and the owner committed it.
+- **Files changed:**
+  - Assembly contracts, resolution, in-memory and PostgreSQL repositories, and routes;
+  - render planning;
+  - migration registration and additive migration `0016`, which adds `order_source` and
+    `order_key_at` to `assembly_member` with three checks and no backfill;
+  - `tests/test_assembly_media_order.py`;
+  - authorized updates to existing tests;
+  - the glossary, the persistence document, the capability layer, and the rendering README.
+- **Plan clarifications during implementation** (the owner's, all Green):
+  - (A) the frozen-order render assertion now expects the frozen order;
+  - (B) legacy untimed members hydrate with a NULL key and stay invalid;
+  - (C) mechanical `CompletionMember` constructor updates that preserve values;
+  - (D) the `0016` reverse guard is narrowed to `registration_time` rows, which keeps the
+    existing `0013` reverse/reapply test unchanged.
+- **Existing assertions changed:** only under the plan and A–D. Details:
+  - the `"timing"` validation case;
+  - the frozen-order render test, renamed;
+  - the migration-order lists;
+  - mechanical constructor fields.
+- **Review:** the `directive-reviewer` returned FIX-FIRST for a test gap. The owner added a
+  pure-planner test covering a bound binding with no revision (`INPUT_MISSING`) and a
+  template with no Session-media slot, which renders packaging inputs only.
+- **Tests:** host full suite **2,327 passed, 0 failed, 2 skipped** before the added test;
+  the new test file then passed 25 of 25. Ruff and Pyright are clean.
+- **Deviations:** none. ADR-0032 decision 5 still says members render "in timeline order".
+  Under this plan they render in the frozen revision order, which equals timeline order
+  whenever timing is known.
+- **Remaining work:**
+  - Option A: once production Media Timing Evidence inspection exists, it becomes the
+    ordering source.
+  - A Producer UI that shows ordering sources before approval.

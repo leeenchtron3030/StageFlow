@@ -37,6 +37,7 @@ from app.contexts.assembly.session_contracts import (
     AssemblySlot,
     AssemblyValidation,
     CompletionMember,
+    MediaOrderSource,
     MetadataField,
     MetadataOverrideAction,
     MetadataValue,
@@ -123,7 +124,7 @@ PROFILE = FIRST_RENDER_PROFILE
 def assembly() -> SessionAssembly:
     revision = AssemblyRevision(
         EntityId.new(), EntityId.new(), EntityId.new(), 1, None, EntityId.new(), 1, EntityId.new(),
-        (CompletionMember(EntityId.new(), 1, NOW),),
+        (CompletionMember(EntityId.new(), 1, NOW, NOW, MediaOrderSource.MEDIA_TIMING, NOW),),
         (SlotBinding("intro", EntityId.new(), "bound"),
          SlotBinding("media", None, "session_media")),
         (MetadataValue(MetadataField.SESSION_TITLE, ("Frozen title",), EntityId.new(), 2,
@@ -142,14 +143,16 @@ def plan_for(value: SessionAssembly) -> RenderPlan:
          for m in value.revision.membership})
 
 
-def test_plan_template_then_timeline_order_and_frozen_override_provenance() -> None:
+def test_plan_template_then_frozen_order_and_frozen_override_provenance() -> None:
     source = assembly()
-    first, second = source.revision.membership[0], CompletionMember(EntityId.new(), 2,
-                                                                    NOW + timedelta(seconds=2))
+    first, second = source.revision.membership[0], CompletionMember(
+        EntityId.new(), 2, NOW + timedelta(seconds=2), NOW, MediaOrderSource.MEDIA_TIMING,
+        NOW + timedelta(seconds=2),
+    )
     source = replace(source, revision=replace(source.revision, membership=(second, first)))
     plan = plan_for(source)
     assert [item.reference for item in plan.inputs[1:]] == [
-        CompletedMediaAssetContent(first.asset_id), CompletedMediaAssetContent(second.asset_id),
+        CompletedMediaAssetContent(second.asset_id), CompletedMediaAssetContent(first.asset_id),
     ]
     assert plan.manifest.metadata == source.revision.metadata
     assert plan.manifest.metadata[0].source == "operator_override"

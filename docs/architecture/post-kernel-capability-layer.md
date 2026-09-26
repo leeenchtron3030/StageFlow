@@ -17,7 +17,8 @@ ED-0076 implements ADR-0030's Packaging Asset identity, immutable content revisi
 human approval lineage, and bounded authenticated reads in the new Assembly context.
 ED-0077 implements Session Assembly templates, proposals, revisions, validation, and
 human approval. ED-0086 adds human-only, Session-local metadata overrides with frozen
-source provenance. Rendering remains future work.
+source provenance. ED-0087 implements the bounded render first slice, and ED-0088
+adds per-member ordering provenance and frozen slot-order expansion.
 
 The Kernel remains the protected operational foundation. New capabilities reference its
 Business Event, Stage, Program Expectation, realized Session, media registration,
@@ -473,8 +474,16 @@ the prior revision, with optimistic Assembly and package-revision guards.
 
 Proposals require a `complete` Kernel package and pin its completion decision and exact
 `session_completion_asset` membership, including association revisions. Ineligible
-packages produce a persisted invalid revision. Members sort by registered media start,
-then asset ID for ties; missing timing or unavailable membership blocks validation.
+packages produce a persisted invalid revision. ED-0088 orders each member by known
+`media_started_at` (`media_timing`), otherwise the registry's `registered_at`
+(`registration_time`), then asset ID for ties. Both the source and aware `order_key_at`
+are frozen per member and exposed on revision APIs before human approval confirms the
+order. All-untimed and mixed membership can be valid; unavailable membership still
+blocks validation. New proposals never emit `MEDIA_TIMING_UNAVAILABLE`, though the
+reason remains readable for historical invalid revisions. Legacy NULL ordering fields
+hydrate as `media_timing` with the stored media start as key; untimed legacy invalid
+revisions retain their null key and stored invalidity and cannot be approved or rendered.
+This changes no registry media start, Media Timing Evidence, or derived staleness rule.
 No live association membership or media content is read. Each `session_media` slot
 references that one frozen membership sequence.
 
@@ -536,9 +545,13 @@ Operation; see the render first slice below.
 
 The rendering context now turns an approved, non-stale Assembly revision into a
 Durable Operation through a human-only idempotent command. The pure planner consumes
-pinned bindings and completion membership, with frozen metadata and override provenance
-in a sidecar. The separate local render worker uses the shared ADR-0025 claims, leases,
-retries and fences, at one lease per worker. Output registration and operation success
+pinned bindings in template slot order. Each bound video Packaging Asset contributes
+its input; each `session_media` slot expands membership in frozen position order. Intro,
+Session media, and outro therefore retain template placement. The planner never re-sorts
+members or requires media start timing, and still refuses unapproved, invalid or stale
+revisions, missing inputs, and non-video inputs. Frozen metadata and override provenance
+remain in a sidecar. The separate local render worker uses the shared ADR-0025 claims,
+leases, retries and fences, at one lease per worker. Output registration and operation success
 share a transaction. All failures after running are bounded typed attempt outcomes.
 
 The first profile is video-only CUDA decode to H.264 NVENC, p4, VBR 8 Mbit/s, GOP 60,

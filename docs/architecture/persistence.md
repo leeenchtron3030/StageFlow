@@ -167,6 +167,24 @@ Reversal runs before `0014` (and before direct `0007` reversal), restores the or
 checks and nullability, and refuses while any render operations, inputs, outputs, or
 capabilities exist. It deletes no render history and requires no backfill on reapply.
 
+`0016_assembly_media_order` adds only nullable `order_source` (text) and `order_key_at`
+(`timestamptz`) to `assembly_member`, plus three checks: the closed source values
+`media_timing`/`registration_time`, both fields NULL or both set, and a media-timing key
+matching a non-null `media_started_at`. It changes no `0013` column or constraint and
+performs no backfill or UPDATE. Existing immutability triggers stay active. Proposals
+freeze the source and key with each position. Membership input and hydration read
+`registered_at` from the existing registry; no third Assembly column duplicates it.
+
+Legacy NULL pairs hydrate as `media_timing` with `order_key_at = media_started_at`,
+preserving stored positions and validation. An untimed legacy invalid revision keeps
+its null key and remains unapprovable and unrenderable. New revisions always have an
+aware key, including registration-time fallback for untimed media. Migration `0016`
+applies after `0015` and reverses before it. Its reverse locks `assembly_member` and
+refuses with `assembly_media_order_reverse_requires_no_registration_time_members`
+while any `registration_time` row exists; `media_timing` rows do not block reversal.
+Allowed reversal drops only the two columns, three checks and ledger entry; timed
+rows hydrate identically after reapply, which performs no backfill.
+
 Registration is at least once and idempotent. It does not claim exactly-once delivery.
 Only a newly created ingress record is eligible for the included dispatcher path; an
 exact replay does not repeat that caller-visible dispatch path. The asset-registration
