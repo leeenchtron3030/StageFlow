@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved
+Completed (2026-09-26).
 
 ## Execution authority
 
@@ -156,4 +156,33 @@ Revert the code. No data changes. v2 outputs stay readable as recorded history.
 
 ## Completion record
 
-_(Filled in on completion.)_
+- **Implemented revision:** branch `codex/ed-0089-render-profile-v2`, stacked on ED-0088.
+  Codex implemented it and the owner committed it.
+- **Files changed:**
+  - rendering contracts: `output_frame_rate`, `CURRENT_RENDER_PROFILE` v2,
+    `RENDER_PROFILE_V1`, and a `FIRST_RENDER_PROFILE` alias used only by tests;
+  - the FFmpeg adapter: `-fps_mode cfr -r 30000/1001`;
+  - the API: v2 default, v1 refused with a bounded 409;
+  - the render worker and repository: v2 capability and claims;
+  - `tests/test_render_profile_v2.py` and additions to `tests/test_rendering_phase_b.py`;
+  - the rendering README, the capability layer, and the glossary.
+- **Plan clarification** (the owner's): Codex stopped Yellow because the shared ADR-0025
+  substrate promotes due pending work to `eligible` before matching capabilities. The
+  guarantee was restated: v1 work is never claimed, leased, or attempted by a v2 worker.
+  The substrate is unchanged.
+- **Review:** the `directive-reviewer` returned FIX-FIRST for two missing negative tests
+  (non-Fraction rate; unknown output profile version). The owner added them, plus an
+  assertion that `-r` is an output option. No existing assertion was changed.
+- **Tests:** host full suite **2,337 passed, 0 failed, 2 skipped** before the added
+  assertions. Afterwards the rendering files passed 51 of 51, and Ruff and Pyright are
+  clean.
+- **Owner real-GPU render:** see
+  [Run 002](../validation/results/render-durable-operation-002.md).
+  - 0 duplicate timestamps (Run 001 had 22), 0 decode warnings, and identity checks pass.
+  - The literal "within one frame of the input sum" criterion is **not met**: the output
+    is 0.334 s short of the naive per-file sum. v1 was 0.40 s short by the same measure,
+    and v2 differs from v1 by +0.067 s. Run 002 explains this as concat timestamp joining.
+- **Deviations:** the frame count is no longer equal to the input frame sum (19,842 against
+  19,850). This is expected with constant-rate output.
+- **Remaining work:** remove the `FIRST_RENDER_PROFILE` alias once the tests use the current
+  name.
