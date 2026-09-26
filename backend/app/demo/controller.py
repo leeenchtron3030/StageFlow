@@ -730,7 +730,7 @@ def worker_summary(dsn: str, event_id: object, deployment_id: object) -> dict[st
                                    WHERE tc.worker_id = w.worker_id)
                        OR EXISTS (SELECT 1 FROM stageflow.work_worker_capability tc
                                   WHERE tc.worker_id = w.worker_id
-                                    AND tc.operation_kind <> 'render'))
+                                    AND tc.operation_kind = 'transcription'))
                 ORDER BY w.worker_id
                 LIMIT 20
                 """,

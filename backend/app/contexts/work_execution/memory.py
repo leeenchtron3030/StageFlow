@@ -19,6 +19,7 @@ from .contracts import (
     DurableOperation,
     EventNetworkPolicy,
     ExecutionLocality,
+    MediaTimingOperationInput,
     OperationAttempt,
     OperationClaim,
     OperationFailure,
@@ -26,6 +27,7 @@ from .contracts import (
     OperationStatus,
     OperationStatusCount,
     PendingOperation,
+    RenderOperationInput,
     TranscriptionOperationInput,
     Worker,
     WorkerCapability,
@@ -43,7 +45,16 @@ from .repository import (
 
 
 class InMemoryWorkExecutionRepository(WorkExecutionRepository[OperationInput]):
-    def __init__(self, clock: Clock) -> None:
+    def __init__(
+        self, clock: Clock, *, input_types: tuple[type[OperationInput], ...] = (
+            TranscriptionOperationInput, RenderOperationInput, MediaTimingOperationInput,
+        ),
+    ) -> None:
+        if not input_types or any(value not in (
+            TranscriptionOperationInput, RenderOperationInput, MediaTimingOperationInput,
+        ) for value in input_types):
+            raise ValueError("unsupported operation input type")
+        self._input_types = input_types
         self.clock = clock
         self.operations: dict[EntityId, DurableOperation[OperationInput]] = {}
         self.attempts: dict[EntityId, OperationAttempt] = {}
@@ -57,6 +68,8 @@ class InMemoryWorkExecutionRepository(WorkExecutionRepository[OperationInput]):
         self, pending: PendingOperation[OperationInput],
     ) -> DurableOperation[OperationInput]:
         request = pending.request
+        if not isinstance(request.input, self._input_types):
+            raise WorkExecutionConflictError("operation_kind_not_supported")
         with self._lock:
             matches = [old for old in self.operations.values()
                        if old.id == request.operation_id
@@ -67,7 +80,8 @@ class InMemoryWorkExecutionRepository(WorkExecutionRepository[OperationInput]):
             for old in matches:
                 if (old.id == request.operation_id or old.idempotency_key == request.idempotency_key
                         or old.work_key == pending.work_key):
-                    if (old.kind == request.input.kind == "render"
+                    if (old.kind == request.input.kind
+                            and old.kind in ("render", "media_timing")
                             and old.work_key == pending.work_key
                             and old.id != request.operation_id
                             and old.idempotency_key != request.idempotency_key
@@ -157,6 +171,8 @@ class InMemoryWorkExecutionRepository(WorkExecutionRepository[OperationInput]):
             network = request.network_policy == EventNetworkPolicy.NETWORK_PERMITTED
             for operation in sorted(self.operations.values(), key=lambda o: (
                     -o.priority, o.eligible_at, o.created_at)):
+                if not isinstance(operation.input, self._input_types):
+                    continue
                 if operation.deployment_id != worker.deployment_id:
                     continue
                 if (operation.status in (OperationStatus.PENDING, OperationStatus.RETRY_WAIT)
@@ -299,6 +315,8 @@ class InMemoryWorkExecutionRepository(WorkExecutionRepository[OperationInput]):
             rows: list[DurableOperation[OperationInput]] = []
             for operation in sorted(self.operations.values(), key=lambda o: o.lease_expires_at
                                     or o.created_at):
+                if not isinstance(operation.input, self._input_types):
+                    continue
                 if (operation.status in (OperationStatus.LEASED, OperationStatus.RUNNING,
                                          OperationStatus.CANCEL_REQUESTED)
                         and operation.lease_expires_at is not None
@@ -316,11 +334,27 @@ class InMemoryWorkExecutionRepository(WorkExecutionRepository[OperationInput]):
 
     def get_operation(self, operation_id: EntityId) -> DurableOperation[OperationInput]:
         try:
-            return self.operations[operation_id]
+            operation = self.operations[operation_id]
         except KeyError as exc:
             raise WorkExecutionNotFoundError("operation_not_found") from exc
+        if not isinstance(operation.input, self._input_types):
+            raise WorkExecutionNotFoundError("operation_kind_not_supported")
+        return operation
+
+    def list_operations(
+        self, *, deployment_id: str, event_id: EntityId | None, limit: int = 100,
+    ) -> tuple[DurableOperation[OperationInput], ...]:
+        if not 1 <= limit <= 500:
+            raise ValueError("limit must be between 1 and 500")
+        return tuple(sorted((o for o in self.operations.values()
+                             if isinstance(o.input, self._input_types)
+                             and o.deployment_id == deployment_id and o.event_id == event_id),
+                            key=lambda o: (-o.created_at.timestamp(), o.id.value))[:limit])
 
     def list_attempts(self, operation_id: EntityId) -> tuple[OperationAttempt, ...]:
+        operation = self.operations.get(operation_id)
+        if operation is None or not isinstance(operation.input, self._input_types):
+            return ()
         return tuple(sorted((a for a in self.attempts.values() if a.operation_id == operation_id),
                             key=lambda a: a.attempt_number))
 
@@ -370,7 +404,8 @@ class InMemoryWorkExecutionRepository(WorkExecutionRepository[OperationInput]):
                           event_id: EntityId | None) -> WorkExecutionProjection:
         now = self.clock.now()
         rows = [o for o in self.operations.values()
-                if o.deployment_id == deployment_id and o.event_id == event_id]
+                if isinstance(o.input, self._input_types)
+                and o.deployment_id == deployment_id and o.event_id == event_id]
         eligible = [o.eligible_at for o in rows if o.status == OperationStatus.ELIGIBLE]
         attention: set[str] = set()
         for operation in rows:
@@ -385,7 +420,7 @@ class InMemoryWorkExecutionRepository(WorkExecutionRepository[OperationInput]):
                 and c.operation_schema_version == operation.schema_version
                 and c.execution_profile_id == operation.input.execution_profile_id
                 and c.execution_profile_version == operation.input.execution_profile_version
-                and (operation.input.kind == "render"
+                and (not isinstance(operation.input, TranscriptionOperationInput)
                      or operation.input.asset_format in (c.accepted_asset_formats or ()))
                 for c in self.capabilities.values()
             ):

@@ -229,6 +229,17 @@ schema. The `0005` reverse removes only membership tagged as its legacy reconstr
 before dropping its additive columns.
 Reversal is an explicit operator action for an isolated database and is never automatic.
 
+`0017_media_timing_operation` adds the `media_timing` kind to the shared Work Execution
+journal after `0016`. Its asset/manifest identity and inspection profile ID/version use
+existing asset/manifest and execution-profile columns; transcription-specific fields are
+not populated. A dedicated terminal-result foreign key references advisory MTE, with
+kind-aware success and result-column checks. Capabilities carry no transcription fields.
+Configured repository input types filter claims, listings, counts, and limits. This is
+Phase A persistence only: no inspector, worker, enqueue composition, or MTE write path is
+introduced. Reverse runs before `0016`, restores the exact `0015`/`0016` constraints,
+and refuses while timing operations, capabilities, or terminal-result references exist.
+No backfill or existing-row identity change occurs.
+
 ## Windows reference-node validation
 
 The initial Windows Razer validation used an isolated PostgreSQL 17.10 cluster bound to

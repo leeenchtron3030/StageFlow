@@ -150,7 +150,30 @@ class RenderOperationInput:
             raise ValueError("output_token must be an opaque token, never a path.")
 
 
-type OperationInput = TranscriptionOperationInput | RenderOperationInput
+@dataclass(frozen=True, slots=True)
+class MediaTimingOperationInput:
+    asset_id: EntityId
+    manifest_id: EntityId
+    manifest_version: str
+    inspection_profile_id: str
+    inspection_profile_version: str
+    kind: Literal["media_timing"] = field(default="media_timing", init=False)
+    requires_cloud: Literal[False] = field(default=False, init=False)
+
+    def __post_init__(self) -> None:
+        for name in ("manifest_version", "inspection_profile_id", "inspection_profile_version"):
+            object.__setattr__(self, name, _identifier(getattr(self, name), name))
+
+    @property
+    def execution_profile_id(self) -> str:
+        return self.inspection_profile_id
+
+    @property
+    def execution_profile_version(self) -> str:
+        return self.inspection_profile_version
+
+
+type OperationInput = TranscriptionOperationInput | RenderOperationInput | MediaTimingOperationInput
 
 InputT = TypeVar(
     "InputT", bound=OperationInput, covariant=True, default=TranscriptionOperationInput,
@@ -251,6 +274,7 @@ class DurableOperation(Generic[InputT]):
     created_at: datetime
     updated_at: datetime
     terminal_result_rendered_output_id: EntityId | None = None
+    terminal_result_media_timing_evidence_id: EntityId | None = None
 
     def __post_init__(self) -> None:
         if self.kind != self.input.kind:
@@ -420,6 +444,14 @@ class WorkerCapability:
         )
         if not formats and self.operation_kind == "transcription":
             raise ValueError("A worker capability requires an accepted asset format.")
+        if self.operation_kind == "media_timing" and (
+            self.accepted_asset_formats is not None
+            or self.supports_word_timing or self.supports_speaker_labels
+            or any(value is not None for value in (
+                self.provider_id, self.provider_version, self.model_id, self.model_version,
+            ))
+        ):
+            raise ValueError("media_timing capability cannot declare transcription fields.")
         object.__setattr__(
             self, "accepted_asset_formats",
             None if self.accepted_asset_formats is None else formats,
@@ -454,7 +486,7 @@ class ClaimRequest:
     worker_id: EntityId
     network_policy: EventNetworkPolicy
     lease_duration: timedelta
-    operation_kind: Literal["transcription", "render"] | None = None
+    operation_kind: Literal["transcription", "render", "media_timing"] | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -532,6 +564,7 @@ class WorkExecutionProjection:
 
 
 __all__ = [
+    "MediaTimingOperationInput",
     "RenderOperationInput",
     "OperationInput",
     "EnqueueRenderOperation",

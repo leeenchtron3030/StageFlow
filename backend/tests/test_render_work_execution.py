@@ -763,6 +763,9 @@ def test_reverse_refuses_render_capability_without_render_operations(
                 sql.Identifier(table),
             )).fetchall()
             assert rows == []
+    # Successor migrations reverse first in their own transactions; start from the
+    # post-0016 baseline so the assertion covers only the refused 0015 reverse.
+    PostgresMigrationRunner(render_postgres_dsn).reverse_media_timing_operation_v1()
     before = schema_contract(render_postgres_dsn)
     with pytest.raises(psycopg.errors.RaiseException, match="cannot reverse 0015"):
         PostgresMigrationRunner(render_postgres_dsn).reverse_render_durable_operation_v1()
