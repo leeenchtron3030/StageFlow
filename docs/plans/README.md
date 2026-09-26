@@ -147,3 +147,5 @@ or architecture document unless those documents are explicitly updated.
 | [Multi-encode render benchmark](multi-encode-render-benchmark.md) | Completed - Green qualification tooling and measurement | StageFlow Validation / Backend | ADR-0029; ED-0078 follow-up; ED-0085 |
 | [Assembly metadata overrides](assembly-metadata-overrides.md) | Completed - Green Assembly metadata overrides | StageFlow Assembly / Backend | ED-0077 follow-up; owner decisions 2026-09-25; ED-0086 |
 | [Render Durable Operation (first slice)](render-durable-operation.md) | Completed - Green render Durable Operation | StageFlow Rendering / Work Execution / Backend | ADR-0032; ADR-0025; ADR-0029; ED-0087 |
+| [Assembly media-order fallback and render slot order](assembly-media-order-fallback.md) | Approved | StageFlow Assembly / Rendering / Backend | Owner decision 2026-09-26; ED-0077; ADR-0027; ADR-0032; ED-0088 |
+| [Render profile v2: constant output frame rate](render-profile-v2-constant-frame-rate.md) | Approved | StageFlow Rendering / Backend | ADR-0032 amendment 3; ED-0089 |

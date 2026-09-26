@@ -115,6 +115,18 @@ Checks still require these columns for transcription, and the reverse restores `
 - The reverse restores the originals, and only while no render rows exist.
 - Every changed constraint is listed in the implementation report and verified in review.
 
+*Owner amendment 3, 2026-09-26 (render profile v2 — constant output frame rate):*
+- Real-GPU validation Run 001 showed that `-fps_mode passthrough` produces duplicate
+  presentation timestamps when inputs have slightly different frame rates (for example a
+  30000/1001 bumper with 2997/100 recordings).
+- The current render profile therefore becomes **version 2**. It is identical to
+  decision 5's settings except for its output frame rate, which is a constant 30000/1001.
+- Version 1 remains a recorded identity for existing Rendered Outputs. It cannot be
+  requested for new renders.
+- A v2 request for a revision already rendered under v1 is a new operation, because the
+  work key includes the profile version.
+- Implemented under ED-0089.
+
 ## Alternatives
 
 - **A separate render-only operation substrate** (new operation, attempt, and worker tables
