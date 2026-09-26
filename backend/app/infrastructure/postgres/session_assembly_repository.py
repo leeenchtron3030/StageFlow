@@ -34,6 +34,7 @@ from app.contexts.assembly.session_contracts import (
     AssemblyValidation,
     CompletionMember,
     ExplicitBinding,
+    MediaOrderSource,
     MetadataField,
     MetadataOverrideAction,
     MetadataOverridePage,
@@ -254,14 +255,19 @@ class PostgresSessionAssemblyRepository:
             ).fetchone()
             if completion is not None and completion["membership_snapshot_status"] != "unresolved":
                 rows = conn.execute(
-                    """SELECT m.asset_id,m.association_revision,a.media_started_at
+                    """SELECT m.asset_id,m.association_revision,a.media_started_at,a.registered_at
                        FROM stageflow.session_completion_asset m
                        JOIN stageflow.completed_media_asset_registry a USING (asset_id)
                        WHERE m.completion_decision_id=%s""",
                     (completion["completion_decision_id"],),
                 ).fetchall()
                 members = tuple(CompletionMember(_id(r["asset_id"]), r["association_revision"],
-                                                 r["media_started_at"]) for r in rows)
+                                                 r["media_started_at"], r["registered_at"],
+                                                 MediaOrderSource.MEDIA_TIMING
+                                                 if r["media_started_at"] is not None
+                                                 else MediaOrderSource.REGISTRATION_TIME,
+                                                 r["media_started_at"] or r["registered_at"])
+                                for r in rows)
         metadata: tuple[MetadataValue, ...] = ()
         if session["program_expectation_id"] is not None:
             row = conn.execute(
@@ -360,10 +366,12 @@ class PostgresSessionAssemblyRepository:
             cursor.executemany(
                 """INSERT INTO stageflow.assembly_member
                    (revision_id,position,completion_decision_id,asset_id,association_revision,
-                    media_started_at) VALUES (%s,%s,%s,%s,%s,%s)""",
+                    media_started_at,order_source,order_key_at)
+                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s)""",
                 [(r.id.value, i, None if r.completion_decision_id is None
                   else r.completion_decision_id.value, m.asset_id.value, m.association_revision,
-                  m.media_started_at) for i, m in enumerate(r.membership)],
+                  m.media_started_at, m.order_source.value, m.order_key_at)
+                 for i, m in enumerate(r.membership)],
             )
             cursor.executemany(
                 """INSERT INTO stageflow.assembly_binding
@@ -399,10 +407,13 @@ class PostgresSessionAssemblyRepository:
         members: dict[EntityId, list[CompletionMember]] = {}
         bindings: dict[EntityId, list[SlotBinding]] = {}
         metadata: dict[EntityId, list[MetadataValue]] = {}
-        for m in conn.execute("""SELECT * FROM stageflow.assembly_member
+        for m in conn.execute("""SELECT m.*,a.registered_at FROM stageflow.assembly_member m
+                                 JOIN stageflow.completed_media_asset_registry a USING (asset_id)
                                  WHERE revision_id=ANY(%s::uuid[]) ORDER BY position""", (ids,)):
             members.setdefault(_id(m["revision_id"]), []).append(CompletionMember(
                 _id(m["asset_id"]), m["association_revision"], m["media_started_at"],
+                m["registered_at"], MediaOrderSource(m["order_source"] or "media_timing"),
+                m["media_started_at"] if m["order_source"] is None else m["order_key_at"],
             ))
         for b in conn.execute("""SELECT * FROM stageflow.assembly_binding
                                  WHERE revision_id=ANY(%s::uuid[]) ORDER BY position""", (ids,)):

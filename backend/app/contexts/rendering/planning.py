@@ -30,14 +30,12 @@ def build_render_plan(
     try:
         # Bindings were frozen in template order by Assembly; no live template resolution.
         for binding in revision.bindings:
-            if binding.packaging_revision_id is not None:
+            if binding.outcome == "bound":
+                if binding.packaging_revision_id is None:
+                    raise RenderError(RenderReason.INPUT_MISSING)
                 ordered.append(packaging[binding.packaging_revision_id])
-        if any(member.media_started_at is None for member in revision.membership):
-            raise RenderError(RenderReason.INPUT_MISSING)
-        for member in sorted(revision.membership, key=lambda m: (
-            m.media_started_at or revision.created_at, m.asset_id.value,
-        )):
-            ordered.append(media[member.asset_id])
+            elif binding.outcome == "session_media":
+                ordered.extend(media[member.asset_id] for member in revision.membership)
     except KeyError:
         raise RenderError(RenderReason.INPUT_MISSING) from None
     if not ordered:

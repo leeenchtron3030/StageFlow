@@ -1,5 +1,6 @@
 """Pure deterministic proposal resolution and validation."""
 from collections.abc import Iterable
+from dataclasses import replace
 
 from app.shared.ids import EntityId
 
@@ -11,6 +12,7 @@ from .session_contracts import (
     AssemblyTemplate,
     AssemblyValidation,
     ExplicitBinding,
+    MediaOrderSource,
     MetadataField,
     MetadataOverrideAction,
     MetadataValue,
@@ -85,8 +87,6 @@ def validate_assembly(
         issues.append(ValidationIssue(ValidationReason.INELIGIBLE_PACKAGE))
     elif inputs.completion_decision_id is None or not inputs.membership:
         issues.append(ValidationIssue(ValidationReason.COMPLETION_MEMBERSHIP_UNAVAILABLE))
-    if any(m.media_started_at is None for m in inputs.membership):
-        issues.append(ValidationIssue(ValidationReason.MEDIA_TIMING_UNAVAILABLE))
     if tuple(b.slot_key for b in bindings) != tuple(s.key for s in template.slots):
         raise ValueError("bindings must match template order")
     for slot, binding in zip(template.slots, bindings, strict=True):
@@ -114,9 +114,13 @@ def build_revision(
     if template.event_id != inputs.event_id:
         raise ValueError("template_not_in_session_event")
     bindings = resolve_bindings(template, inputs, candidates, explicit)
-    membership = tuple(sorted(inputs.membership, key=lambda m: (
-        m.media_started_at is None, m.media_started_at or inputs.authoritative_start,
-        m.asset_id.value,
+    keyed = tuple(replace(
+        m, order_source=(MediaOrderSource.MEDIA_TIMING if m.media_started_at is not None
+                         else MediaOrderSource.REGISTRATION_TIME),
+        order_key_at=m.media_started_at if m.media_started_at is not None else m.registered_at,
+    ) for m in inputs.membership)
+    membership = tuple(sorted(keyed, key=lambda m: (
+        m.order_key_at if m.order_key_at is not None else m.registered_at, m.asset_id.value,
     )))
     return AssemblyRevision(
         revision_id, inputs.session_id, inputs.event_id, number, previous, template.id,

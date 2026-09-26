@@ -2,8 +2,15 @@
 
 The first Render Profile is `h264-nvenc-1080p-video`, version `1`: CUDA decode,
 H.264 NVENC, preset p4, VBR 8 Mbit/s, GOP 60, 1920 by 1080, MP4, video only.
-The pure planner consumes pinned Assembly bindings in template order, followed by
-pinned completion membership in timeline order. Non-video Packaging Assets produce
+The pure planner expands frozen Assembly bindings in template slot order: each bound
+video Packaging Asset contributes its input, and each `session_media` slot expands
+the pinned completion membership in its stored position order. For example, intro,
+Session media, and outro retain that order. The planner never re-sorts members or
+requires media start timing. ED-0088 freezes each member's `order_source` and aware
+`order_key_at` at proposal: known media timing, otherwise registry registration time,
+then asset ID for ties. Human approval confirms this order. Legacy untimed invalid
+revisions remain readable with a null key and cannot be approved or rendered.
+Non-video Packaging Assets produce
 `render_input_not_video`; they are never silently skipped. Metadata and override
 provenance come from the revision's frozen snapshot and are stored in a sidecar.
 

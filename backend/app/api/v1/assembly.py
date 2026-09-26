@@ -430,7 +430,9 @@ def _assembly_response(r: AssemblyRevision) -> dict[str, object]:
                                    else r.completion_decision_id.value),
         "membership": [{"asset_id": m.asset_id.value,
                         "association_revision": m.association_revision,
-                        "media_started_at": m.media_started_at} for m in r.membership],
+                        "media_started_at": m.media_started_at,
+                        "order_source": m.order_source.value,
+                        "order_key_at": m.order_key_at} for m in r.membership],
         "bindings": [{"slot_key": b.slot_key, "outcome": b.outcome,
                       "packaging_revision_id": (None if b.packaging_revision_id is None
                                                 else b.packaging_revision_id.value)}
