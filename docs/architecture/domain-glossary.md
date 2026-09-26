@@ -289,8 +289,10 @@ authorized by this document.
 
 ### Rendering terms
 
-- **Render Profile:** immutable, versioned execution settings. The first profile uses
-  CUDA decode and H.264 NVENC at 1080p, preset p4, VBR 8 Mbit/s, GOP 60, MP4, video only.
+- **Render Profile:** immutable, versioned execution settings. The current profile, v2,
+  uses CUDA decode and H.264 NVENC at 1080p, preset p4, VBR 8 Mbit/s, GOP 60, MP4,
+  video only, with constant 30000/1001 output frame rate. v1 remains a readable recorded
+  identity but cannot be requested for new renders.
 - **Render Request:** human-authorized, idempotent command for an approved, non-stale
   Assembly revision and one Render Profile. It enqueues a Durable Operation, not publication.
 - **Rendered Output:** immutable rendering-owned identity for completed output bytes and

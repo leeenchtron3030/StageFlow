@@ -1,7 +1,17 @@
 # Rendering context
 
-The first Render Profile is `h264-nvenc-1080p-video`, version `1`: CUDA decode,
-H.264 NVENC, preset p4, VBR 8 Mbit/s, GOP 60, 1920 by 1080, MP4, video only.
+The current Render Profile is `h264-nvenc-1080p-video`, version `2`: CUDA decode,
+H.264 NVENC, preset p4, VBR 8 Mbit/s, GOP 60, 1920 by 1080, MP4, video only,
+with a constant output frame rate of 30000/1001. FFmpeg uses `-fps_mode cfr -r 30000/1001`
+after the existing CUDA scale filter, keeping frames on the GPU path. Frame-count
+parsing and the CUDA-decode fallback guard are unchanged.
+
+New requests default to v2; explicit v1 requests return `render_profile_unsupported`
+(HTTP 409). `RENDER_PROFILE_V1` records the former passthrough identity only. Existing
+v1 outputs and sidecar identities remain readable without rewriting stored history.
+`CURRENT_RENDER_PROFILE` names v2; `FIRST_RENDER_PROFILE` is a compatibility alias for
+it, used only by tests, and may be removed once they adopt the current-profile name.
+
 The pure planner expands frozen Assembly bindings in template slot order: each bound
 video Packaging Asset contributes its input, and each `session_media` slot expands
 the pinned completion membership in its stored position order. For example, intro,
@@ -20,14 +30,18 @@ Packaging Asset approval, and governing metadata overrides. Program refresh alon
 does not make a revision stale. PostgreSQL validates new requests in the enqueue
 transaction while holding the same Session and Packaging locks as Assembly commands.
 
-The work key is Assembly revision plus profile ID and version. Exact command replay
+The work key is Assembly revision plus profile ID and version. Requesting v2 for a
+revision already rendered under v1 creates a new operation. Exact command replay
 returns the existing operation and its current state, including failure or cancellation.
 Conflicting command intent fails typed. Another command for the same work returns the
 existing operation; generated output tokens do not create new work. Re-rendering the
 same revision/profile after terminal failure is outside this slice: a new approved
 revision is the supported path. No generation or attempt component is added to the key.
 
-`RenderWorker` claims one render lease, renews and fences through the shared ADR-0025
+`RenderWorker` declares and claims only v2. v1 operations remain visible and are never claimed, leased, or attempted by a v2 worker;
+the shared ADR-0025 substrate may still promote a due v1 operation from `pending` to
+`eligible` as it does for all work.
+The worker claims one render lease, renews and fences through the shared ADR-0025
 repository, and commits output identity with operation success in one transaction.
 Exceptions after `mark_running` become typed attempt outcomes that release the lease;
 unexpected exceptions use `render_internal_error` without exception text. An expired

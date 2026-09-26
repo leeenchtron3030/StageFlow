@@ -12,7 +12,7 @@ from app.contexts.assembly.contracts import (
 from app.contexts.assembly.resolution import is_stale
 from app.contexts.assembly.session_contracts import SessionAssembly
 from app.contexts.rendering.contracts import (
-    FIRST_RENDER_PROFILE,
+    CURRENT_RENDER_PROFILE,
     FFmpegIdentity,
     RenderedOutput,
     RenderError,
@@ -106,10 +106,10 @@ class PostgresRenderRepository(PostgresWorkExecutionRepository[RenderOperationIn
         self, connection: psycopg.Connection[Row], pending: PendingOperation[RenderOperationInput],
     ) -> None:
         value = pending.request.input
-        if (value.execution_profile_id != FIRST_RENDER_PROFILE.id
-                or value.execution_profile_version != FIRST_RENDER_PROFILE.version):
+        if (value.execution_profile_id != CURRENT_RENDER_PROFILE.id
+                or value.execution_profile_version != CURRENT_RENDER_PROFILE.version):
             raise RenderError(RenderReason.PROFILE_UNSUPPORTED)
-        plan = self._plan(connection, value.assembly_revision_id, FIRST_RENDER_PROFILE, lock=True)
+        plan = self._plan(connection, value.assembly_revision_id, CURRENT_RENDER_PROFILE, lock=True)
         if plan.revision.event_id != pending.request.event_id:
             raise WorkExecutionConflictError("render_event_conflict")
 

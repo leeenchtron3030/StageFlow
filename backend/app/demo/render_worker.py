@@ -10,7 +10,7 @@ from pathlib import Path
 from uuid import NAMESPACE_URL, uuid5
 
 from app.bootstrap.event_mode_kernel import load_kernel_components_from_environment
-from app.contexts.rendering.contracts import FIRST_RENDER_PROFILE, FFmpegIdentity, RenderError
+from app.contexts.rendering.contracts import CURRENT_RENDER_PROFILE, FFmpegIdentity, RenderError
 from app.contexts.rendering.service import RenderWorker
 from app.contexts.work_execution import (
     ClaimRequest,
@@ -35,8 +35,8 @@ def render_capability(
 ) -> WorkerCapability:
     token = base64.urlsafe_b64encode(identity.version.encode("ascii")).decode("ascii").rstrip("=")
     return WorkerCapability(
-        EntityId.new(), worker_id, "render", "v1", FIRST_RENDER_PROFILE.id,
-        FIRST_RENDER_PROFILE.version, ExecutionLocality.LOCAL, None, False, False,
+        EntityId.new(), worker_id, "render", "v1", CURRENT_RENDER_PROFILE.id,
+        CURRENT_RENDER_PROFILE.version, ExecutionLocality.LOCAL, None, False, False,
         None, None, None, None, "ffmpeg:" + token, identity.sha256, nvenc, observed_at,
     )
 
@@ -75,7 +75,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             worker_id, config.deployment.node_id, config.deployment.deployment_id, event.id,
             True, False, "stageflow-render-worker-1", 1, now, now,
         ))
-        profile = FIRST_RENDER_PROFILE
+        profile = CURRENT_RENDER_PROFILE
         nvenc = ffmpeg.nvenc_available()
         repository.register_render_capability(render_capability(
             worker_id, ffmpeg.identity, nvenc, now,

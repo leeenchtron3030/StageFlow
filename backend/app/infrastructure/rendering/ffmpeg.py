@@ -89,6 +89,7 @@ class FFmpegAdapter:
         profile: RenderProfile, heartbeat: Callable[[], None],
     ) -> EncodingResult:
         require_profile(profile)
+        assert profile.output_frame_rate is not None
         store.validate()
         if safe_path(output).parent != store.temp:
             raise RenderError(RenderReason.STORE_UNAVAILABLE)
@@ -103,7 +104,8 @@ class FFmpegAdapter:
                        "-f", "concat", "-safe", "0", "-protocol_whitelist", "file,pipe",
                        "-i", str(concat), "-map", "0:v:0", "-map_metadata", "-1",
                        "-map_chapters", "-1",
-                       "-vf", "scale_cuda=1920:1080:format=nv12", "-fps_mode", "passthrough",
+                       "-vf", "scale_cuda=1920:1080:format=nv12", "-fps_mode", "cfr",
+                       "-r", str(profile.output_frame_rate),
                        "-c:v", profile.encoder, "-preset", profile.preset,
                        "-rc", profile.rate_control, "-b:v", str(profile.bit_rate),
                        "-g", str(profile.gop), "-an", "-f", profile.container,
