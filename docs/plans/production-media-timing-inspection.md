@@ -12,12 +12,12 @@ Approved
     that media timing comes first: a new Durable Operation kind using an operator-installed
     LGPL `ffprobe` by explicit path, recording observed `creation_time` and duration as
     advisory MTE.
-  - [ADR-0033](../adr/ADR-0033-production-media-timing-inspection.md), proposed and
-    awaiting the owner's acceptance.
+  - [ADR-0033](../adr/ADR-0033-production-media-timing-inspection.md), accepted by
+    the owner on 2026-09-26.
   - ADR-0027 (MTE is advisory; the application boundary exists), ADR-0025, and ADR-0032
     with amendment 2 (the kind-aware constraint rule).
   - ED-0087 (the substrate generalization and the FFmpeg identity pattern).
-- Implementation-ready: Yes, once ADR-0033 is accepted.
+- Implementation-ready: Yes.
 - Required escalation: stop if this would:
   - write `media_started_at`, Session boundaries, association, membership, or package
     state;
