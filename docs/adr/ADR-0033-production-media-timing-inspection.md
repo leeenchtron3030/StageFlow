@@ -2,8 +2,8 @@
 
 ## Status
 
-Proposed (drafted 2026-09-26 at the owner's direction; the owner selected this path and
-its defaults on the 2026-09-26 escalation — "media timing first").
+Accepted (owner, 2026-09-26). Drafted at the owner's direction after the owner selected
+this path and its defaults on the 2026-09-26 escalation, "media timing first".
 
 ## Date
 

@@ -2,11 +2,11 @@
 
 ## Status
 
-Approved (pending acceptance of ADR-0033)
+Approved
 
 ## Execution authority
 
-- Classification: Green autonomous once ADR-0033 is accepted.
+- Classification: Green autonomous under accepted ADR-0033.
 - Authority evidence:
   - The owner decided on 2026-09-26, on the "derived Editorial placement" escalation,
     that media timing comes first: a new Durable Operation kind using an operator-installed
