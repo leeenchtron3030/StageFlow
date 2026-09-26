@@ -120,8 +120,9 @@ render *before* the Session media.
    - a check that `order_source = 'media_timing'` requires `order_key_at = media_started_at`.
 
    Adding nullable columns fires no UPDATE trigger, and no backfill is done. The reverse
-   drops the columns and checks, and is **refused while any row has a non-NULL
-   `order_source`**. The migration is registered after `0015`, in forward and reverse
+   drops the columns and checks, and is **refused while any row has `order_source =
+   'registration_time'`**. Those are the only rows whose meaning would be lost; rows with
+   `media_timing` hydrate identically to legacy NULL rows after a reverse. The migration is registered after `0015`, in forward and reverse
    order.
 5. Render planning: slot-ordered expansion and frozen member order, as described above.
 6. API: expose `order_source` and `order_key_at` on revision members, additively.
@@ -132,7 +133,8 @@ render *before* the Session media.
    - ordering sources are frozen and survive a reload;
    - staleness is unchanged;
    - legacy NULL rows hydrate as `media_timing`;
-   - `0016` forward, reverse, and reapply, including a refused reverse when set rows exist;
+   - `0016` forward, reverse, and reapply, including a refused reverse when `registration_time` rows exist, and an allowed reverse with
+     only `media_timing` rows;
    - render planning places intro → session media → outro in template order and keeps the
      frozen member order, with and without timing;
    - the API exposes the new fields and no paths.
@@ -161,7 +163,7 @@ render *before* the Session media.
 
 `0016` is additive: two nullable columns and three checks on `assembly_member`, with no
 backfill. Existing revisions keep their stored positions. The reverse is valid only while
-no member has a non-NULL `order_source`, and this is stated in the migration.
+no member has `order_source = 'registration_time'`, and this is stated in the migration.
 
 ## Failure and recovery considerations
 
@@ -189,8 +191,8 @@ suite, Ruff, and Pyright.
 
 ## Rollback
 
-Revert the code and apply the `0016` reverse (only while no member records an ordering
-source).
+Revert the code and apply the `0016` reverse (only while no member records a
+`registration_time` ordering source).
 
 ## Completion record
 
