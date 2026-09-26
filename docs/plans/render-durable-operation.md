@@ -153,6 +153,14 @@ and a partial output is never registered.
     result is recorded as a sanitized validation result, and a `/security-review` pass is
     run on the PR.
 
+## Owner amendment
+
+*Owner amendment 2026-09-25 (during ED-0087 implementation):* the same kind-conditional
+nullability applies to every transcription-source column that `0007` makes required on
+`work_operation` or `work_worker_capability`: `asset_id`, `manifest_id`,
+`manifest_version`, `asset_format`, and any other such column the implementation finds.
+Checks still require these columns for transcription, and the reverse restores `NOT NULL`.
+
 ## Out of scope
 
 - Audio, overlays, burned-in titles, image slots, extra profiles, and bitrate ladders.

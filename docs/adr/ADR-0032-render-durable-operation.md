@@ -97,6 +97,14 @@ A render has no single source asset. It consumes an Assembly revision.
    missing or changed input become typed attempt outcomes under ADR-0025 retry rules. A
    partial output is never registered. Stderr is never stored, only bounded codes.
 
+## Amendment
+
+*Owner amendment 2026-09-25 (during ED-0087 implementation):* the same kind-conditional
+nullability applies to every transcription-source column that `0007` makes required on
+`work_operation` or `work_worker_capability`: `asset_id`, `manifest_id`,
+`manifest_version`, `asset_format`, and any other such column the implementation finds.
+Checks still require these columns for transcription, and the reverse restores `NOT NULL`.
+
 ## Alternatives
 
 - **A separate render-only operation substrate** (new operation, attempt, and worker tables
