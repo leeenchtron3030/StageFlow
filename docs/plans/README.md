@@ -149,3 +149,4 @@ or architecture document unless those documents are explicitly updated.
 | [Render Durable Operation (first slice)](render-durable-operation.md) | Completed - Green render Durable Operation | StageFlow Rendering / Work Execution / Backend | ADR-0032; ADR-0025; ADR-0029; ED-0087 |
 | [Assembly media-order fallback and render slot order](assembly-media-order-fallback.md) | Completed - Green Assembly media order | StageFlow Assembly / Rendering / Backend | Owner decision 2026-09-26; ED-0077; ADR-0027; ADR-0032; ED-0088 |
 | [Render profile v2: constant output frame rate](render-profile-v2-constant-frame-rate.md) | Completed - Green render profile v2 | StageFlow Rendering / Backend | ADR-0032 amendment 3; ED-0089 |
+| [Production media timing inspection](production-media-timing-inspection.md) | Approved (pending ADR-0033) | StageFlow Media Timing / Work Execution / Backend | ADR-0033; ADR-0027; ADR-0032; ED-0090 |
