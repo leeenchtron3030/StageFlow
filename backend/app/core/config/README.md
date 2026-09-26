@@ -66,7 +66,23 @@ keys and retained current and historical records no longer depend on legacy keys
 directive rewrites no persisted history and introduces no migration. Presentation copy,
 launcher output, and the example deployment TOML remain ED-0080 work.
 
-## Out of scope
+## Optional local rendering
+
+`[local_render]` is optional and `enabled` defaults to `false`. When supplied it requires
+`ffmpeg_path`, `output_root`, and `packaging_content_root`. All three must be absolute
+local locations outside the repository, without parent traversal or links. The operator
+creates the two content directories and installs FFmpeg separately; StageFlow never
+downloads it or searches the executable search path. The worker checks files/directories,
+reparse points, containment, binary identity and GPL/nonfree configuration before execution.
+No configured location is included in the effective redacted summary or render responses.
+
+Enable the section explicitly and start `python -m app.demo.render_worker` separately.
+Its NVENC probe must succeed for its render capability to be eligible. Capacity is one
+lease; FFmpeg version and SHA-256 identify the runtime. Existing deployments without
+this section retain their behavior. No transcription dependency or distribution policy
+changes. Filesystem roots must remain under operator control while execution is active.
+
+## Out-of-scope configuration actions
 
 - Secret storage or display.
 - Automatic business-state bootstrap while parsing configuration.

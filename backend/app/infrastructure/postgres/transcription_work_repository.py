@@ -145,6 +145,7 @@ class PostgresWorkExecutionRepository[
                         )
                     return self._operation(replay, connection)
 
+                self._validate_new_operation(connection, pending)
                 if isinstance(request.input, TranscriptionOperationInput):
                     asset = connection.execute(
                         """
@@ -235,6 +236,16 @@ class PostgresWorkExecutionRepository[
             raise WorkExecutionStorageUnavailableError(
                 "postgresql_work_execution_unavailable"
             ) from exc
+
+    def _validate_new_operation(
+        self, connection: psycopg.Connection[Row], pending: PendingOperation[InputT],
+    ) -> None:
+        """Optional kind-specific authority check in the enqueue transaction."""
+
+    def _assert_active_claim(
+        self, row: Mapping[str, object] | None, claim: OperationClaim[InputT],
+    ) -> None:
+        _require_active_claim(row, claim)
 
     def _operation(
         self, row: Mapping[str, object], connection: psycopg.Connection[Row],
@@ -1305,18 +1316,19 @@ class PostgresWorkExecutionRepository[
                 rows = connection.execute(
                     """
                     SELECT * FROM stageflow.work_operation
-                    WHERE deployment_id = %s
+                    WHERE operation_kind = ANY(%s) AND deployment_id = %s
                       AND event_id IS NOT DISTINCT FROM %s
                     ORDER BY created_at DESC, operation_id
                     LIMIT %s
                     """,
                     (
+                        list(self._operation_kinds),
                         deployment_id,
                         None if event_id is None else event_id.value,
                         limit,
                     ),
                 ).fetchall()
-                return tuple(_operation(row, connection) for row in rows)
+                return tuple(self._operation(row, connection) for row in rows)
         except (psycopg.InterfaceError, psycopg.OperationalError) as exc:
             raise WorkExecutionStorageUnavailableError(
                 "postgresql_work_execution_unavailable"
@@ -1380,11 +1392,12 @@ class PostgresWorkExecutionRepository[
             with self._connect() as connection:
                 rows = connection.execute(
                     """
-                    SELECT * FROM stageflow.work_operation_attempt
-                    WHERE operation_id = %s
-                    ORDER BY attempt_number
+                    SELECT a.* FROM stageflow.work_operation_attempt a
+                    JOIN stageflow.work_operation o USING (operation_id)
+                    WHERE a.operation_id = %s AND o.operation_kind = ANY(%s)
+                    ORDER BY a.attempt_number
                     """,
-                    (operation_id.value,),
+                    (operation_id.value, list(self._operation_kinds)),
                 ).fetchall()
                 return tuple(_attempt(row) for row in rows)
         except (psycopg.InterfaceError, psycopg.OperationalError) as exc:
@@ -1515,10 +1528,12 @@ class PostgresWorkExecutionRepository[
             with self._connect() as connection:
                 params = {
                     "deployment_id": deployment_id,
+                    "operation_kinds": list(self._operation_kinds),
                     "event_id": None if event_id is None else event_id.value,
                 }
                 where = """
-                    deployment_id = %(deployment_id)s
+                    operation_kind = ANY(%(operation_kinds)s)
+                    AND deployment_id = %(deployment_id)s
                     AND event_id IS NOT DISTINCT FROM %(event_id)s
                 """
                 now = connection.execute(
