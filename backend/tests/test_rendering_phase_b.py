@@ -296,6 +296,13 @@ else:
     assert args[args.index("-b:v") + 1] == "8000000"
     assert args[args.index("-g") + 1] == "60" and "-an" in args
     assert args[args.index("-hwaccel") + 1] == "cuda"
+    assert args[args.index("-hwaccel_output_format") + 1] == "cuda"
+    assert args[args.index("-vf") + 1] == "scale_cuda=1920:1080:format=nv12"
+    assert args[args.index("-fps_mode") + 1] == "cfr"
+    assert args[args.index("-r") + 1] == "30000/1001"
+    assert args.index("-r") > args.index("-i")  # an output option, not an input rate
+    assert args[args.index("-rc") + 1] == "vbr"
+    assert args[args.index("-f", args.index("-an")) + 1] == "mp4"
     pathlib.Path(args[-1]).write_bytes(b"deterministic-render-bytes")
     print("frame=60\\nout_time_us=2000000\\nprogress=end")
     if mode == "fallback":
@@ -414,6 +421,7 @@ def test_execution_sidecar_frozen_provenance_and_no_partial_output(
         sidecar = (root / output.manifest_content_key).read_bytes()
         assert hashlib.sha256(sidecar).hexdigest() == output.manifest_sha256
         document = json.loads(sidecar)
+        assert document["profile_version"] == output.profile_version == "2"
         assert document["metadata"][0]["source"] == "operator_override"
         assert document["metadata"][0]["source_id"] == plan.manifest.metadata[0].source_id.value
         assert document["metadata"][0]["values"] == ["Frozen title"]

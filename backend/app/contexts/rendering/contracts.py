@@ -3,6 +3,7 @@ import re
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
+from fractions import Fraction
 from typing import Literal
 
 from app.contexts.assembly.contracts import ContentReference
@@ -39,7 +40,7 @@ class RenderError(RuntimeError):
 @dataclass(frozen=True, slots=True)
 class RenderProfile:
     id: str = "h264-nvenc-1080p-video"
-    version: str = "1"
+    version: str = "2"
     encoder: Literal["h264_nvenc"] = "h264_nvenc"
     preset: Literal["p4"] = "p4"
     rate_control: Literal["vbr"] = "vbr"
@@ -50,13 +51,22 @@ class RenderProfile:
     container: Literal["mp4"] = "mp4"
     decode: Literal["cuda"] = "cuda"
     audio: Literal[False] = False
+    # None records v1's passthrough behavior; new requests require the current profile.
+    output_frame_rate: Fraction | None = Fraction(30000, 1001)
+
+    def __post_init__(self) -> None:
+        if self.output_frame_rate is not None and type(self.output_frame_rate) is not Fraction:
+            raise RenderError(RenderReason.PROFILE_UNSUPPORTED)
 
 
-FIRST_RENDER_PROFILE = RenderProfile()
+CURRENT_RENDER_PROFILE = RenderProfile()
+RENDER_PROFILE_V1 = RenderProfile(version="1", output_frame_rate=None)
+# Compatibility for existing planner callers; remove when those callers adopt CURRENT.
+FIRST_RENDER_PROFILE = CURRENT_RENDER_PROFILE
 
 
 def require_profile(profile: RenderProfile) -> None:
-    if profile != FIRST_RENDER_PROFILE:
+    if profile != CURRENT_RENDER_PROFILE:
         raise RenderError(RenderReason.PROFILE_UNSUPPORTED)
 
 
@@ -151,8 +161,9 @@ class RenderedOutput:
 
     def __post_init__(self) -> None:
         if (self.media_type != "video/mp4"
-                or self.profile_id != FIRST_RENDER_PROFILE.id
-                or self.profile_version != FIRST_RENDER_PROFILE.version):
+                or self.profile_id != CURRENT_RENDER_PROFILE.id
+                or self.profile_version not in (RENDER_PROFILE_V1.version,
+                                                CURRENT_RENDER_PROFILE.version)):
             raise RenderError(RenderReason.OUTPUT_INVALID)
         for name in ("content_key", "manifest_content_key"):
             if re.fullmatch(r"[A-Za-z0-9_-]{1,128}", getattr(self, name)) is None:

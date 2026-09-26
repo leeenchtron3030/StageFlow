@@ -1,4 +1,5 @@
 """Authenticated human render requests and bounded Event/Session reads."""
+from dataclasses import replace
 from typing import Annotated, Literal
 from uuid import UUID
 
@@ -8,7 +9,7 @@ from pydantic import BaseModel, ConfigDict
 from app.bootstrap.event_mode_kernel import KernelComponents
 from app.contexts.assembly.session_repository import AssemblyNotFoundError
 from app.contexts.rendering.contracts import (
-    FIRST_RENDER_PROFILE,
+    CURRENT_RENDER_PROFILE,
     RenderActor,
     RenderedOutput,
     RenderError,
@@ -31,7 +32,7 @@ class RequestBody(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
     assembly_revision_id: UUID
     profile_id: Literal["h264-nvenc-1080p-video"] = "h264-nvenc-1080p-video"
-    profile_version: Literal["1"] = "1"
+    profile_version: Literal["1", "2"] = "2"
     actor_id: UUID
     command_id: UUID
     confirmed: Literal["confirmed"]
@@ -83,7 +84,8 @@ def _output(output: RenderedOutput) -> dict[str, object]:
 def request_render(body: RequestBody, request: Request) -> dict[str, object]:
     try:
         return _operation(_service(request).request_render(
-            EntityId(str(body.assembly_revision_id)), FIRST_RENDER_PROFILE,
+            EntityId(str(body.assembly_revision_id)),
+            replace(CURRENT_RENDER_PROFILE, version=body.profile_version),
             RenderActor(EntityId(str(body.actor_id))), EntityId(str(body.command_id)),
         ))
     except RenderError as exc:

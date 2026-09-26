@@ -68,7 +68,9 @@ frames. Real bumpers almost always differ slightly from the recorder's rate.
 - A request that names v1 fails with the existing typed `render_profile_unsupported`, and
   the API returns it as a bounded error instead of a validation crash.
 - Workers declare and claim only v2. Any v1 operation still pending when the upgrade
-  happens stays unclaimed and visible, with no change to its state. The deployment has
+  happens stays visible and is never claimed, leased, or attempted by a v2 worker. The
+  shared ADR-0025 substrate may still promote it from `pending` to `eligible`, as it does
+  for all due work (owner clarification during implementation). The deployment has
   none.
 - Rendered Outputs record `render_profile_version = "2"`. The sidecar manifest carries the
   profile version, as it already does.

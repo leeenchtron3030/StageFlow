@@ -554,10 +554,16 @@ remain in a sidecar. The separate local render worker uses the shared ADR-0025 c
 leases, retries and fences, at one lease per worker. Output registration and operation success
 share a transaction. All failures after running are bounded typed attempt outcomes.
 
-The first profile is video-only CUDA decode to H.264 NVENC, p4, VBR 8 Mbit/s, GOP 60,
-1080p MP4. FFmpeg remains operator-installed and is identified and license-configuration
-checked at the infrastructure boundary. `[local_render]` is optional and disabled by
-default. The authenticated rendering API provides requests and Event/Session-scoped
+The current profile is `h264-nvenc-1080p-video` v2: video-only CUDA decode to H.264
+NVENC, p4, VBR 8 Mbit/s, GOP 60, 1080p MP4, with constant 30000/1001 output frame rate
+(ADR-0032 amendment 3). Requests default to v2; explicit v1 requests receive the bounded
+`render_profile_unsupported` refusal. Existing v1 outputs retain their recorded identity
+and remain readable. The revision/profile/version work key makes v2 on a v1-rendered
+revision a new operation. Workers declare and claim v2 only; v1 operations remain visible
+and are never claimed by a v2 worker (ADR-0025 eligibility promotion still applies). GPU timestamp, decode, duration and throughput qualification
+for v2 remains the owner's Run 002 step. FFmpeg remains operator-installed and is
+identified and license-configuration checked at the infrastructure boundary. `[local_render]`
+is optional and disabled by default. The authenticated rendering API provides requests and Event/Session-scoped
 paginated operation/output reads. No automatic authority, audio, overlays, publication,
 delivery or frontend is introduced. Host GPU/playability and security qualification
 remain separate from implementation evidence.
