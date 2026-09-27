@@ -8,6 +8,46 @@ authorized by this document.
 
 ## Canonical and qualified terms
 
+### Editorial phrase list
+
+- **Definition:** An immutable, Event-scoped, operator-supplied list identified by key,
+  stable ID and version, with a name, 1–200 phrases, creator and aware creation time.
+- **Matching:** Each phrase contains 1–100 trimmed characters. Duplicate phrases after
+  NFKC normalization, casefolding and whitespace collapse are rejected. Unicode
+  alphanumeric tokens match exactly within one transcript segment.
+- **Versioning:** Publishing is a human-only idempotent command. A new version preserves
+  earlier versions; it never edits a transcript or activates automatic derivation.
+
+### Editorial derivation run
+
+- **Definition:** The immutable result of a human command matching one phrase-list
+  version against a Session's currently associated assets. It pins the latest complete
+  Transcript Evidence and the latest active MTE containing exactly one
+  `creation_time_plus_duration` derivation for each eligible asset.
+- **Identity:** Session, phrase-list ID/version and the sorted asset/transcript/MTE
+  identity set. Identical inputs return the original run, including its creator, time,
+  candidate IDs and skip counts; changed inputs create a new run.
+- **Bounds:** At most 500 candidates. Missing transcript, timing or Session start counts
+  once per skipped asset, in that precedence order. Negative Session starts and eligible
+  matches beyond the limit count per match as `outside_session` and `limit_reached`.
+- **Persistence:** One synchronous transaction owns the run, candidates, provenance,
+  initial location evaluations and immutable command receipt. No upstream state changes.
+
+### Derived Editorial candidate
+
+- **Definition:** An advisory `EditorialCandidateMoment` with origin and epistemic kind
+  `derived`, source and reason `transcript_phrase_match`, revision 1 and no human-command
+  operation ID. It references its derivation run through a required provenance record.
+- **Placement:** First-word asset offset plus advisory MTE start minus authoritative
+  Session start, in integer microseconds; the last word supplies the end. Starts before
+  the Session are skipped. Session-end conflicts use the same evaluation as declared
+  candidates and remain visible rather than moving or deleting the candidate.
+- **Lineage:** Phrase-list version, normalized phrase, asset, transcript revision,
+  segment/word identities, asset offsets, MTE revision and qualification are retained.
+  Every occurrence counts; overlapping occurrences of one phrase keep the earliest.
+- **Authority:** The unchanged human review actions may create an Editorial Clip.
+  Derivation grants no approval, publication, Session, association or package authority.
+
 ### Business Event
 
 - **Definition:** A scheduled conference production containing Stages, Sessions, and

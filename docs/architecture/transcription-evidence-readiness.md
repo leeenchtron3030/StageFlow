@@ -25,6 +25,16 @@ term. Session Transcript composition and any public API naming remain unresolved
 
 ## Evidence and authority boundary
 
+Editorial phrase derivation is now a read-only consumer of the latest complete revision
+for each currently associated asset. Later partial or failed revisions do not replace
+that complete input. Matching uses normalized word text and word ordinals within one
+segment; it never bridges segments or manufactures word times from segment text.
+Every derived candidate retains asset, evidence ID/revision, segment ID, first/last word
+IDs and asset-relative offsets, plus the advisory MTE revision used for placement.
+An operator publishes the phrase-list version and explicitly invokes the derivation run.
+Neither transcript arrival nor a new evidence revision automatically generates candidates.
+The existing human review and Clip creation remain the only Editorial approval path.
+
 A transcript result is evidence about the audible content of one immutable Completed
 Media Asset manifest revision. It is not the Session Transcript described by the
 foundational product model, a Session boundary, media-membership authority, an Editorial

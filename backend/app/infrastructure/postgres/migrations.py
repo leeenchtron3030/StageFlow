@@ -130,6 +130,13 @@ class PostgresMigrationRunner:
             "0018_assembly_timing_evidence_forward.sql",
             version="0018_assembly_timing_evidence",
         )
+        self.apply_derived_editorial_candidates_v1()
+
+    def apply_derived_editorial_candidates_v1(self) -> None:
+        self._execute_if_missing(
+            "0019_derived_editorial_candidates_forward.sql",
+            version="0019_derived_editorial_candidates",
+        )
 
     def reverse_event_mode_kernel_v1(self) -> None:
         self.reverse_demo_vertical_slice_v1()
@@ -231,9 +238,16 @@ class PostgresMigrationRunner:
         )
 
     def reverse_assembly_timing_evidence_v1(self) -> None:
+        self.reverse_derived_editorial_candidates_v1()
         self._execute_if_present(
             "0018_assembly_timing_evidence_reverse.sql",
             version="0018_assembly_timing_evidence",
+        )
+
+    def reverse_derived_editorial_candidates_v1(self) -> None:
+        self._execute_if_present(
+            "0019_derived_editorial_candidates_reverse.sql",
+            version="0019_derived_editorial_candidates",
         )
 
     def _execute(self, filename: str) -> None:

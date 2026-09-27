@@ -4,13 +4,15 @@ import base64
 import binascii
 import json
 from collections.abc import Mapping
+from dataclasses import asdict
 from datetime import UTC, datetime
 from typing import Annotated, Literal, cast
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, Request
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, StringConstraints
 
+from app.api.v1.response_models import ImmutableIntMapping
 from app.bootstrap.event_mode_kernel import KernelComponents
 from app.contexts.editorial import (
     EditorialCandidateMoment,
@@ -24,6 +26,12 @@ from app.contexts.editorial import (
     EditorialReviewQueueItem,
     EditorialReviewQueuePosition,
 )
+from app.contexts.editorial.derivation_contracts import (
+    EditorialCandidateProvenance,
+    EditorialDerivationRun,
+    EditorialPhraseList,
+)
+from app.contexts.editorial.derivation_service import EditorialDerivationService
 from app.contexts.production.event_mode_kernel import KernelStorageUnavailableError
 from app.shared.ids import EntityId
 
@@ -75,10 +83,42 @@ class ReviewEditorialMomentCommand(BaseModel):
     ] = None
 
 
+class EditorialProvenanceResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    run_id: str
+    phrase_list_id: str
+    phrase_list_version: int
+    normalized_phrase: str
+    asset_id: str
+    transcript_evidence_id: str
+    transcript_revision: int
+    segment_id: str
+    first_word_id: str
+    last_word_id: str
+    asset_start_microseconds: int
+    asset_end_microseconds: int
+    timing_evidence_id: str
+    timing_revision: int
+    timing_qualification: str
+
+
+def editorial_provenance_response(
+    provenance: EditorialCandidateProvenance | None,
+) -> EditorialProvenanceResponse | None:
+    if provenance is None:
+        return None
+    return EditorialProvenanceResponse.model_validate({
+        name: (value.value if isinstance(value, EntityId) else value)
+        for name in provenance.__dataclass_fields__
+        for value in (getattr(provenance, name),)
+    })
+
+
 class EditorialCandidateMomentResponse(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    operation_id: str
+    operation_id: str | None
     candidate_moment_id: str
     session_id: str
     expected_session_revision: int
@@ -86,10 +126,11 @@ class EditorialCandidateMomentResponse(BaseModel):
     timeline_end_microseconds: int | None
     session_authoritative_start: AwareDatetime
     session_authoritative_end: AwareDatetime | None
-    origin: Literal["declared"]
-    epistemic_kind: Literal["declared"]
-    source_kind: Literal["producer_declaration"]
-    reason_code: Literal["human_mark_moment"]
+    origin: Literal["declared", "derived"]
+    epistemic_kind: Literal["declared", "derived"]
+    source_kind: Literal["producer_declaration", "transcript_phrase_match"]
+    reason_code: Literal["human_mark_moment", "transcript_phrase_match"]
+    provenance: EditorialProvenanceResponse | None = None
     review_state: EditorialReviewStateValue
     actor_id: str
     note: str | None
@@ -190,7 +231,7 @@ def _components(request: Request) -> KernelComponents:
 
 def _response(moment: EditorialCandidateMoment) -> EditorialCandidateMomentResponse:
     return EditorialCandidateMomentResponse(
-        operation_id=moment.operation_id.value,
+        operation_id=None if moment.operation_id is None else moment.operation_id.value,
         candidate_moment_id=moment.id.value,
         session_id=moment.session_id.value,
         expected_session_revision=moment.expected_session_revision,
@@ -198,10 +239,13 @@ def _response(moment: EditorialCandidateMoment) -> EditorialCandidateMomentRespo
         timeline_end_microseconds=moment.timeline_end_microseconds,
         session_authoritative_start=moment.session_authoritative_start,
         session_authoritative_end=moment.session_authoritative_end,
-        origin="declared",
-        epistemic_kind="declared",
-        source_kind="producer_declaration",
-        reason_code="human_mark_moment",
+        origin=cast(Literal["declared", "derived"], moment.origin.value),
+        epistemic_kind=cast(Literal["declared", "derived"], moment.epistemic_kind.value),
+        source_kind=moment.source_kind.value,
+        reason_code=cast(
+            Literal["human_mark_moment", "transcript_phrase_match"], moment.reason_code,
+        ),
+        provenance=editorial_provenance_response(moment.provenance),
         review_state=moment.review_state.value,
         actor_id=moment.actor_id.value,
         note=moment.note,
@@ -529,6 +573,147 @@ def editorial_review_queue(
         items_truncated=truncated,
         limit=limit,
     )
+
+
+class PublishEditorialPhraseListCommand(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    command_id: UUID
+    actor_id: UUID
+    confirmed: Literal["confirmed"]
+    key: Annotated[str, Field(min_length=1, max_length=100)]
+    version: Annotated[int, Field(ge=1)]
+    name: Annotated[str, Field(min_length=1, max_length=200)]
+    phrases: Annotated[
+        tuple[Annotated[str, StringConstraints(
+            strip_whitespace=True, min_length=1, max_length=100,
+        )], ...],
+        Field(min_length=1, max_length=200),
+    ]
+
+
+class DeriveEditorialCandidatesCommand(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    command_id: UUID
+    actor_id: UUID
+    confirmed: Literal["confirmed"]
+    phrase_list_id: UUID
+    version: Annotated[int, Field(ge=1)]
+
+
+class EditorialPhraseListResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    phrase_list_id: str
+    event_id: str
+    key: str
+    version: int
+    name: str
+    phrases: tuple[str, ...]
+    created_by: str
+    created_at: AwareDatetime
+
+
+class EditorialPhraseListPageResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    items: tuple[EditorialPhraseListResponse, ...]
+    items_truncated: bool
+    next_after: int | None
+    limit: int
+
+
+class EditorialDerivationRunResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    run_id: str
+    session_id: str
+    phrase_list_id: str
+    phrase_list_version: int
+    created_by: str
+    created_at: AwareDatetime
+    input_asset_count: int
+    candidate_ids: tuple[str, ...]
+    skip_counts: ImmutableIntMapping
+
+
+def _phrase_list_response(item: EditorialPhraseList) -> EditorialPhraseListResponse:
+    return EditorialPhraseListResponse(
+        phrase_list_id=item.id.value, event_id=item.event_id.value, key=item.key,
+        version=item.version, name=item.name, phrases=item.phrases,
+        created_by=item.created_by.value, created_at=item.created_at,
+    )
+
+
+def _run_response(item: EditorialDerivationRun) -> EditorialDerivationRunResponse:
+    return EditorialDerivationRunResponse(
+        run_id=item.id.value, session_id=item.session_id.value,
+        phrase_list_id=item.phrase_list_id.value, phrase_list_version=item.phrase_list_version,
+        created_by=item.created_by.value, created_at=item.created_at,
+        input_asset_count=len(item.inputs),
+        candidate_ids=tuple(i.value for i in item.candidate_ids),
+        skip_counts=asdict(item.skips),
+    )
+
+
+def _derivation_service(request: Request) -> EditorialDerivationService:
+    components = _components(request)
+    if components.editorial_derivation is None:
+        raise HTTPException(status_code=503, detail="editorial_derivation_service_unavailable")
+    return components.editorial_derivation
+
+
+@router.post("/events/{event_id}/phrase-lists", response_model=EditorialPhraseListResponse)
+def publish_editorial_phrase_list(
+    event_id: UUID, command: PublishEditorialPhraseListCommand, request: Request,
+) -> EditorialPhraseListResponse:
+    service = _derivation_service(request)
+    try:
+        return _phrase_list_response(service.publish_phrase_list(
+            event_id=EntityId(str(event_id)), key=command.key, version=command.version,
+            name=command.name, phrases=command.phrases, actor_id=EntityId(str(command.actor_id)),
+            command_id=EntityId(str(command.command_id)),
+        ))
+    except (EditorialMomentConflictError, EditorialMomentNotFoundError,
+            EditorialMomentStorageUnavailableError, ValueError) as exc:
+        raise _translate_error(exc) from exc
+
+
+@router.get("/events/{event_id}/phrase-lists", response_model=EditorialPhraseListPageResponse)
+def editorial_phrase_list_versions(
+    event_id: UUID, request: Request,
+    key: Annotated[str, Query(min_length=1, max_length=100)],
+    after: Annotated[int, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+) -> EditorialPhraseListPageResponse:
+    service = _derivation_service(request)
+    try:
+        items = service.versions(EntityId(str(event_id)), key, after=after, limit=limit + 1)
+    except (EditorialMomentStorageUnavailableError, ValueError) as exc:
+        raise _translate_error(exc) from exc
+    return EditorialPhraseListPageResponse(
+        items=tuple(_phrase_list_response(item) for item in items[:limit]),
+        items_truncated=len(items) > limit,
+        next_after=items[limit - 1].version if len(items) > limit else None, limit=limit,
+    )
+
+
+@router.post("/sessions/{session_id}/derivations", response_model=EditorialDerivationRunResponse)
+def derive_editorial_candidates(
+    session_id: UUID, command: DeriveEditorialCandidatesCommand, request: Request,
+) -> EditorialDerivationRunResponse:
+    service = _derivation_service(request)
+    try:
+        return _run_response(service.derive_candidates(
+            session_id=EntityId(str(session_id)),
+            phrase_list_id=EntityId(str(command.phrase_list_id)),
+            version=command.version, actor_id=EntityId(str(command.actor_id)),
+            command_id=EntityId(str(command.command_id)),
+        ))
+    except (EditorialMomentConflictError, EditorialMomentNotFoundError,
+            EditorialMomentStorageUnavailableError, ValueError) as exc:
+        raise _translate_error(exc) from exc
 
 
 __all__ = [

@@ -20,6 +20,16 @@ deliberate transitional Demo compatibility backed by the same aggregate, service
 repository. Their eventual deprecation/removal is a bounded future cleanup after the
 Demo compatibility contract allows it; ED-0069 does not remove or redesign them.
 
-Observed, derived, and inferred origins remain vocabulary only. Machine generation,
-workers, models, automatic review authority, rendering, export, publishing, and package
-or Session-boundary changes are not implemented here.
+Human-invoked transcript phrase derivation now produces `derived` candidates through
+`EditorialDerivationService`. Immutable Event-scoped phrase-list versions and derivation
+runs live in Editorial; transaction-bound readers supply associated assets, latest
+complete transcript evidence and latest active advisory timing evidence. Matching and
+placement are pure domain functions. Migration `0019` stores these aggregates, command
+receipts and candidate provenance, preserving the declared-row constraints. Exact
+command replay and identical input sets return the original run.
+
+The existing review actions and Clip creation also handle derived candidates. Candidate
+and queue reads expose origin and evidence provenance, including timing qualification.
+Observed and inferred origins remain vocabulary only. Automatic derivation, models,
+automatic review authority, rendering, export, publishing, and package or Session-boundary
+changes are not implemented here.

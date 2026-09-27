@@ -24,6 +24,31 @@ backfill, or authoritative media/Session update in this execution slice.
 
 ## Current implementation
 
+`0019_derived_editorial_candidates` follows `0018` by plain migration chaining. It adds
+immutable `editorial_phrase_list` versions, `editorial_derivation_run` results,
+`editorial_candidate_provenance` and command receipts. Separate receipts let distinct
+command IDs replay one input-identical run without modifying that run. Candidate checks
+become kind-aware: declared origin, epistemic kind, reason and required unique human
+operation reference retain their previous meaning; derived rows require the phrase-match
+source/reason, NULL operation ID and provenance. A deferred constraint trigger requires
+the provenance in the same transaction. Composite foreign keys retain asset/evidence and
+segment/word lineage; evidence revision and qualification are checked at commit.
+
+The derivation transaction serializes command replay and per-Session runs using advisory
+locks, holds a shared Session boundary lock, and selects association plus both evidence
+identities in one statement snapshot. Server cursors fetch input headers in batches of
+100 and transcript words in batches of 1,000, preserving segment/word ordinal order.
+Matching uses pinned immutable revisions. Candidate insertion, initial location evaluation,
+run result and receipt commit together. There is no backfill or upstream mutation.
+The reverse refuses any phrase list, run or derived candidate; otherwise it removes only
+the new structures and restores the original declared checks and operation requirement.
+
+The authenticated Editorial API publishes phrase lists, pages versions by Event/key
+(limits 1–100), and derives candidates for a Session. Run responses contain at most 500
+candidate IDs and all five skip counts. Candidate/queue reads add origin and provenance
+without media paths. PostgreSQL remains the runtime authority; the in-memory adapter is
+a test double only. Owner live-run qualification remains separate from synthetic tests.
+
 The current branch implements stable ingress, the bounded Durable Event-Mode Kernel,
 Media Timing Evidence, and the first bounded transcription-worker persistence slice:
 

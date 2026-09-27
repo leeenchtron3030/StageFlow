@@ -7,6 +7,8 @@ from enum import StrEnum
 from app.shared.ids import EntityId
 from app.shared.time import require_aware_datetime
 
+from .derivation_contracts import EditorialCandidateProvenance
+
 
 class EditorialCandidateOrigin(StrEnum):
     OBSERVED = "observed"
@@ -17,6 +19,7 @@ class EditorialCandidateOrigin(StrEnum):
 
 class EditorialCandidateSourceKind(StrEnum):
     PRODUCER_DECLARATION = "producer_declaration"
+    TRANSCRIPT_PHRASE_MATCH = "transcript_phrase_match"
 
 
 class EditorialReviewState(StrEnum):
@@ -129,7 +132,7 @@ class EditorialCandidateMoment:
     session_authoritative_start: datetime
     session_authoritative_end: datetime | None
     actor_id: EntityId
-    operation_id: EntityId
+    operation_id: EntityId | None
     note: str | None
     declared_at: datetime
     revision: int = 1
@@ -142,6 +145,7 @@ class EditorialCandidateMoment:
     review_state: EditorialReviewState = EditorialReviewState.UNREVIEWED
     updated_at: datetime | None = None
     location_conflict_reason: EditorialLocationConflictReason | None = None
+    provenance: EditorialCandidateProvenance | None = None
 
     def __post_init__(self) -> None:
         if self.revision < 1:
@@ -155,15 +159,26 @@ class EditorialCandidateMoment:
             if self.location_conflict_reason is None
             else EditorialLocationConflictReason(self.location_conflict_reason)
         )
-        if (
-            origin is not EditorialCandidateOrigin.DECLARED
-            or epistemic_kind is not EditorialCandidateOrigin.DECLARED
+        if source_kind is EditorialCandidateSourceKind.PRODUCER_DECLARATION:
+            if (
+                origin is not EditorialCandidateOrigin.DECLARED
+                or epistemic_kind is not EditorialCandidateOrigin.DECLARED
+            ):
+                raise ValueError("human-declared Editorial Candidate Moment must be declared")
+            if self.reason_code != "human_mark_moment":
+                raise ValueError("Editorial Candidate Moment reason is fixed")
+            if self.operation_id is None or self.provenance is not None:
+                raise ValueError("declared candidate requires a human command only")
+        elif (
+            origin is not EditorialCandidateOrigin.DERIVED
+            or epistemic_kind is not EditorialCandidateOrigin.DERIVED
+            or self.reason_code != "transcript_phrase_match"
+            or self.operation_id is not None
+            or self.provenance is None
+            or self.revision != 1
+            or self.timeline_end_microseconds is None
         ):
-            raise ValueError("human-declared Editorial Candidate Moment must be declared")
-        if source_kind is not EditorialCandidateSourceKind.PRODUCER_DECLARATION:
-            raise ValueError("human-declared source kind must be producer_declaration")
-        if self.reason_code != "human_mark_moment":
-            raise ValueError("Editorial Candidate Moment reason is fixed")
+            raise ValueError("derived candidate requires phrase-match provenance")
         EditorialCandidateLocation(
             session_revision=self.expected_session_revision,
             timeline_start_microseconds=self.timeline_start_microseconds,
