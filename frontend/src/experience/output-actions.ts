@@ -38,23 +38,7 @@ export function outputActionDisabled(context: OutputActionContext, action: Outpu
   return item.approval_state === "unreviewed" ? undefined : "This revision has already been reviewed.";
 }
 
-export function outputConfirmation(action: OutputAction, item: AssemblyItem | null, packageRevision: number, templateName?: string): string {
-  const number = item?.revision.revision_number;
-  const consequence = action === "propose"
-    ? `Freeze a new Assembly proposal from package revision ${packageRevision} using ${templateName ?? "the selected Event template"}.`
-    : action === "render" ? `Queue a video-only render of approved Assembly revision ${number} using profile v2.`
-    : `${action === "approve" ? "Approve" : "Reject"} Assembly revision ${number}, including its frozen member order and bound packaging.`;
-  if (action === "propose") return `${consequence}\nMember order and bound packaging will be frozen using the selected Event template. Members may use registration_time fallback or unqualified timing evidence; review the resulting revision before approval.`;
-  const members = item?.revision.membership ?? [];
-  const fallback = members.flatMap((m, i) => m.order_source === "registration_time" ? [i + 1] : []);
-  const unqualified = members.flatMap((m, i) => m.order_source === "timing_evidence" && m.order_evidence_qualification !== "qualified" ? [i + 1] : []);
-  const packaging = item?.revision.bindings.filter((b) => b.outcome === "bound") ?? [];
-  return [consequence,
-    fallback.length ? `registration_time fallback: member positions ${fallback.join(", ")}; registration is not captured-content time.` : "",
-    unqualified.length ? `Unqualified timing evidence (not qualified): member positions ${unqualified.join(", ")}; advisory only.` : "",
-    `Bound packaging: ${packaging.length ? packaging.map((b) => b.slot_key).join(", ") : "none"}.`,
-  ].filter(Boolean).join("\n");
-}
+export { outputConfirmation } from "./ui-labels.ts";
 
 export interface PreparedOutputCommand {
   action: OutputAction;

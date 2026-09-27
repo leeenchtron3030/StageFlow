@@ -1,3 +1,4 @@
+import { uiLabels, timingLabel, unplacedRecordings, assignmentReason } from "../experience/ui-labels.ts";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { SessionTimingEvidence } from "./session-timing-evidence";
@@ -61,8 +62,8 @@ function MediaUncertaintyPanel({
     <section className="media-uncertainty-panel" aria-labelledby="media-uncertainty-title">
       <div className="section-heading">
         <div>
-          <span className="eyebrow">Membership uncertainty · bounded recent evidence</span>
-          <h2 id="media-uncertainty-title">Affected media</h2>
+          <span className="eyebrow">Recordings needing a decision</span>
+          <h2 id="media-uncertainty-title">Recordings</h2>
         </div>
         <span>{uncertain.length} shown · media preserved</span>
       </div>
@@ -76,14 +77,16 @@ function MediaUncertaintyPanel({
             <article className={`uncertainty-card uncertainty-${asset.associationStatus}`} key={asset.candidateId}>
               <div className="uncertainty-identity">
                 <div>
-                  <span className="eyebrow">{asset.stageName} · {asset.registrationState}</span>
+                  <span className="eyebrow">{asset.stageName} · {uiLabels.assignment[asset.registrationState as keyof typeof uiLabels.assignment] ?? asset.registrationState}</span>
                   <strong>{asset.assetId ? `Asset ${asset.assetId.slice(0, 12)}` : `Candidate ${asset.candidateId.slice(0, 12)}`}</strong>
                 </div>
                 <span className={`association-badge association-${asset.associationStatus}`}>
-                  {asset.associationStatus === "conflict" ? "Conflict · Review" : "Unresolved · Review"}
+                  {asset.associationStatus === "conflict" ? uiLabels.assignment.conflict : uiLabels.assignment.unresolved}
                 </span>
               </div>
-              <p className="operator-explanation">{asset.explanation}</p>
+              <p className="operator-explanation">{assignmentReason(asset.associationReasonCodes, asset.explanation)} Checked: {considered || "No Sessions reported"}. Nothing was deleted.</p>
+              <details className="diagnostic-details"><summary>{uiLabels.details}</summary>
+              <p>{asset.registrationState} · {asset.associationStatus} · {asset.associationReasonCodes.join(" · ")}</p>
               <dl className="definition-grid uncertainty-definitions">
                 <Definition
                   label="Sessions considered by policy"
@@ -97,19 +100,19 @@ function MediaUncertaintyPanel({
                   label="Timing evidence"
                   value={
                     timing
-                      ? `${timing.qualificationStatus} · candidate interval is Derived and advisory`
+                      ? `${timingLabel(timing.qualificationStatus)} · ${uiLabels.estimate}`
                       : "No timing evidence in this bounded read"
                   }
                 />
                 <Definition label="Last observed" value={asset.lastObservedAt} />
               </dl>
               <details className="diagnostic-details">
-                <summary>Evidence and provenance</summary>
+                <summary>{uiLabels.details}</summary>
                 <p>Source binding: {asset.sourceBindingKey}</p>
                 <p>Policy: {asset.associationPolicy ?? "Not reported"}</p>
                 <p>Epistemic kinds: {asset.epistemicKinds.join(" · ") || "Not reported"}</p>
                 <p>Diagnostic codes: {asset.diagnosticCodes.map(readableCode).join(" · ") || "None"}</p>
-              </details>
+              </details></details>
             </article>
           );
         })}
@@ -452,33 +455,33 @@ export function SessionOperationalView({
   demoLaunchContext?: string;
   outputs?: ReactNode;
 }) {
-  if (!session) return <><WorkspaceTitle eyebrow="Producer · Session" title="Session unavailable" summary="The requested Session is outside this bounded projection." /><Link className="text-link" href={href("/sessions", workspace)}>Return to Sessions</Link></>;
+  if (!session) return <><WorkspaceTitle eyebrow="Producer · Session" title="Session unavailable" summary="The requested Session is not available in this view." /><Link className="text-link" href={href("/sessions", workspace)}>Return to Sessions</Link></>;
   return (
     <>
       <WorkspaceTitle eyebrow={`Producer · ${session.stageName}`} title={session.title} summary={`${formatActivityState(session)} · Package ${formatPackageState(session)}`} />
       <div className="session-detail-grid">
         <section className="detail-panel">
-          <div className="section-heading"><h2>Operational lifecycle</h2><span>{session.provenance.toUpperCase()}</span></div>
+          <div className="section-heading"><h2>Operational lifecycle</h2><span>{uiLabels.lifecycle[session.provenance]}</span></div>
           <dl className="definition-grid">
             <Definition label="Presentation" value={formatActivityState(session)} />
-            <Definition label="Package" value={`${formatPackageState(session)} · revision ${session.packageRevision}`} />
-            <Definition label="Session revision" value={String(session.sessionRevision)} />
+            <Definition label="Package" value={formatPackageState(session)} />
             <Definition label="Stage" value={session.stageName} />
-            <Definition label="Declared start" value={session.authoritativeStart ?? "Not declared"} />
-            <Definition label="Declared end" value={session.authoritativeEnd ?? "Not declared"} />
+            <Definition label="Session start" value={session.authoritativeStart ?? "Not declared"} />
+            <Definition label="Presentation end" value={session.authoritativeEnd ?? "Not declared"} />
           </dl>
+          <details><summary>{uiLabels.details}</summary><p>{session.provenance} · {session.activityState} · {session.packageState} · Session revision {session.sessionRevision} · Package revision {session.packageRevision}</p></details>
         </section>
         <section className="detail-panel">
-          <div className="section-heading"><h2>Media membership</h2><span>Aggregate</span></div>
+          <div className="section-heading"><h2>{uiLabels.recordings}</h2></div>
           <div className="media-metric-grid" aria-label="Stage media context for this Session">
-            <div><span>Registered</span><strong>{session.media.registered}</strong></div>
-            <div><span>Associated</span><strong>{session.media.associated}</strong></div>
-            <div><span>Stabilizing</span><strong>{session.media.stabilizing}</strong></div>
-            <div><span>Unresolved</span><strong>{session.media.unresolved}</strong></div>
-            <div><span>Conflicting</span><strong>{session.media.conflicting}</strong></div>
+            <div><span>{uiLabels.assignment.registered}</span><strong>{session.media.registered}</strong></div>
+            <div><span>{uiLabels.assignment.associated}</span><strong>{session.media.associated}</strong></div>
+            <div><span>{uiLabels.assignment.stabilizing}</span><strong>{session.media.stabilizing}</strong></div>
+            <div><span>{uiLabels.assignment.unresolved}</span><strong>{session.media.unresolved}</strong></div>
+            <div><span>{uiLabels.assignment.conflicting}</span><strong>{session.media.conflicting}</strong></div>
           </div>
-          <p>Stage aggregate context · bounded Session evidence appears below. Physical recording boundaries and filesystem timestamps are not content truth.</p>
-          {session.media.unresolved ? <div className="review-callout"><strong>{session.media.unresolved} unplaced / time unknown</strong><span>Media preserved. Ownership remains unresolved.</span></div> : null}
+          <details><summary>{uiLabels.details}</summary><p>Stage aggregate context · registered / associated / stabilizing / unresolved / conflicting. Physical recording boundaries and filesystem timestamps are not content truth.</p></details>
+          {session.media.unresolved ? <p className="review-callout">{unplacedRecordings(session.media.unresolved)}</p> : null}
         </section>
       </div>
       {outputs}

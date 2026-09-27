@@ -1,3 +1,4 @@
+import { uiLabels } from "./ui-labels.ts";
 import { generateUuidV4 } from "../shared/ids/uuid-v4.ts";
 import { demoAuthorityHeaders } from "./demo-launch-context.ts";
 import { idSchema } from "./outputs-api.ts";
@@ -27,7 +28,7 @@ export function authorityDisabled(context: EditorialAuthority): string | undefin
 }
 export function intentError(intent: EditorialIntent): string | undefined {
   if (intent.kind === "review") {
-    if (!idSchema.safeParse(intent.candidate.candidate_moment_id).success || !Number.isSafeInteger(intent.candidate.revision) || intent.candidate.revision < 1) return "Refresh candidate revision.";
+    if (!idSchema.safeParse(intent.candidate.candidate_moment_id).success || !Number.isSafeInteger(intent.candidate.revision) || intent.candidate.revision < 1) return uiLabels.refreshMoment;
     if (!intent.reason.trim() || Array.from(intent.reason.trim()).length > 500) return "A reason of 1–500 characters is required.";
     const hasRange = intent.start !== undefined || intent.end !== undefined;
     if (intent.action === "revise_range" || hasRange) {
@@ -85,7 +86,7 @@ export async function sendEditorialCommand(command: EditorialCommand, fetcher: t
     if (parsed.success) return { kind: "succeeded", message: `${parsed.data.name} · version ${parsed.data.version} published.`, identifiers: { phrase_list_id: parsed.data.phrase_list_id } };
   } else {
     const parsed = editorialReviewResultSchema.safeParse(payload);
-    if (parsed.success) return { kind: "succeeded", message: parsed.data.clip ? "Approved · Editorial Clip created." : { reject: "Candidate rejected.", revise_range: "Range revision requested; candidate location preserved.", defer: "Candidate deferred.", approve_and_create_clip: "Review recorded." }[parsed.data.decision.action], identifiers: { review_decision_id: parsed.data.decision.review_decision_id, clip_id: parsed.data.clip?.clip_id } };
+    if (parsed.success) return { kind: "succeeded", message: parsed.data.clip ? "Approved · Editorial Clip created." : uiLabels.reviewOutcome[parsed.data.decision.action], identifiers: { review_decision_id: parsed.data.decision.review_decision_id, clip_id: parsed.data.clip?.clip_id } };
   }
   return { kind: "failed", message: "Command response incomplete; refreshed. Check current state." };
 }

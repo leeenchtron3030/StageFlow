@@ -46,14 +46,14 @@ test("proposal selection and confirmation gate UUID creation", () => {
 test("confirmations lead with consequences and explicitly name ordering exceptions and bound packaging", () => {
   for (const action of ["approve", "reject", "render"] as const) {
     const text = outputConfirmation(action, fixtureAssembly(), 1);
-    assert.match(text.split("\n")[0], action === "render" ? /^Queue a video-only render.*revision 2.*profile v2/ : new RegExp(`^${action === "approve" ? "Approve" : "Reject"} Assembly revision 2.*frozen member order and bound packaging`));
-    assert.match(text, /registration_time fallback: member positions 3/);
-    assert.match(text, /Unqualified timing evidence.*member positions 2.*advisory only/);
-    assert.match(text, /Bound packaging: opening/);
+    assert.match(text.split("\n")[0], action === "render" ? /^Queue a video-only render.*approved Assembly.*1080p \(v2\)/ : new RegExp(`^${action === "approve" ? "Approve" : "Reject"} this Assembly.*locked recording order and layout`));
+    assert.match(text, /Arrival time \(no recorder time\): recordings 3/);
+    assert.match(text, /2: Recorder time \(unverified\).*Timing is an estimate/);
+    assert.match(text, /Layout: Intro/);
   }
   const proposal = outputConfirmation("propose", null, 4, "Event opening");
-  assert.match(proposal.split("\n")[0], /^Freeze.*package revision 4.*Event opening/);
-  assert.match(proposal, /registration_time.*unqualified timing evidence/);
+  assert.match(proposal.split("\n")[0], /^Lock.*Assembly proposal.*Event opening/);
+  assert.match(proposal, /arrival time or unverified recorder time/);
 });
 test("one primary action follows state; rejected revisions cannot render", () => {
   assert.equal(nextOutputAction(null), "propose");

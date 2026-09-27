@@ -647,3 +647,17 @@ button:disabled { cursor: not-allowed; color: var(--subtle-foreground); backgrou
 .editorial-moments-table { width: 100%; border-collapse: collapse; font-size: .9rem; }
 .editorial-moments-table th, .editorial-moments-table td { padding: .4rem .6rem; text-align: left; border-bottom: 1px solid var(--border, #64748b); }
 @media (max-width: 600px) { .editorial-details > div, .editorial-range { grid-template-columns: 1fr; } }
+
+/* ED-0095: one compact moment line, with diagnostic content expanded on demand. */
+.editorial-session { margin-block: 1rem; }
+.editorial-session > h2 { margin-bottom: .35rem; }
+.editorial-session > p { margin-block: .35rem; }
+.editorial-row > details { margin-left: auto; min-width: 5rem; }
+.editorial-row > details[open] { flex-basis: 100%; }
+.editorial-row > details > summary { cursor: pointer; }
+.derivation-result { display: inline-block; margin-inline-start: .75rem; }
+
+.derivation-control { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
+.derivation-result p { margin: 0; }
+
+.session-moments pre { white-space: pre-wrap; overflow-wrap: anywhere; }

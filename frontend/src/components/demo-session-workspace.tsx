@@ -1,5 +1,6 @@
 "use client";
 
+import { uiLabels } from "../experience/ui-labels.ts";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { SessionMoments } from "./session-moments";
@@ -40,13 +41,13 @@ function stateSummary(states: string[]): string {
 function transcriptSummary(workspace?: DemoWorkspace): string {
   if (!workspace) return "Evidence unavailable";
   const evidence = workspace.transcript_evidence;
-  if (!evidence.length) return "No Transcription Evidence yet";
+  if (!evidence.length) return "No automatic transcript yet";
   // Segment text remains available even when the optional word-timing list is capped.
   const words = evidence.reduce((total, item) => total + item.segments.reduce(
     (count, segment) => count + (segment.text.trim().match(/\S+/gu)?.length ?? 0), 0,
   ), 0);
   const bounded = workspace.transcript_assets_truncated || evidence.some((item) => item.segments_truncated);
-  return `${stateSummary(evidence.map((item) => item.status))} · ${words.toLocaleString("en-US")} words${bounded ? " shown · bounded evidence" : ""}`;
+  return `${stateSummary(evidence.map((item) => item.status))} · ${words.toLocaleString("en-US")} words${bounded ? " shown · more available" : ""}`;
 }
 
 async function responseDetail(response: Response): Promise<string> {
@@ -242,7 +243,7 @@ export function DemoSessionWorkspace({
     const timelineMicroseconds = Math.max(0, Math.round((end - start) * 1_000));
     await send(
       "moments/mark",
-      `Declare a human Editorial Candidate Moment at ${formatOffset(timelineMicroseconds)}?`,
+      `Mark a moment at ${formatOffset(timelineMicroseconds)}?`,
       {
         expected_session_revision: sessionRevision,
         timeline_start_microseconds: timelineMicroseconds,
@@ -256,10 +257,9 @@ export function DemoSessionWorkspace({
     <section className="demo-session-workspace" aria-labelledby="demo-session-workspace-title">
       <div className="section-heading">
         <div>
-          <span className="eyebrow">Trusted Demo LAN · bounded live projection</span>
-          <h2 id="demo-session-workspace-title">Session workspace</h2>
+          <h2 id="demo-session-workspace-title">{uiLabels.sessionTools}</h2>
         </div>
-        <span className="advisory-badge">Evidence only · not Session Transcript truth</span>
+        <details><summary>{uiLabels.details}</summary>Trusted Demo LAN · bounded live projection · Evidence only · not Session Transcript truth</details>
       </div>
 
       <div className="demo-authority-actions" aria-label="Demo Session authority controls">
@@ -281,7 +281,7 @@ export function DemoSessionWorkspace({
           onClick={() =>
             void send(
               "sessions/process-transcription",
-              "Run one bounded media cycle now and reconcile local transcription for safely associated media? This is a fallback diagnostic action.",
+              "Run one media check now and update local transcripts for safely assigned recordings? This is a fallback diagnostic action.",
               {},
             )
           }
@@ -340,7 +340,7 @@ export function DemoSessionWorkspace({
       </div>
 
       {workspace?.operations.some((operation) => operation.status !== "succeeded") ? (
-        <div className="demo-operation-list" aria-label="Bounded transcription Operations">
+        <div className="demo-operation-list" aria-label="Transcription operations">
           {workspace.operations.filter((operation) => operation.status !== "succeeded").map((operation) => (
             <article key={operation.operation_id}>
               <strong>{readable(operation.status)}</strong>
@@ -353,20 +353,22 @@ export function DemoSessionWorkspace({
       ) : null}
       {workspace?.operations_truncated ? (
         <p className="bounded-notice">
-          Bounded Operation view: at most {workspace.operation_limit} recent Event operations are considered.
+          Latest {workspace.operation_limit} Event operations are considered.
         </p>
       ) : null}
 
       <details className="transcription-disclosure">
-        <summary><strong>Transcription Evidence</strong> · {loading ? "Refreshing evidence" : transcriptSummary(workspace)}</summary>
+        <summary><strong>{uiLabels.transcript}</strong> · {loading ? "Refreshing evidence" : transcriptSummary(workspace)}</summary>
         <div className="transcription-evidence-list">
           {workspace?.transcript_evidence.length ? workspace.transcript_evidence.map((evidence) => (
             <details className="transcription-evidence-card" key={evidence.evidence_id}>
-              <summary>Asset {evidence.asset_id.slice(0, 8)} · {evidence.status} · evidence r{evidence.revision} · {evidence.language ?? "Language not reported"}</summary>
+              <summary>Asset {evidence.asset_id.slice(0, 8)} · {evidence.status} · {evidence.language ?? "Language not reported"}</summary>
+              <details><summary>{uiLabels.details}</summary><p>Evidence revision {evidence.revision} · {evidence.status} · <code>{evidence.evidence_id}</code></p>
               <header>
                 <span>{evidence.provider_id} {evidence.provider_version} · {evidence.model_id} {evidence.model_version}</span>
               </header>
               {evidence.limitations.length ? <p className="evidence-limitations">{evidence.limitations.join(" · ")}</p> : null}
+              </details>
               <div className="transcript-segments">
                 {evidence.segments.map((segment) => (
                   <section key={segment.segment_id}>
@@ -393,18 +395,18 @@ export function DemoSessionWorkspace({
                   </section>
                 ))}
               </div>
-              {evidence.segments_truncated ? <p className="bounded-notice">Bounded view: first {evidence.segment_limit} segments shown.</p> : null}
+              {evidence.segments_truncated ? <p className="bounded-notice">Showing {evidence.segment_limit} segments; more available.</p> : null}
             </details>
           )) : (
             <div className="operational-empty compact-empty">
-              <strong>No Transcription Evidence yet</strong>
+              <strong>No automatic transcript yet</strong>
               <span>Automatic reconciliation handles routine media. Process Media Now is the idempotent fallback.</span>
             </div>
           )}
         </div>
         {workspace?.transcript_assets_truncated ? (
           <p className="bounded-notice">
-            Bounded evidence view: the first {workspace.transcript_asset_limit} Session assets are shown.
+            Showing {workspace.transcript_asset_limit} Session recordings; more available.
           </p>
         ) : null}
 

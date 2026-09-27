@@ -215,7 +215,7 @@ line; preserve resolved entries as concise evidence rather than deleting them.
 - Unchanged: the canonical domain, storage, and API values (`declared` / `derived`), and
   the full provenance under Candidate details.
 - Classification: Green (UI terminology only)
-- Status: implementing (ED-0095)
+- Status: validated (ED-0095)
 
 ### 2026-09-27 - Owner decision: plain-language UI wording across Producer and Editorial screens
 
@@ -277,5 +277,5 @@ line; preserve resolved entries as concise evidence rather than deleting them.
 - Unchanged: canonical domain, storage, and API terms, and every safety or honesty
   meaning. Only wording changes. A disclaimer is reworded, never dropped.
 - Classification: Green (UI terminology and presentation)
-- Status: implementing (ED-0095)
+- Status: validated (ED-0095)
 

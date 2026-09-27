@@ -30,8 +30,8 @@ test("queue uses bounded Event pages and opaque cursors, summaries distinguish g
   assert.equal(second.next_cursor, null);
   assert.match(paths[0], new RegExp(`events/${eventId}/review-queue\\?limit=100$`));
   assert.match(paths[1], /cursor=fixture-page-2&limit=100$/);
-  assert.equal(queueSummary(first), "6 awaiting review · 6 total · this page: 1 derived");
-  assert.equal(queueSummary(second), "6 awaiting review · 6 total · this page: 2 derived · 1 outside Session");
+  assert.equal(queueSummary(first), "6 awaiting review · 6 total · this page: 1 suggested");
+  assert.equal(queueSummary(second), "6 awaiting review · 6 total · this page: 2 suggested · 1 outside Session");
   await assert.rejects(() => api.queue("untrusted/path"));
   assert.throws(() => editorialQueueSchema.parse({ ...first, limit: 101 }));
 });
@@ -48,12 +48,12 @@ test("phrase-list client carries Event/key/version paging; Session moments are b
 test("row labels use Session timeline and duration, exception flags never repeat qualified timing", () => {
   assert.equal(candidateLabel(candidate, "Opening Session"), "Opening Session · 00:18:52 · 8 s");
   assert.equal(timelinePosition(3661000000), "01:01:01");
-  assert.match(candidateLabel(fixtureCandidate()), /Point mark · range needed/);
-  assert.match(candidateLabel(candidate), /^Session title unavailable/);
-  assert.deepEqual(candidateFlags(candidate), ["Unqualified timing"]);
-  assert.deepEqual(candidateFlags(fixtureCandidate(3)), ["Outside Session"]);
+  assert.match(candidateLabel(fixtureCandidate()), /Single point: set start and end/);
+  assert.match(candidateLabel(candidate), /^00:18:52/);
+  assert.deepEqual(candidateFlags(candidate), ["Recorder time (unverified)"]);
+  assert.deepEqual(candidateFlags(fixtureCandidate(3)), ["Outside Session", "Recorder time (verified)"]);
   assert.deepEqual(candidateFlags(fixtureCandidate(2)), []);
-  assert.deepEqual(candidateFlags({ ...candidate, provenance: { ...candidate.provenance!, timing_qualification: "expired" } }), ["Timing expired"]);
+  assert.deepEqual(candidateFlags({ ...candidate, provenance: { ...candidate.provenance!, timing_qualification: "expired" } }), ["Recorder time (verification expired)"]);
 });
 test("normalization mirrors backend fullwidth, sharp-s, punctuation and empty-token cases", () => {
   // backend/tests/test_derived_editorial_candidates.py:96–114
@@ -164,8 +164,8 @@ test("publish and derive commands use distinct UUIDs, exact version and no brows
   assert.ok(intentError({ ...derive, version: 0 }));
 });
 test("derivation and moments summaries show nonzero exceptions and actual review state counts", () => {
-  assert.equal(derivationSummary(runFixture()), "1 candidates · 2 skipped: no timing evidence · 1 skipped: outside session");
-  assert.equal(momentsSummary([fixtureCandidate(), candidate, fixtureCandidate(2)]), "2 declared · 1 derived · 2 awaiting review · 1 deferred");
+  assert.equal(derivationSummary(runFixture()), "1 moment · 2 skipped: no timing evidence · 1 skipped: outside session");
+  assert.equal(momentsSummary([fixtureCandidate(), candidate, fixtureCandidate(2)]), "2 marked · 1 suggested · 2 awaiting review · 1 deferred");
 });
 test("same command object retries only after transport failure; success refreshes and parses run", async () => {
   const command = prepareEditorialCommand(context, derive, true)!;
@@ -184,7 +184,7 @@ for (const status of [409, 422, 503]) test(`HTTP ${status} never retries and onl
   assert.equal(result.kind, status === 409 ? "conflict" : "failed");
 });
 test("review and publish success parse identifiers; malformed success refreshes without replay", async () => {
-  for (const [intent, payload, expected] of [[review("defer"), reviewResult(), "Candidate deferred."], [publish, fixturePhraseLists().items[0], "Synthetic phrases · version 1 published."], [review(), {}, "Command response incomplete; refreshed. Check current state."]] as const) {
+  for (const [intent, payload, expected] of [[review("defer"), reviewResult(), "Moment deferred."], [publish, fixturePhraseLists().items[0], "Synthetic phrases · version 1 published."], [review(), {}, "Command response incomplete; refreshed. Check current state."]] as const) {
     let refreshed = false;
     const result = await sendEditorialCommand(prepareEditorialCommand(context, intent, true)!, async () => Response.json(payload), async () => { refreshed = true; });
     assert.ok(refreshed); assert.equal(result.message, expected); assert.notEqual(result.kind, "network_failure");

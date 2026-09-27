@@ -80,7 +80,7 @@ test("queue paging replaces bounded rows, preserves failed-page position and exp
   assert.equal(reads.length, 0);
   assert.equal(ui.find("button", "Previous page").disabled, true);
   await ui.click("Next page"); ui.render();
-  assert.match(ui.html(), /Page 2/); assert.match(ui.html(), /2 derived · 1 outside Session/);
+  assert.match(ui.html(), /Page 2/); assert.match(ui.html(), /2 suggested · 1 outside Session/);
   assert.equal(ui.find("button", "Next page").disabled, true);
   fail = true; await ui.click("Previous page"); ui.render();
   assert.match(ui.html(), /Page 2/); assert.match(ui.html(), /rows may be stale/);
@@ -90,15 +90,15 @@ test("queue paging replaces bounded rows, preserves failed-page position and exp
 test("candidate markup uses phrase-only transcript, text flags and collapsed full provenance", () => {
   const ui = harness("EditorialReviewSurface", surfaceProps());
   const html = ui.html();
-  assert.match(html, /Synthetic opening Session · 00:18:52 · 8 s/);
-  assert.match(html, />Declared</); assert.match(html, />Derived</); assert.match(html, /Unqualified timing/);
+  assert.match(html, /00:18:52 · 8 s/);
+  assert.match(html, />Marked</); assert.match(html, />Suggested ·/); assert.match(html, /recorder time \(unverified\)/);
   assert.equal((html.match(/silver lantern/g) ?? []).length, 1);
   for (const text of ["phrase list version", "transcript revision", "timing revision", "timing evidence id", "first word id", "last word id"]) assert.ok(html.includes(text), text);
   assert.doesNotMatch(html, /<details open|<details[^>]*open=/);
 });
 test("selected review controls sit in their candidate row and receive keyboard focus", () => {
   const ui = harness("EditorialReviewSurface", surfaceProps());
-  ui.click(presentation.candidateLabel(fixtures.fixtureCandidate(), fixtures.editorialFixtureSessions[0].title));
+  ui.click(presentation.candidateLabel(fixtures.fixtureCandidate()));
   const rows = nodes(ui.render()).filter((node) => node.type === "li");
   assert.ok(nodes(rows[0]).some((node) => typeof node.type === "function" && node.type.name === "ReviewForm"));
   assert.ok(rows.slice(1).every((row) => !nodes(row).some((node) => typeof node.type === "function" && node.type.name === "ReviewForm")));
@@ -117,7 +117,7 @@ test("real review form validates reason/range and dispatches each action only on
   assert.equal((intents[0] as { end: number }).end, 1123123456);
   assert.match(consequences[0], /^Create an Editorial Clip/);
   for (const action of ["reject", "revise_range", "defer"] as const) { ui.change("select", "editorial-action", action); ui.submit(); assert.equal((intents.at(-1) as { action: string }).action, action); }
-  assert.match(consequences[2], /candidate location stays unchanged/);
+  assert.match(consequences[2], /moment location stays unchanged/);
   ui.props.disabled = true; ui.render(); ui.submit(); assert.equal(intents.length, 4);
 });
 test("confirmation is consequence-labelled, cancels/Esc restore focus, duplicate confirms issue one command", async () => {
@@ -191,10 +191,10 @@ test("moments summary replaces 31 tiles with counts, five initial rows and colla
   const items = Array.from({ length: 31 }, (_, i) => fixtures.fixtureCandidate(i));
   const ui = harness("MomentsSummary", { moments: { session_id: items[0].session_id, candidate_count: 35, items, items_truncated: true } }, { file: "session-moments.tsx" });
   const html = ui.html();
-  assert.match(html, /16 declared · 15 derived · 30 awaiting review · 1 deferred · 31 of 35 shown/);
+  assert.match(html, /16 marked · 15 suggested · 30 awaiting review · 1 deferred · 31 of 35 shown/);
   assert.match(html, /26 more moments/); assert.match(html, /href="\/editorial"/);
   assert.doesNotMatch(html, /<article|Producer Mark Moment|<details open/);
-  assert.equal((html.split("<details>")[0].match(/<tr>/g) ?? []).length, 6);
+  assert.equal((html.split("</table>")[0].match(/<tr>/g) ?? []).length, 6);
 });
 test("unchanged ranged review form omits adjustments; editing either value sends the range", () => {
   const candidate = fixtures.fixtureCandidate(1), commands: actions.EditorialCommand[] = [];
@@ -306,10 +306,12 @@ test("derivation result renders one summary line with nonzero skips and identifi
   const ui = harness("EditorialReviewSurface", surfaceProps(), { fetcher: async () => Response.json(run), client: api.editorialApi(async () => fixtures.fixtureQueue()) });
   (ui.child("PhraseTools").begin as (i: actions.EditorialIntent, c: string) => void)({ kind: "derive", sessionId: candidate.session_id, phraseListId: provenance.phrase_list_id, version: 1 }, "Create advisory candidates.");
   ui.render(); ui.submit(); await settle();
-  const tree = ui.render();
+  ui.render();
+  const tools = harness("PhraseTools", ui.child("PhraseTools"));
+  const tree = tools.render();
   const summary = nodes(tree).filter((node) => node.type === "p" && plain(node.props.children).includes("skipped:"));
   assert.equal(summary.length, 1); assert.equal(summary[0].props.role, "status");
-  assert.equal(plain(summary[0].props.children), "1 candidates · 2 skipped: no timing evidence · 1 skipped: outside session");
+  assert.equal(plain(summary[0].props.children), "1 moment · 2 skipped: no timing evidence · 1 skipped: outside session");
   const result = nodes(tree).find((node) => node.type === "div" && Array.isArray(node.props.children) && node.props.children.includes(summary[0]));
   assert.ok(result);
   const html = renderToStaticMarkup(result);
@@ -318,5 +320,81 @@ test("derivation result renders one summary line with nonzero skips and identifi
   for (const id of [run.run_id, run.phrase_list_id, ...run.candidate_ids]) {
     assert.ok(details.includes(id)); assert.ok(!visible.includes(id));
   }
-  assert.match(details, /<summary>Result details<\/summary>/);
+  assert.match(details, /<summary>Details<\/summary>/);
+});
+
+
+test("Session groups keep first-seen order, compact Details, shared certainty and only review exceptions", () => {
+  const props = surfaceProps();
+  const second = { id: "00000000-0000-4000-8000-000000000099", title: "Synthetic closing Session" };
+  props.sessions = [...props.sessions, second];
+  const first = props.initialQueue.items[0];
+  props.initialQueue.items.splice(1, 0, { ...first, candidate: { ...fixtures.fixtureCandidate(5), session_id: second.id } });
+  const before = JSON.stringify(props.initialQueue);
+  const ui = harness("EditorialReviewSurface", props);
+  const tree = ui.render();
+  const groups = nodes(tree).filter((n) => n.type === "section" && n.props.className === "editorial-session");
+  assert.equal(groups.length, 2);
+  assert.deepEqual(groups.map((g) => plain(nodes(g).find((n) => n.type === "h2")?.props.children)), props.sessions.map((s) => s.title));
+  const rows = nodes(groups[0]).filter((n) => n.props.className === "editorial-row");
+  assert.equal(rows.length, 3);
+  for (const row of rows) {
+    assert.ok(nodes(row).some((n) => typeof n.type === "function" && n.type.name === "CandidateDetails"));
+    assert.doesNotMatch(plain(row), /Synthetic opening Session|Awaiting review/);
+  }
+  assert.match(plain(groups[0]), /All suggestions use recorder time \(unverified\)/);
+  assert.doesNotMatch(rows.map(plain).join(""), /Recorder time/);
+  assert.match(rows.map(plain).join(""), /Deferred/);
+  const html = ui.html();
+  assert.match(html, /Suggestions need human review. No review or clip approval is automatic/);
+  assert.match(html, /<summary>Details<\/summary>.*origin.*declared.*review state.*unreviewed/);
+  assert.doesNotMatch(html, /<details[^>]*\bopen/);
+  assert.equal(JSON.stringify(props.initialQueue), before);
+});
+
+test("mixed suggestion timing stays on the affected row and never labels a marked moment", () => {
+  const props = surfaceProps();
+  props.initialQueue.items[2].candidate = fixtures.fixtureCandidate(3);
+  const ui = harness("EditorialReviewSurface", props);
+  const tree = ui.render();
+  assert.doesNotMatch(plain(tree), /All suggestions use/);
+  const rows = nodes(tree).filter((n) => n.props.className === "editorial-row");
+  assert.doesNotMatch(plain(rows[0]), /Recorder time/);
+  assert.match(plain(rows[1]), /Recorder time \(unverified\)/);
+  assert.match(plain(rows[2]), /Recorder time \(verified\).*Outside Session|Outside Session.*Recorder time \(verified\)/);
+});
+
+test("mm:ss controls preserve fractional microseconds and the existing review command", () => {
+  const candidate = { ...fixtures.fixtureCandidate(1), timeline_start_microseconds: 1123123456, timeline_end_microseconds: 1130000249 };
+  const commands: actions.EditorialCommand[] = [];
+  const ui = harness("ReviewForm", { candidate, disabled: false, begin: (intent: actions.EditorialIntent) => commands.push(actions.prepareEditorialCommand(context(), intent, true)!) });
+  assert.equal(ui.find("input", "editorial-start").value, "18:43.123456");
+  assert.equal(ui.find("input", "editorial-end").value, "18:50.000249");
+  assert.match(ui.html(), /Start — time into Session \(mm:ss\)/);
+  ui.change("textarea", "editorial-reason", "Synthetic review"); ui.submit();
+  assert.equal("adjusted_timeline_start_microseconds" in commands[0].body, false);
+  ui.change("input", "editorial-end", "19:01.000249"); ui.submit();
+  assert.equal(commands[1].body.adjusted_timeline_end_microseconds, 1141000249);
+  ui.change("input", "editorial-start", "18:60"); ui.submit();
+  assert.equal(commands.length, 2);
+});
+
+test("derivation failures and successful results share the Run derivation control row", async () => {
+  const ui = harness("EditorialReviewSurface", surfaceProps(), { fetcher: async () => Response.json({ detail: "synthetic_failure" }, { status: 422 }) });
+  const candidate = fixtures.fixtureCandidate(1);
+  (ui.child("PhraseTools").begin as (i: actions.EditorialIntent, c: string) => void)({ kind: "derive", sessionId: candidate.session_id, phraseListId: candidate.provenance!.phrase_list_id, version: 1 }, "Suggest moments.");
+  ui.render(); ui.submit(); await settle(); ui.render();
+  assert.doesNotMatch(plain(ui.render()), /synthetic_failure/);
+  const tools = harness("PhraseTools", ui.child("PhraseTools"));
+  const control = nodes(tools.render()).find((n) => n.props.className === "derivation-control");
+  assert.ok(control);
+  assert.match(plain(control), /Run derivation.*synthetic_failure/);
+  assert.ok(nodes(control).some((n) => n.props.role === "status"));
+});
+
+test("Session moments expose a real Editorial review anchor and Suggested phrase", () => {
+  const ui = harness("MomentsSummary", { moments: { session_id: fixtures.editorialFixtureSessions[0].id, candidate_count: 1, items: [fixtures.fixtureCandidate(1)], items_truncated: false } }, { file: "session-moments.tsx" });
+  assert.equal(ui.find("a", "Editorial review").href, "/editorial");
+  assert.match(ui.html(), /Suggested.*silver lantern/);
+  assert.match(ui.html(), /<summary>Details<\/summary>[\s\S]*origin/);
 });

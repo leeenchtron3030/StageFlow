@@ -1,3 +1,4 @@
+import { uiLabels } from "../experience/ui-labels.ts";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
@@ -85,7 +86,7 @@ export function OperationalShell({
           <NavLink
             activePath={activePath}
             href="/editorial"
-            label="Live Triage"
+            label={uiLabels.editorial}
             workspace={workspace}
           />
         </nav>
@@ -116,16 +117,12 @@ export function OperationalShell({
 
         <div className={`data-source-block ${modeClass}`}>
           <span className="eyebrow">Data source</span>
-          <strong className="mode-status">{workspace.dataSource.statusLabel}</strong>
-          <span>{workspace.dataSource.label}</span>
+          <strong className="mode-status">{workspace.dataSource.state === "live_connected" ? uiLabels.live : workspace.dataSource.statusLabel}</strong>
+          {workspace.dataSource.state !== "live_connected" ? <span>{workspace.dataSource.label}</span> : null}
           {workspace.dataSource.scenarioLabel ? (
             <span>{workspace.dataSource.scenarioLabel}</span>
           ) : null}
-          <span>
-            {workspace.dataSource.authoritative
-              ? "Backend projection"
-              : "Not production authority"}
-          </span>
+          {workspace.dataSource.authoritative ? <details><summary>{uiLabels.details}</summary><p>{workspace.dataSource.label} · Backend projection · {workspace.dataSource.state}</p></details> : <span>Not production authority</span>}
         </div>
       </aside>
 
@@ -139,10 +136,11 @@ export function OperationalShell({
             <span className={`event-live-dot${workspace.event.ready ? " is-ready" : ""}`} />
             <span>{workspace.event.lifecycle.replace("_", " ")}</span>
             <span className="header-separator">·</span>
-            <span>{workspace.event.modeLabel}</span>
+            <span>{workspace.dataSource.runtimeProfile === "demo-single-stage" ? uiLabels.testSetup : workspace.event.modeLabel}</span>
+            {workspace.dataSource.runtimeProfile === "demo-single-stage" ? <details><summary>{uiLabels.details}</summary>{workspace.dataSource.runtimeProfile} · {workspace.event.modeLabel}</details> : null}
           </div>
           <div className={`header-mode-indicator ${modeClass}`} role="status">
-            {workspace.dataSource.statusLabel}
+            {workspace.dataSource.state === "live_connected" ? uiLabels.live : workspace.dataSource.statusLabel}
           </div>
           <div className="event-clock">
             <span className="eyebrow">Status observed</span>

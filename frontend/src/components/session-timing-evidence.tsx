@@ -1,3 +1,4 @@
+import { uiLabels, timingLabel } from "../experience/ui-labels.ts";
 import type { MediaTimingEvidenceView, OperationalWorkspace } from "../experience/model.ts";
 import { wallClockLabel, intervalDuration } from "../experience/session-outputs.ts";
 
@@ -8,21 +9,21 @@ export function SessionTimingEvidence({ evidence, status }: {
   const assets = new Set(evidence.map((item) => item.assetId)).size;
   const qualifications = [...new Set(evidence.map((item) => item.qualificationStatus))];
   const summary = status === "unavailable" ? "Timing evidence unavailable"
-    : !assets ? "No timing evidence in this bounded read"
-    : `${assets} recent ${assets === 1 ? "asset" : "assets"} · ${qualifications.length === 1 ? `all ${qualifications[0]}` : "mixed qualifications"} · advisory only`;
+    : !assets ? "No timing estimates in this view"
+    : `${assets} recent ${assets === 1 ? "recording" : "recordings"} · ${qualifications.length === 1 ? timingLabel(qualifications[0]) : "Timing certainty varies"}`;
   return <details className="timing-evidence-panel session-evidence">
-    <summary><strong>Media Timing Evidence</strong><span>{summary}</span></summary>
-    {status === "unavailable" ? <p role="status">The bounded evidence read could not be refreshed. No authority changed.</p> : <>
-      <p>Bounded recent evidence · Observed recorder facts and Derived intervals never grant Session authority.</p>
+    <summary><strong>Timing estimates</strong><span>{summary}</span></summary>
+    {status === "unavailable" ? <p role="status">Timing estimates could not be refreshed. No Session decisions changed.</p> : <>
+      <p>Recorder timing estimates do not change Session decisions.</p>
       <div className="timing-evidence-list">{evidence.map((item) => {
         const limitations = [...new Set([...item.limitations, ...item.observations.flatMap((observation) => observation.limitations)].map((text) => text.trim()).filter(Boolean))];
-        const shortTool = item.toolLabel.replace(/[a-f0-9]{64}/gi, (hash) => `${hash.slice(0, 12)}…`);
         return <details className="timing-evidence-card" key={item.evidenceId}>
           <summary>
-            <strong>{wallClockLabel(item.candidateStartedAt)} · {intervalDuration(item.candidateStartedAt && item.candidateEndedAt ? { started_at: item.candidateStartedAt, ended_at: item.candidateEndedAt } : null)} · evidence r{item.revision}</strong>
-            <span>{item.qualificationStatus} · {shortTool}</span>
+            <strong>{uiLabels.estimatedStart}: {wallClockLabel(item.candidateStartedAt)} · {intervalDuration(item.candidateStartedAt && item.candidateEndedAt ? { started_at: item.candidateStartedAt, ended_at: item.candidateEndedAt } : null)}</strong>
+            <span>{qualifications.length > 1 ? timingLabel(item.qualificationStatus) : ""} · {uiLabels.details}</span>
           </summary>
           <dl className="definition-grid">
+            <div><dt>Evidence revision / qualification</dt><dd>{item.revision} · {item.qualificationStatus}</dd></div>
             <div><dt>Media ID</dt><dd><code className="copyable-id">{item.assetId}</code></dd></div>
             <div><dt>Evidence ID</dt><dd><code>{item.evidenceId}</code></dd></div>
             <div><dt>Provider / full tool identity</dt><dd>{item.providerLabel} · {item.toolLabel}</dd></div>
@@ -34,6 +35,7 @@ export function SessionTimingEvidence({ evidence, status }: {
           </dl>
           <h3>Observed facts</h3>
           {item.observations.length ? <ul>{item.observations.map((observation, index) => <li key={index}>{observation.kind.replaceAll("_", " ")}{observation.precision ? ` · ${observation.precision}` : ""}</li>)}</ul> : <p>No normalized observations.</p>}
+          {item.qualificationStatus === "unqualified" ? <p>{uiLabels.recorderLimitation}</p> : null}
           {limitations.length ? <><h3>Limitations</h3><ul>{limitations.map((limitation) => <li key={limitation}>{limitation}</li>)}</ul></> : null}
         </details>;
       })}</div>

@@ -6,6 +6,41 @@ useful business-language history. Qualified terms below control new architectura
 serialized boundaries where older generic terms are ambiguous. No broad code rename is
 authorized by this document.
 
+## UI wording
+
+The source of truth for Producer and Editorial display labels is
+[`frontend/src/experience/ui-labels.ts`](../../frontend/src/experience/ui-labels.ts).
+Canonical domain, API, and storage terms are unchanged. Internal values remain in
+collapsed Details for diagnosis; shared facts appear once and exceptions remain visible.
+
+| Internal term | UI label |
+| --- | --- |
+| Editorial origin `declared` / `derived` | Marked / Suggested (with matched phrase) |
+| Candidate Moment / point mark | Moment / Single point: set start and end |
+| Session-relative range | time into Session (mm:ss) |
+| Unqualified timing / advisory / derived candidate start | Recorder time (unverified) / Estimate / Estimated start |
+| Timing limitations / newer evidence revision | Recorder start and length are unverified / A newer timing estimate exists |
+| Kernel status / backend projection | Live · connected |
+| Trusted Demo LAN workspace | Session tools |
+| Stage aggregate / media membership | Recordings |
+| Transcription Evidence | Automatic transcript: may contain errors |
+| Registered / Associated / Stabilizing | Found / In this Session / Still recording |
+| Unresolved / Conflicting | Needs a decision / Claimed by two Sessions |
+| Unplaced media / `no_safely_eligible_session` | Recording needs a decision; nothing was deleted / No Session matches this recording’s time; checked Session titles |
+| Lifecycle `declared` | Set by producer |
+| Current / stale / frozen proposal order | Up to date / Out of date: inputs changed / Order locked when proposed |
+| Render pending, leased, running / succeeded / terminal_failed | Rendering... / Done / Failed |
+| Render profile h264-nvenc-1080p-video v2 | 1080p (v2) |
+| Slot bindings | Layout: Intro ([asset name]) → Recording |
+| Timing ordering / registration fallback | Ordered by recorder time / N recordings ordered by arrival time (no recorder time) |
+| Live Triage / Review queue | Editorial review |
+| Demo profile disclaimer | Test setup · 1 stage · not event-ready |
+| Bounded reads / revision bookkeeping | Showing N of M (or latest N where accurate) / Details |
+
+Certainty labels apply only to their source; rejected and expired timing stay distinct.
+Human review, transcript uncertainty, preservation (Nothing was deleted), and the
+not-event-ready disclaimer retain their meaning.
+
 ## Canonical and qualified terms
 
 ### Editorial phrase list

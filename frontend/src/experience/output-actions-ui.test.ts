@@ -83,8 +83,8 @@ test("decision dialog gates submission, names exceptions, cancels with focus res
   assert.equal(ui.stats().shows, 1); assert.equal(ui.stats().open, true);
   assert.equal(ui.find("button", "Confirm approval").disabled, true);
   ui.submit(); assert.equal(calls, 0);
-  assert.match(ui.html(), /registration_time fallback: member positions 3/);
-  assert.match(ui.html(), /Unqualified timing evidence/); assert.match(ui.html(), /Bound packaging: opening/);
+  assert.match(ui.html(), /Arrival time \(no recorder time\): recordings 3/);
+  assert.match(ui.html(), /Recorder time \(unverified\)/); assert.match(ui.html(), /Layout: Intro/);
   assert.equal(ui.find("dialog")["aria-labelledby"], "output-consequence");
   assert.doesNotMatch(ui.html(), /<h4|output-confirm-title/);
   assert.equal(ui.find("button", "Cancel").autoFocus, true);
@@ -108,14 +108,14 @@ test("current render state replaces the primary render action; another render re
     ctx.outputs = { state: "available", value: { items: [{ ...presentation.outputSummary(fixtureRenderedOutput()), assembly_revision_id: item.revision.revision_id }], truncated: false } };
     const bodies: Record<string, unknown>[] = [];
     const ui = harness(ctx, async (_url, init) => { bodies.push(JSON.parse(String(init?.body))); return Response.json({ operation_id: id(30) }); });
-    const label = state === "succeeded" ? "Render succeeded · 60.000 seconds" : state === "terminal_failed" ? "Render failed · encoder_unavailable" : "Render pending";
+    const label = state === "succeeded" ? "Done · 60.000 seconds" : state === "terminal_failed" ? "Failed · encoder_unavailable" : "Rendering...";
     assert.ok(ui.html().includes(label));
     assert.equal(ui.find("button", "Request another render").className, "output-secondary-action");
     assert.doesNotMatch(ui.html(), />Request render</);
     assert.equal(bodies.length, 0);
     ui.click("Request another render");
     assert.equal(bodies.length, 0); assert.equal(ui.stats().open, true);
-    assert.match(ui.html(), /Queue a video-only render of approved Assembly revision 2 using profile v2/);
+    assert.match(ui.html(), /Queue a video-only render of the approved Assembly in 1080p \(v2\)/);
     assert.equal(ui.find("dialog")["aria-labelledby"], "output-consequence");
     assert.doesNotMatch(ui.html(), /<h4/);
     ui.click("Cancel"); assert.equal(bodies.length, 0);
@@ -134,14 +134,14 @@ test("no current-revision render keeps Request render primary; older operations 
     ctx.operations = { state: "available", value: { items: operations, truncated: false } };
     const ui = harness(ctx, async () => { assert.fail("must not submit"); });
     assert.equal(ui.find("button", "Request render").className, undefined);
-    assert.doesNotMatch(ui.html(), /Request another render|Render succeeded/);
+    assert.doesNotMatch(ui.html(), /Request another render|Done/);
   }
 });
 test("proposal loads Event-scoped templates only when opened, requires selection and carries chosen template", async () => {
   const ctx = context(); ctx.assembly = { state: "available", value: null };
   const bodies: Record<string, unknown>[] = [];
   const ui = harness(ctx, async (_url, init) => { bodies.push(JSON.parse(String(init?.body))); return Response.json({ revision_id: id(21) }); });
-  assert.equal(ui.stats().reads, 0); ui.click("Propose revision");
+  assert.equal(ui.stats().reads, 0); ui.click("Propose Assembly");
   assert.equal(bodies.length, 0); await settle(); ui.render(); assert.equal(ui.stats().reads, 1);
   assert.equal(ui.find("button", "Confirm proposal").disabled, true);
   ui.change("select", "output-template", id(5)); assert.equal(ui.find("button", "Confirm proposal").disabled, false);
