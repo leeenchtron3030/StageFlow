@@ -80,15 +80,16 @@ function Assembly({ item, timing }: { item: AssemblyItem; timing: SessionOutputs
     {!revision.bindings.length ? <p>No slot bindings.</p> : null}
   </>;
 }
-export function SessionOutputsPanel({ outputs }: { outputs: SessionOutputs }) {
+export function SessionOutputsPanel({ outputs, actions }: { outputs: SessionOutputs; actions?: import("react").ReactNode }) {
   const assembly = outputs.assembly.state === "available" ? outputs.assembly.value : null;
   const memberIds = new Set(assembly?.revision.membership.map((member) => member.asset_id));
   const outside = outputs.timing.filter((entry) => !memberIds.has(entry.assetId));
   return <section className="detail-panel outputs-panel" aria-labelledby="session-outputs-title">
-    <div className="section-heading"><h2 id="session-outputs-title">Outputs</h2><span>Read-only</span></div>
+    <div className="section-heading"><h2 id="session-outputs-title">Outputs</h2>{actions ? null : <span>Read-only</span>}</div>
     {outputs.fixture ? <p><strong>Development fixture · Synthetic outputs · Not production authority</strong></p> : null}
     <div className="outputs-section">
       <h3>Assembly</h3>
+      {actions}
       {outputs.assembly.state === "unavailable" ? <Unavailable section="Assembly" /> : outputs.assembly.value ? <Assembly item={outputs.assembly.value} timing={outputs.timing} /> : <p>No Assembly revision proposed for this Session.</p>}
     </div>
     <div className="outputs-section">

@@ -359,6 +359,7 @@ test("Session page passes one five-second budget through workspace and Outputs l
     "@/components/operational-shell": { OperationalShell: empty },
     "@/components/operational-views": { SessionOperationalView: empty },
     "@/components/session-outputs-panel": { SessionOutputsPanel: empty },
+    "@/components/session-output-actions": { SessionOutputActions: empty },
   };
   runInNewContext(compiledPage.outputText, { exports: pageExports, process: { env: {} }, require: (id: string) => imports[id] ?? require(id) });
   await pageExports.default!({ params: Promise.resolve({ sessionId: workspace.sessions[0].id }), searchParams: Promise.resolve({}) });
