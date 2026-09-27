@@ -201,3 +201,81 @@ line; preserve resolved entries as concise evidence rather than deleting them.
   worker hit `spawn EPERM`. Host test/build completion remains required.
   Independent Codex review approved after the alias check was constrained to the
   original request host, with tests for Next.js normalization of other 127.x.x.x hosts.
+
+### 2026-09-27 - Owner decision: Editorial origin labels
+
+- Route/scenario: `/editorial` review queue and Session Detail moments (ED-0095).
+- Category: terminology | glance comprehension
+- Observation: "Declared" and "Derived" are internal provenance terms. They do not tell a
+  producer at a glance whether a person or StageFlow created the moment.
+- Owner decision: the UI labels the `declared` origin as **Marked** (a person marked the
+  moment) and the `derived` origin as **Suggested** (StageFlow generated it, and it awaits
+  human review). A Suggested row shows its source inline, for example
+  `Suggested · "people"`.
+- Unchanged: the canonical domain, storage, and API values (`declared` / `derived`), and
+  the full provenance under Candidate details.
+- Classification: Green (UI terminology only)
+- Status: validated (ED-0095)
+
+### 2026-09-27 - Owner decision: plain-language UI wording across Producer and Editorial screens
+
+- Route/scenario: Session Detail (lifecycle, recordings, Outputs, media timing, Session
+  tools, transcript), `/editorial`, the navigation, and the top bar.
+- Category: terminology | glance comprehension
+- Observation: internal domain and implementation terms appear throughout the UI.
+  Examples: qualification and advisory, bounded, projection and Kernel, the association
+  states, revision bookkeeping, slot bindings, candidate, and wall-clock. They hide what a
+  producer needs to know.
+- Owner decision (every recommended change was approved): one central UI-label mapping
+  from each internal term to plain UI wording. Internal values stay visible under
+  "Details" for diagnosis. The approved wording:
+  - **Evidence certainty:**
+    - "Recorder time (unverified)" replaces unqualified timing. Show nothing when the
+      term does not apply.
+    - "Estimate" replaces advisory, where it is not redundant.
+    - "Estimated start: HH:MM:SS" replaces the derived candidate start.
+    - Limitation text moves into details as "Recorder start and length are unverified".
+    - Evidence revisions appear only in details, plus the exception "A newer timing
+      estimate exists".
+    - "not content truth" disclaimers move into details or are removed.
+  - **Implementation words:**
+    - "bounded ..." becomes "Latest N" or "Showing N of M", or is omitted.
+    - "Live Kernel status · read only · Backend projection" becomes "Live · connected".
+    - "Trusted Demo LAN · bounded live projection · Session workspace" becomes "Session
+      tools".
+    - "Stage aggregate context" and "Media membership · Aggregate" become "Recordings".
+    - "Evidence only · not Session transcript truth" becomes "Automatic transcript: may
+      contain errors".
+  - **Assignment states:** Registered, Associated, Stabilizing, Unresolved, Conflicting
+    become Found, In this Session, Still recording, Needs a decision, Claimed by two
+    Sessions.
+    - The unplaced-media notice becomes "1 recording needs a decision: no Session fits
+      it. Nothing was deleted."
+    - The association-reason text becomes "No Session matches this recording's time.
+      Checked: [Session titles]."
+  - **Bookkeeping:**
+    - Revision numbers move into details, except where they explain a problem.
+    - "Staleness: Current · Inputs unchanged" becomes "Up to date", or "Out of date: ..."
+      when it applies.
+    - "Frozen proposal order" becomes "Order locked when proposed".
+    - The lifecycle badge "DECLARED" becomes "Set by producer".
+    - Render states become "Rendering... / Done / Failed", and the profile becomes "1080p
+      (v2)".
+  - **Assembly:**
+    - Slot bindings become "Layout: Intro ([asset name]) -> Recording".
+    - The ordering explanation becomes "Ordered by recorder time", with an exception line
+      such as "N recordings ordered by arrival time (no recorder time)" only when it
+      applies.
+  - **Editorial:**
+    - Candidate becomes Moment ("Review moment", "Details").
+    - "Point mark · Range needed" becomes "Single point: set start and end".
+    - Range inputs become "time into Session (mm:ss)".
+    - Navigation and page share one name: "Editorial review".
+    - Origin labels are Marked / Suggested (see the previous entry).
+  - **Top bar:** "Demo Profile · Single Stage · Not Event-Readiness Certified" becomes
+    "Test setup · 1 stage · not event-ready". The not-event-ready disclaimer must stay.
+- Unchanged: canonical domain, storage, and API terms, and every safety or honesty
+  meaning. Only wording changes. A disclaimer is reworded, never dropped.
+- Classification: Green (UI terminology and presentation)
+- Status: validated (ED-0095)
+

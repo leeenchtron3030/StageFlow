@@ -1,3 +1,4 @@
+import { uiLabels, timingLabel, renderLabel } from "./ui-labels.ts";
 import { assemblyApi, type AssemblyItem, type AssemblyMember } from "./assembly-api.ts";
 import { renderingApi, type RenderOperation, type RenderedOutput } from "./rendering-api.ts";
 import { mediaTimingApi, type MediaTimingSummary } from "./media-timing-api.ts";
@@ -31,26 +32,25 @@ export function outputDuration(output: OutputSummary) {
 export function currentRenderSummary(revisionId: string, operations?: SessionOutputs["operations"], outputs?: SessionOutputs["outputs"]): string | undefined {
   if (operations?.state !== "available") return undefined;
   const matching = operations.value.items.filter((operation) => operation.assembly_revision_id === revisionId);
-  if (matching.some((operation) => renderStateRank(operation.state) === 0)) return "Render pending";
+  if (matching.some((operation) => renderStateRank(operation.state) === 0)) return uiLabels.render.pending;
   if (matching.some((operation) => operation.state === "succeeded")) {
     const output = outputs?.state === "available" ? newestOutputs(outputs.value.items.filter((output) => output.assembly_revision_id === revisionId))[0] : undefined;
-    return `Render succeeded${output ? ` · ${outputDuration(output)}` : ""}`;
+    return `${uiLabels.render.succeeded}${output ? ` · ${outputDuration(output)}` : ""}`;
   }
   const failed = matching.find((operation) => operation.state === "terminal_failed");
-  if (failed) return `Render failed · ${failed.reason_code ?? "Unknown reason"}`;
-  if (matching.length) return `Render ${matching[0].state.replaceAll("_", " ")}`;
+  if (failed) return `${uiLabels.render.terminal_failed} · ${failed.reason_code ?? "Unknown reason"}`;
+  if (matching.length) return renderLabel(matching[0].state);
 }
 export function orderingSourceLabel(source: AssemblyMember["order_source"]): string {
-  return { media_timing: "Media start time", timing_evidence: "Recorder timing evidence", registration_time: "Registration time fallback" }[source];
+  return uiLabels.order[source];
 }
 export function qualificationLabel(value: AssemblyMember["order_evidence_qualification"]): string {
-  if (value === null) return "Recorder timing qualification not supplied";
-  return { unqualified: "Unqualified recorder timing", qualified: "Qualified recorder timing", rejected: "Rejected recorder timing", expired: "Expired recorder timing qualification" }[value];
+  return timingLabel(value);
 }
 export function memberOrderingLabel(member: AssemblyMember): string {
   return member.order_source === "timing_evidence"
-    ? qualificationLabel(member.order_evidence_qualification)
-    : `${orderingSourceLabel(member.order_source)} · qualification not applicable`;
+    ? timingLabel(member.order_evidence_qualification) || uiLabels.order.timing_evidence
+    : orderingSourceLabel(member.order_source);
 }
 export function memberOrderSummary(members: AssemblyMember[]) {
   const counts = new Map<string, number>();
@@ -58,12 +58,16 @@ export function memberOrderSummary(members: AssemblyMember[]) {
     const label = memberOrderingLabel(member);
     counts.set(label, (counts.get(label) ?? 0) + 1);
   }
-  const [baseline, count] = [...counts].sort((a, b) => b[1] - a[1])[0] ?? ["", 0];
+  const [baseline] = [...counts].sort((a, b) => b[1] - a[1])[0] ?? ["", 0];
+  const arrivals = members.filter((member) => member.order_source === "registration_time").length;
+  const recorder = members.length - arrivals;
+  const certainties = [...counts].filter(([label]) => label !== uiLabels.order.media_timing && label !== uiLabels.order.registration_time);
   return {
     baseline,
-    text: count === members.length
-      ? `All ${count} members ordered by ${baseline.toLowerCase()}`
-      : `${count} of ${members.length} members ordered by ${baseline.toLowerCase()} · exceptions flagged below`,
+    text: [recorder ? uiLabels.orderedByRecorder : "",
+      ...certainties.map(([label, count]) => `${label}${count === recorder ? "" : ` (${count} ${count === 1 ? "recording" : "recordings"})`}`),
+      arrivals ? `${arrivals} ${arrivals === 1 ? "recording" : "recordings"} ordered by arrival time (no recorder time)` : "",
+    ].filter(Boolean).join(" · "),
   };
 }
 export function wallClockLabel(value?: string | null): string {

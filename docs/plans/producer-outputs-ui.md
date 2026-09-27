@@ -375,3 +375,42 @@ Each phase is frontend-only and reverts independently. No data migrations are in
   - A Host-header allowlist to guard against DNS rebinding.
   - Render operations carry no timestamps. If chronological order matters, it needs a
     backend field.
+
+### Phase 3: ED-0095 (2026-09-27)
+
+- **Implemented revision:** branch `codex/ed-0095-editorial-review-surface`. Codex
+  implemented it and the owner committed it.
+  - `/editorial` connected to the runtime: the Event review queue, the four human review
+    actions, phrase-list versions and publishing with an exact preview matching the
+    backend's normalization, and derivation runs.
+  - The Session moments grid replaced by a summary and a compact table.
+- **Review:** the `directive-reviewer` returned FIX-FIRST. Codex fixed it:
+  - no more false "adjusted range" on approvals;
+  - no background flicker;
+  - state-aware review defaults;
+  - dead CSS removed and the navigation badge corrected;
+  - blank phrase lines ignored.
+- **Owner checkpoint:**
+  - the origin labels **Marked / Suggested**;
+  - a plain-language wording pass across the Producer and Editorial screens, using a
+    central `ui-labels.ts` and the glossary's "UI wording" section, with every
+    disclaimer kept;
+  - queue grouping by Session, one line per moment, the derivation result shown beside
+    its control, and a real link.
+
+  All of it is recorded in `docs/ux/operator-feedback.md`.
+- **Live check** against the live-run data:
+  - a deferral of one validation-derived moment succeeded;
+  - a derivation rerun returned the same run;
+  - a wrong launch token was refused;
+  - every step produced paired audit lines. The reason text was never logged; only its
+    presence and length were recorded.
+- **Tests:** frontend typecheck and lint pass, **249/249 tests pass**, and the build
+  succeeds.
+  - Existing assertions changed only where they pinned approved wording or structure.
+  - Proxy, security, audit, and Demo-command tests are unchanged.
+  - No backend change.
+- **Remaining work:**
+  - A Host-header allowlist to guard against DNS rebinding.
+  - A drift test for the Unicode table against the backend's Unicode version.
+  - Render operation timestamps, if chronological order is needed.

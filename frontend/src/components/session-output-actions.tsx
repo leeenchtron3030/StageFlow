@@ -1,5 +1,6 @@
 "use client";
 
+import { uiLabels } from "../experience/ui-labels.ts";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { assemblyApi, type assemblyTemplatesSchema } from "../experience/assembly-api.ts";
@@ -81,7 +82,7 @@ export function SessionOutputActions({ context }: { context: OutputActionContext
   return <div className="output-actions">
     {renderSummary ? <strong role="status">{renderSummary}</strong> : null}
     <button ref={trigger} className={renderSummary ? "output-secondary-action" : undefined} type="button" onClick={begin} disabled={Boolean(disabled) || busy || refreshing || Boolean(retry)} aria-describedby="output-action-state">
-      {primary === "propose" ? "Propose revision" : primary === "approve" ? "Approve / Reject" : renderSummary ? "Request another render" : "Request render"}
+      {primary === "propose" ? "Propose Assembly" : primary === "approve" ? "Approve / Reject" : renderSummary ? "Request another render" : "Request render"}
     </button>
     <span ref={actionState} tabIndex={-1} id="output-action-state">{busy ? "Working…" : refreshing ? "Refreshing current state…" : disabled ?? (retry ? "Resolve the pending command before another action." : "")}</span>
     {result ? <div className="output-command-result">
@@ -109,7 +110,8 @@ export function SessionOutputActions({ context }: { context: OutputActionContext
           <label htmlFor="output-reason">Reason (required)</label>
           <textarea id="output-reason" value={reason} onChange={(event) => setReason(event.target.value)} required maxLength={500} />
         </> : null}
-        {item && action !== "propose" ? <details><summary>Bound packaging identifiers</summary><ul>{item.revision.bindings.filter((b) => b.outcome === "bound").map((b) => <li key={b.slot_key}>{b.slot_key}: <code>{b.packaging_revision_id}</code></li>)}</ul></details> : null}
+        {action === "propose" ? <details><summary>{uiLabels.details}</summary><p>Package revision {context.packageRevision} · Expected Assembly revision {item?.current_revision_number ?? 0}</p><p>Template ID: <code>{templateId || "Not selected"}</code></p></details> : null}
+        {item && action !== "propose" ? <details><summary>{uiLabels.details}</summary><p>Assembly revision {item.revision.revision_number} · Package revision {item.revision.package_revision}</p><ul>{item.revision.bindings.filter((b) => b.outcome === "bound").map((b) => <li key={b.slot_key}>{b.slot_key}: <code>{b.packaging_revision_id}</code></li>)}</ul></details> : null}
         {changed ? <p>State changed. Cancel and review the current revision.</p> : null}
         <div className="output-dialog-actions">
           <button type="button" autoFocus onClick={() => setOpen(false)}>Cancel</button>

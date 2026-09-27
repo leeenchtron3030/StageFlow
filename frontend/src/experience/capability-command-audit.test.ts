@@ -49,6 +49,31 @@ function pair(disposition: string, outcome: string, backendStatus: number | null
   for (const forbidden of [secret, launch, freeText, "request_body", "response_body"]) assert.ok(!lines.join("\n").includes(forbidden), forbidden);
   return { received, result };
 }
+
+for (const kind of ["review", "publish", "derive"] as const) {
+  for (const status of [200, 409, 503]) test(`Editorial ${kind} audit pairs at HTTP ${status} without operator or phrase text`, async () => {
+    const phraseText = "Synthetic private silver lantern phrase";
+    const path = kind === "review" ? `moments/${id(2)}/reviews` : kind === "publish" ? `events/${id(2)}/phrase-lists` : `sessions/${id(2)}/derivations`;
+    const body = kind === "review" ? { operation_id: id(1), confirmed: "confirmed", expected_candidate_revision: 1, action: "defer", reason: freeText }
+      : kind === "publish" ? { command_id: id(1), confirmed: "confirmed", key: "synthetic", name: freeText, version: 1, phrases: [phraseText] }
+      : { command_id: id(1), confirmed: "confirmed", phrase_list_id: id(5), version: 1 };
+    const payload = kind === "review" ? { decision: { review_decision_id: id(4), operation_id: id(1), reason: freeText }, clip: { clip_id: id(6) } }
+      : kind === "publish" ? { phrase_list_id: id(4), phrases: [phraseText] } : { run_id: id(4), candidate_ids: [id(6)] };
+    globalThis.fetch = async () => Response.json(status === 200 ? payload : { detail: "synthetic_editorial_failure", reason: freeText }, { status });
+    assert.equal((await command({ capability: "editorial", path, body: JSON.stringify(body) })).status, status);
+    const { received, result } = pair("accepted", status === 200 ? "succeeded" : status === 409 ? "rejected" : "failed", status);
+    assert.equal(received.capability, "editorial");
+    assert.equal(received.route_pattern, capabilityRoutes.editorial.find((r) => r.method === "POST" && r.path.test(path))!.path.source);
+    assert.equal(received[kind === "review" ? "operation_id" : "command_id"], id(1));
+    assert.equal(received.reason_present, kind === "review");
+    if (status === 200) {
+      assert.equal(result[kind === "review" ? "review_decision_id" : kind === "publish" ? "phrase_list_id" : "run_id"], id(4));
+      if (kind === "review") assert.equal(result.clip_id, id(6));
+      if (kind === "derive") assert.deepEqual(result.candidate_ids, [id(6)]);
+    }
+    assert.ok(!lines.join("\n").includes(phraseText));
+  });
+}
 test("audit success pairs request/result, safe identities, pattern, launch fingerprint and reason metadata", async () => {
   await command();
   const { received, result } = pair("accepted", "succeeded", 200);

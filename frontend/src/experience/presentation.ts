@@ -1,3 +1,4 @@
+import { uiLabels } from "./ui-labels.ts";
 import type {
   AttentionLevel,
   MediaSummaryView,
@@ -13,30 +14,21 @@ const attentionOrder: Record<AttentionLevel, number> = {
 };
 
 export function formatMediaSummary(media: MediaSummaryView): string {
-  const parts = [`${media.associated} associated`];
-  if (media.stabilizing > 0) parts.push(`${media.stabilizing} stabilizing`);
-  if (media.unresolved > 0) parts.push(`${media.unresolved} unresolved`);
-  if (media.conflicting > 0) parts.push(`${media.conflicting} conflicting`);
+  const parts = [`${media.associated} ${uiLabels.assignment.associated.toLowerCase()}`];
+  if (media.stabilizing > 0) parts.push(`${media.stabilizing} ${uiLabels.assignment.stabilizing.toLowerCase()}`);
+  if (media.unresolved > 0) parts.push(`${media.unresolved} ${uiLabels.assignment.unresolved.toLowerCase()}`);
+  if (media.conflicting > 0) parts.push(`${media.conflicting} ${uiLabels.assignment.conflicting.toLowerCase()}`);
   return parts.join(" · ");
 }
 
 export function formatActivityState(session?: SessionView): string {
   if (!session) return "No realized Session";
-  if (session.activityState === "presentation_active") return "Presentation active";
-  if (session.activityState === "presentation_ended") return "Presentation ended";
-  return "Expected";
+  return uiLabels.activity[session.activityState];
 }
 
 export function formatPackageState(session?: SessionView): string {
   if (!session) return "No package";
-  const labels: Record<SessionView["packageState"], string> = {
-    assembling: "Assembling",
-    ready_for_review: "Ready for review",
-    in_review: "In review",
-    correction_required: "Review required",
-    complete: "Complete",
-  };
-  return labels[session.packageState];
+  return uiLabels.package[session.packageState];
 }
 
 export function workspaceAttentionLevel(

@@ -41,7 +41,7 @@ test("render tables preserve stable state groups, sort output instants, and disc
   const html = render(outputs);
   const operationTable = html.match(/<table[^>]*aria-label="Render operations">.*?<\/table>/)![0];
   const outputTable = html.match(/<table[^>]*aria-label="Rendered Outputs">.*?<\/table>/)![0];
-  assert.deepEqual([...operationTable.matchAll(/<th scope="row">([^<]+)<\/th>/g)].map((m) => m[1]), ["running", "pending", "leased", "succeeded", "succeeded", "terminal failed", "cancelled"]);
+  assert.deepEqual([...operationTable.matchAll(/<th scope="row">([^<]+)<\/th>/g)].map((m) => m[1]), ["Rendering...", "Rendering...", "Rendering...", "Done", "Done", "Failed", "Cancelled"]);
   assert.ok(operationTable.indexOf(fixtureId(102)) < operationTable.indexOf(fixtureId(106)));
   assert.ok(outputTable.indexOf(fixtureId(201)) < outputTable.indexOf(fixtureId(202)));
   assert.ok(outputTable.indexOf(fixtureId(202)) < outputTable.indexOf(fixtureId(200)));
@@ -55,7 +55,7 @@ test("render tables preserve stable state groups, sort output instants, and disc
     assert.doesNotMatch(table, /<details[^>]*\bopen/);
   }
   assert.match(outputTable, /<details>.*SHA-256 prefix:.*aaaaaaaaaaaa/);
-  assert.match(html, /Newest produced time first within this bounded read/);
+  assert.match(html, /Newest produced time first among the outputs shown/);
   assert.match(html, /operation times are unavailable/);
   assert.doesNotMatch(operationTable, /Produced time|newest|dateTime/);
   assert.equal(JSON.stringify(outputs), before);
@@ -67,15 +67,15 @@ test("current revision summary prioritizes in-flight over success over failure a
   const summary = (items: typeof operation[], outputs: presentation.SessionOutputs["outputs"] = { state: "unavailable" }) =>
     presentation.currentRenderSummary(revisionId, { state: "available", value: { items, truncated: true } }, outputs);
   const failed = { ...operation, state: "terminal_failed" as const, reason_code: "encoder_unavailable" };
-  for (const state of ["pending", "leased", "running"] as const) assert.equal(summary([failed, operation, { ...operation, state }]), "Render pending");
+  for (const state of ["pending", "leased", "running"] as const) assert.equal(summary([failed, operation, { ...operation, state }]), "Rendering...");
   const output = { ...presentation.outputSummary(fixtureRenderedOutput()), assembly_revision_id: revisionId };
   assert.equal(summary([failed, operation], { state: "available", value: { items: [
     { ...output, produced_at: "2026-09-27T12:00:00Z" },
     { ...output, produced_at: "2026-09-27T07:00:00-07:00", duration_microseconds: 90_000_000 },
     { ...output, produced_at: "2026-09-28T12:00:00Z", assembly_revision_id: fixtureId(99), duration_microseconds: 1 },
-  ], truncated: true } }), "Render succeeded · 90.000 seconds");
-  assert.equal(summary([failed, operation]), "Render succeeded");
-  assert.equal(summary([failed]), "Render failed · encoder_unavailable");
+  ], truncated: true } }), "Done · 90.000 seconds");
+  assert.equal(summary([failed, operation]), "Done");
+  assert.equal(summary([failed]), "Failed · encoder_unavailable");
   assert.equal(summary([fixtureRenderOperation()]), undefined);
   assert.equal(summary([]), undefined);
   assert.equal(presentation.currentRenderSummary(revisionId, { state: "unavailable" }), undefined);
@@ -117,9 +117,10 @@ test("slot names and roles resolve by frozen packaging revision, with only safe 
   assert.deepEqual(outputs.knownRevisions, [{ revisionId: fixtureId(1), number: 2 }]);
   const html = render(outputs);
   const bindings = html.match(/<ul[^>]*aria-label="Assembly slot bindings">.*?<\/ul>/)![0];
-  assert.match(bindings, /Event opening · opening bumper/);
-  assert.match(bindings, /<details><summary>Packaging details<\/summary>.*Packaging revision ID/);
-  assert.doesNotMatch(bindings.replace(/<details>.*?<\/details>/g, ""), /10000000-/);
+  assert.match(html, /Layout: Intro \(Event opening\)/);
+  assert.match(html, /<details><summary>Details<\/summary><ul aria-label="Assembly slot bindings">/);
+  assert.doesNotMatch(html.replace(/<details[^>]*>.*?<\/details>/g, ""), /10000000-/);
+  assert.ok(bindings.includes(fixtureId(7)));
   assert.doesNotMatch(JSON.stringify(outputs), /never-expose-content|ffffffffffff/);
 });
 
@@ -139,7 +140,7 @@ test("missing, failed, truncated and wrong-scope packaging reads keep the ID in 
     assert.deepEqual(result.packaging, []);
     assert.equal(result.assembly.state, "available");
     assert.match(render(result), /Packaging asset unavailable/);
-    assert.match(render(result), new RegExp(`<details><summary>Packaging details</summary>.*${fixtureId(7)}`));
+    assert.match(render(result), new RegExp(`<details><summary>Details</summary>.*${fixtureId(7)}`));
   }
 });
 
@@ -177,20 +178,20 @@ test("uniform members have one ordering summary, readable labels and collapsed c
   outputs.assembly = { state: "available", value: item };
   outputs.timing = item.revision.membership.map((member) => ({ assetId: member.asset_id, result: { state: "available", value: { ...fixtureTiming(), asset_id: member.asset_id } } }));
   const html = render(outputs);
-  assert.match(html, /All 11 members ordered by unqualified recorder timing/);
-  assert.equal((html.match(/unqualified recorder timing/gi) ?? []).length, 1);
+  assert.match(html, /Ordered by recorder time · Recorder time \(unverified\)/);
+  assert.equal((html.match(/Recorder time \(unverified\)/gi) ?? []).length, 1);
   assert.doesNotMatch(html, /class="outputs-qualification"/);
   assert.match(html, /<th scope="row">3<\/th><td><details/);
   assert.match(html, /Start: 12:00:00 \(all members\) · Duration: 1:00 \(all members\)/);
-  assert.equal((html.match(/Evidence revision 3 · frozen and latest/g) ?? []).length, 1);
-  assert.match(html, /Evidence revision 3 · frozen and latest \(all members\)/);
+  assert.doesNotMatch(html.replace(/<details[^>]*>.*?<\/details>/g, ""), /Evidence revision/);
+  assert.match(html, /<dt>Evidence revision<\/dt><dd>3 · latest 3/);
   assert.equal((html.match(/<th scope="row">\d+<\/th>/g) ?? []).length, 11);
   for (const label of ["Position", "Details"]) assert.ok(html.includes(`<th scope="col">${label}</th>`));
   for (const label of ["Start", "Duration", "Flags"]) assert.ok(!html.includes(`<th scope="col">${label}</th>`));
-  assert.match(html, /<summary>Member details<\/summary>.*Media ID \(select to copy\).*class="copyable-id" tabindex="0"/);
+  assert.match(html, /<summary>Details<\/summary>.*Media ID \(select to copy\).*class="copyable-id" tabindex="0"/);
   assert.match(html, /Start \(date and zone\).*2026-09-27T12:00:00Z/);
   assert.doesNotMatch(html, /<details[^>]*\bopen/);
-  assert.match(html, /All Session media in this bounded view is covered by the Assembly/);
+  assert.match(html, /All recordings shown are in the Assembly/);
   assert.doesNotMatch(html, /aria-label="Media timing outside Assembly"/);
   assert.equal((html.match(new RegExp(fixtureId(102), "g")) ?? []).length, 1);
 });
@@ -202,10 +203,10 @@ test("only differing ordering or qualification is flagged, and registration is n
   item.revision.membership = [recorder, { ...recorder, asset_id: fixtureId(80) }, { ...recorder, asset_id: fixtureId(81), order_evidence_qualification: "qualified" }, item.revision.membership[2]];
   outputs.assembly = { state: "available", value: item };
   const html = render(outputs);
-  assert.match(html, /2 of 4 members ordered by unqualified recorder timing · exceptions flagged below/);
+  assert.match(html, /Recorder time \(unverified\) \(2 recordings\)/);
   assert.equal((html.match(/class="outputs-qualification"/g) ?? []).length, 2);
-  assert.match(html, /Qualified recorder timing/);
-  assert.match(html, /Registration time fallback · qualification not applicable/);
+  assert.match(html, /Recorder time \(verified\)/);
+  assert.match(html, /Arrival time \(no recorder time\)/);
   assert.match(html, /<th scope="row">4<\/th><td>Start unknown<\/td><td>Duration unknown/);
   assert.doesNotMatch(html, /qualification not supplied/);
   assert.equal(presentation.wallClockLabel("2026-09-27T07:48:15-07:00"), "07:48:15");
@@ -218,7 +219,7 @@ test("folding preserves latest versus frozen evidence and lists only media outsi
   outputs.timing[1].result = { state: "available", value: latest };
   outputs.timing.push({ assetId: fixtureId(99), result: { state: "unavailable" } });
   const html = render(outputs);
-  assert.match(html, /Latest evidence revision 4 · Frozen ordering evidence revision 3/);
+  assert.match(html, /A newer timing estimate exists/);
   assert.match(html, /Latest timing does not replace frozen ordering evidence/);
   const outside = html.split('aria-label="Media timing outside Assembly"')[1];
   assert.ok(outside.includes(fixtureId(99)));
@@ -227,25 +228,25 @@ test("folding preserves latest versus frozen evidence and lists only media outsi
   assert.doesNotMatch(html, /All Session media/);
   outputs.timing.pop(); outputs.timingTruncated = true;
   assert.doesNotMatch(render(outputs), /All Session media/);
-  assert.match(render(outputs), /additional media may be outside this bounded view/);
+  assert.match(render(outputs), /additional media may be outside this view/);
 });
 
 test("evidence summary and cards are collapsed, limitations unique, full tool hash only in detail", () => {
   const evidence = getFixtureWorkspace("run-004").mediaTimingEvidence[0];
   const item = { ...evidence, toolLabel: `ffprobe sha256:${"a".repeat(64)}`, limitations: ["One limitation", "One limitation"], observations: [{ kind: "duration", precision: "microseconds", limitations: ["One limitation", "Second limitation"] }] };
   const html = renderEvidence([item]);
-  assert.match(html, /1 recent asset · all unqualified · advisory only/);
+  assert.match(html, /1 recent recording · Recorder time \(unverified\)/);
   assert.equal((html.match(/One limitation/g) ?? []).length, 1);
   assert.equal((html.match(/Second limitation/g) ?? []).length, 1);
   assert.equal((html.match(new RegExp("a".repeat(64), "g")) ?? []).length, 1);
   const summaries = html.match(/<summary>[\s\S]*?<\/summary>/g) ?? [];
   assert.equal(summaries.length, 2);
-  assert.ok(summaries[1].includes("aaaaaaaaaaaa…"));
+  assert.ok(summaries[1].includes("Estimated start"));
   assert.ok(!summaries[1].includes("a".repeat(64)));
   assert.doesNotMatch(html, /<details[^>]*\bopen/);
-  assert.match(renderEvidence([item, { ...item, evidenceId: "other", assetId: "other", qualificationStatus: "qualified" }]), /2 recent assets · mixed qualifications/);
+  assert.match(renderEvidence([item, { ...item, evidenceId: "other", assetId: "other", qualificationStatus: "qualified" }]), /2 recent recordings · Timing certainty varies/);
   assert.match(renderEvidence([], "unavailable"), /<summary>.*Timing evidence unavailable<\/span><\/summary>/);
-  assert.match(renderEvidence([]), /No timing evidence in this bounded read/);
+  assert.match(renderEvidence([]), /No timing estimates in this view/);
 });
 
 test("Session structure puts Outputs immediately after lifecycle and membership, before evidence", () => {
@@ -262,9 +263,9 @@ test("Session structure puts Outputs immediately after lifecycle and membership,
   });
   const workspace = getFixtureWorkspace("quiet");
   const html = renderToStaticMarkup(React.createElement(SessionOperationalView, { workspace, session: workspace.sessions[0], outputs: React.createElement(exports.SessionOutputsPanel!, { outputs: getFixtureSessionOutputs() }) }));
-  assert.ok(html.indexOf("Operational lifecycle") < html.indexOf("Media membership"));
+  assert.ok(html.indexOf("Operational lifecycle") < html.indexOf("Recordings"));
   assert.match(html, /<\/section><\/div><section class="detail-panel outputs-panel"/);
-  assert.ok(html.indexOf("Outputs") < html.indexOf("Media Timing Evidence"));
+  assert.ok(html.indexOf("Outputs") < html.indexOf("Timing estimates"));
 });
 
 test("member flags show differing evidence revision and frozen/latest status only", () => {
@@ -278,12 +279,12 @@ test("member flags show differing evidence revision and frozen/latest status onl
   outputs.timing[2].result = { state: "available", value: latest };
   outputs.timing[3].result = { state: "unavailable" };
   const html = render(outputs);
-  assert.equal((html.match(/Evidence revision 3 · frozen and latest/g) ?? []).length, 1);
-  assert.match(html, /2 of 4 members; exceptions below/);
+  assert.doesNotMatch(html.replace(/<details[^>]*>.*?<\/details>/g, ""), /Evidence revision/);
+  assert.match(html, /Ordered by recorder time/);
   const flags = [...html.matchAll(/<td class="member-flags">(.*?)<\/td>/g)].map((match) => match[1]);
   assert.deepEqual(flags.slice(0, 2), ["", ""]);
-  assert.match(flags[2], /Latest evidence revision 3 · Frozen ordering evidence revision 3/);
-  assert.match(flags[3], /Frozen ordering evidence revision 3 · Media timing unavailable/);
+  assert.match(flags[2], /A newer timing estimate exists/);
+  assert.match(flags[3], /Media timing unavailable/);
 });
 
 test("bounded timing sample counts unique recent assets without inventing a Session total", () => {
@@ -291,7 +292,7 @@ test("bounded timing sample counts unique recent assets without inventing a Sess
   const evidence = Array.from({ length: 8 }, (_, index) => ({ ...item, assetId: fixtureId(100 + index), evidenceId: fixtureId(200 + index) }));
   evidence.push({ ...evidence[0], evidenceId: fixtureId(300), revision: 2 });
   const summary = renderEvidence(evidence).match(/<summary>(.*?)<\/summary>/)![1];
-  assert.match(summary, /8 recent assets/);
+  assert.match(summary, /8 recent recordings/);
   assert.doesNotMatch(summary, /9 recent|of \d+|12 assets/);
 });
 
@@ -319,6 +320,7 @@ function renderDemo(workspace?: DemoWorkspace, loading = false) {
   const { DemoSessionWorkspace } = compileComponent("../components/demo-session-workspace.tsx", {
     react: { ...React, useState: () => [states.shift(), () => undefined] },
     "next/navigation": { useRouter: () => ({ refresh() {} }) },
+    "./session-moments": { SessionMoments: () => null },
     "@/experience/demo-api.ts": {}, "@/experience/demo-launch-context.ts": {}, "@/experience/demo-package-approval.ts": {},
   });
   return renderToStaticMarkup(React.createElement(DemoSessionWorkspace, {
@@ -329,7 +331,7 @@ function renderDemo(workspace?: DemoWorkspace, loading = false) {
 
 test("transcript summary and every asset use closed native disclosures with segments inside", () => {
   const html = renderDemo(demoWorkspaceFixture());
-  assert.match(html, /<details class="transcription-disclosure"><summary><strong>Transcription Evidence<\/strong> · 11 complete · 1,546 words<\/summary>/);
+  assert.match(html, /<details class="transcription-disclosure"><summary><strong>Automatic transcript: may contain errors<\/strong> · 11 complete · 1,546 words<\/summary>/);
   assert.equal((html.match(/<details class="transcription-evidence-card">/g) ?? []).length, 11);
   assert.match(html, /<details class="transcription-evidence-card"><summary>Asset .*?<\/summary>.*?class="transcript-segments"/);
   assert.doesNotMatch(html, /<details[^>]*\bopen/);
@@ -346,12 +348,12 @@ test("transcript summary discloses partial, failed, empty, loading and bounded e
   for (const boundedBy of ["assets", "segments"] as const) {
     workspace.transcript_assets_truncated = boundedBy === "assets";
     workspace.transcript_evidence[0].segments_truncated = boundedBy === "segments";
-    assert.match(renderDemo(workspace), /1 partial · 1 failed · 9 complete · 1,546 words shown · bounded evidence/);
+    assert.match(renderDemo(workspace), /1 partial · 1 failed · 9 complete · 1,546 words shown · more available/);
   }
   workspace.transcript_evidence = [];
-  assert.match(renderDemo(workspace), /<summary><strong>Transcription Evidence<\/strong> · No Transcription Evidence yet<\/summary>/);
-  assert.match(renderDemo(), /<summary><strong>Transcription Evidence<\/strong> · Evidence unavailable<\/summary>/);
-  assert.match(renderDemo(undefined, true), /<summary><strong>Transcription Evidence<\/strong> · Refreshing evidence<\/summary>/);
+  assert.match(renderDemo(workspace), /<summary><strong>Automatic transcript: may contain errors<\/strong> · No automatic transcript yet<\/summary>/);
+  assert.match(renderDemo(), /<summary><strong>Automatic transcript: may contain errors<\/strong> · Evidence unavailable<\/summary>/);
+  assert.match(renderDemo(undefined, true), /<summary><strong>Automatic transcript: may contain errors<\/strong> · Refreshing evidence<\/summary>/);
 });
 
 test("operation states are summarized and only non-succeeded operations retain tiles", () => {
@@ -365,12 +367,12 @@ test("operation states are summarized and only non-succeeded operations retain t
   workspace.operations_truncated = true;
   html = renderDemo(workspace);
   assert.match(html, /11 succeeded · 1 queued · 1 running · 1 retry scheduled · 1 terminal failed · 1 cancelled/);
-  const grid = html.split('aria-label="Bounded transcription Operations">')[1].split('</div>')[0];
+  const grid = html.split('aria-label="Transcription operations">')[1].split('</div>')[0];
   assert.equal((grid.match(/<article>/g) ?? []).length, 5);
   assert.doesNotMatch(grid, /succeeded|succeede/);
   assert.match(grid, /Attempt 1 \/ 3/);
   assert.match(grid, /synthetic reason/);
-  assert.match(html, /Bounded Operation view: at most 100 recent Event operations/);
+  assert.match(html, /Latest 100 Event operations/);
   workspace.operations = [];
   assert.match(renderDemo(workspace), /<span>Operations<\/span><strong>No operations<\/strong>/);
 });
@@ -506,14 +508,14 @@ test("Session page passes one five-second budget through workspace and Outputs l
 
 test("real Outputs panel renders frozen position order and all ordering/qualification labels", () => {
   const output = render(getFixtureSessionOutputs());
-  for (const label of ["Outputs", "Read-only", "Development fixture", "Not production authority", "Current revision", "Unqualified recorder timing", "media_timing", "timing_evidence", "registration_time", "Registration time fallback", "Slot bindings", "Evidence revision 3 · frozen and latest", "advisory", "SHA-256 prefix:", "aaaaaaaaaaaa", "60.000 seconds", "1799", "version 2", "2026-09-27T12:00:00Z"]) assert.ok(output.includes(label), label);
+  for (const label of ["Outputs", "Read-only", "Development fixture", "Not production authority", "Current revision", "Recorder time (unverified)", "media_timing", "timing_evidence", "registration_time", "Arrival time (no recorder time)", "Layout", "Evidence revision", "advisory", "SHA-256 prefix:", "aaaaaaaaaaaa", "60.000 seconds", "1799", "version 2", "2026-09-27T12:00:00Z"]) assert.ok(output.includes(label), label);
   assert.ok(output.indexOf('scope="row">1</th>') < output.indexOf('scope="row">2</th>')); assert.ok(output.indexOf('scope="row">2</th>') < output.indexOf('scope="row">3</th>'));
   assert.match(output, /aria-label="Assembly members in frozen position order"/);
-  assert.match(output, /qualification not applicable/);
+  assert.doesNotMatch(output, /qualification not applicable/);
   assert.doesNotMatch(output, /<button|<video|<audio|synthetic-output|synthetic-manifest|content_key|ffmpeg_sha256/);
 });
 test("qualified, rejected, expired and absent qualifications remain distinct text", () => {
-  const expected = ["Unqualified recorder timing", "Qualified recorder timing", "Rejected recorder timing", "Expired recorder timing qualification", "Recorder timing qualification not supplied"];
+  const expected = ["Recorder time (unverified)", "Recorder time (verified)", "Recorder time (rejected)", "Recorder time (verification expired)", ""];
   for (const [index, value] of (["unqualified", "qualified", "rejected", "expired", null] as const).entries()) assert.equal(presentation.qualificationLabel(value), expected[index]);
 });
 test("staleness, issue codes, approval and bounded reads have visible consequences", () => {
@@ -524,7 +526,7 @@ test("staleness, issue codes, approval and bounded reads have visible consequenc
   outputs.assembly.value.revision.validation = { state: "invalid", issues: [{ code: "unresolved_required_slot", subject: "opening" }] };
   outputs.operations.value.truncated = true; outputs.outputs.value.truncated = true; outputs.timingTruncated = true;
   const html = render(outputs);
-  for (const text of ["Inputs changed", "Prior decisions remain recorded", "unresolved_required_slot", "approved", "More operations exist", "More outputs exist", "Additional assets are not shown"]) assert.ok(html.includes(text), text);
+  for (const text of ["Out of date: inputs changed", "Prior decisions remain recorded", "unresolved_required_slot", "approved", "More operations exist", "More outputs exist", "Additional assets are not shown"]) assert.ok(html.includes(text), text);
 });
 test("empty, unavailable and missing evidence are distinct; no fixture fallback", () => {
   const outputs = getFixtureSessionOutputs(); outputs.fixture = false; outputs.assembly = { state: "available", value: null }; outputs.operations = { state: "unavailable" }; outputs.outputs = { state: "available", value: { items: [], truncated: false } };
@@ -630,4 +632,77 @@ test("Kernel Session loading uses protected server reads and strips output conte
     globalThis.fetch = originalFetch;
     if (originalSecret === undefined) delete process.env.STAGEFLOW_API_SHARED_SECRET; else process.env.STAGEFLOW_API_SHARED_SECRET = originalSecret;
   }
+});
+
+
+// Remove closed disclosures, including nested ones, to test the initial scanning surface.
+function collapsedMarkup(html: string): string {
+  let depth = 0;
+  return html.split(/(<\/?details\b[^>]*>)/).filter((part) => {
+    if (part.startsWith("<details")) { depth++; return false; }
+    if (part.startsWith("</details")) { depth--; return false; }
+    return depth === 0;
+  }).join("");
+}
+
+test("Outputs use plain labels while internal revisions and states stay in Details", () => {
+  const outputs = getFixtureSessionOutputs();
+  outputs.packaging = [{ revisionId: fixtureId(7), name: "Event opening", role: "opening_bumper" }];
+  const html = render(outputs), visible = collapsedMarkup(html);
+  for (const text of ["Up to date", "Awaiting review", "Order locked when proposed", "Ordered by recorder time", "Recorder time (unverified)", "1 recording ordered by arrival time (no recorder time)", "Layout: Intro (Event opening) → Recording", "Done", "1080p (v2)"]) assert.ok(visible.includes(text), text);
+  assert.doesNotMatch(visible, /revision \d|unqualified|registration_time|session_media|bounded|wall-clock|advisory/i);
+  for (const raw of ["unqualified", "registration_time", "session_media", "Current revision: 2", "succeeded", "opening_bumper"]) assert.ok(html.includes(raw), raw);
+  assert.match(html, /Recorder start and length are unverified/);
+});
+
+test("navigation and top bar share Editorial review and preserve the event-readiness disclaimer", () => {
+  const { OperationalShell } = compileComponent("../components/operational-shell.tsx", {
+    "next/link": { __esModule: true, default: ({ children, ...props }: React.PropsWithChildren<{ href: string }>) => React.createElement("a", props, children) },
+    "@/experience/fixtures.ts": { scenarioOptions: [] },
+    "@/experience/presentation.ts": { workspaceAttentionLevel: () => undefined },
+  });
+  const workspace = getFixtureWorkspace("quiet");
+  workspace.dataSource = { ...workspace.dataSource, kind: "kernel", state: "live_connected", authoritative: true, runtimeProfile: "demo-single-stage", scenarioId: undefined };
+  const html = renderToStaticMarkup(React.createElement(OperationalShell, { workspace, activePath: "/editorial" }));
+  const visible = collapsedMarkup(html);
+  assert.match(visible, /href="\/editorial"[^>]*><span>Editorial review/);
+  assert.match(visible, /Test setup · 1 stage · not event-ready/);
+  assert.match(visible, /Live · connected/);
+  assert.doesNotMatch(visible, /Backend projection|Live Triage/);
+  assert.match(html, /<summary>Details<\/summary>.*demo-single-stage/);
+});
+
+test("Session lifecycle, recordings and assignment retain diagnostics and preservation meaning", () => {
+  const empty = () => null;
+  const { SessionOperationalView } = compileComponent("../components/operational-views.tsx", {
+    "next/link": { default: empty },
+    "@/experience/program-provider.ts": { programProviderDisplayName: () => "Schedule" },
+    "@/experience/presentation.ts": { formatActivityState: () => "Active", formatPackageState: () => "Assembling", authorityActionsEnabled: () => false },
+    "./session-timing-evidence": { SessionTimingEvidence },
+    "./demo-session-workspace": { DemoSessionWorkspace: empty },
+    "./demo-program-refresh-control": { DemoProgramRefreshControl: empty },
+    "./demo-start-session-control": { DemoStartSessionControl: empty },
+    "./mission-control": { AttentionPanel: empty, WorkspaceTitle: empty },
+  });
+  const workspace = getFixtureWorkspace("run-004");
+  const session = { ...workspace.sessions[0], provenance: "declared", media: { ...workspace.sessions[0].media, unresolved: 1 } };
+  workspace.mediaAssets = [{ ...workspace.mediaAssets[0], consideredSessionIds: [session.id], associationReasonCodes: ["no_safely_eligible_session"], associationStatus: "unresolved" }];
+  const html = renderToStaticMarkup(React.createElement(SessionOperationalView, { workspace, session }));
+  const visible = collapsedMarkup(html);
+  for (const label of ["Set by producer", "Found", "In this Session", "Still recording", "Needs a decision", "Claimed by two Sessions", "1 recording needs a decision: no Session fits it. Nothing was deleted.", "No Session matches this recording&#x27;s time. Checked:"]) assert.ok(visible.includes(label), label);
+  assert.doesNotMatch(visible, /Session revision|Package revision|Aggregate|DECLARED/);
+  assert.match(html, /<summary>Details<\/summary>.*Session revision/);
+});
+
+
+test("uniform outside timing is stated once, with raw certainty and full timestamps in Details", () => {
+  const outputs = getFixtureSessionOutputs();
+  outputs.assembly = { state: "available", value: null };
+  outputs.timing = [fixtureId(90), fixtureId(91)].map((assetId) => ({ assetId, result: { state: "available", value: { ...fixtureTiming(), asset_id: assetId } } }));
+  const html = render(outputs), visible = collapsedMarkup(html);
+  assert.equal((visible.match(/Recorder time \(unverified\)/g) ?? []).length, 1);
+  assert.match(visible, /all 2 recordings below/);
+  assert.equal((visible.match(/Estimated start:.*?12:00:00/g) ?? []).length, 2);
+  assert.doesNotMatch(visible, /Evidence revision|unqualified|10000000-/);
+  assert.match(html, /<summary>Details<\/summary>.*Evidence revision 3.*unqualified/);
 });

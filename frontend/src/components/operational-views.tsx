@@ -1,10 +1,10 @@
+import { uiLabels, timingLabel, unplacedRecordings, assignmentReason } from "../experience/ui-labels.ts";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { SessionTimingEvidence } from "./session-timing-evidence";
 import { programProviderDisplayName } from "@/experience/program-provider.ts";
 
 import type {
-  EditorialCandidateView,
   MediaAssetView,
   MediaTimingEvidenceView,
   OperationalWorkspace,
@@ -62,8 +62,8 @@ function MediaUncertaintyPanel({
     <section className="media-uncertainty-panel" aria-labelledby="media-uncertainty-title">
       <div className="section-heading">
         <div>
-          <span className="eyebrow">Membership uncertainty · bounded recent evidence</span>
-          <h2 id="media-uncertainty-title">Affected media</h2>
+          <span className="eyebrow">Recordings needing a decision</span>
+          <h2 id="media-uncertainty-title">Recordings</h2>
         </div>
         <span>{uncertain.length} shown · media preserved</span>
       </div>
@@ -77,14 +77,16 @@ function MediaUncertaintyPanel({
             <article className={`uncertainty-card uncertainty-${asset.associationStatus}`} key={asset.candidateId}>
               <div className="uncertainty-identity">
                 <div>
-                  <span className="eyebrow">{asset.stageName} · {asset.registrationState}</span>
+                  <span className="eyebrow">{asset.stageName} · {uiLabels.assignment[asset.registrationState as keyof typeof uiLabels.assignment] ?? asset.registrationState}</span>
                   <strong>{asset.assetId ? `Asset ${asset.assetId.slice(0, 12)}` : `Candidate ${asset.candidateId.slice(0, 12)}`}</strong>
                 </div>
                 <span className={`association-badge association-${asset.associationStatus}`}>
-                  {asset.associationStatus === "conflict" ? "Conflict · Review" : "Unresolved · Review"}
+                  {asset.associationStatus === "conflict" ? uiLabels.assignment.conflict : uiLabels.assignment.unresolved}
                 </span>
               </div>
-              <p className="operator-explanation">{asset.explanation}</p>
+              <p className="operator-explanation">{assignmentReason(asset.associationReasonCodes, asset.explanation)} Checked: {considered || "No Sessions reported"}. Nothing was deleted.</p>
+              <details className="diagnostic-details"><summary>{uiLabels.details}</summary>
+              <p>{asset.registrationState} · {asset.associationStatus} · {asset.associationReasonCodes.join(" · ")}</p>
               <dl className="definition-grid uncertainty-definitions">
                 <Definition
                   label="Sessions considered by policy"
@@ -98,19 +100,19 @@ function MediaUncertaintyPanel({
                   label="Timing evidence"
                   value={
                     timing
-                      ? `${timing.qualificationStatus} · candidate interval is Derived and advisory`
+                      ? `${timingLabel(timing.qualificationStatus)} · ${uiLabels.estimate}`
                       : "No timing evidence in this bounded read"
                   }
                 />
                 <Definition label="Last observed" value={asset.lastObservedAt} />
               </dl>
               <details className="diagnostic-details">
-                <summary>Evidence and provenance</summary>
+                <summary>{uiLabels.details}</summary>
                 <p>Source binding: {asset.sourceBindingKey}</p>
                 <p>Policy: {asset.associationPolicy ?? "Not reported"}</p>
                 <p>Epistemic kinds: {asset.epistemicKinds.join(" · ") || "Not reported"}</p>
                 <p>Diagnostic codes: {asset.diagnosticCodes.map(readableCode).join(" · ") || "None"}</p>
-              </details>
+              </details></details>
             </article>
           );
         })}
@@ -453,33 +455,33 @@ export function SessionOperationalView({
   demoLaunchContext?: string;
   outputs?: ReactNode;
 }) {
-  if (!session) return <><WorkspaceTitle eyebrow="Producer · Session" title="Session unavailable" summary="The requested Session is outside this bounded projection." /><Link className="text-link" href={href("/sessions", workspace)}>Return to Sessions</Link></>;
+  if (!session) return <><WorkspaceTitle eyebrow="Producer · Session" title="Session unavailable" summary="The requested Session is not available in this view." /><Link className="text-link" href={href("/sessions", workspace)}>Return to Sessions</Link></>;
   return (
     <>
       <WorkspaceTitle eyebrow={`Producer · ${session.stageName}`} title={session.title} summary={`${formatActivityState(session)} · Package ${formatPackageState(session)}`} />
       <div className="session-detail-grid">
         <section className="detail-panel">
-          <div className="section-heading"><h2>Operational lifecycle</h2><span>{session.provenance.toUpperCase()}</span></div>
+          <div className="section-heading"><h2>Operational lifecycle</h2><span>{uiLabels.lifecycle[session.provenance]}</span></div>
           <dl className="definition-grid">
             <Definition label="Presentation" value={formatActivityState(session)} />
-            <Definition label="Package" value={`${formatPackageState(session)} · revision ${session.packageRevision}`} />
-            <Definition label="Session revision" value={String(session.sessionRevision)} />
+            <Definition label="Package" value={formatPackageState(session)} />
             <Definition label="Stage" value={session.stageName} />
-            <Definition label="Declared start" value={session.authoritativeStart ?? "Not declared"} />
-            <Definition label="Declared end" value={session.authoritativeEnd ?? "Not declared"} />
+            <Definition label="Session start" value={session.authoritativeStart ?? "Not declared"} />
+            <Definition label="Presentation end" value={session.authoritativeEnd ?? "Not declared"} />
           </dl>
+          <details><summary>{uiLabels.details}</summary><p>{session.provenance} · {session.activityState} · {session.packageState} · Session revision {session.sessionRevision} · Package revision {session.packageRevision}</p></details>
         </section>
         <section className="detail-panel">
-          <div className="section-heading"><h2>Media membership</h2><span>Aggregate</span></div>
+          <div className="section-heading"><h2>{uiLabels.recordings}</h2></div>
           <div className="media-metric-grid" aria-label="Stage media context for this Session">
-            <div><span>Registered</span><strong>{session.media.registered}</strong></div>
-            <div><span>Associated</span><strong>{session.media.associated}</strong></div>
-            <div><span>Stabilizing</span><strong>{session.media.stabilizing}</strong></div>
-            <div><span>Unresolved</span><strong>{session.media.unresolved}</strong></div>
-            <div><span>Conflicting</span><strong>{session.media.conflicting}</strong></div>
+            <div><span>{uiLabels.assignment.registered}</span><strong>{session.media.registered}</strong></div>
+            <div><span>{uiLabels.assignment.associated}</span><strong>{session.media.associated}</strong></div>
+            <div><span>{uiLabels.assignment.stabilizing}</span><strong>{session.media.stabilizing}</strong></div>
+            <div><span>{uiLabels.assignment.unresolved}</span><strong>{session.media.unresolved}</strong></div>
+            <div><span>{uiLabels.assignment.conflicting}</span><strong>{session.media.conflicting}</strong></div>
           </div>
-          <p>Stage aggregate context · bounded Session evidence appears below. Physical recording boundaries and filesystem timestamps are not content truth.</p>
-          {session.media.unresolved ? <div className="review-callout"><strong>{session.media.unresolved} unplaced / time unknown</strong><span>Media preserved. Ownership remains unresolved.</span></div> : null}
+          <details><summary>{uiLabels.details}</summary><p>Stage aggregate context · registered / associated / stabilizing / unresolved / conflicting. Physical recording boundaries and filesystem timestamps are not content truth.</p></details>
+          {session.media.unresolved ? <p className="review-callout">{unplacedRecordings(session.media.unresolved)}</p> : null}
         </section>
       </div>
       {outputs}
@@ -519,72 +521,6 @@ export function SessionOperationalView({
       {workspace.dataSource.runtimeProfile === "demo-single-stage" ? null : (
         <AuthorityControls workspace={workspace} />
       )}
-    </>
-  );
-}
-
-function CandidateRow({ candidate }: { candidate: EditorialCandidateView }) {
-  return (
-    <article className={`candidate-row candidate-${candidate.state}`}>
-      <div className="candidate-marker" aria-hidden="true">{candidate.origin === "producer" ? "◆" : "✦"}</div>
-      <div className="candidate-time"><strong>{candidate.at}</strong><span>{candidate.stageName}</span></div>
-      <div className="candidate-copy"><span className="eyebrow">{candidate.origin} · {candidate.state}</span><strong>{candidate.sessionTitle}</strong><p>{candidate.excerpt}</p><span>{candidate.reason}</span></div>
-      <button
-        aria-label={`Review ${candidate.sessionTitle} Candidate Moment. Disabled because Editorial review execution is not implemented.`}
-        disabled
-        title="Fixture-only Candidate Moment. Disabled: Editorial review execution is not implemented."
-        type="button"
-      >
-        Review
-      </button>
-    </article>
-  );
-}
-
-export function EditorialShellView({ workspace }: { workspace: OperationalWorkspace }) {
-  const current = workspace.sessions.find((session) => session.activityState === "presentation_active") ?? workspace.sessions[0];
-  const hotMoments = workspace.editorialCandidates.filter((item) => item.state === "priority");
-  const pendingReview = workspace.editorialCandidates.filter(
-    (item) => item.state === "candidate" || item.state === "priority" || item.state === "deferred",
-  );
-  return (
-    <>
-      <WorkspaceTitle eyebrow={`Editorial · ${workspace.event.name}`} title="Editorial workspace" summary={workspace.editorialCandidates.length ? `${pendingReview.length} simulated review items · ${hotMoments.length} Hot Moments` : "No Editorial runtime connected"} />
-      <div className="editorial-notice" role="note"><strong>{workspace.dataSource.kind === "fixture" ? "Development Editorial fixture" : "Editorial workflow frame"}</strong><span>No transcript, model, or Editorial decision runtime is connected. Fixture Candidates, Hot Moments, and Clips are simulated and never Producer Attention.</span></div>
-      <div className="editorial-summary-grid">
-        <section><span className="eyebrow">Session context</span><strong>{current?.title ?? "No Session selected"}</strong><span>{current ? `${current.stageName} · ${formatActivityState(current)}` : "Unavailable"}</span></section>
-        <section><span className="eyebrow">Transcript</span><strong>{workspace.transcriptState.label}</strong><span>{workspace.transcriptState.detail}</span></section>
-        <section><span className="eyebrow">Candidate Moments</span><strong>{workspace.editorialCandidates.length}</strong><span>{pendingReview.length} awaiting human judgment</span></section>
-        <section><span className="eyebrow">Hot Moments</span><strong>{hotMoments.length}</strong><span>Editorial urgency · not Producer Attention</span></section>
-        <section><span className="eyebrow">Approved Editorial Clips</span><strong>{workspace.editorialClips.length}</strong><span>Fixture-only approved surface</span></section>
-        <section><span className="eyebrow">Human review</span><strong>{pendingReview.length ? "Judgment pending" : "Caught up"}</strong><span>No automatic approval authority</span></section>
-      </div>
-      <div className="editorial-layout">
-        <section className="media-workspace">
-          <div className="section-heading"><div><span className="eyebrow">Session context</span><h2>{current?.title ?? "No Session selected"}</h2></div><span>{current ? formatActivityState(current) : "Unavailable"}</span></div>
-          <div className="media-placeholder"><span>Media / timeline workspace</span><strong>Playback not implemented</strong><p>Future media remains anchored to one Session timeline. No synthetic media is shown.</p></div>
-          <div className="timeline-placeholder"><span className="timeline-line" /><span className="timeline-playhead" /><div><span>00:00</span><span>Session timeline placeholder</span><span>LIVE</span></div></div>
-          <section className="transcript-placeholder"><span className="eyebrow">Transcript surface</span><strong>{workspace.transcriptState.label}</strong><p>{workspace.transcriptState.detail}</p><p>Transcript text remains intentionally absent because no transcription execution is implemented.</p></section>
-        </section>
-        <aside className="candidate-panel"><div className="section-heading"><h2>Candidate Moments</h2><span>{workspace.dataSource.kind === "fixture" ? "Simulated fixture" : "Not connected"}</span></div>{workspace.editorialCandidates.length ? workspace.editorialCandidates.map((item) => <CandidateRow candidate={item} key={item.id} />) : <div className="operational-empty"><strong>Caught up</strong><span>No Candidate evidence is available.</span></div>}</aside>
-      </div>
-      <section className="approved-clips-panel" aria-labelledby="approved-clips-title">
-        <div className="section-heading"><div><span className="eyebrow">Human-approved surface</span><h2 id="approved-clips-title">Approved Editorial Clips</h2></div><span>Fixture only · no rendering</span></div>
-        {workspace.editorialClips.length ? workspace.editorialClips.map((clip) => (
-          <article className="approved-clip-row" key={clip.id}>
-            <div><strong>{clip.sessionTitle}</strong><span>{clip.rangeLabel}</span></div>
-            <span>{clip.reviewLabel}</span>
-            <button
-              aria-label={`Open approved Editorial Clip for ${clip.sessionTitle}. Disabled because Clip playback and persistence are not implemented.`}
-              disabled
-              title="Fixture-only approved Clip. Disabled: Clip playback and persistence are not implemented."
-              type="button"
-            >
-              Open Clip
-            </button>
-          </article>
-        )) : <div className="operational-empty compact-empty"><strong>No approved Editorial Clips</strong><span>Approval and Clip persistence are not implemented.</span></div>}
-      </section>
     </>
   );
 }
