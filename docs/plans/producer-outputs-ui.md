@@ -188,4 +188,38 @@ Each phase is frontend-only and reverts independently. No data migrations are in
 
 ## Completion record
 
-_(Filled in per phase.)_
+### Phase 1: ED-0093 (2026-09-27)
+
+- **Implemented revision:** branch `codex/ed-0093-producer-outputs-foundation`. Codex
+  implemented it and the owner committed it.
+  - The shared server-only capability proxy module.
+  - Four routes: assembly, rendering, editorial, and media timing. They cover 23 anchored
+    method and path pairs, matching the backend exactly.
+  - Typed zod clients and the `DemoMoment` fix.
+  - A read-only Outputs panel on Session Detail.
+- **Checks:**
+  - `directive-reviewer`: APPROVE.
+  - A security review of the new routes found no findings at confidence 8 or higher. The
+    note below the threshold is DNS rebinding, a design gap across the whole app. A
+    Host-header allowlist is a follow-up.
+  - Demo proxy behaviour and tests are unchanged.
+- **Owner review checkpoint (live against the demo database):** the owner directed a
+  standing rule. The UI must be simplified and easy to scan under dense workload. See
+  `docs/ux/operator-feedback.md`, 2026-09-27. Two presentation passes implemented it:
+  - Outputs placed directly after the Session summary.
+  - One summary line in place of the repeated warnings, with only exceptions flagged.
+  - A compact member table (position, start, duration), with IDs moved into details.
+  - Timing folded into the member rows. Only media outside the Assembly is listed
+    separately.
+  - Evidence and transcription sections collapsed by default, with truthful counts.
+  - Operations summarized by state.
+  - A five-second overall read budget for Session Detail.
+- **Tests:** frontend typecheck, lint, **118/118 tests**, and build pass on the host.
+  - Existing assertions changed only where they pinned the wording or structure of the
+    redesigned sections.
+  - Proxy, route, security, and command tests are unchanged.
+  - No backend change.
+- **Remaining work:**
+  - The Editorial moments grid (31 uniform tiles) is redesigned in ED-0095.
+  - A Host-header allowlist (DNS rebinding).
+  - A proxy audit log for capability commands, to be decided before ED-0094 adds command UI.

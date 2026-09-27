@@ -585,7 +585,7 @@ button:disabled { cursor: not-allowed; color: var(--subtle-foreground); backgrou
 .demo-authority-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; padding: 12px 14px; border-bottom: 1px solid var(--border); }
 .demo-authority-actions button:not(:disabled), .demo-command-panel button:not(:disabled) { border-color: var(--accent); color: var(--accent-strong); cursor: pointer; }
 .demo-authority-actions > span { color: var(--muted-foreground); font-size: 11px; }
-.demo-work-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--border); }
+.demo-work-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--border); }
 .demo-work-summary > div { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; background: var(--surface-raised); }
 .demo-work-summary span { color: var(--subtle-foreground); font-size: 9px; font-weight: 650; letter-spacing: .07em; text-transform: uppercase; }
 .demo-work-summary strong { font-family: var(--font-mono); }
@@ -616,3 +616,31 @@ button:disabled { cursor: not-allowed; color: var(--subtle-foreground); backgrou
   .transcript-segments > section { grid-template-columns: 1fr; }
   .transcript-segment-time { flex-direction: row; gap: 8px; }
 }
+
+/* Read-only Session outputs: dense evidence rows with text-carried states. */
+.outputs-panel { font-variant-numeric: tabular-nums; }
+.outputs-section { padding: 14px; border-top: 1px solid var(--border); }
+.outputs-section h3, .outputs-section h4 { margin: 0 0 10px; }
+.outputs-section h4 { margin-top: 18px; }
+.outputs-facts { display: flex; flex-wrap: wrap; gap: 12px 28px; }
+.outputs-facts dt { color: var(--muted-foreground); font-size: 12px; }
+.outputs-facts dd { margin: 4px 0 0; }
+.outputs-rows { list-style: none; margin: 0; padding: 0; }
+.outputs-rows li { display: grid; gap: 5px; padding: 12px 0; border-top: 1px solid var(--border); overflow-wrap: anywhere; }
+.outputs-rows span { font-size: 13px; }
+.outputs-qualification { font-weight: 600; }
+.copyable-id { user-select: all; overflow-wrap: anywhere; }
+.session-evidence > summary, .session-evidence .timing-evidence-card > summary { cursor: pointer; padding: 12px 14px; }
+.session-evidence summary span { margin-left: 12px; color: var(--muted-foreground); }
+.session-evidence summary:focus-visible, .outputs-panel summary:focus-visible, .copyable-id:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.session-evidence dd { overflow-wrap: anywhere; }
+.member-table-scroll { overflow-x: auto; }
+.member-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.member-table th, .member-table td { padding: 7px 10px; border-top: 1px solid var(--border); text-align: left; vertical-align: top; }
+.member-table thead { color: var(--muted-foreground); }
+.member-table td:nth-child(2), .member-table td:nth-child(3), .member-table summary { white-space: nowrap; }
+.member-table summary { cursor: pointer; }
+.member-flags span + span::before { content: " · "; }
+.member-table .outputs-facts { min-width: 220px; }
+.transcription-disclosure > summary, .transcription-evidence-card > summary { padding: 12px 14px; cursor: pointer; }
+.transcription-disclosure summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }

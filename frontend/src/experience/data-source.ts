@@ -9,10 +9,12 @@ import {
   type KernelStatusPayload,
 } from "./kernel-adapter.ts";
 import type { OperationalWorkspace } from "./model.ts";
+import type { ReadBudget } from "./read-budget.ts";
 
 export interface WorkspaceRequest {
   scenario?: string;
   includeTimingEvidence?: boolean;
+  readBudget?: ReadBudget;
 }
 
 const stageflowApiSecretHeader = "x-stageflow-api-secret";
@@ -35,6 +37,7 @@ export async function loadWorkspace(
   if (configuredMode() === "fixture") return getFixtureWorkspace(request.scenario);
 
   const observedAt = new Date().toISOString();
+  const read = <T,>(operation: () => Promise<T>) => request.readBudget ? request.readBudget.read(operation) : operation();
   const url =
     process.env.STAGEFLOW_KERNEL_STATUS_URL ??
     "http://127.0.0.1:8000/api/v1/kernel/status";
@@ -45,12 +48,15 @@ export async function loadWorkspace(
       Accept: "application/json",
       [stageflowApiSecretHeader]: apiSecret,
     };
-    const response = await fetch(url, {
-      cache: "no-store",
-      signal: AbortSignal.timeout(2_500),
-      headers,
+    const { response, payload } = await read(async () => {
+      const response = await fetch(url, {
+        cache: "no-store",
+        signal: request.readBudget ? AbortSignal.any([request.readBudget.signal, AbortSignal.timeout(2_500)]) : AbortSignal.timeout(2_500),
+        headers,
+      });
+      const payload = (await response.json()) as KernelStatusPayload;
+      return { response, payload };
     });
-    const payload = (await response.json()) as KernelStatusPayload;
     if (!response.ok && response.status !== 503) {
       return kernelUnavailableWorkspace(observedAt, `Kernel returned HTTP ${response.status}`);
     }
@@ -64,12 +70,12 @@ export async function loadWorkspace(
       new URL("../", url).toString().replace(/\/$/, "");
     try {
       const histories = await Promise.all(
-        media.map(async (item) => {
+        media.map((item) => read(async () => {
           const response = await fetch(
             `${apiBase}/media-assets/${encodeURIComponent(item.asset_id)}/timing-evidence`,
             {
               cache: "no-store",
-              signal: AbortSignal.timeout(2_500),
+              signal: request.readBudget ? AbortSignal.any([request.readBudget.signal, AbortSignal.timeout(2_500)]) : AbortSignal.timeout(2_500),
               headers,
             },
           );
@@ -78,7 +84,7 @@ export async function loadWorkspace(
             item,
             history: (await response.json()) as KernelMediaTimingEvidenceHistory,
           };
-        }),
+        })),
       );
       workspace.mediaTimingEvidence = histories.flatMap(({ item, history }) =>
         adaptKernelMediaTimingEvidence(history, item, payload.stages),
