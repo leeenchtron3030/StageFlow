@@ -168,6 +168,30 @@ operator identity (`STAGEFLOW_DEMO_OPERATOR_ID`), as the Demo commands already d
   `registration_time` members or unqualified timing. Results appear inline as one line,
   with the backend identifier available in details.
 
+#### Phase 2 owner review checkpoint (2026-09-27)
+
+- Classification: Green; implementation-ready. Authority: ED-0094, the six approved
+  checkpoint items in `docs/ux/operator-feedback.md`, and the owner's execution
+  clarification. Loopback equivalence is explicitly approved for the three named
+  aliases, with the same scheme and port; other origin protections stay unchanged.
+- Acceptance: compact render tables; operations grouped in stable state precedence
+  (in-flight, succeeded, failed/other), without chronology claims; outputs newest first
+  by `produced_at` within the bounded read. Resolve known Assembly revision numbers.
+  Current-revision summary uses in-flight, succeeded with newest matching output, then
+  failed precedence; another render remains an explicit secondary confirmed action.
+- Collapse uniform member values into the summary. Resolve slot names and roles using
+  bounded server-side Packaging Asset/revision reads under the existing shared deadline;
+  unmatched identities remain unavailable with IDs in details. Confirmation consequence
+  supplies the accessible dialog label without a repeated heading.
+- Scope: frontend production code, focused tests, this plan and the checkpoint record.
+  No backend, dependency, schema, configuration, audit-log, or automatic-action changes.
+- Validation: presentation and real UI-handler tests for items 1–5; additive proxy tests
+  for all loopback pairings, port/scheme differences, non-loopback and cross-site refusal,
+  and absent/literal-null origins. Preserve existing security/Demo assertions.
+  Run frontend test, typecheck, lint, build, and `git diff --check`; report sandbox worker
+  failures, and use the existing per-file no-isolation test workaround if necessary.
+  Deliberately review the final diff and record validation before closing the checkpoint.
+
 ### Phase 3: ED-0095, connecting the Editorial review surface
 
 1. Connect `/editorial` to the real runtime when the data mode is `kernel`. The fixture
@@ -262,3 +286,56 @@ Each phase is frontend-only and reverts independently. No data migrations are in
   - The Editorial moments grid (31 uniform tiles) is redesigned in ED-0095.
   - A Host-header allowlist (DNS rebinding).
   - A proxy audit log for capability commands, to be decided before ED-0094 adds command UI.
+
+### Phase 2 owner review checkpoint: ED-0094 (2026-09-27)
+
+- Applied the six owner-approved checkpoint changes to the existing ED-0094 action
+  implementation (`b4e548b`); changes remain uncommitted on the directive branch.
+- Render tables preserve stable state grouping and sort outputs by production instant
+  within the bounded read. Known revision IDs resolve to numbers; other IDs and hashes
+  are disclosed per row. Current-revision render state replaces the primary render
+  action; another render retains confirmation, idempotency, and manual initiation.
+  The API's `terminal_failed` state supplies the “Render failed” summary.
+- Uniform member start/duration values move to the summary; empty flags columns vanish.
+  Packaging names/roles resolve only by frozen revision identity: at most one 100-asset
+  page and one 100-revision page per asset, eight concurrent packaging revision reads,
+  sharing the existing five-second deadline. Missing/failed/truncated matches remain
+  explicitly unavailable; content references are not retained in the presentation model.
+- Confirmation consequence now supplies the dialog's accessible label. The loopback
+  exception uses the native Request URL because Next.js normalizes other 127.x.x.x
+  hosts to localhost; exact-origin, absent-origin and cross-site behavior is preserved.
+  All route allowlists, audit behavior and secret handling are unchanged.
+- Existing test files touched:
+  - `session-outputs.test.ts`: new render ordering/summary, uniform duration, packaging
+    identity/failure/budget tests; existing loader mock handles the additional packaging
+    read and asserts it separately while preserving its original six-read assertions.
+  - `output-actions-ui.test.ts`: new re-render confirmation and primary-action tests;
+    harness imports the render-summary helper.
+  - `capability-proxy.test.ts`: additions only, six route/method matrices cover every
+    loopback pairing, scheme/port mismatch, non-loopback origins, cross-site, null,
+    malformed origins, and unapproved 127.x.x.x request hosts.
+- Existing assertions changed (only these four):
+  - uniform member row markup now omits shared start/duration and empty flags;
+  - member-row counting matches numeric position headers, excluding new render rows;
+  - uniform member column expectations retain Position/Details and omit Start/Duration/Flags;
+  - confirmation `aria-labelledby` expects `output-consequence`.
+  Existing Demo, audit and other security assertions are unchanged.
+- Validation:
+  - `npm.cmd run typecheck`: pass after correcting the new fixture/helper state to the
+    existing `terminal_failed` API value. Initial typecheck caught that in-scope error.
+  - `npm.cmd run lint`: pass.
+  - `npm.cmd run test`: sandbox `spawn EPERM`; 0 passed, 15 file-worker failures,
+    before test bodies could run.
+  - Each of the 15 files from `package.json` was run separately with
+    `node --import ./src/experience/server-test-runtime.ts --test --test-isolation=none <file>`:
+    **183 passed, 0 failed, 0 skipped**. Final run followed the independent-review fix.
+  - `npm.cmd run build`: compilation passed; TypeScript worker blocked by `spawn EPERM`.
+  - `git diff --check`: pass. Git reports normal LF-to-CRLF working-copy notices.
+  - Initial `npm run typecheck` was blocked by PowerShell's script execution policy;
+    subsequent checks used `npm.cmd`. TMP/TEMP used the workspace `.codex-tmp`.
+- Deliberate diff/self-review completed. Independent Codex review found and then verified
+  closure of the Next.js hostname-normalization edge; no remaining actionable findings.
+  No new plan files, backend changes, dependencies, schemas, migrations or runtime
+  configuration changes. Frontend production code changed. No dev server was started.
+  No new product/architecture decisions remain; full host test/build completion is
+  still required. The operator checkpoint is marked `validated (ED-0094)`.

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { assemblyApi, type assemblyTemplatesSchema } from "../experience/assembly-api.ts";
 import type { z } from "zod";
+import { currentRenderSummary } from "../experience/session-outputs.ts";
 import { nextOutputAction, outputActionDisabled, outputConfirmation, prepareOutputCommand, sendOutputCommand, type OutputAction, type OutputActionContext, type OutputCommandResult, type PreparedOutputCommand } from "../experience/output-actions.ts";
 
 type Templates = z.infer<typeof assemblyTemplatesSchema>;
@@ -26,6 +27,8 @@ export function SessionOutputActions({ context }: { context: OutputActionContext
   const submitting = useRef(false);
   const item = context.assembly.state === "available" ? context.assembly.value : null;
   const primary = nextOutputAction(item);
+  const renderSummary = primary === "render" && item
+    ? currentRenderSummary(item.revision.revision_id, context.operations, context.outputs) : undefined;
   const disabled = outputActionDisabled(context, primary);
   const stateKey = JSON.stringify(context);
   const changed = openedState !== stateKey;
@@ -76,8 +79,9 @@ export function SessionOutputActions({ context }: { context: OutputActionContext
     void execute(command);
   }
   return <div className="output-actions">
-    <button ref={trigger} type="button" onClick={begin} disabled={Boolean(disabled) || busy || refreshing || Boolean(retry)} aria-describedby="output-action-state">
-      {primary === "propose" ? "Propose revision" : primary === "approve" ? "Approve / Reject" : "Request render"}
+    {renderSummary ? <strong role="status">{renderSummary}</strong> : null}
+    <button ref={trigger} className={renderSummary ? "output-secondary-action" : undefined} type="button" onClick={begin} disabled={Boolean(disabled) || busy || refreshing || Boolean(retry)} aria-describedby="output-action-state">
+      {primary === "propose" ? "Propose revision" : primary === "approve" ? "Approve / Reject" : renderSummary ? "Request another render" : "Request render"}
     </button>
     <span ref={actionState} tabIndex={-1} id="output-action-state">{busy ? "Working…" : refreshing ? "Refreshing current state…" : disabled ?? (retry ? "Resolve the pending command before another action." : "")}</span>
     {result ? <div className="output-command-result">
@@ -85,10 +89,9 @@ export function SessionOutputActions({ context }: { context: OutputActionContext
       {result.identifier ? <details><summary>Result details</summary><code className="copyable-id" tabIndex={0}>{result.identifier}</code></details> : null}
     </div> : null}
     {retry ? <button type="button" disabled={busy || refreshing || !context.launchContext || context.launchContext !== retry.launchContext} onClick={() => void execute(retry)}>Retry same command</button> : null}
-    <dialog ref={dialog} className="output-confirmation" aria-labelledby="output-confirm-title" aria-describedby="output-consequence" onCancel={(event) => { event.preventDefault(); setOpen(false); }} onClose={() => { setOpen(false); (trigger.current?.disabled ? actionState.current : trigger.current)?.focus(); }}>
+    <dialog ref={dialog} className="output-confirmation" aria-labelledby="output-consequence" onCancel={(event) => { event.preventDefault(); setOpen(false); }} onClose={() => { setOpen(false); (trigger.current?.disabled ? actionState.current : trigger.current)?.focus(); }}>
       <form onSubmit={(event) => { event.preventDefault(); confirm(); }}>
         <p id="output-consequence">{confirmation.split("\n")[0]}</p>
-        <h4 id="output-confirm-title">{action === "propose" ? "Confirm proposal" : action === "render" ? "Confirm render request" : "Confirm Assembly decision"}</h4>
         {confirmation.split("\n").slice(1).map((line) => <p key={line}>{line}</p>)}
         {action === "propose" ? <>
           <label htmlFor="output-template">Event template</label>

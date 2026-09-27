@@ -659,3 +659,4 @@ button:disabled { cursor: not-allowed; color: var(--subtle-foreground); backgrou
 .output-dialog-actions { display: flex; justify-content: flex-end; gap: 12px; }
 .output-actions button:focus-visible, .output-confirmation :is(select, textarea, button, summary):focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .output-actions button:disabled { cursor: not-allowed; }
+.output-actions .output-secondary-action { background: transparent; color: var(--muted-foreground); font-size: 12px; }

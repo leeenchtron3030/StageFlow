@@ -188,4 +188,16 @@ line; preserve resolved entries as concise evidence rather than deleting them.
      and has no other change.
 - Classification: Green (items 1–5, presentation). Item 6 changes the same-origin check.
   The owner approved it explicitly on 2026-09-27, bounded to loopback aliases.
-- Status: implementing (ED-0094)
+- Owner clarification for items 1–2: operations have no timestamp. Group them stably by
+  state (pending/leased/running, then succeeded, then failed/other), without claiming
+  chronology. Sort Rendered Outputs by `produced_at`, newest first within the bounded
+  read. For the current revision, in-flight takes precedence over succeeded (with the
+  newest matching output), then failed. This is frontend presentation only.
+- Status: validated (ED-0094)
+- Validation: 183/183 frontend tests passed with each file run separately using
+  `node --import ./src/experience/server-test-runtime.ts --test --test-isolation=none`.
+  Typecheck, lint and whitespace checks passed. The normal runner failed to spawn all
+  15 test-file workers (`EPERM`); the build compiled successfully, then its TypeScript
+  worker hit `spawn EPERM`. Host test/build completion remains required.
+  Independent Codex review approved after the alias check was constrained to the
+  original request host, with tests for Next.js normalization of other 127.x.x.x hosts.

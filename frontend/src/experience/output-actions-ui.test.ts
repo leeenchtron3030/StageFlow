@@ -7,7 +7,8 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import ts from "typescript";
 import * as commands from "./output-actions.ts";
-import { fixtureAssembly, fixtureId as id } from "./session-outputs-fixtures.ts";
+import * as presentation from "./session-outputs.ts";
+import { fixtureAssembly, fixtureRenderOperation, fixtureRenderedOutput, fixtureId as id } from "./session-outputs-fixtures.ts";
 
 const require = createRequire(import.meta.url);
 const source = readFileSync(new URL("../components/session-output-actions.tsx", import.meta.url), "utf8");
@@ -43,6 +44,7 @@ function harness(initial: commands.OutputActionContext, fetcher: typeof fetch) {
     },
     "next/navigation": { useRouter: () => ({ refresh() { refreshes++; } }) },
     "../experience/output-actions.ts": commands,
+    "../experience/session-outputs.ts": presentation,
     "../experience/assembly-api.ts": { assemblyApi: () => ({ templates: async (eventId: string) => {
       reads++; assert.equal(eventId, id(3));
       return { event_id: id(3), items: [{ template_id: id(5), event_id: id(3), name: "Event template", version: 2 }], total_count: 1, next_after: null };
@@ -83,7 +85,8 @@ test("decision dialog gates submission, names exceptions, cancels with focus res
   ui.submit(); assert.equal(calls, 0);
   assert.match(ui.html(), /registration_time fallback: member positions 3/);
   assert.match(ui.html(), /Unqualified timing evidence/); assert.match(ui.html(), /Bound packaging: opening/);
-  assert.equal(ui.find("dialog")["aria-labelledby"], "output-confirm-title");
+  assert.equal(ui.find("dialog")["aria-labelledby"], "output-consequence");
+  assert.doesNotMatch(ui.html(), /<h4|output-confirm-title/);
   assert.equal(ui.find("button", "Cancel").autoFocus, true);
   let prevented = false;
   (ui.find("dialog").onCancel as (event: unknown) => void)({ preventDefault() { prevented = true; } }); ui.render();
@@ -94,6 +97,45 @@ test("decision dialog gates submission, names exceptions, cancels with focus res
   ui.submit(); ui.submit(); await settle(); ui.render();
   assert.equal(calls, 1); assert.equal(ui.stats().open, false); assert.equal(ui.stats().refreshes, 1);
   assert.match(ui.html(), /Assembly revision rejected/); assert.match(ui.html(), /Result details/); assert.match(ui.html(), new RegExp(id(20)));
+});
+
+test("current render state replaces the primary render action; another render requires the same confirmation", async () => {
+  for (const state of ["pending", "leased", "running", "succeeded", "terminal_failed"] as const) {
+    const ctx = context();
+    const item = fixtureAssembly(); item.approval_state = "approved";
+    ctx.assembly = { state: "available", value: item };
+    ctx.operations = { state: "available", value: { items: [{ ...fixtureRenderOperation(), assembly_revision_id: item.revision.revision_id, state, reason_code: state === "terminal_failed" ? "encoder_unavailable" : null }], truncated: false } };
+    ctx.outputs = { state: "available", value: { items: [{ ...presentation.outputSummary(fixtureRenderedOutput()), assembly_revision_id: item.revision.revision_id }], truncated: false } };
+    const bodies: Record<string, unknown>[] = [];
+    const ui = harness(ctx, async (_url, init) => { bodies.push(JSON.parse(String(init?.body))); return Response.json({ operation_id: id(30) }); });
+    const label = state === "succeeded" ? "Render succeeded · 60.000 seconds" : state === "terminal_failed" ? "Render failed · encoder_unavailable" : "Render pending";
+    assert.ok(ui.html().includes(label));
+    assert.equal(ui.find("button", "Request another render").className, "output-secondary-action");
+    assert.doesNotMatch(ui.html(), />Request render</);
+    assert.equal(bodies.length, 0);
+    ui.click("Request another render");
+    assert.equal(bodies.length, 0); assert.equal(ui.stats().open, true);
+    assert.match(ui.html(), /Queue a video-only render of approved Assembly revision 2 using profile v2/);
+    assert.equal(ui.find("dialog")["aria-labelledby"], "output-consequence");
+    assert.doesNotMatch(ui.html(), /<h4/);
+    ui.click("Cancel"); assert.equal(bodies.length, 0);
+    ui.click("Request another render"); ui.submit(); await settle(); ui.render();
+    assert.equal(bodies.length, 1);
+    assert.equal(bodies[0].assembly_revision_id, item.revision.revision_id);
+    assert.equal(bodies[0].profile_version, "2");
+    assert.equal(ui.stats().refreshes, 1);
+  }
+});
+
+test("no current-revision render keeps Request render primary; older operations do not affect it", () => {
+  for (const operations of [[], [fixtureRenderOperation()]]) {
+    const ctx = context(); const item = fixtureAssembly(); item.approval_state = "approved";
+    ctx.assembly = { state: "available", value: item };
+    ctx.operations = { state: "available", value: { items: operations, truncated: false } };
+    const ui = harness(ctx, async () => { assert.fail("must not submit"); });
+    assert.equal(ui.find("button", "Request render").className, undefined);
+    assert.doesNotMatch(ui.html(), /Request another render|Render succeeded/);
+  }
 });
 test("proposal loads Event-scoped templates only when opened, requires selection and carries chosen template", async () => {
   const ctx = context(); ctx.assembly = { state: "available", value: null };

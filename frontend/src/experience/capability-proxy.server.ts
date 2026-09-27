@@ -50,10 +50,19 @@ function noStoreHeaders(contentType = "application/json"): Headers {
 function isSameOriginCommand(request: NextRequest): boolean {
   const origin = request.headers.get("origin");
   const fetchSite = request.headers.get("sec-fetch-site");
-  return (
-    (origin === null || origin === request.nextUrl.origin) &&
-    fetchSite !== "cross-site"
-  );
+  if (fetchSite === "cross-site") return false;
+  if (origin === null || origin === request.nextUrl.origin) return true;
+  const loopback = new Set(["localhost", "127.0.0.1", "[::1]"]);
+  try {
+    // NextRequest.url and nextUrl normalize other 127.x.x.x hosts to localhost.
+    // The native Request URL retains the authority needed to bound this exception.
+    const own = new URL(Reflect.get(Request.prototype, "url", request) as string);
+    if (!loopback.has(own.hostname)) return false;
+    const supplied = new URL(origin);
+    // Only serialized origins qualify: no credentials, paths, queries or fragments.
+    return origin === supplied.origin && loopback.has(supplied.hostname) &&
+      supplied.protocol === own.protocol && supplied.port === own.port;
+  } catch { return false; }
 }
 
 function currentApiSecret(): string | undefined {

@@ -14,6 +14,8 @@ export interface OutputActionContext {
   authoritative: boolean;
   fixture: boolean;
   assembly: SessionOutputs["assembly"];
+  operations?: SessionOutputs["operations"];
+  outputs?: SessionOutputs["outputs"];
 }
 export function nextOutputAction(item: AssemblyItem | null): OutputAction {
   if (!item || item.stale || item.revision.validation.state !== "valid") return "propose";

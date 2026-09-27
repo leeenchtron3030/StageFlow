@@ -25,6 +25,141 @@ const page = { items: [], next_after: null, limit: 100 };
 const eventId = fixtureId(3), sessionId = fixtureId(2);
 const revisions = (items = [fixtureAssembly()]) => ({ ...page, event_id: eventId, session_id: sessionId, items, total_count: items.length, items_truncated: false });
 
+test("render tables preserve stable state groups, sort output instants, and disclose identities only in details", () => {
+  const outputs = getFixtureSessionOutputs();
+  const states = ["terminal_failed", "running", "succeeded", "pending", "cancelled", "leased", "succeeded"] as const;
+  const operations = states.map((state, index) => ({ ...fixtureRenderOperation(), state, operation_id: fixtureId(100 + index), assembly_revision_id: index === 0 ? fixtureId(1) : fixtureId(4) }));
+  outputs.operations = { state: "available", value: { items: operations, truncated: true } };
+  const items = [
+    { ...presentation.outputSummary(fixtureRenderedOutput()), output_id: fixtureId(200), produced_at: "2026-09-27T12:00:00Z" },
+    { ...presentation.outputSummary(fixtureRenderedOutput()), output_id: fixtureId(201), produced_at: "2026-09-27T07:00:00-07:00", assembly_revision_id: fixtureId(99) },
+    { ...presentation.outputSummary(fixtureRenderedOutput()), output_id: fixtureId(202), produced_at: "2026-09-27T13:00:00Z", assembly_revision_id: fixtureId(1) },
+  ];
+  outputs.outputs = { state: "available", value: { items, truncated: true } };
+  outputs.knownRevisions = [{ revisionId: fixtureId(4), number: 1 }];
+  const before = JSON.stringify(outputs);
+  const html = render(outputs);
+  const operationTable = html.match(/<table[^>]*aria-label="Render operations">.*?<\/table>/)![0];
+  const outputTable = html.match(/<table[^>]*aria-label="Rendered Outputs">.*?<\/table>/)![0];
+  assert.deepEqual([...operationTable.matchAll(/<th scope="row">([^<]+)<\/th>/g)].map((m) => m[1]), ["running", "pending", "leased", "succeeded", "succeeded", "terminal failed", "cancelled"]);
+  assert.ok(operationTable.indexOf(fixtureId(102)) < operationTable.indexOf(fixtureId(106)));
+  assert.ok(outputTable.indexOf(fixtureId(201)) < outputTable.indexOf(fixtureId(202)));
+  assert.ok(outputTable.indexOf(fixtureId(202)) < outputTable.indexOf(fixtureId(200)));
+  assert.match(outputTable, /Revision 1/); assert.match(outputTable, /Revision 2/); assert.match(outputTable, /earlier revision/);
+  assert.match(operationTable, /Revision 1/); assert.match(operationTable, /Revision 2/);
+  assert.match(outputTable, /60.000 seconds · 1799 frames/);
+  assert.match(outputTable, /<time dateTime="2026-09-27T07:00:00-07:00"/);
+  for (const table of [operationTable, outputTable]) {
+    const visible = table.replace(/<details>.*?<\/details>/g, "");
+    assert.doesNotMatch(visible, /10000000-|aaaaaaaaaaaa|h264-nvenc/);
+    assert.doesNotMatch(table, /<details[^>]*\bopen/);
+  }
+  assert.match(outputTable, /<details>.*SHA-256 prefix:.*aaaaaaaaaaaa/);
+  assert.match(html, /Newest produced time first within this bounded read/);
+  assert.match(html, /operation times are unavailable/);
+  assert.doesNotMatch(operationTable, /Produced time|newest|dateTime/);
+  assert.equal(JSON.stringify(outputs), before);
+});
+
+test("current revision summary prioritizes in-flight over success over failure and chooses newest matching output", () => {
+  const revisionId = fixtureId(1);
+  const operation = { ...fixtureRenderOperation(), assembly_revision_id: revisionId };
+  const summary = (items: typeof operation[], outputs: presentation.SessionOutputs["outputs"] = { state: "unavailable" }) =>
+    presentation.currentRenderSummary(revisionId, { state: "available", value: { items, truncated: true } }, outputs);
+  const failed = { ...operation, state: "terminal_failed" as const, reason_code: "encoder_unavailable" };
+  for (const state of ["pending", "leased", "running"] as const) assert.equal(summary([failed, operation, { ...operation, state }]), "Render pending");
+  const output = { ...presentation.outputSummary(fixtureRenderedOutput()), assembly_revision_id: revisionId };
+  assert.equal(summary([failed, operation], { state: "available", value: { items: [
+    { ...output, produced_at: "2026-09-27T12:00:00Z" },
+    { ...output, produced_at: "2026-09-27T07:00:00-07:00", duration_microseconds: 90_000_000 },
+    { ...output, produced_at: "2026-09-28T12:00:00Z", assembly_revision_id: fixtureId(99), duration_microseconds: 1 },
+  ], truncated: true } }), "Render succeeded · 90.000 seconds");
+  assert.equal(summary([failed, operation]), "Render succeeded");
+  assert.equal(summary([failed]), "Render failed · encoder_unavailable");
+  assert.equal(summary([fixtureRenderOperation()]), undefined);
+  assert.equal(summary([]), undefined);
+  assert.equal(presentation.currentRenderSummary(revisionId, { state: "unavailable" }), undefined);
+});
+
+test("uniform unknown duration is stated once; differing member values retain columns", () => {
+  const outputs = getFixtureSessionOutputs();
+  outputs.timing = outputs.timing.map((entry) => ({ ...entry, result: { state: "unavailable" } }));
+  let html = render(outputs);
+  assert.equal((html.match(/Duration unknown/g) ?? []).length, 1);
+  assert.match(html, /Duration unknown \(all members\)/);
+  assert.doesNotMatch(html, /<th scope="col">Duration<\/th>/);
+  assert.match(html, /<th scope="col">Start<\/th>/);
+  outputs.timing[1].result = { state: "available", value: fixtureTiming() };
+  html = render(outputs);
+  assert.match(html, /<th scope="col">Duration<\/th>/);
+  assert.match(html, /<td>1:00<\/td>/);
+  assert.match(html, /<td>Duration unknown<\/td>/);
+});
+
+const packagingAsset = (n = 70) => ({ packaging_asset_id: fixtureId(n), event_id: eventId, stage_id: null, name: "Event opening", role: "opening_bumper", created_at: "2026-09-27T12:00:00Z" });
+const packagingAssets = (assets = [packagingAsset()]) => ({ ...page, event_id: eventId, items: assets.map((asset) => ({ asset, current_revision_number: 2, decision_count: 1 })), total_count: assets.length, items_truncated: false });
+const packagingRevisions = (assetId = fixtureId(70)) => ({
+  ...page, event_id: eventId, packaging_asset_id: assetId, total_count: 1, items_truncated: false,
+  items: [{ revision: { revision_id: fixtureId(7), packaging_asset_id: assetId, revision_number: 1,
+    content: { kind: "external_content", content_key: "never-expose-content", sha256: "f".repeat(64), byte_size: 1, media_type: "video/mp4" },
+    measured_duration_microseconds: null, effective_from: null, effective_until: null, created_at: "2026-09-27T12:00:00Z",
+  }, approval_state: "approved", decision_count: 0, latest_decision: null }],
+});
+const baseReads = { assembly: async () => revisions(), rendering: async () => page, timing: async (path: string) => ({ asset_id: path.split("/")[1], evidence: null }) };
+
+test("slot names and roles resolve by frozen packaging revision, with only safe labels retained", async () => {
+  const paths: string[] = [];
+  const outputs = await presentation.readSessionOutputs(eventId, sessionId, [], { ...baseReads,
+    packaging: async (path) => { paths.push(path); return path.includes("/revisions") ? packagingRevisions() : packagingAssets(); },
+  });
+  assert.deepEqual(paths, [`events/${eventId}/packaging-assets?limit=100`, `events/${eventId}/packaging-assets/${fixtureId(70)}/revisions?after=0&limit=100`]);
+  assert.deepEqual(outputs.packaging, [{ revisionId: fixtureId(7), name: "Event opening", role: "opening_bumper" }]);
+  assert.deepEqual(outputs.knownRevisions, [{ revisionId: fixtureId(1), number: 2 }]);
+  const html = render(outputs);
+  const bindings = html.match(/<ul[^>]*aria-label="Assembly slot bindings">.*?<\/ul>/)![0];
+  assert.match(bindings, /Event opening · opening bumper/);
+  assert.match(bindings, /<details><summary>Packaging details<\/summary>.*Packaging revision ID/);
+  assert.doesNotMatch(bindings.replace(/<details>.*?<\/details>/g, ""), /10000000-/);
+  assert.doesNotMatch(JSON.stringify(outputs), /never-expose-content|ffffffffffff/);
+});
+
+test("missing, failed, truncated and wrong-scope packaging reads keep the ID in details with unavailable wording", async () => {
+  const wrongRevision = packagingRevisions(); wrongRevision.items[0].revision.packaging_asset_id = fixtureId(99);
+  const readers = [
+    async () => { throw new Error("unavailable"); },
+    async () => ({ ...packagingAssets([]), items_truncated: true, next_after: fixtureId(90), total_count: 110 }),
+    async () => ({ ...packagingAssets(), event_id: fixtureId(90) }),
+    async (path: string) => path.includes("/revisions") ? { ...packagingRevisions(), event_id: fixtureId(90) } : packagingAssets(),
+    async (path: string) => path.includes("/revisions") ? { ...packagingRevisions(), packaging_asset_id: fixtureId(90) } : packagingAssets(),
+    async (path: string) => path.includes("/revisions") ? wrongRevision : packagingAssets(),
+    async (path: string) => path.includes("/revisions") ? { ...packagingRevisions(), items: [], items_truncated: true, next_after: 100, total_count: 101 } : packagingAssets(),
+  ];
+  for (const packaging of readers) {
+    const result = await presentation.readSessionOutputs(eventId, sessionId, [], { ...baseReads, packaging });
+    assert.deepEqual(result.packaging, []);
+    assert.equal(result.assembly.state, "available");
+    assert.match(render(result), /Packaging asset unavailable/);
+    assert.match(render(result), new RegExp(`<details><summary>Packaging details</summary>.*${fixtureId(7)}`));
+  }
+});
+
+test("packaging shares the deadline, limits revision reads to eight concurrent and preserves other sections", async () => {
+  const budget = createReadBudget(40);
+  let calls = 0;
+  try {
+    const result = await presentation.readSessionOutputs(eventId, sessionId, [], { ...baseReads,
+      packaging: async (path) => {
+        if (!path.includes("/revisions")) return packagingAssets(Array.from({ length: 100 }, (_, index) => packagingAsset(100 + index)));
+        calls++; return new Promise(() => {});
+      },
+    }, budget);
+    assert.equal(calls, 8); assert.deepEqual(result.packaging, []);
+    assert.equal(result.assembly.state, "available"); assert.equal(result.outputs.state, "available");
+    assert.ok(result.timing.every((entry) => entry.result.state === "available"));
+    assert.equal(budget.signal.aborted, true);
+  } finally { budget.dispose(); }
+});
+
 function compileComponent(file: string, imports: Record<string, unknown>) {
   const source = readFileSync(new URL(file, import.meta.url), "utf8");
   const compiled = ts.transpileModule(source, { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS } });
@@ -45,11 +180,13 @@ test("uniform members have one ordering summary, readable labels and collapsed c
   assert.match(html, /All 11 members ordered by unqualified recorder timing/);
   assert.equal((html.match(/unqualified recorder timing/gi) ?? []).length, 1);
   assert.doesNotMatch(html, /class="outputs-qualification"/);
-  assert.match(html, /<th scope="row">3<\/th><td>12:00:00<\/td><td>1:00<\/td><td class="member-flags"><\/td>/);
+  assert.match(html, /<th scope="row">3<\/th><td><details/);
+  assert.match(html, /Start: 12:00:00 \(all members\) · Duration: 1:00 \(all members\)/);
   assert.equal((html.match(/Evidence revision 3 · frozen and latest/g) ?? []).length, 1);
   assert.match(html, /Evidence revision 3 · frozen and latest \(all members\)/);
-  assert.equal((html.match(/<th scope="row">/g) ?? []).length, 11);
-  for (const label of ["Position", "Start", "Duration", "Flags", "Details"]) assert.ok(html.includes(`<th scope="col">${label}</th>`));
+  assert.equal((html.match(/<th scope="row">\d+<\/th>/g) ?? []).length, 11);
+  for (const label of ["Position", "Details"]) assert.ok(html.includes(`<th scope="col">${label}</th>`));
+  for (const label of ["Start", "Duration", "Flags"]) assert.ok(!html.includes(`<th scope="col">${label}</th>`));
   assert.match(html, /<summary>Member details<\/summary>.*Media ID \(select to copy\).*class="copyable-id" tabindex="0"/);
   assert.match(html, /Start \(date and zone\).*2026-09-27T12:00:00Z/);
   assert.doesNotMatch(html, /<details[^>]*\bopen/);
@@ -463,10 +600,16 @@ test("Kernel Session loading uses protected server reads and strips output conte
   const secret = "synthetic-kernel-read-secret-0123456789";
   process.env.STAGEFLOW_API_SHARED_SECRET = secret;
   const seen: string[] = [];
+  let packagingRead = false;
   globalThis.fetch = async (input, init) => {
-    const url = new URL(String(input)); seen.push(url.pathname);
+    const url = new URL(String(input));
     assert.equal(url.hostname, "127.0.0.1"); assert.equal(init?.method, "GET");
     assert.equal(new Headers(init?.headers).get("x-stageflow-api-secret"), secret);
+    if (url.pathname.endsWith("/packaging-assets")) {
+      packagingRead = true;
+      return Response.json({ ...page, event_id: eventId, total_count: 0, items_truncated: false });
+    }
+    seen.push(url.pathname);
     if (url.pathname.endsWith("/revisions")) return Response.json(revisions());
     if (url.pathname.endsWith("/operations")) return Response.json({ ...page, items: [fixtureRenderOperation()] });
     if (url.pathname.endsWith("/outputs")) return Response.json({ ...page, items: [fixtureRenderedOutput()] });
@@ -478,6 +621,7 @@ test("Kernel Session loading uses protected server reads and strips output conte
     assert.equal(result.fixture, false); assert.equal(result.assembly.state, "available");
     assert.equal(result.operations.state, "available"); assert.equal(result.outputs.state, "available");
     assert.equal(seen.length, 6);
+    assert.equal(packagingRead, true);
     for (const item of result.timing) assert.equal(item.result.state, "available");
     const html = render(result);
     assert.doesNotMatch(html, /Development fixture|synthetic-output|synthetic-manifest/);

@@ -22,6 +22,7 @@ export default async function SessionPage({ params, searchParams }: { params: Pr
       launchContext: demoLaunchContext, operatorAvailable: Boolean(demoActorId),
       authoritative: workspace.dataSource.authoritative && workspace.dataSource.state === "live_connected",
       fixture: outputs.fixture, assembly: outputs.assembly,
+      operations: outputs.operations, outputs: outputs.outputs,
     }} /> : null;
     return <OperationalShell activePath="/sessions" workspace={workspace}><SessionOperationalView demoActorId={demoActorId} demoLaunchContext={demoLaunchContext} session={session} workspace={workspace} outputs={outputs ? <SessionOutputsPanel outputs={outputs} actions={actions} /> : null} /></OperationalShell>;
   } finally { budget.dispose(); }
