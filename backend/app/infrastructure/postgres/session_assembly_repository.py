@@ -52,6 +52,8 @@ from app.contexts.assembly.session_repository import (
 )
 from app.shared.ids import EntityId
 
+from .assembly_timing_reader import PostgresAssemblyTimingReader
+
 type Row = dict[str, Any]
 type Connection = psycopg.Connection[Row]
 SLOTS = TypeAdapter(tuple[AssemblySlot, ...])
@@ -341,10 +343,14 @@ class PostgresSessionAssemblyRepository:
             template = self._get_template(conn, template_id)
             if template.event_id != _id(session["event_id"]):
                 raise AssemblyNotFoundError("template_not_in_session_event")
+            inputs = self._inputs(conn, session)
             revision = build_revision(
                 command, revision_id, number + 1,
                 None if current is None else _id(current["revision_id"]), template,
-                self._inputs(conn, session), self._candidates(conn, template.event_id), explicit,
+                inputs, self._candidates(conn, template.event_id), explicit,
+                PostgresAssemblyTimingReader(conn).read(
+                    tuple(m.asset_id for m in inputs.membership),
+                ),
             )
             self._insert_revision(conn, revision)
             return revision
@@ -366,11 +372,14 @@ class PostgresSessionAssemblyRepository:
             cursor.executemany(
                 """INSERT INTO stageflow.assembly_member
                    (revision_id,position,completion_decision_id,asset_id,association_revision,
-                    media_started_at,order_source,order_key_at)
-                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s)""",
+                    media_started_at,order_source,order_key_at,order_evidence_id,
+                    order_evidence_revision,order_evidence_qualification)
+                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
                 [(r.id.value, i, None if r.completion_decision_id is None
                   else r.completion_decision_id.value, m.asset_id.value, m.association_revision,
-                  m.media_started_at, m.order_source.value, m.order_key_at)
+                  m.media_started_at, m.order_source.value, m.order_key_at,
+                  None if m.order_evidence_id is None else m.order_evidence_id.value,
+                  m.order_evidence_revision, m.order_evidence_qualification)
                  for i, m in enumerate(r.membership)],
             )
             cursor.executemany(
@@ -414,6 +423,9 @@ class PostgresSessionAssemblyRepository:
                 _id(m["asset_id"]), m["association_revision"], m["media_started_at"],
                 m["registered_at"], MediaOrderSource(m["order_source"] or "media_timing"),
                 m["media_started_at"] if m["order_source"] is None else m["order_key_at"],
+                # An allowed 0018 reverse restores 0016 members without these columns.
+                None if m.get("order_evidence_id") is None else _id(m["order_evidence_id"]),
+                m.get("order_evidence_revision"), m.get("order_evidence_qualification"),
             ))
         for b in conn.execute("""SELECT * FROM stageflow.assembly_binding
                                  WHERE revision_id=ANY(%s::uuid[]) ORDER BY position""", (ids,)):

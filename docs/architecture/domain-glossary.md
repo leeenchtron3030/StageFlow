@@ -268,9 +268,13 @@ authorized by this document.
 ### Media order source
 
 - **Definition:** The frozen per-member basis for Session Assembly presentation order:
-  `media_timing` uses known `media_started_at`; `registration_time` uses the registry's
-  infrastructure-observed `registered_at`. The aware `order_key_at` records the selected
-  instant. New proposals sort by that key, then asset ID, across both sources.
+  `media_timing` uses known `media_started_at`; otherwise `timing_evidence` uses the
+  single `creation_time_plus_duration` Derived start in the latest active MTE revision;
+  otherwise `registration_time` uses the registry's infrastructure-observed `registered_at`.
+  Zero or several matching derivations fall through. The aware `order_key_at` records the
+  selected instant. New proposals sort by that key, then asset ID, across all three sources.
+  Only `timing_evidence` carries `order_evidence_id`, `order_evidence_revision`, and
+  `order_evidence_qualification`, frozen for disclosure before human approval.
 - **Authority:** Human Assembly approval confirms the proposed order. Registration time
   does not assert captured-content timing or change completion membership, Session
   boundaries, package authority, or advisory Media Timing Evidence (ADR-0027).
