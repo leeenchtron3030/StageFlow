@@ -6,8 +6,8 @@
 
 This document records the provider-neutral production boundary approved by MTE-001
 through MTE-005 and [ADR-0027](../adr/ADR-0027-media-timing-evidence.md). It does not
-qualify any recorder profile, authorize automatic association, or select a production
-inspection worker/provider.
+qualify any recorder profile or authorize automatic association. ADR-0033 now supplies
+the production inspection worker/provider described below.
 
 ## Evidence and epistemic boundary
 
@@ -80,17 +80,49 @@ state. Reversal remains an explicit isolated-database operator action.
 
 ## Application and inspection boundaries
 
-- `MediaTimingInspectionPort.inspect(request)` is a future provider-neutral execution
-  seam. No production adapter, watcher, scheduler, queue, broker, or worker is selected.
-- `MediaTimingEvidenceApplication.apply(request, result)` validates and commits already
+- `MediaTimingInspectionPort.inspect(request)` retains the original provider-neutral
+  execution seam. The production inspection worker uses the typed `TimingInspector`
+  boundary and an operator-installed local `ffprobe` adapter under ADR-0033.
+- `MediaTimingEvidenceApplication.apply(request)` validates and commits already
   inspected evidence synchronously and idempotently.
 - `MediaTimingEvidenceRepository.append/get_active/history` owns durable evidence only.
 - qualification tooling may continue synchronous local inspection outside production.
 
-Actual long-running production inspection must use the durable worker boundary accepted
-by ADR-0025 after that boundary is implemented through a separate approved plan.
-Transcription remains the intended first durable worker consumer and no provider/model
-is selected by MTE v1 or ADR-0025.
+Production inspection uses the shared ADR-0025 lease, retry, fencing, capability, and
+presence substrate with the `media_timing` operation kind. The optional, default-off
+`[local_media_timing]` configuration enables enqueue during Demo reconciliation for newly
+registered assets. Existing assets require an explicit bounded human enqueue command.
+Neither path depends on Session association. The separate CPU worker
+`python -m app.demo.media_timing_worker` defaults to two concurrent inspections (maximum
+eight). Transcription and render capabilities and views remain isolated.
+
+The `container-creation-time` v1 inspection profile runs the rule
+`creation_time_plus_duration` v1. The adapter checks an explicit absolute local binary
+path, version and SHA-256, refuses GPL/nonfree configuration and shell wrappers, and
+rechecks identity before every inspection. It invokes JSON format/stream inspection with
+stdin and stderr connected to `DEVNULL`, a file-only protocol whitelist, a 1 MiB stdout
+cap, and a 30-second timeout per invocation. Raw JSON and stderr are never retained.
+Only container creation time/duration and the first video stream's start/duration are
+projected. Signed stream start is a relative numeric observation, not an absolute time.
+Naive, invalid, missing, or unsafe creation-time text produces an explicit limitation;
+no timezone is guessed. An interval requires valid aware creation time and valid duration.
+Recorder qualification remains `unqualified`, with explicit recording-start/file-open
+and captured-content-duration limitations.
+
+Evidence is applied exclusively through `MediaTimingEvidenceApplication.apply` using a
+transaction-bound PostgreSQL repository. The active lease fence, evidence application,
+attempt finalization, and terminal MTE reference share one transaction. Expiry recovery
+recognizes already committed asset/manifest-matching MTE results. Typed failures release
+leases with bounded reason codes; unexpected exception messages are never persisted.
+Resolver errors preserve their retryability. Definite apply-time storage failures
+schedule a retry; an ambiguous commit leaves the attempt for reconciliation.
+
+Authenticated `/api/v1/media-timing/events/{event_id}/requests` accepts human-confirmed
+asset pages (1–100, `after` asset ID) and idempotently enqueues by asset/manifest/profile.
+`GET .../events/{event_id}/operations` pages by operation ID with the same limit bounds.
+`GET .../assets/{asset_id}/latest` returns one bounded advisory summary: revision,
+qualification, limitations, and candidate interval. Reads remain available when enqueue
+is disabled. These responses expose no source paths or raw tool output.
 
 ## Qualification representation
 
@@ -135,6 +167,8 @@ Transcript evidence remains separate and non-authoritative Session evidence.
 
 - qualifying a concrete recorder/source profile and calibration thresholds;
 - allowing MTE to change automatic Session association or eligibility;
-- implementing ADR-0025 worker/lease execution for production inspection/transcription
-  through a separate bounded plan;
-- automatic AI authority or a consequential inspection/provider dependency.
+- automatic AI authority or a new consequential inspection/provider dependency beyond
+  ADR-0033's operator-installed ffprobe.
+
+Host comparison against live-run reconnaissance and the owner's security review remain
+separate qualification steps; contract and persistence tests do not establish event readiness.

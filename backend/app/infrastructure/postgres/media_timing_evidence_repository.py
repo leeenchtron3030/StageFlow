@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Generator, Mapping
+from contextlib import contextmanager
 from datetime import datetime, timedelta
 from typing import Any, cast
 
@@ -28,8 +29,17 @@ Row = dict[str, Any]
 
 
 class PostgresMediaTimingEvidenceRepository(MediaTimingEvidenceRepository):
-    def __init__(self, dsn: str) -> None:
+    def __init__(self, dsn: str, *, connection: psycopg.Connection[Row] | None = None) -> None:
         self._dsn = dsn
+        self._connection = connection
+
+    @contextmanager
+    def _transaction(self) -> Generator[psycopg.Connection[Row]]:
+        if self._connection is not None:
+            yield self._connection
+        else:
+            with self._connect() as connection:
+                yield connection
 
     def _connect(self) -> psycopg.Connection[Row]:
         return psycopg.Connection[Row].connect(self._dsn, row_factory=dict_row)
@@ -37,7 +47,7 @@ class PostgresMediaTimingEvidenceRepository(MediaTimingEvidenceRepository):
     def append(self, pending: PendingMediaTimingEvidence) -> MediaTimingEvidence:
         request = pending.request
         try:
-            with self._connect() as connection:
+            with self._transaction() as connection:
                 connection.execute(
                     "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
                     (request.operation_id.value,),

@@ -22,7 +22,10 @@ from app.contexts.transcription_evidence.application import (
     TranscriptionExecutionError,
     TranscriptionExecutionRequest,
 )
-from app.contexts.work_execution.contracts import TranscriptionOperationInput
+from app.contexts.work_execution.contracts import (
+    MediaTimingOperationInput,
+    TranscriptionOperationInput,
+)
 from app.core.config.deployment import LocalTranscriptionConfiguration
 from app.shared.ids import EntityId
 from app.shared.time import Clock
@@ -83,7 +86,7 @@ class KernelMediaPathResolver:
         self._repository = repository
         self._source_roots = dict(source_roots)
 
-    def resolve(self, input: TranscriptionOperationInput) -> Path:
+    def resolve(self, input: TranscriptionOperationInput | MediaTimingOperationInput) -> Path:
         asset = self._repository.get_asset(input.asset_id)
         if asset is None:
             raise TranscriptionExecutionError(

@@ -8,6 +8,20 @@ event-critical path, and may be shared by future StageFlow nodes. Media content 
 outside PostgreSQL and is referenced by durable records. PostgreSQL unavailability must
 never redirect authoritative writes into process memory.
 
+## Production inspection transaction
+
+Migration `0017_media_timing_operation` (already introduced with the substrate) adds the
+`media_timing` kind and a terminal MTE foreign-key reference. It reuses asset, manifest,
+and execution-profile columns for inspection-profile identity. Existing transcription
+and render constraints retain their meanings; reversal refuses existing timing operations.
+
+Production inspection now binds the existing MTE repository to the operation transaction.
+Only `MediaTimingEvidenceApplication.apply` appends evidence. Fence verification,
+application, successful Attempt finalization, and terminal reference commit together;
+failure rolls them back together. Expired timing leases with committed matching MTE
+application records reconcile to success. There is no additional schema or migration,
+backfill, or authoritative media/Session update in this execution slice.
+
 ## Current implementation
 
 The current branch implements stable ingress, the bounded Durable Event-Mode Kernel,
@@ -228,6 +242,17 @@ then removes
 schema. The `0005` reverse removes only membership tagged as its legacy reconstruction
 before dropping its additive columns.
 Reversal is an explicit operator action for an isolated database and is never automatic.
+
+`0017_media_timing_operation` adds the `media_timing` kind to the shared Work Execution
+journal after `0016`. Its asset/manifest identity and inspection profile ID/version use
+existing asset/manifest and execution-profile columns; transcription-specific fields are
+not populated. A dedicated terminal-result foreign key references advisory MTE, with
+kind-aware success and result-column checks. Capabilities carry no transcription fields.
+Configured repository input types filter claims, listings, counts, and limits. This is
+Phase A persistence only: no inspector, worker, enqueue composition, or MTE write path is
+introduced. Reverse runs before `0016`, restores the exact `0015`/`0016` constraints,
+and refuses while timing operations, capabilities, or terminal-result references exist.
+No backfill or existing-row identity change occurs.
 
 ## Windows reference-node validation
 

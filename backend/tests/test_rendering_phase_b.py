@@ -695,6 +695,7 @@ def test_demo_workspace_transcription_status_reconciliation_and_work_queue_isola
         postgres_dsn=render_postgres_dsn, deployment=SimpleNamespace(
             deployment_id="test-deployment", event=SimpleNamespace(key=row["event_key"]),
             runtime_profile=RuntimeProfile.DEMO_SINGLE_STAGE,
+            local_media_timing=None,
             local_transcription=SimpleNamespace(execution_profile_id="synthetic",
                                                  execution_profile_version="1"),
         ),

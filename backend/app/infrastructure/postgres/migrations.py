@@ -115,6 +115,14 @@ class PostgresMigrationRunner:
             version="0016_assembly_media_order",
         )
 
+        self.apply_media_timing_operation_v1()
+
+    def apply_media_timing_operation_v1(self) -> None:
+        self._execute_if_missing(
+            "0017_media_timing_operation_forward.sql",
+            version="0017_media_timing_operation",
+        )
+
     def reverse_event_mode_kernel_v1(self) -> None:
         self.reverse_demo_vertical_slice_v1()
         self.reverse_transcription_worker_v1()
@@ -201,9 +209,16 @@ class PostgresMigrationRunner:
         )
 
     def reverse_assembly_media_order_v1(self) -> None:
+        self.reverse_media_timing_operation_v1()
         self._execute_if_present(
             "0016_assembly_media_order_reverse.sql",
             version="0016_assembly_media_order",
+        )
+
+    def reverse_media_timing_operation_v1(self) -> None:
+        self._execute_if_present(
+            "0017_media_timing_operation_reverse.sql",
+            version="0017_media_timing_operation",
         )
 
     def _execute(self, filename: str) -> None:

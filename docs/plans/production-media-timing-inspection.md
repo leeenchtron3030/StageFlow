@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved
+Completed (2026-09-26).
 
 ## Execution authority
 
@@ -221,4 +221,45 @@ MTE rows written stay as history; ADR-0027 sets no deletion policy.
 
 ## Completion record
 
-_(Filled in on completion.)_
+- **Implemented revision:** branch `codex/ed-0090-media-timing-inspection`. Codex
+  implemented it and the owner committed it.
+  - Phase A (`a84fa99`): migration `0017` and the `media_timing` substrate kind.
+  - Phase B (`6fdde32`): the `ffprobe` adapter, inspection profile, worker, enqueue and
+    backfill command, API, and documentation.
+- **Phase A review:**
+  - The `directive-reviewer` returned FIX-FIRST because Codex had changed the migration
+    runner to batch reversals, which was out of scope. The owner reverted it to plain
+    chaining.
+  - The owner also made the timing-result reference a composite `(asset_id, evidence_id)`
+    key, so a result must belong to the operation's own asset.
+  - With plain chaining, one existing render reverse test now takes its baseline after the
+    `0017` reverse. This is a setup change only; the assertion is unchanged.
+- **Phase B review:** the `directive-reviewer` returned FIX-FIRST for missing tests: the
+  adapter's security paths and the Demo enqueue failure path. Codex added them, together
+  with three owner-directed corrections:
+  - the resolver's retryability is preserved;
+  - definite storage failures retry, while ambiguous commits reconcile;
+  - `ffprobe_path` is needed only when the section is enabled.
+
+  The host run also exposed a test-only bug in the fake-`ffprobe` fixture (a subscripted
+  cast after `Popen` was monkeypatched), which the owner fixed.
+- **Deviations:** the adapter adds `-protocol_whitelist file` before the invocation the
+  ADR names. It narrows behaviour and is documented.
+- **Tests:**
+  - host full suite after the Phase A fixes: **2,380 passed, 0 failed**;
+  - host full suite after the Phase B fixes: **2,449 passed, 0 failed, 2 skipped**;
+  - Ruff and Pyright are clean.
+
+  No existing assertion changed except the three pre-authorized migration-order
+  additions.
+- **Owner host run:** see
+  [media timing inspection Run 001](../validation/results/media-timing-inspection-001.md).
+  - All 12 live-run assets were inspected.
+  - The Derived starts are exactly 60 s apart in aware UTC, matching the reconnaissance.
+  - Backfill replay is idempotent, and Kernel facts are untouched.
+- **Security review of the branch diff:** no findings at confidence 8 or higher.
+- **Remaining work:**
+  - ED-0091: Assembly orders members by timing evidence.
+  - ED-0092: derived Editorial candidates.
+  - Optional: automatic enqueue for assets registered by startup or recovery cycles; a
+    demuxer allowlist; recording the actor on the backfill command.

@@ -7,8 +7,10 @@ from typing import cast
 
 from .contracts import (
     DurableOperation,
+    EnqueueOperation,
     EnqueueRenderOperation,
     EnqueueTranscriptionOperation,
+    MediaTimingOperationInput,
     OperationInput,
     PendingOperation,
     RenderOperationInput,
@@ -99,6 +101,42 @@ def pending_render_operation(
             "event_id": None if request.event_id is None else request.event_id.value,
             "work_key": render_work_key(request),
             "output_token": request.input.output_token,
+            "priority": request.priority,
+            "eligible_at": request.eligible_at.isoformat(),
+            "max_attempts": request.max_attempts,
+            "retry_delay_microseconds": int(request.retry_delay.total_seconds() * 1_000_000),
+            "required_for_event": request.required_for_event,
+            "requested_at": request.requested_at.isoformat(),
+        }),
+    )
+
+
+def media_timing_work_key(request: EnqueueOperation[MediaTimingOperationInput]) -> str:
+    value = request.input
+    return _sha({
+        "schema": "stageflow.media_timing_operation.work-key.v1",
+        "asset_id": value.asset_id.value,
+        "manifest_id": value.manifest_id.value,
+        "manifest_version": value.manifest_version,
+        "inspection_profile_id": value.inspection_profile_id,
+        "inspection_profile_version": value.inspection_profile_version,
+    })
+
+
+def pending_media_timing_operation(
+    request: EnqueueOperation[MediaTimingOperationInput],
+) -> PendingOperation[MediaTimingOperationInput]:
+    """Persistence envelope only; inspection enqueue composition belongs to Phase B."""
+    return PendingOperation(
+        request=request,
+        work_key=media_timing_work_key(request),
+        request_digest=_sha({
+            "schema": "stageflow.media_timing_operation.enqueue.v1",
+            "operation_id": request.operation_id.value,
+            "idempotency_key": request.idempotency_key,
+            "deployment_id": request.deployment_id,
+            "event_id": None if request.event_id is None else request.event_id.value,
+            "work_key": media_timing_work_key(request),
             "priority": request.priority,
             "eligible_at": request.eligible_at.isoformat(),
             "max_attempts": request.max_attempts,

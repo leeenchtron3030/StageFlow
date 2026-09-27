@@ -191,6 +191,19 @@ authorized by this document.
 - **Example:** Unqualified vMix `creation_time` and measured duration support a Derived
   candidate interval shown as advisory evidence during media-uncertainty drill-down.
 
+### Media timing inspection
+
+- **Definition:** A durable, retryable `media_timing` operation that inspects a registered
+  Completed Media Asset using an operator-installed ffprobe and records advisory MTE.
+- **Identity:** Asset and manifest identity plus inspection-profile ID/version form the
+  work key. The current profile is `container-creation-time` v1; the derivation rule is
+  `creation_time_plus_duration` v1. Provenance includes binary version and SHA-256.
+- **Authority:** Container creation time is Observed; the candidate interval is Derived.
+  Recorder semantics remain unqualified. Inspection never sets `media_started_at`,
+  Session boundaries, membership, association, or package state.
+- **Execution:** A separate bounded CPU worker shares the existing operation journal;
+  optional automatic enqueue gathers evidence only. Existing-asset enqueue is human-only.
+
 ### Editorial Candidate Moment
 
 - **Definition:** A proposed editorial highlight awaiting human review.
