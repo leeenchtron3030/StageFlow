@@ -129,6 +129,45 @@ operator identity (`STAGEFLOW_DEMO_OPERATOR_ID`), as the Demo commands already d
 5. Tests: command construction, confirmation gating, conflict handling, and each route's
    allowlist.
 
+#### Phase 2 amendments (owner, 2026-09-27)
+
+- **Command audit log.** The owner wants every action traceable for full diagnosis, with a
+  log of successes as well as failures.
+  - Every command through a capability route writes two structured `console.info` lines,
+    `stageflow_capability_command=` followed by JSON, sharing a server-generated
+    `request_id`.
+  - **The received line** records:
+    - an aware ISO timestamp;
+    - the capability, method, and matched route *pattern* (not the raw path);
+    - the resource UUIDs;
+    - `command_id` and `operation_id` taken from the body, when present;
+    - the launch-context fingerprint and whether it was valid;
+    - the bounded client address;
+    - `accepted`, or a refusal reason: `cross_site`, `launch_context`, `too_large`,
+      `not_allowed`, or `secret_unavailable`.
+  - **The result line** records:
+    - the backend HTTP status;
+    - the outcome: `succeeded`, `rejected` (4xx, with the bounded backend error code), or
+      `failed` (5xx, timeout, or unavailable);
+    - the duration in milliseconds;
+    - the resulting identifiers from the response body when present (for example
+      `revision_id`, `decision_id`, `operation_id`).
+  - **Never logged:** the secret, request or response bodies, or operator free text such
+    as reasons. Only `reason_present` and `reason_length` are recorded.
+  - Reads are not logged per request.
+  - The Demo proxy's existing audit lines stay unchanged.
+  - Tests assert both lines for success, rejection, failure, and every refusal branch, and
+    that no secret or free text appears.
+- **Scanning rule** (owner's standing rule, `docs/ux/operator-feedback.md`, 2026-09-27).
+  Actions sit next to the state they change, as one primary action per state:
+  - Propose when there is no current valid revision.
+  - Approve or reject when a revision is unreviewed.
+  - Request render when a revision is approved and not stale.
+
+  The confirmations lead with a one-line consequence, and name exceptions such as
+  `registration_time` members or unqualified timing. Results appear inline as one line,
+  with the backend identifier available in details.
+
 ### Phase 3: ED-0095, connecting the Editorial review surface
 
 1. Connect `/editorial` to the real runtime when the data mode is `kernel`. The fixture
