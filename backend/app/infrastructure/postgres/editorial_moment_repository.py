@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any, cast
 
 import psycopg
@@ -8,8 +8,10 @@ from psycopg.rows import dict_row
 
 from app.contexts.editorial.contracts import (
     DeclareEditorialMoment,
+    EditorialCandidateLocation,
     EditorialCandidateMoment,
     EditorialCandidateOrigin,
+    EditorialCandidateSourceKind,
     EditorialClip,
     EditorialGenerationState,
     EditorialLocationConflictReason,
@@ -24,22 +26,26 @@ from app.contexts.editorial.contracts import (
     EditorialSessionCandidateProjection,
     ReviewEditorialMoment,
 )
+from app.contexts.editorial.derivation import location_conflict_reason
 from app.contexts.editorial.repository import (
     EditorialMomentConflictError,
     EditorialMomentNotFoundError,
     EditorialMomentStorageUnavailableError,
 )
+from app.infrastructure.postgres.editorial_derivation_repository import provenance_from_row
 from app.shared.ids import EntityId
 
 type Row = dict[str, Any]
 
 _MOMENT_SELECT = """
-    SELECT moment.*,
+    SELECT moment.*, row_to_json(provenance) AS provenance,
            location.evaluated_at AS location_evaluated_at,
            location.location_conflict_reason,
            review.action AS current_review_action,
            review.decided_at AS review_decided_at
     FROM stageflow.editorial_candidate_moment AS moment
+    LEFT JOIN stageflow.editorial_candidate_provenance AS provenance
+        USING (candidate_moment_id)
     LEFT JOIN LATERAL (
         SELECT evaluated_at, location_conflict_reason
         FROM stageflow.editorial_candidate_moment_location_history
@@ -392,7 +398,7 @@ class PostgresEditorialMomentRepository:
                             candidate_moment_id
                         LIMIT %s
                     )
-                    SELECT moment.*,
+                    SELECT moment.*, row_to_json(provenance) AS provenance,
                            session.stage_id,
                            stage.event_id,
                            page.review_priority,
@@ -403,6 +409,8 @@ class PostgresEditorialMomentRepository:
                     FROM page
                     JOIN stageflow.editorial_candidate_moment AS moment
                         ON moment.candidate_moment_id = page.candidate_moment_id
+                    LEFT JOIN stageflow.editorial_candidate_provenance AS provenance
+                        ON provenance.candidate_moment_id = moment.candidate_moment_id
                     JOIN stageflow.session AS session
                         ON session.session_id = moment.session_id
                     JOIN stageflow.stage AS stage
@@ -729,13 +737,15 @@ def _moment(row: Row) -> EditorialCandidateMoment:
         session_authoritative_start=cast(datetime, row["session_authoritative_start"]),
         session_authoritative_end=cast(datetime | None, row["session_authoritative_end"]),
         actor_id=EntityId(str(row["actor_id"])),
-        operation_id=EntityId(str(row["operation_id"])),
+        operation_id=(None if row["operation_id"] is None else EntityId(str(row["operation_id"]))),
         note=cast(str | None, row["note"]),
         declared_at=cast(datetime, row["declared_at"]),
         revision=int(row["revision"]),
         origin=EditorialCandidateOrigin(str(row["origin"])),
         epistemic_kind=EditorialCandidateOrigin(str(row["epistemic_kind"])),
         reason_code=str(row["reason_code"]),
+        source_kind=EditorialCandidateSourceKind(row.get("source_kind", "producer_declaration")),
+        provenance=provenance_from_row(row.get("provenance")),
         review_state=review_state,
         updated_at=updated_at,
         location_conflict_reason=(
@@ -825,29 +835,17 @@ def _review_replay(
 def _location_conflict_reason(
     candidate: Row, session: Row
 ) -> EditorialLocationConflictReason | None:
-    basis_start = cast(datetime, candidate["session_authoritative_start"])
-    start = basis_start + timedelta(
-        microseconds=int(candidate["timeline_start_microseconds"])
+    return location_conflict_reason(
+        EditorialCandidateLocation(
+            int(candidate["expected_session_revision"]),
+            int(candidate["timeline_start_microseconds"]),
+            cast(int | None, candidate["timeline_end_microseconds"]),
+            cast(datetime, candidate["session_authoritative_start"]),
+            cast(datetime | None, candidate["session_authoritative_end"]),
+        ),
+        cast(datetime, session["authoritative_start"]),
+        cast(datetime | None, session["authoritative_end"]),
     )
-    timeline_end = cast(int | None, candidate["timeline_end_microseconds"])
-    end = basis_start + timedelta(
-        microseconds=(
-            int(candidate["timeline_start_microseconds"])
-            if timeline_end is None
-            else timeline_end
-        )
-    )
-    authoritative_start = cast(datetime, session["authoritative_start"])
-    authoritative_end = cast(datetime | None, session["authoritative_end"])
-    if end < authoritative_start or (
-        authoritative_end is not None and start > authoritative_end
-    ):
-        return EditorialLocationConflictReason.EXCLUDED
-    if start < authoritative_start or (
-        authoritative_end is not None and end > authoritative_end
-    ):
-        return EditorialLocationConflictReason.PARTIALLY_EXCLUDED
-    return None
 
 
 __all__ = ["PostgresEditorialMomentRepository"]

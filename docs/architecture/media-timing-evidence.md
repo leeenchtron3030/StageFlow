@@ -136,6 +136,15 @@ There is no confidence-to-authority promotion system.
 
 ## Authorized consumers
 
+Editorial now reads the latest active MTE for each Session-associated asset during an
+explicit human phrase-derivation command. Exactly one `creation_time_plus_duration`
+derivation supplies placement; zero or multiple matches count as missing timing, with
+no fallback to an older revision. Candidates freeze the evidence ID, revision and
+qualification, alongside transcript word offsets. MTE start plus those offsets is
+converted to Session-relative microseconds; the existing boundary-conflict evaluation
+remains in force. Candidate and review-queue reads disclose timing qualification.
+No qualification is upgraded, no evidence is rewritten, and human review remains required.
+
 MTE v1 is advisory evidence. Narrow consumers may display it, align transcript evidence,
 produce Session-boundary proposals or association suggestions, support later Editorial
 timing, and assist diagnostics/qualification.

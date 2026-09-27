@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved
+Completed (2026-09-26).
 
 ## Execution authority
 
@@ -232,4 +232,43 @@ Revert the code and apply the `0019` reverse (only while no derived rows exist).
 
 ## Completion record
 
-_(Filled in on completion.)_
+- **Implemented revision:** branch `codex/ed-0092-derived-editorial-candidates`, stacked
+  on ED-0091. Codex implemented it in one run with no escalation, and the owner committed
+  it.
+- **Files changed:**
+  - Editorial derivation contracts, pure matching and placement, reader ports, the
+    in-memory repository, and the service;
+  - the PostgreSQL derivation repository;
+  - migration `0019` (phrase lists, runs, command receipts, and provenance, with
+    kind-aware candidate checks) and its registration;
+  - the startup schema gate for `0019`, which follows the ED-0086 precedent because the
+    candidate reads now join provenance;
+  - the Editorial API;
+  - tests;
+  - the glossary, persistence, capability-layer, MTE, transcript-readiness, and Editorial
+    README documents.
+- **Review:** the `directive-reviewer` returned FIX-FIRST for test gaps. Codex fixed them,
+  together with one owner-directed correction:
+  - PostgreSQL and domain guards for declared rows;
+  - persisted Session-end conflicts;
+  - phrase identity by normalized token sequence, with punctuation-only phrases rejected
+    (the owner's correction);
+  - literal checks that the `0019` reverse restores the `0008` constraints.
+- **Existing assertions changed:** only the pre-authorized `0019` additions to the
+  migration-order lists.
+- **Tests:** host full suite **2,562 passed, 0 failed, 2 skipped**; Ruff and Pyright
+  are clean.
+- **Owner host run:** see
+  [Run 001](../validation/results/derived-editorial-candidates-001.md).
+  - 30 derived candidates on the live-run Session, with 0 placement mismatches against an
+    independent recomputation.
+  - 1 boundary exclusion recorded.
+  - Replay is idempotent, and nothing was reviewed automatically.
+- **Deviations:** none from the design decisions.
+- **Remaining work:**
+  - The frontend `DemoMoment` type still assumes `origin: "declared"` and a non-null
+    `operation_id`. Nothing reads them yet; a type update is needed before a UI shows
+    derived candidates.
+  - Run identity does not include the Session revision (per the plan), so after a
+    boundary correction a new run needs changed inputs or a new phrase-list version.
+  - A Producer UI for phrase lists and derived-candidate review.

@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Annotated, Literal
+from typing import Annotated, Literal, cast
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, Request, Response
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
+from app.api.v1.editorial import EditorialProvenanceResponse, editorial_provenance_response
 from app.api.v1.response_models import (
     ImmutableIntMapping,
     ProgramChangeResponse,
@@ -145,16 +146,17 @@ class ProcessTranscriptionResponse(BaseModel):
 class EditorialMomentResponse(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    operation_id: str
+    operation_id: str | None
     candidate_moment_id: str
     session_id: str
     expected_session_revision: int
     timeline_start_microseconds: int
     timeline_end_microseconds: int | None
-    origin: Literal["declared"]
-    epistemic_kind: Literal["declared"]
-    reason_code: Literal["human_mark_moment"]
-    source_kind: Literal["producer_declaration"]
+    origin: Literal["declared", "derived"]
+    epistemic_kind: Literal["declared", "derived"]
+    reason_code: Literal["human_mark_moment", "transcript_phrase_match"]
+    source_kind: Literal["producer_declaration", "transcript_phrase_match"]
+    provenance: EditorialProvenanceResponse | None = None
     review_state: EditorialReviewStateValue
     actor_id: str
     note: str | None
@@ -288,16 +290,19 @@ def _session_response(operation_id: UUID, session: Session) -> SessionCommandRes
 
 def _moment_response(moment: EditorialCandidateMoment) -> EditorialMomentResponse:
     return EditorialMomentResponse(
-        operation_id=moment.operation_id.value,
+        operation_id=None if moment.operation_id is None else moment.operation_id.value,
         candidate_moment_id=moment.id.value,
         session_id=moment.session_id.value,
         expected_session_revision=moment.expected_session_revision,
         timeline_start_microseconds=moment.timeline_start_microseconds,
         timeline_end_microseconds=moment.timeline_end_microseconds,
-        origin="declared",
-        epistemic_kind="declared",
-        reason_code="human_mark_moment",
-        source_kind="producer_declaration",
+        origin=cast(Literal["declared", "derived"], moment.origin.value),
+        epistemic_kind=cast(Literal["declared", "derived"], moment.epistemic_kind.value),
+        reason_code=cast(
+            Literal["human_mark_moment", "transcript_phrase_match"], moment.reason_code,
+        ),
+        source_kind=moment.source_kind.value,
+        provenance=editorial_provenance_response(moment.provenance),
         review_state=moment.review_state.value,
         actor_id=moment.actor_id.value,
         note=moment.note,

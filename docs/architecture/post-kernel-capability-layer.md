@@ -12,7 +12,8 @@ broader capabilities. Only the bounded transcription Work Execution and evidence
 explicitly authorized by ADR-0025 and its implementation-ready plan is currently
 implemented. ED-0067 implements the bounded Phase 1 human-declared Editorial Candidate
 Moment slice, and ED-0072 implements the append-only human review, Editorial Clip, and
-bounded Event review-queue foundation. Machine-origin candidates remain future work.
+bounded Event review-queue foundation. Human-invoked deterministic phrase derivation now
+adds advisory derived candidates; inferred candidates remain future work.
 ED-0076 implements ADR-0030's Packaging Asset identity, immutable content revisions,
 human approval lineage, and bounded authenticated reads in the new Assembly context.
 ED-0077 implements Session Assembly templates, proposals, revisions, validation, and
@@ -181,6 +182,23 @@ detail and remains recursively immutable. Confidence is optional and advisory; i
 never approval authority.
 
 ### Epistemic provenance and source artifacts
+
+The bounded derived-candidate implementation accepts an immutable, Event-scoped phrase
+list through a human command, then derives candidates only on an explicit human request.
+It matches every occurrence of normalized contiguous Unicode alphanumeric words within
+each segment of the latest complete transcript revision for associated assets. Overlaps
+of the same phrase retain the earliest occurrence; different phrases remain separate.
+NFKC, casefolding and collapsed whitespace define normalization. No model, provider or
+network call participates.
+
+Each run pins its sorted asset/transcript/MTE input identities and returns the same result
+on replay. Placement uses the latest active MTE's single `creation_time_plus_duration`
+start and first/last word offsets relative to the authoritative Session start. At most
+500 candidates are retained, with typed skip counts. Provenance names the phrase-list
+version, normalized match, word and segment identities, offsets, evidence revisions and
+timing qualification. Candidate reads and the existing review queue expose those facts.
+Unqualified timing remains advisory. Declared candidates and all four human review
+actions, including approval creating a Clip, retain their existing semantics.
 
 The four origins preserve different claims:
 

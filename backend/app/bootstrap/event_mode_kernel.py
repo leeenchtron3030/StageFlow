@@ -11,6 +11,7 @@ import psycopg
 from app.contexts.assembly.service import PackagingAssetService
 from app.contexts.assembly.session_service import SessionAssemblyService
 from app.contexts.editorial import EditorialMomentService
+from app.contexts.editorial.derivation_service import EditorialDerivationService
 from app.contexts.events import EventStageBootstrapRequest, StageBootstrapDefinition
 from app.contexts.integration.devcon import DevconProgramSync
 from app.contexts.integration.local_schedule import LocalScheduleFileSource
@@ -38,6 +39,9 @@ from app.infrastructure.postgres import (
     PostgresEventModeKernelRepository,
     PostgresIngressRepository,
     PostgresMediaTimingEvidenceRepository,
+)
+from app.infrastructure.postgres.editorial_derivation_repository import (
+    PostgresEditorialDerivationRepository,
 )
 from app.infrastructure.postgres.packaging_asset_repository import PostgresPackagingAssetRepository
 from app.infrastructure.postgres.session_assembly_repository import (
@@ -81,6 +85,7 @@ class KernelComponents:
     media_timing_evidence_repository: MediaTimingEvidenceRepository | None = None
     program_source: ProgramScheduleSource | None = None
     editorial_moments: EditorialMomentService | None = None
+    editorial_derivation: EditorialDerivationService | None = None
     packaging_assets: PackagingAssetService | None = None
     session_assemblies: SessionAssemblyService | None = None
     media_cycle_lock: Lock = field(default_factory=Lock, repr=False)
@@ -275,11 +280,12 @@ def verify_editorial_schema(dsn: str) -> None:
                     '0011_editorial_review_foundation',
                     '0012_packaging_asset_foundation',
                     '0013_session_assembly_foundation',
-                    '0014_assembly_metadata_overrides'
+                    '0014_assembly_metadata_overrides',
+                    '0019_derived_editorial_candidates'
                 )
                 """
             ).fetchone()
-            if row is None or row[0] != 6:
+            if row is None or row[0] != 7:
                 raise KernelSchemaMigrationRequiredError(
                     "editorial_schema_migration_required"
                 )
@@ -329,6 +335,9 @@ def build_kernel_components(
         editorial_moments=EditorialMomentService(
             PostgresEditorialMomentRepository(configuration.postgres_dsn),
             kernel.clock,
+        ),
+        editorial_derivation=EditorialDerivationService(
+            PostgresEditorialDerivationRepository(configuration.postgres_dsn), kernel.clock,
         ),
         media_timing_evidence_repository=PostgresMediaTimingEvidenceRepository(
             configuration.postgres_dsn
