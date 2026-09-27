@@ -151,3 +151,4 @@ or architecture document unless those documents are explicitly updated.
 | [Render profile v2: constant output frame rate](render-profile-v2-constant-frame-rate.md) | Completed - Green render profile v2 | StageFlow Rendering / Backend | ADR-0032 amendment 3; ED-0089 |
 | [Production media timing inspection](production-media-timing-inspection.md) | Completed - Green media timing inspection | StageFlow Media Timing / Work Execution / Backend | ADR-0033; ADR-0027; ADR-0032; ED-0090 |
 | [Assembly ordering by Media Timing Evidence](assembly-order-by-timing-evidence.md) | Completed - Green Assembly timing-evidence order | StageFlow Assembly / Media Timing / Backend | Owner decision 2026-09-26 (option A); ADR-0033; ADR-0027; ED-0088; ED-0091 |
+| [Derived Editorial candidates](derived-editorial-candidates.md) | Approved | StageFlow Editorial / Transcription / Media Timing / Backend | Owner decision 2026-09-25; ADR-0033; ADR-0027; ED-0092 |
