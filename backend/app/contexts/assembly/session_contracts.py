@@ -4,6 +4,9 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Literal
 
+from app.contexts.production.media_timing_evidence.contracts import (
+    RecorderProfileQualificationStatus,
+)
 from app.shared.ids import EntityId
 from app.shared.time.validation import require_aware_datetime
 
@@ -142,6 +145,7 @@ class AssemblyTemplate:
 class MediaOrderSource(StrEnum):
     MEDIA_TIMING = "media_timing"
     REGISTRATION_TIME = "registration_time"
+    TIMING_EVIDENCE = "timing_evidence"
 
 
 @dataclass(frozen=True, slots=True)
@@ -153,6 +157,9 @@ class CompletionMember:
     order_source: MediaOrderSource
     # Only legacy invalid revisions may lack a media-timing key.
     order_key_at: datetime | None
+    order_evidence_id: EntityId | None = None
+    order_evidence_revision: int | None = None
+    order_evidence_qualification: RecorderProfileQualificationStatus | None = None
 
     def __post_init__(self) -> None:
         positive(self.association_revision, "association_revision")
@@ -164,7 +171,18 @@ class CompletionMember:
             if self.order_key_at != self.media_started_at:
                 raise ValueError("media_timing order key must equal media_started_at")
         elif self.order_key_at is None:
-            raise ValueError("registration_time requires an order key")
+            raise ValueError(f"{self.order_source.value} requires an order key")
+        evidence = (self.order_evidence_id, self.order_evidence_revision,
+                    self.order_evidence_qualification)
+        if self.order_source == MediaOrderSource.TIMING_EVIDENCE:
+            if any(value is None for value in evidence):
+                raise ValueError("timing_evidence requires all evidence fields")
+            assert self.order_evidence_revision is not None
+            positive(self.order_evidence_revision, "order_evidence_revision")
+            object.__setattr__(self, "order_evidence_qualification",
+                               RecorderProfileQualificationStatus(self.order_evidence_qualification))
+        elif any(value is not None for value in evidence):
+            raise ValueError("evidence fields require timing_evidence")
         if self.media_started_at is not None:
             require_aware_datetime(self.media_started_at, "media_started_at")
 

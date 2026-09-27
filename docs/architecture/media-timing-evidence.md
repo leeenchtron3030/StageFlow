@@ -140,6 +140,15 @@ MTE v1 is advisory evidence. Narrow consumers may display it, align transcript e
 produce Session-boundary proposals or association suggestions, support later Editorial
 timing, and assist diagnostics/qualification.
 
+Assembly now consumes MTE for proposal ordering (ED-0091 / ADR-0033 decision 5).
+Registry `media_started_at` retains priority; otherwise a single
+`creation_time_plus_duration` derivation in the latest active revision supplies the key.
+Missing or ambiguous matching derivations fall through to registration time. The immutable
+Assembly member records the evidence ID, revision and qualification, exposed before human
+approval. Qualification is disclosed, not promoted: even `unqualified` evidence remains
+advisory. Existing revisions and staleness are unaffected by later evidence. Assembly
+performs no evidence or qualification writes.
+
 MTE v1 cannot directly mutate authoritative Session Start, Presentation End, Session
 membership, ADR-0024 association semantics, Package Ready, Package Complete, or any other
 authority-bearing state. Producer Attention remains unchanged by ordinary MTE presence.

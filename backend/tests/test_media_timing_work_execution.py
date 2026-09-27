@@ -373,6 +373,8 @@ def test_migration_0017_refuses_reverse_without_losing_state(
                              (evidence.value, operation.id.value))
             hydrated = repo.get_operation(operation.id)
             assert hydrated.terminal_result_media_timing_evidence_id == evidence
+    # Isolate the refused 0017 reverse from its separately committed successor reversal.
+    PostgresMigrationRunner(dsn).reverse_assembly_timing_evidence_v1()
     before = schema_contract(dsn)
     message = f"cannot reverse 0017: media_timing {branch}"
     with pytest.raises(psycopg.errors.RaiseException, match=message):

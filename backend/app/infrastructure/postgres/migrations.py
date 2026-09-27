@@ -123,6 +123,14 @@ class PostgresMigrationRunner:
             version="0017_media_timing_operation",
         )
 
+        self.apply_assembly_timing_evidence_v1()
+
+    def apply_assembly_timing_evidence_v1(self) -> None:
+        self._execute_if_missing(
+            "0018_assembly_timing_evidence_forward.sql",
+            version="0018_assembly_timing_evidence",
+        )
+
     def reverse_event_mode_kernel_v1(self) -> None:
         self.reverse_demo_vertical_slice_v1()
         self.reverse_transcription_worker_v1()
@@ -216,9 +224,16 @@ class PostgresMigrationRunner:
         )
 
     def reverse_media_timing_operation_v1(self) -> None:
+        self.reverse_assembly_timing_evidence_v1()
         self._execute_if_present(
             "0017_media_timing_operation_reverse.sql",
             version="0017_media_timing_operation",
+        )
+
+    def reverse_assembly_timing_evidence_v1(self) -> None:
+        self._execute_if_present(
+            "0018_assembly_timing_evidence_reverse.sql",
+            version="0018_assembly_timing_evidence",
         )
 
     def _execute(self, filename: str) -> None:
