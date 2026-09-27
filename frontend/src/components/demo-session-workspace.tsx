@@ -29,6 +29,24 @@ function readable(value: string): string {
   return value.replaceAll("_", " ");
 }
 
+function stateSummary(states: string[]): string {
+  const counts = new Map<string, number>();
+  for (const state of states) counts.set(state, (counts.get(state) ?? 0) + 1);
+  return [...counts].map(([state, count]) => `${count} ${readable(state)}`).join(" · ");
+}
+
+function transcriptSummary(workspace?: DemoWorkspace): string {
+  if (!workspace) return "Evidence unavailable";
+  const evidence = workspace.transcript_evidence;
+  if (!evidence.length) return "No Transcription Evidence yet";
+  // Segment text remains available even when the optional word-timing list is capped.
+  const words = evidence.reduce((total, item) => total + item.segments.reduce(
+    (count, segment) => count + (segment.text.trim().match(/\S+/gu)?.length ?? 0), 0,
+  ), 0);
+  const bounded = workspace.transcript_assets_truncated || evidence.some((item) => item.segments_truncated);
+  return `${stateSummary(evidence.map((item) => item.status))} · ${words.toLocaleString("en-US")} words${bounded ? " shown · bounded evidence" : ""}`;
+}
+
 async function responseDetail(response: Response): Promise<string> {
   try {
     const payload = (await response.json()) as { detail?: unknown };
@@ -233,11 +251,11 @@ export function DemoSessionWorkspace({
 
   if (!enabled) return null;
   return (
-    <section className="demo-session-workspace" aria-labelledby="transcription-evidence-title">
+    <section className="demo-session-workspace" aria-labelledby="demo-session-workspace-title">
       <div className="section-heading">
         <div>
           <span className="eyebrow">Trusted Demo LAN · bounded live projection</span>
-          <h2 id="transcription-evidence-title">Transcription Evidence</h2>
+          <h2 id="demo-session-workspace-title">Session workspace</h2>
         </div>
         <span className="advisory-badge">Evidence only · not Session Transcript truth</span>
       </div>
@@ -316,14 +334,13 @@ export function DemoSessionWorkspace({
 
       <div className="demo-work-summary">
         <div><span>Evidence state</span><strong>{loading ? "Refreshing" : workspace ? "Connected" : "Unavailable"}</strong></div>
-        <div><span>Operations</span><strong>{workspace?.operations.length ?? 0}</strong></div>
-        <div><span>Evidence revisions</span><strong>{workspace?.transcript_evidence.length ?? 0}</strong></div>
+        <div><span>Operations</span><strong>{workspace ? stateSummary(workspace.operations.map((operation) => operation.status)) || "No operations" : "Unavailable"}</strong></div>
         <div><span>Declared Moments</span><strong>{workspace?.moments.length ?? 0}</strong></div>
       </div>
 
-      {workspace?.operations.length ? (
+      {workspace?.operations.some((operation) => operation.status !== "succeeded") ? (
         <div className="demo-operation-list" aria-label="Bounded transcription Operations">
-          {workspace.operations.map((operation) => (
+          {workspace.operations.filter((operation) => operation.status !== "succeeded").map((operation) => (
             <article key={operation.operation_id}>
               <strong>{readable(operation.status)}</strong>
               <span>Asset {operation.asset_id.slice(0, 8)}</span>
@@ -339,57 +356,58 @@ export function DemoSessionWorkspace({
         </p>
       ) : null}
 
-      <div className="transcription-evidence-list">
-        {workspace?.transcript_evidence.length ? workspace.transcript_evidence.map((evidence) => (
-          <article className="transcription-evidence-card" key={evidence.evidence_id}>
-            <header>
-              <div>
-                <strong>{evidence.status.toUpperCase()} · evidence r{evidence.revision}</strong>
-                <span>{evidence.language ?? "Language not reported"}</span>
+      <details className="transcription-disclosure">
+        <summary><strong>Transcription Evidence</strong> · {loading ? "Refreshing evidence" : transcriptSummary(workspace)}</summary>
+        <div className="transcription-evidence-list">
+          {workspace?.transcript_evidence.length ? workspace.transcript_evidence.map((evidence) => (
+            <details className="transcription-evidence-card" key={evidence.evidence_id}>
+              <summary>Asset {evidence.asset_id.slice(0, 8)} · {evidence.status} · evidence r{evidence.revision} · {evidence.language ?? "Language not reported"}</summary>
+              <header>
+                <span>{evidence.provider_id} {evidence.provider_version} · {evidence.model_id} {evidence.model_version}</span>
+              </header>
+              {evidence.limitations.length ? <p className="evidence-limitations">{evidence.limitations.join(" · ")}</p> : null}
+              <div className="transcript-segments">
+                {evidence.segments.map((segment) => (
+                  <section key={segment.segment_id}>
+                    <div className="transcript-segment-time">
+                      <span>{formatOffset(segment.asset_start_microseconds)}</span>
+                      <span>→ {formatOffset(segment.asset_end_microseconds)}</span>
+                    </div>
+                    <div>
+                      {segment.speaker_label ? <span className="eyebrow">{segment.speaker_label} · {readable(segment.speaker_evidence_kind ?? "unknown")}</span> : null}
+                      <p>{segment.text}</p>
+                      {segment.words.length ? (
+                        <details>
+                          <summary>Observed word timing · {segment.words.length} shown{segment.words_truncated ? ` of more than ${segment.word_limit}` : ""}</summary>
+                          <div className="transcript-word-list">
+                            {segment.words.map((word) => (
+                              <span key={word.word_id} title={`${formatOffset(word.asset_start_microseconds)}–${formatOffset(word.asset_end_microseconds)}`}>
+                                {word.text}
+                              </span>
+                            ))}
+                          </div>
+                        </details>
+                      ) : null}
+                    </div>
+                  </section>
+                ))}
               </div>
-              <span>{evidence.provider_id} {evidence.provider_version} · {evidence.model_id} {evidence.model_version}</span>
-            </header>
-            {evidence.limitations.length ? <p className="evidence-limitations">{evidence.limitations.join(" · ")}</p> : null}
-            <div className="transcript-segments">
-              {evidence.segments.map((segment) => (
-                <section key={segment.segment_id}>
-                  <div className="transcript-segment-time">
-                    <span>{formatOffset(segment.asset_start_microseconds)}</span>
-                    <span>→ {formatOffset(segment.asset_end_microseconds)}</span>
-                  </div>
-                  <div>
-                    {segment.speaker_label ? <span className="eyebrow">{segment.speaker_label} · {readable(segment.speaker_evidence_kind ?? "unknown")}</span> : null}
-                    <p>{segment.text}</p>
-                    {segment.words.length ? (
-                      <details>
-                        <summary>Observed word timing · {segment.words.length} shown{segment.words_truncated ? ` of more than ${segment.word_limit}` : ""}</summary>
-                        <div className="transcript-word-list">
-                          {segment.words.map((word) => (
-                            <span key={word.word_id} title={`${formatOffset(word.asset_start_microseconds)}–${formatOffset(word.asset_end_microseconds)}`}>
-                              {word.text}
-                            </span>
-                          ))}
-                        </div>
-                      </details>
-                    ) : null}
-                  </div>
-                </section>
-              ))}
+              {evidence.segments_truncated ? <p className="bounded-notice">Bounded view: first {evidence.segment_limit} segments shown.</p> : null}
+            </details>
+          )) : (
+            <div className="operational-empty compact-empty">
+              <strong>No Transcription Evidence yet</strong>
+              <span>Automatic reconciliation handles routine media. Process Media Now is the idempotent fallback.</span>
             </div>
-            {evidence.segments_truncated ? <p className="bounded-notice">Bounded view: first {evidence.segment_limit} segments shown.</p> : null}
-          </article>
-        )) : (
-          <div className="operational-empty compact-empty">
-            <strong>No Transcription Evidence yet</strong>
-            <span>Automatic reconciliation handles routine media. Process Media Now is the idempotent fallback.</span>
-          </div>
-        )}
-      </div>
-      {workspace?.transcript_assets_truncated ? (
-        <p className="bounded-notice">
-          Bounded evidence view: the first {workspace.transcript_asset_limit} Session assets are shown.
-        </p>
-      ) : null}
+          )}
+        </div>
+        {workspace?.transcript_assets_truncated ? (
+          <p className="bounded-notice">
+            Bounded evidence view: the first {workspace.transcript_asset_limit} Session assets are shown.
+          </p>
+        ) : null}
+
+      </details>
 
       {workspace?.moments.length ? (
         <div className="declared-moment-list" aria-label="Declared Editorial Candidate Moments">

@@ -1,11 +1,56 @@
-import { assemblyConsequence, orderingSourceLabel, qualificationLabel, type SessionOutputs } from "../experience/session-outputs.ts";
-import type { AssemblyItem } from "../experience/assembly-api.ts";
+import { assemblyConsequence, memberOrderingLabel, memberOrderSummary, intervalDuration, wallClockLabel, qualificationLabel, type SessionOutputs } from "../experience/session-outputs.ts";
+import type { AssemblyItem, AssemblyMember } from "../experience/assembly-api.ts";
 
 function Unavailable({ section }: { section: string }) {
   return <p role="status">{section} unavailable · Current state cannot be verified. Other Session information remains available. Refresh to try again.</p>;
 }
-function Assembly({ item }: { item: AssemblyItem }) {
+function memberEvidenceLabel(member: AssemblyMember, timing?: SessionOutputs["timing"][number]) {
+  const evidence = timing?.result.state === "available" ? timing.result.value.evidence : null;
+  const sameEvidence = evidence && member.order_evidence_id === evidence.evidence_id && member.order_evidence_revision === evidence.revision;
+  if (evidence) return `${sameEvidence ? `Evidence revision ${evidence.revision} · frozen and latest` : `Latest evidence revision ${evidence.revision}`}${member.order_evidence_revision && !sameEvidence ? ` · Frozen ordering evidence revision ${member.order_evidence_revision}` : ""}`;
+  return `${member.order_evidence_revision ? `Frozen ordering evidence revision ${member.order_evidence_revision} · ` : ""}${timing?.result.state === "unavailable" || !timing ? "Media timing unavailable" : "No timing evidence recorded."}`;
+}
+function Member({ member, index, timing, baseline, evidenceBaseline }: { member: AssemblyMember; index: number; timing?: SessionOutputs["timing"][number]; baseline: string; evidenceBaseline: string }) {
+  const evidence = timing?.result.state === "available" ? timing.result.value.evidence : null;
+  const start = member.media_started_at ?? evidence?.candidate_interval?.started_at
+    ?? (member.order_source === "timing_evidence" ? member.order_key_at : null);
+  const ordering = memberOrderingLabel(member);
+  const sameEvidence = evidence && member.order_evidence_id === evidence.evidence_id && member.order_evidence_revision === evidence.revision;
+  const evidenceLabel = memberEvidenceLabel(member, timing);
+  return <tr>
+    <th scope="row">{index + 1}</th>
+    <td>{wallClockLabel(start)}</td>
+    <td>{intervalDuration(evidence?.candidate_interval)}</td>
+    <td className="member-flags">
+      {ordering !== baseline ? <span className="outputs-qualification">{ordering}</span> : null}
+      {evidenceLabel !== evidenceBaseline ? <span>{evidenceLabel}</span> : null}
+    </td>
+    <td>
+      <details className="diagnostic-details">
+        <summary>Member details</summary>
+        <dl className="outputs-facts">
+          <div><dt>Media ID (select to copy)</dt><dd><code className="copyable-id" tabIndex={0}>{member.asset_id}</code></dd></div>
+          <div><dt>Start (date and zone)</dt><dd>{start ?? "Unknown"}</dd></div>
+          <div><dt>Start source</dt><dd>{member.media_started_at ? "Media start time" : evidence?.candidate_interval ? "Latest Derived candidate interval · advisory only" : member.order_source === "timing_evidence" && start ? "Frozen timing evidence · advisory only" : "Unknown"}</dd></div>
+          <div><dt>Ordering key (wall-clock)</dt><dd>{member.order_key_at ?? "Unavailable"}</dd></div>
+          <div><dt>Ordering source</dt><dd><code>{member.order_source}</code></dd></div>
+        </dl>
+        {evidence && !sameEvidence ? <p>Latest evidence: {qualificationLabel(evidence.qualification)} · advisory only. Latest timing does not replace frozen ordering evidence.</p> : null}
+        {evidence?.limitations.length ? <p>Limitations: {[...new Set(evidence.limitations)].join(" · ")}</p> : null}
+        {evidence?.limitations_truncated ? <p>Additional limitations are not shown.</p> : null}
+      </details>
+    </td>
+  </tr>;
+}
+function Assembly({ item, timing }: { item: AssemblyItem; timing: SessionOutputs["timing"] }) {
   const revision = item.revision;
+  const order = memberOrderSummary(revision.membership);
+  const evidenceCounts = new Map<string, number>();
+  for (const member of revision.membership) {
+    const label = memberEvidenceLabel(member, timing.find((entry) => entry.assetId === member.asset_id));
+    evidenceCounts.set(label, (evidenceCounts.get(label) ?? 0) + 1);
+  }
+  const [evidenceBaseline, evidenceCount] = [...evidenceCounts].sort((a, b) => b[1] - a[1])[0] ?? ["", 0];
   return <>
     <p>{assemblyConsequence(item)}</p>
     <dl className="outputs-facts">
@@ -17,15 +62,16 @@ function Assembly({ item }: { item: AssemblyItem }) {
     </dl>
     {revision.validation.issues.length ? <ul aria-label="Assembly validation issue codes">{revision.validation.issues.map((issue, index) => <li key={index}>{issue.code}{issue.subject ? ` · ${issue.subject}` : ""}</li>)}</ul> : <p>No validation issues reported.</p>}
     <h4>Member order</h4>
-    <p>Frozen proposal order. Recorder timing evidence is advisory; registration time is an ordering fallback, not captured-content time.</p>
-    <ol className="outputs-rows" aria-label="Assembly members in frozen position order">
-      {revision.membership.map((member, index) => <li key={member.asset_id}>
-        <strong>Position {index + 1} · Media {member.asset_id}</strong>
-        <span>Ordering source: {orderingSourceLabel(member.order_source)} <code>({member.order_source})</code></span>
-        <span className="outputs-qualification">{qualificationLabel(member.order_evidence_qualification)}</span>
-        <span>Ordering key (wall-clock): {member.order_key_at ? <time dateTime={member.order_key_at}>{member.order_key_at}</time> : "Unavailable"}{member.order_evidence_revision ? ` · Frozen evidence revision ${member.order_evidence_revision}` : ""}</span>
-      </li>)}
-    </ol>
+    <p>Position · wall-clock start · duration. Frozen proposal order. Recorder timing evidence is advisory; registration time is an ordering fallback, not captured-content time.</p>
+    {revision.membership.length ? <>
+      <p>{order.text} · {evidenceBaseline} ({evidenceCount === revision.membership.length ? "all members" : `${evidenceCount} of ${revision.membership.length} members; exceptions below`})</p>
+      <div className="member-table-scroll">
+        <table className="member-table" aria-label="Assembly members in frozen position order">
+          <thead><tr><th scope="col">Position</th><th scope="col">Start</th><th scope="col">Duration</th><th scope="col">Flags</th><th scope="col">Details</th></tr></thead>
+          <tbody>{revision.membership.map((member, index) => <Member key={member.asset_id} member={member} index={index} timing={timing.find((entry) => entry.assetId === member.asset_id)} baseline={order.baseline} evidenceBaseline={evidenceBaseline} />)}</tbody>
+        </table>
+      </div>
+    </> : null}
     {!revision.membership.length ? <p>No members in this revision.</p> : null}
     <h4>Slot bindings</h4>
     <ul className="outputs-rows" aria-label="Assembly slot bindings">{revision.bindings.map((binding) => <li key={binding.slot_key}>
@@ -35,12 +81,15 @@ function Assembly({ item }: { item: AssemblyItem }) {
   </>;
 }
 export function SessionOutputsPanel({ outputs }: { outputs: SessionOutputs }) {
+  const assembly = outputs.assembly.state === "available" ? outputs.assembly.value : null;
+  const memberIds = new Set(assembly?.revision.membership.map((member) => member.asset_id));
+  const outside = outputs.timing.filter((entry) => !memberIds.has(entry.assetId));
   return <section className="detail-panel outputs-panel" aria-labelledby="session-outputs-title">
     <div className="section-heading"><h2 id="session-outputs-title">Outputs</h2><span>Read-only</span></div>
     {outputs.fixture ? <p><strong>Development fixture · Synthetic outputs · Not production authority</strong></p> : null}
     <div className="outputs-section">
       <h3>Assembly</h3>
-      {outputs.assembly.state === "unavailable" ? <Unavailable section="Assembly" /> : outputs.assembly.value ? <Assembly item={outputs.assembly.value} /> : <p>No Assembly revision proposed for this Session.</p>}
+      {outputs.assembly.state === "unavailable" ? <Unavailable section="Assembly" /> : outputs.assembly.value ? <Assembly item={outputs.assembly.value} timing={outputs.timing} /> : <p>No Assembly revision proposed for this Session.</p>}
     </div>
     <div className="outputs-section">
       <h3>Render operations</h3>
@@ -73,9 +122,9 @@ export function SessionOutputsPanel({ outputs }: { outputs: SessionOutputs }) {
     </div>
     <div className="outputs-section">
       <h3>Media timing</h3>
-      <p>Advisory summaries for Assembly members and bounded recent Session media. Latest evidence can differ from the frozen Assembly evidence. These reads do not establish complete Session membership.</p>
-      {!outputs.timing.length ? <p>No media assets available in this bounded view.</p> : null}
-      <ul className="outputs-rows" aria-label="Media timing per asset">{outputs.timing.map(({ assetId, result }) => <li key={assetId}>
+      {assembly && !outside.length ? <p>{outputs.timingTruncated ? "Assembly members shown above; additional media may be outside this bounded view." : "All Session media in this bounded view is covered by the Assembly."}</p> : <p>{assembly ? "Media outside the Assembly" : "Assembly coverage unavailable"} · bounded recent Session and considered media · advisory only.</p>}
+      {!outputs.timing.length && !assembly ? <p>No media assets available in this bounded view.</p> : null}
+      {outside.length ? <ul className="outputs-rows" aria-label="Media timing outside Assembly">{outside.map(({ assetId, result }) => <li key={assetId}>
         <strong>Media {assetId}</strong>
         {result.state === "unavailable" ? <Unavailable section="Media timing" /> : result.value.evidence ? <>
           <span className="outputs-qualification">{qualificationLabel(result.value.evidence.qualification)}</span>
@@ -84,7 +133,7 @@ export function SessionOutputsPanel({ outputs }: { outputs: SessionOutputs }) {
           {result.value.evidence.limitations.length ? <span>Limitations: {result.value.evidence.limitations.join(" · ")}</span> : null}
           {result.value.evidence.limitations_truncated ? <span>Additional limitations are not shown.</span> : null}
         </> : <span>No timing evidence recorded.</span>}
-      </li>)}</ul>
+      </li>)}</ul> : null}
       {outputs.timingTruncated ? <p>Showing timing for the first 100 assets. Additional assets are not shown.</p> : null}
     </div>
   </section>;

@@ -1,4 +1,6 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
+import { SessionTimingEvidence } from "./session-timing-evidence";
 import { programProviderDisplayName } from "@/experience/program-provider.ts";
 
 import type {
@@ -443,11 +445,13 @@ export function SessionOperationalView({
   workspace,
   demoActorId,
   demoLaunchContext,
+  outputs,
 }: {
   session?: SessionView;
   workspace: OperationalWorkspace;
   demoActorId?: string;
   demoLaunchContext?: string;
+  outputs?: ReactNode;
 }) {
   if (!session) return <><WorkspaceTitle eyebrow="Producer · Session" title="Session unavailable" summary="The requested Session is outside this bounded projection." /><Link className="text-link" href={href("/sessions", workspace)}>Return to Sessions</Link></>;
   return (
@@ -478,13 +482,14 @@ export function SessionOperationalView({
           {session.media.unresolved ? <div className="review-callout"><strong>{session.media.unresolved} unplaced / time unknown</strong><span>Media preserved. Ownership remains unresolved.</span></div> : null}
         </section>
       </div>
+      {outputs}
       <MediaUncertaintyPanel
         assets={workspace.mediaAssets.filter(
           (item) => item.sessionId === session.id || item.consideredSessionIds.includes(session.id),
         )}
         workspace={workspace}
       />
-      <TimingEvidencePanel
+      <SessionTimingEvidence
         evidence={workspace.mediaTimingEvidence.filter(
           (item) =>
             item.sessionId === session.id ||

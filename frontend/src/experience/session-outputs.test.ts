@@ -9,6 +9,11 @@ import ts from "typescript";
 import * as presentation from "./session-outputs.ts";
 import { loadSessionOutputs } from "./session-outputs.server.ts";
 import { getFixtureWorkspace } from "./fixtures.ts";
+import { createReadBudget } from "./read-budget.ts";
+import { loadWorkspace } from "./data-source.ts";
+import type { MediaTimingEvidenceView } from "./model.ts";
+import type { KernelStatusPayload } from "./kernel-adapter.ts";
+import type { DemoSessionWorkspace as DemoWorkspace } from "./demo-api.ts";
 import { fixtureAssembly, fixtureId, fixtureRenderedOutput, fixtureRenderOperation, fixtureTiming, getFixtureSessionOutputs } from "./session-outputs-fixtures.ts";
 const require = createRequire(import.meta.url);
 const source = readFileSync(new URL("../components/session-outputs-panel.tsx", import.meta.url), "utf8");
@@ -20,12 +25,353 @@ const page = { items: [], next_after: null, limit: 100 };
 const eventId = fixtureId(3), sessionId = fixtureId(2);
 const revisions = (items = [fixtureAssembly()]) => ({ ...page, event_id: eventId, session_id: sessionId, items, total_count: items.length, items_truncated: false });
 
+function compileComponent(file: string, imports: Record<string, unknown>) {
+  const source = readFileSync(new URL(file, import.meta.url), "utf8");
+  const compiled = ts.transpileModule(source, { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS } });
+  const exports: Record<string, React.ElementType> = {};
+  runInNewContext(compiled.outputText, { exports, require: (id: string) => imports[id] ?? require(id) });
+  return exports;
+}
+const { SessionTimingEvidence } = compileComponent("../components/session-timing-evidence.tsx", { "../experience/session-outputs.ts": presentation });
+const renderEvidence = (evidence: MediaTimingEvidenceView[], status = "available") => renderToStaticMarkup(React.createElement(SessionTimingEvidence, { evidence, status }));
+
+test("uniform members have one ordering summary, readable labels and collapsed copyable identity", () => {
+  const outputs = getFixtureSessionOutputs();
+  const item = fixtureAssembly();
+  item.revision.membership = Array.from({ length: 11 }, (_, index) => ({ ...item.revision.membership[1], asset_id: fixtureId(index + 100) }));
+  outputs.assembly = { state: "available", value: item };
+  outputs.timing = item.revision.membership.map((member) => ({ assetId: member.asset_id, result: { state: "available", value: { ...fixtureTiming(), asset_id: member.asset_id } } }));
+  const html = render(outputs);
+  assert.match(html, /All 11 members ordered by unqualified recorder timing/);
+  assert.equal((html.match(/unqualified recorder timing/gi) ?? []).length, 1);
+  assert.doesNotMatch(html, /class="outputs-qualification"/);
+  assert.match(html, /<th scope="row">3<\/th><td>12:00:00<\/td><td>1:00<\/td><td class="member-flags"><\/td>/);
+  assert.equal((html.match(/Evidence revision 3 · frozen and latest/g) ?? []).length, 1);
+  assert.match(html, /Evidence revision 3 · frozen and latest \(all members\)/);
+  assert.equal((html.match(/<th scope="row">/g) ?? []).length, 11);
+  for (const label of ["Position", "Start", "Duration", "Flags", "Details"]) assert.ok(html.includes(`<th scope="col">${label}</th>`));
+  assert.match(html, /<summary>Member details<\/summary>.*Media ID \(select to copy\).*class="copyable-id" tabindex="0"/);
+  assert.match(html, /Start \(date and zone\).*2026-09-27T12:00:00Z/);
+  assert.doesNotMatch(html, /<details[^>]*\bopen/);
+  assert.match(html, /All Session media in this bounded view is covered by the Assembly/);
+  assert.doesNotMatch(html, /aria-label="Media timing outside Assembly"/);
+  assert.equal((html.match(new RegExp(fixtureId(102), "g")) ?? []).length, 1);
+});
+
+test("only differing ordering or qualification is flagged, and registration is never a media start", () => {
+  const outputs = getFixtureSessionOutputs();
+  const item = fixtureAssembly();
+  const recorder = item.revision.membership[1];
+  item.revision.membership = [recorder, { ...recorder, asset_id: fixtureId(80) }, { ...recorder, asset_id: fixtureId(81), order_evidence_qualification: "qualified" }, item.revision.membership[2]];
+  outputs.assembly = { state: "available", value: item };
+  const html = render(outputs);
+  assert.match(html, /2 of 4 members ordered by unqualified recorder timing · exceptions flagged below/);
+  assert.equal((html.match(/class="outputs-qualification"/g) ?? []).length, 2);
+  assert.match(html, /Qualified recorder timing/);
+  assert.match(html, /Registration time fallback · qualification not applicable/);
+  assert.match(html, /<th scope="row">4<\/th><td>Start unknown<\/td><td>Duration unknown/);
+  assert.doesNotMatch(html, /qualification not supplied/);
+  assert.equal(presentation.wallClockLabel("2026-09-27T07:48:15-07:00"), "07:48:15");
+  assert.equal(presentation.intervalDuration({ started_at: "2026-09-27T07:48:15-07:00", ended_at: "2026-09-27T14:49:15Z" }), "1:00");
+});
+
+test("folding preserves latest versus frozen evidence and lists only media outside Assembly", () => {
+  const outputs = getFixtureSessionOutputs();
+  const latest = fixtureTiming(); latest.evidence!.revision = 4; latest.evidence!.evidence_id = fixtureId(88);
+  outputs.timing[1].result = { state: "available", value: latest };
+  outputs.timing.push({ assetId: fixtureId(99), result: { state: "unavailable" } });
+  const html = render(outputs);
+  assert.match(html, /Latest evidence revision 4 · Frozen ordering evidence revision 3/);
+  assert.match(html, /Latest timing does not replace frozen ordering evidence/);
+  const outside = html.split('aria-label="Media timing outside Assembly"')[1];
+  assert.ok(outside.includes(fixtureId(99)));
+  assert.ok(!outside.includes(fixtureId(11)));
+  assert.match(outside, /Media timing unavailable/);
+  assert.doesNotMatch(html, /All Session media/);
+  outputs.timing.pop(); outputs.timingTruncated = true;
+  assert.doesNotMatch(render(outputs), /All Session media/);
+  assert.match(render(outputs), /additional media may be outside this bounded view/);
+});
+
+test("evidence summary and cards are collapsed, limitations unique, full tool hash only in detail", () => {
+  const evidence = getFixtureWorkspace("run-004").mediaTimingEvidence[0];
+  const item = { ...evidence, toolLabel: `ffprobe sha256:${"a".repeat(64)}`, limitations: ["One limitation", "One limitation"], observations: [{ kind: "duration", precision: "microseconds", limitations: ["One limitation", "Second limitation"] }] };
+  const html = renderEvidence([item]);
+  assert.match(html, /1 recent asset · all unqualified · advisory only/);
+  assert.equal((html.match(/One limitation/g) ?? []).length, 1);
+  assert.equal((html.match(/Second limitation/g) ?? []).length, 1);
+  assert.equal((html.match(new RegExp("a".repeat(64), "g")) ?? []).length, 1);
+  const summaries = html.match(/<summary>[\s\S]*?<\/summary>/g) ?? [];
+  assert.equal(summaries.length, 2);
+  assert.ok(summaries[1].includes("aaaaaaaaaaaa…"));
+  assert.ok(!summaries[1].includes("a".repeat(64)));
+  assert.doesNotMatch(html, /<details[^>]*\bopen/);
+  assert.match(renderEvidence([item, { ...item, evidenceId: "other", assetId: "other", qualificationStatus: "qualified" }]), /2 recent assets · mixed qualifications/);
+  assert.match(renderEvidence([], "unavailable"), /<summary>.*Timing evidence unavailable<\/span><\/summary>/);
+  assert.match(renderEvidence([]), /No timing evidence in this bounded read/);
+});
+
+test("Session structure puts Outputs immediately after lifecycle and membership, before evidence", () => {
+  const empty = () => null;
+  const { SessionOperationalView } = compileComponent("../components/operational-views.tsx", {
+    "next/link": { default: empty },
+    "@/experience/program-provider.ts": { programProviderDisplayName: () => "Schedule" },
+    "@/experience/presentation.ts": { formatActivityState: () => "Active", formatPackageState: () => "Assembling", authorityActionsEnabled: () => false },
+    "./session-timing-evidence": { SessionTimingEvidence },
+    "./demo-session-workspace": { DemoSessionWorkspace: empty },
+    "./demo-program-refresh-control": { DemoProgramRefreshControl: empty },
+    "./demo-start-session-control": { DemoStartSessionControl: empty },
+    "./mission-control": { AttentionPanel: empty, WorkspaceTitle: empty },
+  });
+  const workspace = getFixtureWorkspace("quiet");
+  const html = renderToStaticMarkup(React.createElement(SessionOperationalView, { workspace, session: workspace.sessions[0], outputs: React.createElement(exports.SessionOutputsPanel!, { outputs: getFixtureSessionOutputs() }) }));
+  assert.ok(html.indexOf("Operational lifecycle") < html.indexOf("Media membership"));
+  assert.match(html, /<\/section><\/div><section class="detail-panel outputs-panel"/);
+  assert.ok(html.indexOf("Outputs") < html.indexOf("Media Timing Evidence"));
+});
+
+test("member flags show differing evidence revision and frozen/latest status only", () => {
+  const outputs = getFixtureSessionOutputs();
+  const item = fixtureAssembly();
+  item.revision.membership = Array.from({ length: 4 }, (_, index) => ({ ...item.revision.membership[1], asset_id: fixtureId(index + 100) }));
+  outputs.assembly = { state: "available", value: item };
+  outputs.timing = item.revision.membership.map((member) => ({ assetId: member.asset_id, result: { state: "available", value: { ...fixtureTiming(), asset_id: member.asset_id } } }));
+  // Same revision number, different identity: it must not be called frozen and latest.
+  const latest = fixtureTiming(); latest.evidence!.evidence_id = fixtureId(88);
+  outputs.timing[2].result = { state: "available", value: latest };
+  outputs.timing[3].result = { state: "unavailable" };
+  const html = render(outputs);
+  assert.equal((html.match(/Evidence revision 3 · frozen and latest/g) ?? []).length, 1);
+  assert.match(html, /2 of 4 members; exceptions below/);
+  const flags = [...html.matchAll(/<td class="member-flags">(.*?)<\/td>/g)].map((match) => match[1]);
+  assert.deepEqual(flags.slice(0, 2), ["", ""]);
+  assert.match(flags[2], /Latest evidence revision 3 · Frozen ordering evidence revision 3/);
+  assert.match(flags[3], /Frozen ordering evidence revision 3 · Media timing unavailable/);
+});
+
+test("bounded timing sample counts unique recent assets without inventing a Session total", () => {
+  const item = getFixtureWorkspace("run-004").mediaTimingEvidence[0];
+  const evidence = Array.from({ length: 8 }, (_, index) => ({ ...item, assetId: fixtureId(100 + index), evidenceId: fixtureId(200 + index) }));
+  evidence.push({ ...evidence[0], evidenceId: fixtureId(300), revision: 2 });
+  const summary = renderEvidence(evidence).match(/<summary>(.*?)<\/summary>/)![1];
+  assert.match(summary, /8 recent assets/);
+  assert.doesNotMatch(summary, /9 recent|of \d+|12 assets/);
+});
+
+function demoWorkspaceFixture(): DemoWorkspace {
+  return {
+    session_id: sessionId, activity_state: "presentation_active", package_state: "assembling", package_revision: 1, revision: 1,
+    label: "Transcription Evidence", authority_notice: "Evidence only",
+    work: { counts: {}, oldest_eligible_at: null, active_lease_count: 0, attention_codes: [] },
+    operations: [], operations_truncated: false, operation_limit: 100,
+    transcript_assets_truncated: false, transcript_asset_limit: 20, moments: [],
+    transcript_evidence: Array.from({ length: 11 }, (_, index) => ({
+      evidence_id: fixtureId(index + 100), operation_id: fixtureId(index + 200), asset_id: fixtureId(index + 300), revision: 1,
+      status: "complete", language: "en", provider_id: "synthetic", provider_version: "1", model_id: "synthetic", model_version: "1",
+      produced_at: "2026-09-27T12:00:00Z", applied_at: "2026-09-27T12:00:00Z", limitations: [], partial_reason: null, failure_reason: null,
+      segments_truncated: false, segment_limit: 100,
+      segments: [{ segment_id: fixtureId(index + 400), ordinal: 0, text: Array(index === 0 ? 146 : 140).fill("synthetic").join(" "),
+        asset_start_microseconds: 0, asset_end_microseconds: 60_000_000, speaker_label: null, speaker_evidence_kind: null,
+        confidence: null, confidence_semantics: null, limitations: [], words: [], words_truncated: false, word_limit: 100 }],
+    })),
+  };
+}
+
+function renderDemo(workspace?: DemoWorkspace, loading = false) {
+  const states = [workspace, loading, undefined, undefined];
+  const { DemoSessionWorkspace } = compileComponent("../components/demo-session-workspace.tsx", {
+    react: { ...React, useState: () => [states.shift(), () => undefined] },
+    "next/navigation": { useRouter: () => ({ refresh() {} }) },
+    "@/experience/demo-api.ts": {}, "@/experience/demo-launch-context.ts": {}, "@/experience/demo-package-approval.ts": {},
+  });
+  return renderToStaticMarkup(React.createElement(DemoSessionWorkspace, {
+    sessionId, sessionTitle: "Synthetic Session", enabled: true, initialActivityState: "presentation_active", initialPackageState: "assembling",
+    initialRevision: 1, initialPackageRevision: 1, mediaAssociated: 11, mediaUnresolved: 0, mediaConflicting: 0,
+  }));
+}
+
+test("transcript summary and every asset use closed native disclosures with segments inside", () => {
+  const html = renderDemo(demoWorkspaceFixture());
+  assert.match(html, /<details class="transcription-disclosure"><summary><strong>Transcription Evidence<\/strong> · 11 complete · 1,546 words<\/summary>/);
+  assert.equal((html.match(/<details class="transcription-evidence-card">/g) ?? []).length, 11);
+  assert.match(html, /<details class="transcription-evidence-card"><summary>Asset .*?<\/summary>.*?class="transcript-segments"/);
+  assert.doesNotMatch(html, /<details[^>]*\bopen/);
+  // Authority controls remain outside the evidence disclosure.
+  for (const label of ["End Presentation", "Process Media Now", "Package Ready", "Approve Package", "Mark Moment"]) {
+    assert.ok(html.indexOf(label) < html.indexOf('<details class="transcription-disclosure">'));
+  }
+});
+
+test("transcript summary discloses partial, failed, empty, loading and bounded evidence", () => {
+  const workspace = demoWorkspaceFixture();
+  workspace.transcript_evidence[0].status = "partial";
+  workspace.transcript_evidence[1].status = "failed";
+  for (const boundedBy of ["assets", "segments"] as const) {
+    workspace.transcript_assets_truncated = boundedBy === "assets";
+    workspace.transcript_evidence[0].segments_truncated = boundedBy === "segments";
+    assert.match(renderDemo(workspace), /1 partial · 1 failed · 9 complete · 1,546 words shown · bounded evidence/);
+  }
+  workspace.transcript_evidence = [];
+  assert.match(renderDemo(workspace), /<summary><strong>Transcription Evidence<\/strong> · No Transcription Evidence yet<\/summary>/);
+  assert.match(renderDemo(), /<summary><strong>Transcription Evidence<\/strong> · Evidence unavailable<\/summary>/);
+  assert.match(renderDemo(undefined, true), /<summary><strong>Transcription Evidence<\/strong> · Refreshing evidence<\/summary>/);
+});
+
+test("operation states are summarized and only non-succeeded operations retain tiles", () => {
+  const workspace = demoWorkspaceFixture();
+  const operation = { operation_id: fixtureId(500), asset_id: "succeeded-asset", status: "succeeded", attempt_count: 1, max_attempts: 3, last_reason_code: null, created_at: "2026-09-27T12:00:00Z", updated_at: "2026-09-27T12:00:00Z" };
+  workspace.operations = Array.from({ length: 11 }, (_, index) => ({ ...operation, operation_id: fixtureId(500 + index) }));
+  let html = renderDemo(workspace);
+  assert.match(html, /<span>Operations<\/span><strong>11 succeeded<\/strong>/);
+  assert.doesNotMatch(html, /class="demo-operation-list"|Asset succeede/);
+  workspace.operations.push(...["queued", "running", "retry_scheduled", "terminal_failed", "cancelled"].map((status, index) => ({ ...operation, status, asset_id: `${status}-asset`, operation_id: fixtureId(600 + index), last_reason_code: "synthetic_reason" })));
+  workspace.operations_truncated = true;
+  html = renderDemo(workspace);
+  assert.match(html, /11 succeeded · 1 queued · 1 running · 1 retry scheduled · 1 terminal failed · 1 cancelled/);
+  const grid = html.split('aria-label="Bounded transcription Operations">')[1].split('</div>')[0];
+  assert.equal((grid.match(/<article>/g) ?? []).length, 5);
+  assert.doesNotMatch(grid, /succeeded|succeede/);
+  assert.match(grid, /Attempt 1 \/ 3/);
+  assert.match(grid, /synthetic reason/);
+  assert.match(html, /Bounded Operation view: at most 100 recent Event operations/);
+  workspace.operations = [];
+  assert.match(renderDemo(workspace), /<span>Operations<\/span><strong>No operations<\/strong>/);
+});
+
+test("shared deadline retains completed sections and stops queued timing reads after eight stalls", async () => {
+  const budget = createReadBudget(30);
+  let count = 0;
+  try {
+    const result = await presentation.readSessionOutputs(eventId, sessionId, Array.from({ length: 100 }, (_, index) => fixtureId(index + 100)), {
+      assembly: async () => revisions([]), rendering: async () => page,
+      timing: () => { count++; return new Promise(() => {}); },
+    }, budget);
+    assert.equal(count, 8);
+    assert.equal(result.timing.length, 100);
+    assert.ok(result.timing.every((entry) => entry.result.state === "unavailable"));
+    assert.equal(result.assembly.state, "available");
+    assert.equal(result.operations.state, "available");
+    assert.equal(budget.signal.aborted, true);
+  } finally { budget.dispose(); }
+});
+
+test("a stalled render read does not block timing; Assembly pagination shares the deadline", async () => {
+  for (const stallAssembly of [false, true]) {
+    const budget = createReadBudget(30);
+    let timingReads = 0, assemblyReads = 0;
+    try {
+      const result = await presentation.readSessionOutputs(eventId, sessionId, [fixtureId(11)], {
+        assembly: async () => {
+          assemblyReads++;
+          if (!stallAssembly) return revisions([]);
+          if (assemblyReads === 1) return revisions([{ ...fixtureAssembly(), current_revision_number: 101 }]);
+          return new Promise(() => {});
+        },
+        rendering: async (path) => path.startsWith("outputs") ? page : new Promise(() => {}),
+        timing: async () => { timingReads++; return fixtureTiming(); },
+      }, budget);
+      assert.equal(result.operations.state, "unavailable");
+      assert.equal(result.outputs.state, "available");
+      assert.equal(result.assembly.state, stallAssembly ? "unavailable" : "available");
+      assert.equal(timingReads, stallAssembly ? 0 : 1);
+      assert.equal(result.timing[0].result.state, stallAssembly ? "unavailable" : "available");
+    } finally { budget.dispose(); }
+  }
+});
+
+test("workspace response bodies and subsequent reads obey the same overall deadline", async () => {
+  const originalFetch = globalThis.fetch;
+  const originalMode = process.env.STAGEFLOW_UI_DATA_MODE;
+  const originalSecret = process.env.STAGEFLOW_API_SHARED_SECRET;
+  process.env.STAGEFLOW_UI_DATA_MODE = "kernel";
+  process.env.STAGEFLOW_API_SHARED_SECRET = "synthetic-budget-test-secret-0123456789";
+  const budget = createReadBudget(30);
+  globalThis.fetch = async () => ({ ok: true, json: () => new Promise(() => {}) }) as Response;
+  try {
+    const workspace = await loadWorkspace({ includeTimingEvidence: true, readBudget: budget });
+    assert.equal(workspace.dataSource.kind, "kernel");
+    assert.equal(workspace.event.ready, false);
+    let calls = 0;
+    const reads = async () => { calls++; return page; };
+    const outputs = await presentation.readSessionOutputs(eventId, sessionId, [], { assembly: reads, rendering: reads, timing: reads }, budget);
+    assert.equal(calls, 0);
+    assert.equal(outputs.assembly.state, "unavailable");
+  } finally {
+    budget.dispose(); globalThis.fetch = originalFetch;
+    if (originalMode === undefined) delete process.env.STAGEFLOW_UI_DATA_MODE; else process.env.STAGEFLOW_UI_DATA_MODE = originalMode;
+    if (originalSecret === undefined) delete process.env.STAGEFLOW_API_SHARED_SECRET; else process.env.STAGEFLOW_API_SHARED_SECRET = originalSecret;
+  }
+});
+
+test("stalled evidence degrades its section while keeping the completed Kernel workspace", async () => {
+  const originalFetch = globalThis.fetch;
+  const originalMode = process.env.STAGEFLOW_UI_DATA_MODE;
+  const originalSecret = process.env.STAGEFLOW_API_SHARED_SECRET;
+  process.env.STAGEFLOW_UI_DATA_MODE = "kernel";
+  process.env.STAGEFLOW_API_SHARED_SECRET = "synthetic-budget-test-secret-0123456789";
+  const payload: KernelStatusPayload = {
+    configured: true, configuration_supplied: true, configuration_valid: true, runtime_composed: true,
+    event_id: eventId, event_key: "synthetic", event_name: "Synthetic Event", database_available: true,
+    ready: true, recovering: false, reconciliation_status: "complete", reconciliation_started_at: null,
+    reconciliation_completed_at: null, stages: [], attention_codes: [], recent_media: [{
+      asset_id: fixtureId(11), candidate_id: fixtureId(50), proposed_asset_id: fixtureId(11), stage_id: fixtureId(51),
+      source_binding_key: "synthetic", registration_state: "registered", discovered_at: "2026-09-27T12:00:00Z",
+      last_observed_at: "2026-09-27T12:00:00Z", association_status: "unresolved", association_authority: null,
+      session_id: null, epistemic_kinds: [], media_started_at: null, media_ended_at: null, diagnostic_codes: [],
+      association_reason_codes: [], association_policy_id: null, association_policy_version: null, association_input_references: [],
+    }],
+  };
+  const budget = createReadBudget(30);
+  let reads = 0;
+  globalThis.fetch = async () => { reads++; return reads === 1 ? Response.json(payload) : new Promise(() => {}); };
+  try {
+    const workspace = await loadWorkspace({ includeTimingEvidence: true, readBudget: budget });
+    assert.equal(reads, 2);
+    assert.equal(workspace.event.id, eventId);
+    assert.equal(workspace.event.ready, true);
+    assert.equal(workspace.mediaTimingEvidenceStatus, "unavailable");
+  } finally {
+    budget.dispose(); globalThis.fetch = originalFetch;
+    if (originalMode === undefined) delete process.env.STAGEFLOW_UI_DATA_MODE; else process.env.STAGEFLOW_UI_DATA_MODE = originalMode;
+    if (originalSecret === undefined) delete process.env.STAGEFLOW_API_SHARED_SECRET; else process.env.STAGEFLOW_API_SHARED_SECRET = originalSecret;
+  }
+});
+
+test("Session page passes one five-second budget through workspace and Outputs loading", async (context) => {
+  context.mock.timers.enable({ apis: ["setTimeout"] });
+  const budget = createReadBudget();
+  context.mock.timers.tick(4_999);
+  assert.equal(budget.signal.aborted, false);
+  context.mock.timers.tick(1);
+  assert.equal(budget.signal.aborted, true);
+  budget.dispose();
+  const pageSource = readFileSync(new URL("../../app/sessions/[sessionId]/page.tsx", import.meta.url), "utf8");
+  const compiledPage = ts.transpileModule(pageSource, { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS } });
+  const pageExports: { default?: (props: unknown) => Promise<React.ReactElement> } = {};
+  let disposed = false, outputRead = false;
+  const pageBudget = { ...createReadBudget(), dispose() { disposed = true; } };
+  const workspace = getFixtureWorkspace("quiet");
+  const empty = () => null;
+  const imports: Record<string, unknown> = {
+    "@/experience/read-budget.ts": { createReadBudget: () => pageBudget },
+    "@/experience/data-source.ts": { loadWorkspace: async (request: { readBudget: unknown }) => { assert.equal(request.readBudget, pageBudget); return workspace; } },
+    "@/experience/session-outputs.server.ts": { loadSessionOutputs: async (_workspace: unknown, id: string, receivedBudget: unknown) => { assert.equal(receivedBudget, pageBudget); assert.equal(id, workspace.sessions[0].id); outputRead = true; return getFixtureSessionOutputs(); } },
+    "@/components/operational-shell": { OperationalShell: empty },
+    "@/components/operational-views": { SessionOperationalView: empty },
+    "@/components/session-outputs-panel": { SessionOutputsPanel: empty },
+  };
+  runInNewContext(compiledPage.outputText, { exports: pageExports, process: { env: {} }, require: (id: string) => imports[id] ?? require(id) });
+  await pageExports.default!({ params: Promise.resolve({ sessionId: workspace.sessions[0].id }), searchParams: Promise.resolve({}) });
+  assert.equal(outputRead, true);
+  assert.equal(disposed, true);
+});
+
 test("real Outputs panel renders frozen position order and all ordering/qualification labels", () => {
   const output = render(getFixtureSessionOutputs());
-  for (const label of ["Outputs", "Read-only", "Development fixture", "Not production authority", "Current revision", "Unqualified recorder timing", "media_timing", "timing_evidence", "registration_time", "Registration time fallback", "Slot bindings", "Latest evidence revision 3", "Advisory only", "SHA-256 prefix:", "aaaaaaaaaaaa", "60.000 seconds", "1799", "version 2", "2026-09-27T12:00:00Z"]) assert.ok(output.includes(label), label);
-  assert.ok(output.indexOf("Position 1") < output.indexOf("Position 2")); assert.ok(output.indexOf("Position 2") < output.indexOf("Position 3"));
+  for (const label of ["Outputs", "Read-only", "Development fixture", "Not production authority", "Current revision", "Unqualified recorder timing", "media_timing", "timing_evidence", "registration_time", "Registration time fallback", "Slot bindings", "Evidence revision 3 · frozen and latest", "advisory", "SHA-256 prefix:", "aaaaaaaaaaaa", "60.000 seconds", "1799", "version 2", "2026-09-27T12:00:00Z"]) assert.ok(output.includes(label), label);
+  assert.ok(output.indexOf('scope="row">1</th>') < output.indexOf('scope="row">2</th>')); assert.ok(output.indexOf('scope="row">2</th>') < output.indexOf('scope="row">3</th>'));
   assert.match(output, /aria-label="Assembly members in frozen position order"/);
-  assert.match(output, /Recorder timing qualification not supplied/);
+  assert.match(output, /qualification not applicable/);
   assert.doesNotMatch(output, /<button|<video|<audio|synthetic-output|synthetic-manifest|content_key|ffmpeg_sha256/);
 });
 test("qualified, rejected, expired and absent qualifications remain distinct text", () => {
@@ -96,7 +442,7 @@ test("legacy invalid Assembly timing stays visible without inventing a timestamp
   outputs.assembly.value.revision.membership[0].order_key_at = null;
   outputs.assembly.value.revision.membership[0].media_started_at = null;
   const html = render(outputs);
-  assert.match(html, /Ordering key \(wall-clock\): Unavailable/);
+  assert.match(html, /Ordering key \(wall-clock\)<\/dt><dd>Unavailable/);
   assert.doesNotMatch(html, /dateTime="null"/);
 });
 

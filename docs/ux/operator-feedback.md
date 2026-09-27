@@ -57,7 +57,7 @@ line; preserve resolved entries as concise evidence rather than deleting them.
   - never rely on colour alone.
 - Recommended smallest change: the five findings below.
 - Classification: Green (presentation and density; no authority or semantic change)
-- Status: implementing (ED-0093)
+- Status: validated (ED-0093)
 
 ### 2026-09-27 - The Outputs panel is buried below the long evidence drill-down
 
@@ -70,7 +70,7 @@ line; preserve resolved entries as concise evidence rather than deleting them.
 - Recommended smallest change: put the Outputs panel directly after the Session's
   lifecycle and media summary, and collapse the evidence drill-down by default.
 - Classification: Green
-- Status: implementing (ED-0093)
+- Status: validated (ED-0093)
 
 ### 2026-09-27 - The media timing evidence drill-down is noisy
 
@@ -89,7 +89,7 @@ line; preserve resolved entries as concise evidence rather than deleting them.
   - show the tool identity as a short hash prefix;
   - keep the full detail behind disclosure.
 - Classification: Green
-- Status: implementing (ED-0093)
+- Status: validated (ED-0093)
 
 ### 2026-09-27 - A repeated per-row warning hides the exceptions
 
@@ -103,7 +103,7 @@ line; preserve resolved entries as concise evidence rather than deleting them.
   members ordered by unqualified recorder timing"), with only differing members flagged
   per row.
 - Classification: Green
-- Status: implementing (ED-0093)
+- Status: validated (ED-0093)
 
 ### 2026-09-27 - Members are identifiable only by UUID
 
@@ -119,7 +119,7 @@ line; preserve resolved entries as concise evidence rather than deleting them.
 
   The UUID moves to a secondary, copyable detail.
 - Classification: Green
-- Status: implementing (ED-0093)
+- Status: validated (ED-0093)
 
 ### 2026-09-27 - Media timing repeats the Assembly member list
 
@@ -131,4 +131,33 @@ line; preserve resolved entries as concise evidence rather than deleting them.
   into the member rows. List separately only media outside the Assembly, such as
   unresolved or unplaced assets.
 - Classification: Green
-- Status: implementing (ED-0093)
+- Status: validated (ED-0093)
+
+### 2026-09-27 - Second scanning pass after the first owner-review changes
+
+- Route/scenario: Session Detail, live-run Session, kernel mode, after the first ED-0093
+  review changes.
+- Category: glance comprehension | prominence
+- Observation (applying the owner's standing scanning rule):
+  - Assembly member rows still take about three lines each, and repeat "Evidence
+    revision 1 · frozen and latest" on all 11.
+  - The Transcription Evidence section expands every transcript segment of every asset,
+    making the page thousands of pixels long.
+  - The collapsed "Media Timing Evidence · 8 assets" does not match the 11 members plus 1
+    unresolved asset shown above it. It is a bounded recent sample.
+  - The transcription operations grid shows 11 identical "succeeded" tiles.
+- Operational consequence: long, uniform content hides the rare exception a worker must
+  act on.
+- Recommended smallest change:
+  - a compact one-line-per-member table, with a shared evidence revision moved to the
+    summary line and only differing values shown per row;
+  - Transcription Evidence collapsed by default behind a summary (count complete, total
+    words), with per-asset disclosure;
+  - a truthful count label for the bounded evidence sample (for example "8 recent of 12");
+  - operations summarized by state ("11 succeeded"), with tiles only for non-succeeded
+    operations.
+- Classification: Green (presentation only; no authority, command, or semantic change)
+- Status: validated (ED-0093)
+- Validation: frontend typecheck and lint passed; all 118 tests passed with each test
+  file run separately using Node's `--test-isolation=none` sandbox workaround. The normal
+  test runner and build worker hit `spawn EPERM`; host test/build checks remain required.
