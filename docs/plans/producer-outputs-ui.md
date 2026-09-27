@@ -339,3 +339,39 @@ Each phase is frontend-only and reverts independently. No data migrations are in
   configuration changes. Frontend production code changed. No dev server was started.
   No new product/architecture decisions remain; full host test/build completion is
   still required. The operator checkpoint is marked `validated (ED-0094)`.
+
+### Phase 2: ED-0094 (2026-09-27)
+
+- **Implemented revision:** branch `codex/ed-0094-assembly-render-actions`: `b4e548b`,
+  with the review fix, then `3839a43` for the checkpoint. Codex implemented it and the
+  owner committed it.
+- **Delivered:**
+  - Propose, approve or reject (with a required reason), and request render, from the
+    Outputs panel. One primary action per state, and confirmations that lead with the
+    consequence and name exceptions.
+  - UUID v4 command IDs, retried with the same ID only after a network failure. A 409
+    refreshes instead of retrying.
+  - The capability command audit log: paired received and result lines sharing a
+    `request_id`, with no secrets, bodies, or free text.
+- **Review:** the `directive-reviewer` returned FIX-FIRST because a rejected or revoked
+  revision left the operator stuck. It now leads to a new proposal.
+- **Live check** on the validation Event:
+  - an approve from the browser succeeded;
+  - a render request from the browser completed on the GPU (58.6 s);
+  - a wrong launch token was refused;
+  - all three were logged as paired audit lines.
+- **Owner checkpoint** (`docs/ux/operator-feedback.md`, "ED-0094 review checkpoint"):
+  - compact render tables showing revision numbers;
+  - the current-revision render state, with a secondary "Request another render";
+  - uniform member values stated once;
+  - Packaging Asset names in slot bindings;
+  - the dialog labelled by its consequence line;
+  - loopback-alias origin equivalence, approved by the owner. It was verified live: a
+    command opened at `127.0.0.1` was accepted.
+- **Tests:** frontend typecheck and lint pass, **183/183 tests pass**, and the build
+  succeeds. No backend change.
+- **Remaining work:**
+  - ED-0095, the Editorial surface. It also redesigns the 31-tile Editorial moments grid.
+  - A Host-header allowlist to guard against DNS rebinding.
+  - Render operations carry no timestamps. If chronological order matters, it needs a
+    backend field.
