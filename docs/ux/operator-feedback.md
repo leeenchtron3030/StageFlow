@@ -201,3 +201,19 @@ line; preserve resolved entries as concise evidence rather than deleting them.
   worker hit `spawn EPERM`. Host test/build completion remains required.
   Independent Codex review approved after the alias check was constrained to the
   original request host, with tests for Next.js normalization of other 127.x.x.x hosts.
+
+### 2026-09-27 - Owner decision: Editorial origin labels
+
+- Route/scenario: `/editorial` review queue and Session Detail moments (ED-0095).
+- Category: terminology | glance comprehension
+- Observation: "Declared" and "Derived" are internal provenance terms. They do not tell a
+  producer at a glance whether a person or StageFlow created the moment.
+- Owner decision: the UI labels the `declared` origin as **Marked** (a person marked the
+  moment) and the `derived` origin as **Suggested** (StageFlow generated it, and it awaits
+  human review). A Suggested row shows its source inline, for example
+  `Suggested · "people"`.
+- Unchanged: the canonical domain, storage, and API values (`declared` / `derived`), and
+  the full provenance under Candidate details.
+- Classification: Green (UI terminology only)
+- Status: captured (to implement in ED-0095)
+
