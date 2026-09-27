@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved
+Completed (2026-09-26).
 
 ## Execution authority
 
@@ -166,4 +166,38 @@ Revert the code and apply the `0018` reverse (only while no member records
 
 ## Completion record
 
-_(Filled in on completion.)_
+- **Implemented revision:** branch `codex/ed-0091-assembly-order-timing`. Codex
+  implemented it in one run with no escalation, and the owner committed it.
+- **Files changed:**
+  - Assembly contracts, resolution, and in-memory repository;
+  - an Assembly-context timing reader port, with an in-memory adapter over the MTE
+    repository and a PostgreSQL reader (one bounded query on the proposal's connection);
+  - the PostgreSQL Assembly repository;
+  - migration registration and additive migration `0018`;
+  - Assembly routes;
+  - `tests/test_assembly_timing_evidence.py`;
+  - the glossary, persistence, capability-layer, and MTE architecture documents.
+- **Existing assertions changed:** only pre-authorized or mechanical changes:
+  - the three new fields added to one exact-keyset API assertion;
+  - `0018` added to the migration-order lists;
+  - a setup-only `0018` reverse before the refused-`0017` snapshot.
+- **Review:** the `directive-reviewer` returned APPROVE. Its non-blocking notes:
+  - the reverse-exactness test takes its baseline after a reverse;
+  - no test checks distinct evidence keys against an independently computed order;
+  - the Assembly contracts now import the pure MTE contracts module for the qualification
+    enum.
+- **Tests:** host full suite **2,477 passed, 0 failed, 2 skipped**; Ruff and Pyright
+  are clean.
+- **Owner step:** the demo database was backed up and migrated to `0018`. A new proposal
+  (revision 2) for the live-run Session **validated with no issues**:
+  - all 11 members are ordered by `timing_evidence`, in exact recording order (segments
+    00000–00010, 60 s apart);
+  - each member records evidence revision 1 and qualification `unqualified`.
+
+  This is the first approvable Assembly revision over real discovered media. It was not
+  approved during this step.
+- **Deviations:** none.
+- **Remaining work:**
+  - ED-0092: derived Editorial candidates.
+  - Optional: stronger reverse-exactness and distinct-key ordering tests.
+  - Recorder-profile qualification, which would upgrade the qualification label.
