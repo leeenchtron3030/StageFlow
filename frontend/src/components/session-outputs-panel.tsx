@@ -1,4 +1,4 @@
-import { assemblyConsequence, memberOrderingLabel, memberOrderSummary, intervalDuration, wallClockLabel, qualificationLabel, type SessionOutputs } from "../experience/session-outputs.ts";
+import { assemblyConsequence, memberOrderingLabel, memberOrderSummary, intervalDuration, wallClockLabel, qualificationLabel, sortedRenderOperations, newestOutputs, outputDuration, type SessionOutputs } from "../experience/session-outputs.ts";
 import type { AssemblyItem, AssemblyMember } from "../experience/assembly-api.ts";
 
 function Unavailable({ section }: { section: string }) {
@@ -10,21 +10,25 @@ function memberEvidenceLabel(member: AssemblyMember, timing?: SessionOutputs["ti
   if (evidence) return `${sameEvidence ? `Evidence revision ${evidence.revision} · frozen and latest` : `Latest evidence revision ${evidence.revision}`}${member.order_evidence_revision && !sameEvidence ? ` · Frozen ordering evidence revision ${member.order_evidence_revision}` : ""}`;
   return `${member.order_evidence_revision ? `Frozen ordering evidence revision ${member.order_evidence_revision} · ` : ""}${timing?.result.state === "unavailable" || !timing ? "Media timing unavailable" : "No timing evidence recorded."}`;
 }
-function Member({ member, index, timing, baseline, evidenceBaseline }: { member: AssemblyMember; index: number; timing?: SessionOutputs["timing"][number]; baseline: string; evidenceBaseline: string }) {
+function memberStart(member: AssemblyMember, timing?: SessionOutputs["timing"][number]) {
   const evidence = timing?.result.state === "available" ? timing.result.value.evidence : null;
-  const start = member.media_started_at ?? evidence?.candidate_interval?.started_at
+  return member.media_started_at ?? evidence?.candidate_interval?.started_at
     ?? (member.order_source === "timing_evidence" ? member.order_key_at : null);
+}
+function Member({ member, index, timing, baseline, evidenceBaseline, columns }: { member: AssemblyMember; index: number; timing?: SessionOutputs["timing"][number]; baseline: string; evidenceBaseline: string; columns: { start: boolean; duration: boolean; flags: boolean } }) {
+  const evidence = timing?.result.state === "available" ? timing.result.value.evidence : null;
+  const start = memberStart(member, timing);
   const ordering = memberOrderingLabel(member);
   const sameEvidence = evidence && member.order_evidence_id === evidence.evidence_id && member.order_evidence_revision === evidence.revision;
   const evidenceLabel = memberEvidenceLabel(member, timing);
   return <tr>
     <th scope="row">{index + 1}</th>
-    <td>{wallClockLabel(start)}</td>
-    <td>{intervalDuration(evidence?.candidate_interval)}</td>
-    <td className="member-flags">
+    {columns.start ? <td>{wallClockLabel(start)}</td> : null}
+    {columns.duration ? <td>{intervalDuration(evidence?.candidate_interval)}</td> : null}
+    {columns.flags ? <td className="member-flags">
       {ordering !== baseline ? <span className="outputs-qualification">{ordering}</span> : null}
       {evidenceLabel !== evidenceBaseline ? <span>{evidenceLabel}</span> : null}
-    </td>
+    </td> : null}
     <td>
       <details className="diagnostic-details">
         <summary>Member details</summary>
@@ -42,7 +46,7 @@ function Member({ member, index, timing, baseline, evidenceBaseline }: { member:
     </td>
   </tr>;
 }
-function Assembly({ item, timing }: { item: AssemblyItem; timing: SessionOutputs["timing"] }) {
+function Assembly({ item, timing, packaging }: { item: AssemblyItem; timing: SessionOutputs["timing"]; packaging: SessionOutputs["packaging"] }) {
   const revision = item.revision;
   const order = memberOrderSummary(revision.membership);
   const evidenceCounts = new Map<string, number>();
@@ -51,6 +55,16 @@ function Assembly({ item, timing }: { item: AssemblyItem; timing: SessionOutputs
     evidenceCounts.set(label, (evidenceCounts.get(label) ?? 0) + 1);
   }
   const [evidenceBaseline, evidenceCount] = [...evidenceCounts].sort((a, b) => b[1] - a[1])[0] ?? ["", 0];
+  const starts = revision.membership.map((member) => wallClockLabel(memberStart(member, timing.find((entry) => entry.assetId === member.asset_id))));
+  const durations = revision.membership.map((member) => {
+    const entry = timing.find((entry) => entry.assetId === member.asset_id);
+    return intervalDuration(entry?.result.state === "available" ? entry.result.value.evidence?.candidate_interval : null);
+  });
+  const columns = {
+    start: new Set(starts).size > 1,
+    duration: new Set(durations).size > 1,
+    flags: revision.membership.some((member) => memberOrderingLabel(member) !== order.baseline) || evidenceCounts.size > 1,
+  };
   return <>
     <p>{assemblyConsequence(item)}</p>
     <dl className="outputs-facts">
@@ -64,59 +78,86 @@ function Assembly({ item, timing }: { item: AssemblyItem; timing: SessionOutputs
     <h4>Member order</h4>
     <p>Position · wall-clock start · duration. Frozen proposal order. Recorder timing evidence is advisory; registration time is an ordering fallback, not captured-content time.</p>
     {revision.membership.length ? <>
-      <p>{order.text} · {evidenceBaseline} ({evidenceCount === revision.membership.length ? "all members" : `${evidenceCount} of ${revision.membership.length} members; exceptions below`})</p>
+      <p>{order.text} · {evidenceBaseline} ({evidenceCount === revision.membership.length ? "all members" : `${evidenceCount} of ${revision.membership.length} members; exceptions below`}){!columns.start ? ` · Start: ${starts[0]} (all members)` : ""}{!columns.duration ? ` · ${durations[0] === "Duration unknown" ? durations[0] : `Duration: ${durations[0]}`} (all members)` : ""}</p>
       <div className="member-table-scroll">
         <table className="member-table" aria-label="Assembly members in frozen position order">
-          <thead><tr><th scope="col">Position</th><th scope="col">Start</th><th scope="col">Duration</th><th scope="col">Flags</th><th scope="col">Details</th></tr></thead>
-          <tbody>{revision.membership.map((member, index) => <Member key={member.asset_id} member={member} index={index} timing={timing.find((entry) => entry.assetId === member.asset_id)} baseline={order.baseline} evidenceBaseline={evidenceBaseline} />)}</tbody>
+          <thead><tr><th scope="col">Position</th>{columns.start ? <th scope="col">Start</th> : null}{columns.duration ? <th scope="col">Duration</th> : null}{columns.flags ? <th scope="col">Flags</th> : null}<th scope="col">Details</th></tr></thead>
+          <tbody>{revision.membership.map((member, index) => <Member key={member.asset_id} member={member} index={index} timing={timing.find((entry) => entry.assetId === member.asset_id)} baseline={order.baseline} evidenceBaseline={evidenceBaseline} columns={columns} />)}</tbody>
         </table>
       </div>
     </> : null}
     {!revision.membership.length ? <p>No members in this revision.</p> : null}
     <h4>Slot bindings</h4>
-    <ul className="outputs-rows" aria-label="Assembly slot bindings">{revision.bindings.map((binding) => <li key={binding.slot_key}>
-      <strong>{binding.slot_key}</strong><span>{binding.outcome.replaceAll("_", " ")}{binding.packaging_revision_id ? ` · Packaging revision ${binding.packaging_revision_id}` : ""}</span>
-    </li>)}</ul>
+    <ul className="outputs-rows" aria-label="Assembly slot bindings">{revision.bindings.map((binding) => {
+      const asset = packaging?.find((asset) => asset.revisionId === binding.packaging_revision_id);
+      return <li key={binding.slot_key}>
+        <strong>{binding.slot_key}</strong><span>{binding.outcome.replaceAll("_", " ")}{binding.packaging_revision_id ? ` · ${asset ? `${asset.name} · ${asset.role.replaceAll("_", " ")}` : "Packaging asset unavailable"}` : ""}</span>
+        {binding.packaging_revision_id ? <details><summary>Packaging details</summary><span>Packaging revision ID: <code className="copyable-id" tabIndex={0}>{binding.packaging_revision_id}</code></span></details> : null}
+      </li>;
+    })}</ul>
     {!revision.bindings.length ? <p>No slot bindings.</p> : null}
   </>;
 }
-export function SessionOutputsPanel({ outputs }: { outputs: SessionOutputs }) {
+export function SessionOutputsPanel({ outputs, actions }: { outputs: SessionOutputs; actions?: import("react").ReactNode }) {
   const assembly = outputs.assembly.state === "available" ? outputs.assembly.value : null;
   const memberIds = new Set(assembly?.revision.membership.map((member) => member.asset_id));
   const outside = outputs.timing.filter((entry) => !memberIds.has(entry.assetId));
+  const revisionLabel = (id: string) => {
+    const number = assembly?.revision.revision_id === id ? assembly.revision.revision_number
+      : outputs.knownRevisions?.find((revision) => revision.revisionId === id)?.number;
+    return number === undefined ? "earlier revision" : `Revision ${number}`;
+  };
   return <section className="detail-panel outputs-panel" aria-labelledby="session-outputs-title">
-    <div className="section-heading"><h2 id="session-outputs-title">Outputs</h2><span>Read-only</span></div>
+    <div className="section-heading"><h2 id="session-outputs-title">Outputs</h2>{actions ? null : <span>Read-only</span>}</div>
     {outputs.fixture ? <p><strong>Development fixture · Synthetic outputs · Not production authority</strong></p> : null}
     <div className="outputs-section">
       <h3>Assembly</h3>
-      {outputs.assembly.state === "unavailable" ? <Unavailable section="Assembly" /> : outputs.assembly.value ? <Assembly item={outputs.assembly.value} timing={outputs.timing} /> : <p>No Assembly revision proposed for this Session.</p>}
+      {actions}
+      {outputs.assembly.state === "unavailable" ? <Unavailable section="Assembly" /> : outputs.assembly.value ? <Assembly item={outputs.assembly.value} timing={outputs.timing} packaging={outputs.packaging} /> : <p>No Assembly revision proposed for this Session.</p>}
     </div>
     <div className="outputs-section">
       <h3>Render operations</h3>
       {outputs.operations.state === "unavailable" ? <Unavailable section="Render operations" /> : <>
         {!outputs.operations.value.items.length ? <p>No render operations reported for this Session.</p> : null}
-        <ul className="outputs-rows" aria-label="Render operations">{outputs.operations.value.items.map((operation) => <li key={operation.operation_id}>
-          <strong>Render {operation.operation_id}</strong><span>State: {operation.state.replaceAll("_", " ")} · Attempts: {operation.attempt_count}</span>
-          <span>Profile {operation.profile_id} · version {operation.profile_version}</span>
-          <span>Assembly revision {operation.assembly_revision_id}</span>
-          {operation.reason_code ? <span>Reason: {operation.reason_code}</span> : null}
-        </li>)}</ul>
+        {outputs.operations.value.items.length ? <>
+          <p>In-flight first, then succeeded, then failed or other states. Order within each group is unchanged; operation times are unavailable.</p>
+          <div className="member-table-scroll"><table className="member-table" aria-label="Render operations">
+            <thead><tr><th scope="col">State</th><th scope="col">Profile version</th><th scope="col">Assembly revision</th><th scope="col">Details</th></tr></thead>
+            <tbody>{sortedRenderOperations(outputs.operations.value.items).map((operation) => <tr key={operation.operation_id}>
+              <th scope="row">{operation.state.replaceAll("_", " ")}{operation.reason_code ? ` · ${operation.reason_code}` : ""}</th>
+              <td>version {operation.profile_version}</td><td>{revisionLabel(operation.assembly_revision_id)}</td>
+              <td><details><summary>Operation details</summary><dl className="outputs-facts">
+                <div><dt>Operation ID</dt><dd><code className="copyable-id" tabIndex={0}>{operation.operation_id}</code></dd></div>
+                <div><dt>Assembly revision ID</dt><dd><code>{operation.assembly_revision_id}</code></dd></div>
+                <div><dt>Profile ID</dt><dd>{operation.profile_id}</dd></div>
+                <div><dt>Attempts</dt><dd>{operation.attempt_count}</dd></div>
+                {operation.rendered_output_id ? <div><dt>Output ID</dt><dd><code>{operation.rendered_output_id}</code></dd></div> : null}
+              </dl></details></td>
+            </tr>)}</tbody>
+          </table></div>
+        </> : null}
         {outputs.operations.value.truncated ? <p>Showing the first 100 render operations. More operations exist.</p> : null}
       </>}
     </div>
     <div className="outputs-section">
       <h3>Rendered Outputs</h3>
-      <p>Recorded outputs may belong to earlier Assembly revisions.</p>
+      <p>Newest produced time first within this bounded read. Recorded outputs may belong to earlier Assembly revisions.</p>
       {outputs.outputs.state === "unavailable" ? <Unavailable section="Rendered Outputs" /> : <>
         {!outputs.outputs.value.items.length ? <p>No Rendered Outputs reported for this Session.</p> : null}
-        <ul className="outputs-rows" aria-label="Rendered Outputs">{outputs.outputs.value.items.map((output) => <li key={output.output_id}>
-          <strong>Output {output.output_id}</strong>
-          <span>Profile {output.profile_id} · version {output.profile_version}</span>
-          <span>Duration: {(output.duration_microseconds / 1000000).toFixed(3)} seconds · Frames: {output.frame_count}</span>
-          <span>SHA-256 prefix: <code>{output.sha256}</code></span>
-          <span>Produced (wall-clock): <time dateTime={output.produced_at}>{output.produced_at}</time></span>
-          <span>Assembly revision {output.assembly_revision_id}</span>
-        </li>)}</ul>
+        {outputs.outputs.value.items.length ? <div className="member-table-scroll"><table className="member-table" aria-label="Rendered Outputs">
+          <thead><tr><th scope="col">State</th><th scope="col">Profile version</th><th scope="col">Assembly revision</th><th scope="col">Duration / frames</th><th scope="col">Produced time</th><th scope="col">Details</th></tr></thead>
+          <tbody>{newestOutputs(outputs.outputs.value.items).map((output) => <tr key={output.output_id}>
+            <th scope="row">Produced</th><td>version {output.profile_version}</td><td>{revisionLabel(output.assembly_revision_id)}</td>
+            <td>{outputDuration(output)} · {output.frame_count} frames</td>
+            <td><time dateTime={output.produced_at}>{output.produced_at}</time></td>
+            <td><details><summary>Output details</summary><dl className="outputs-facts">
+              <div><dt>Output ID</dt><dd><code className="copyable-id" tabIndex={0}>{output.output_id}</code></dd></div>
+              <div><dt>Assembly revision ID</dt><dd><code>{output.assembly_revision_id}</code></dd></div>
+              <div><dt>Profile ID</dt><dd>{output.profile_id}</dd></div>
+              <div><dt>SHA-256 prefix:</dt><dd><code>{output.sha256.slice(0, 12)}</code></dd></div>
+            </dl></details></td>
+          </tr>)}</tbody>
+        </table></div> : null}
         {outputs.outputs.value.truncated ? <p>Showing the first 100 Rendered Outputs. More outputs exist.</p> : null}
       </>}
     </div>

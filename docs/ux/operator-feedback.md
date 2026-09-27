@@ -161,3 +161,43 @@ line; preserve resolved entries as concise evidence rather than deleting them.
 - Validation: frontend typecheck and lint passed; all 118 tests passed with each test
   file run separately using Node's `--test-isolation=none` sandbox workaround. The normal
   test runner and build worker hit `spawn EPERM`; host test/build checks remain required.
+
+### 2026-09-27 - ED-0094 review checkpoint: action screens
+
+- Route/scenario: Session Detail, validation Session, kernel mode. A live approve and a
+  live render request were made through the UI; the render completed on the GPU.
+- Category: glance comprehension | authority action | ergonomics
+- Observation and owner-approved changes:
+  1. Render operations and Rendered Outputs are four-line blocks headed by long UUIDs.
+     Change: one compact table, newest first, with state, profile version, Assembly
+     revision *number*, duration or frames, and produced time. IDs go in details.
+  2. "Request render" stays the primary action when a render for the current revision is
+     already pending or has succeeded. Change: show the render state for the current
+     revision ("Render pending", "succeeded", or "failed"). Re-rendering becomes a
+     deliberate secondary action.
+  3. "Duration unknown" repeats on every row. Change: when it is uniform, state it once in
+     the summary and hide the column.
+  4. Slot bindings show packaging revision UUIDs. Change: show the Packaging Asset name
+     and role from the existing packaging read, with the ID in details.
+  5. The confirmation dialog repeats its heading under the consequence line. Change:
+     remove the redundant heading.
+  6. Opening the UI at `127.0.0.1` makes every command (Demo and capability) fail as
+     `cross_site`, because the same-origin check compares text literally against
+     `localhost`. Owner decision: treat `localhost`, `127.0.0.1` and `[::1]` on the same
+     scheme and port as one origin. The check stays loopback-only, is tested explicitly,
+     and has no other change.
+- Classification: Green (items 1–5, presentation). Item 6 changes the same-origin check.
+  The owner approved it explicitly on 2026-09-27, bounded to loopback aliases.
+- Owner clarification for items 1–2: operations have no timestamp. Group them stably by
+  state (pending/leased/running, then succeeded, then failed/other), without claiming
+  chronology. Sort Rendered Outputs by `produced_at`, newest first within the bounded
+  read. For the current revision, in-flight takes precedence over succeeded (with the
+  newest matching output), then failed. This is frontend presentation only.
+- Status: validated (ED-0094)
+- Validation: 183/183 frontend tests passed with each file run separately using
+  `node --import ./src/experience/server-test-runtime.ts --test --test-isolation=none`.
+  Typecheck, lint and whitespace checks passed. The normal runner failed to spawn all
+  15 test-file workers (`EPERM`); the build compiled successfully, then its TypeScript
+  worker hit `spawn EPERM`. Host test/build completion remains required.
+  Independent Codex review approved after the alias check was constrained to the
+  original request host, with tests for Next.js normalization of other 127.x.x.x hosts.

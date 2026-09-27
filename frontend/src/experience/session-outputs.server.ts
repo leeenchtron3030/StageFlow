@@ -10,6 +10,7 @@ export async function loadSessionOutputs(workspace: OperationalWorkspace, sessio
   return readSessionOutputs(workspace.event.id ?? "", sessionId,
     workspace.mediaAssets.filter((asset) => (asset.sessionId === sessionId || asset.consideredSessionIds.includes(sessionId)) && asset.assetId).map((asset) => asset.assetId!), {
       assembly: (path) => readCapability("assembly", path),
+      packaging: (path) => readCapability("assembly", path),
       rendering: (path) => readCapability("rendering", path),
       timing: (path) => readCapability("media-timing", path),
     }, budget);

@@ -1,5 +1,6 @@
 import "server-only";
-import { createHash, timingSafeEqual } from "node:crypto";
+import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
+import { isIP } from "node:net";
 import type { NextRequest } from "next/server";
 
 import { demoLaunchContextHeader } from "./demo-launch-context.ts";
@@ -49,10 +50,19 @@ function noStoreHeaders(contentType = "application/json"): Headers {
 function isSameOriginCommand(request: NextRequest): boolean {
   const origin = request.headers.get("origin");
   const fetchSite = request.headers.get("sec-fetch-site");
-  return (
-    (origin === null || origin === request.nextUrl.origin) &&
-    fetchSite !== "cross-site"
-  );
+  if (fetchSite === "cross-site") return false;
+  if (origin === null || origin === request.nextUrl.origin) return true;
+  const loopback = new Set(["localhost", "127.0.0.1", "[::1]"]);
+  try {
+    // NextRequest.url and nextUrl normalize other 127.x.x.x hosts to localhost.
+    // The native Request URL retains the authority needed to bound this exception.
+    const own = new URL(Reflect.get(Request.prototype, "url", request) as string);
+    if (!loopback.has(own.hostname)) return false;
+    const supplied = new URL(origin);
+    // Only serialized origins qualify: no credentials, paths, queries or fragments.
+    return origin === supplied.origin && loopback.has(supplied.hostname) &&
+      supplied.protocol === own.protocol && supplied.port === own.port;
+  } catch { return false; }
 }
 
 function currentApiSecret(): string | undefined {
@@ -176,6 +186,17 @@ export async function proxy(
   method: string,
   capability: Capability = "demo",
 ): Promise<Response> {
+  if (capability === "demo" || method !== "POST") return proxyTransport(request, segments, method, capability);
+  const audit = capabilityAudit(request, segments, method, capability);
+  const response = await proxyTransport(request, segments, method, capability, audit);
+  await audit.finish(response);
+  return response;
+}
+
+async function proxyTransport(
+  request: NextRequest, segments: string[], method: string, capability: Capability,
+  audit?: ReturnType<typeof capabilityAudit>,
+): Promise<Response> {
   const record = capability === "demo" ? recordProtectedRequest : () => undefined;
   const path = segments.join("/");
   const authorityCommand = method === "POST" && commandPaths.has(path);
@@ -221,6 +242,7 @@ export async function proxy(
         { status: 413, headers: noStoreHeaders() },
       );
     }
+    audit?.body(body);
     const launchContextValid = launchContextMatches(
       request.headers.get(demoLaunchContextHeader),
     );
@@ -259,6 +281,7 @@ export async function proxy(
   }
 
   try {
+    audit?.received("accepted");
     const upstream = await fetch(upstreamUrl(capability, path, request.nextUrl.search), {
       method,
       body,
@@ -271,6 +294,7 @@ export async function proxy(
         ...(method === "POST" ? { "Content-Type": "application/json" } : {}),
       },
     });
+    if (audit) audit.backendStatus = upstream.status;
     let payload: ArrayBuffer;
     try {
       payload = capability === "demo" ? await upstream.arrayBuffer() : await boundedBody(upstream, maximumResponseBytes);
@@ -300,6 +324,84 @@ export async function proxy(
       { status: 503, headers: noStoreHeaders() },
     );
   }
+}
+
+/** Explicit field selection: no bodies, free text, raw paths, or exception messages. */
+function capabilityAudit(request: NextRequest, segments: string[], method: string, capability: Exclude<Capability, "demo">) {
+  const started = performance.now();
+  const requestId = randomUUID();
+  const secret = currentApiSecret();
+  const safe = (value: string) => !secret || !value.includes(secret);
+  const ids = (value: unknown, fields: readonly string[]) => {
+    const object = value && typeof value === "object" ? value as Record<string, unknown> : {};
+    return Object.fromEntries(fields.flatMap((field) => {
+      const id = object[field];
+      return typeof id === "string" && uuidPattern.test(id) && safe(id) ? [[field, id]] : [];
+    }));
+  };
+  const resourceFields = ["event_id", "stage_id", "session_id", "asset_id", "packaging_asset_id", "template_id", "assembly_revision_id", "revision_id", "moment_id", "phrase_list_id"];
+  const pathFields: Record<string, string> = { events: "event_id", sessions: "session_id", assets: "asset_id", "packaging-assets": "packaging_asset_id", moments: "candidate_moment_id" };
+  const matched = capabilityRoutes[capability].find((entry) => entry.method === method && entry.path.test(segments.join("/")));
+  const resources: Record<string, string | string[]> = {};
+  // Only extract resources from matched routes, never from an arbitrary refused path.
+  if (matched) segments.forEach((segment, index) => {
+    const field = pathFields[segments[index - 1]];
+    if (field && uuidPattern.test(segment) && safe(segment)) resources[field] = segment;
+  });
+  let identity: Record<string, string> = {};
+  let reasonPresent = false, reasonLength = 0, received = false;
+  const address = boundedClientAddress(request);
+  const write = (fields: Record<string, unknown>) => console.info("stageflow_capability_command=" + JSON.stringify({
+    timestamp: new Date().toISOString(), request_id: requestId, ...fields,
+  }));
+  const audit = {
+    backendStatus: null as number | null,
+    body(body: string) {
+      try {
+        const value = JSON.parse(body);
+        identity = ids(value, ["command_id", "operation_id"]);
+        // Route scope wins over any contradictory browser-supplied body scope.
+        for (const [key, id] of Object.entries(ids(value, resourceFields))) resources[key] ??= id;
+        if (value?.content?.kind === "completed_media_asset") Object.assign(resources, ids(value.content, ["asset_id"]));
+        if (Array.isArray(value?.explicit)) {
+          resources.packaging_revision_ids = value.explicit.flatMap((binding: unknown) => Object.values(ids(binding, ["packaging_revision_id"])));
+        }
+        reasonPresent = typeof value?.reason === "string";
+        reasonLength = reasonPresent ? value.reason.length : 0;
+      } catch { /* Malformed commands have no safely extracted identity. */ }
+    },
+    received(disposition: string) {
+      if (received) return;
+      received = true;
+      write({ phase: "received", capability, method, route_pattern: matched?.path.source ?? null,
+        resource_ids: resources, command_id: identity.command_id ?? null, operation_id: identity.operation_id ?? null,
+        launch_context_fingerprint: launchContextFingerprint(currentLaunchContext()),
+        launch_context_valid: launchContextMatches(request.headers.get(demoLaunchContextHeader)),
+        producer_proxy_client_address: isIP(address) && safe(address) ? address : "unavailable",
+        disposition, reason_present: reasonPresent, reason_length: reasonLength });
+    },
+    async finish(response: Response) {
+      let value: unknown;
+      try { value = await response.clone().json(); } catch { /* Non-JSON upstream response. */ }
+      const detail = value && typeof value === "object" && "detail" in value ? value.detail : undefined;
+      const code = typeof detail === "string" && /^[a-z][a-z0-9_]{0,95}$/.test(detail) && safe(detail) ? detail : `http_${response.status}`;
+      // Existing operator/JSON refusals fit not_allowed; preserve their bounded result code.
+      const refusal = code.endsWith("_origin_not_allowed") ? "cross_site"
+        : code.endsWith("_launch_context_invalid") ? "launch_context"
+        : code.endsWith("_command_too_large") ? "too_large"
+        : code.endsWith("_api_authentication_unavailable") ? "secret_unavailable" : "not_allowed";
+      audit.received(refusal);
+      const object = value && typeof value === "object" ? value as Record<string, unknown> : {};
+      write({ phase: "result", backend_status: audit.backendStatus, status: response.status,
+        outcome: response.ok ? "succeeded" : response.status >= 400 && response.status < 500 ? "rejected" : "failed",
+        error_code: response.ok ? null : code, duration_ms: Math.max(0, Math.round(performance.now() - started)),
+        ...ids(value, ["revision_id", "decision_id", "operation_id", "template_id", "packaging_asset_id", "override_id", "review_id", "clip_id", "run_id", "output_id", "phrase_list_id"]),
+        ...ids(object.decision, ["review_decision_id", "operation_id"]), ...ids(object.clip, ["clip_id"]),
+        ...(Array.isArray(object.candidate_ids) ? { candidate_ids: object.candidate_ids.filter((id) => typeof id === "string" && uuidPattern.test(id) && safe(id)) } : {}),
+      });
+    },
+  };
+  return audit;
 }
 
 export type Capability = "demo" | "assembly" | "rendering" | "editorial" | "media-timing";

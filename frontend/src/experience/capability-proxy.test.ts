@@ -5,6 +5,7 @@ import * as assembly from "../../app/api/stageflow/assembly/[...path]/route.ts";
 import * as rendering from "../../app/api/stageflow/rendering/[...path]/route.ts";
 import * as editorial from "../../app/api/stageflow/editorial/[...path]/route.ts";
 import * as timing from "../../app/api/stageflow/media-timing/[...path]/route.ts";
+import * as demo from "../../app/api/stageflow/demo/[...path]/route.ts";
 import { readCapability } from "./capability-proxy.server.ts";
 import { demoLaunchContextHeader } from "./demo-launch-context.ts";
 
@@ -135,3 +136,56 @@ test("server-side capability reads use the same allowlist and retain query param
   assert.deepEqual(await readCapability("rendering", `outputs?event_id=${id}&session_id=${id}`), { items: [] });
   await assert.rejects(readCapability("rendering", "requests"));
 });
+
+for (const entry of [
+  ...cases.map((entry) => ({ name: entry.name, handler: entry.handlers.GET, method: "GET", path: entry.reads[0] })),
+  { name: "rendering", handler: rendering.POST, method: "POST", path: "requests" },
+  { name: "demo", handler: demo.POST, method: "POST", path: "sessions/start" },
+]) {
+  test(`${entry.name} ${entry.method}: loopback alias matrix preserves origin restrictions`, async () => {
+    let calls = 0;
+    globalThis.fetch = async () => { calls++; return Response.json({ accepted: true }); };
+    async function check(own: string, origin: string | null, expected: number, fetchSite = "same-origin") {
+      const headers: Record<string, string> = { "sec-fetch-site": fetchSite, [demoLaunchContextHeader]: launch };
+      if (origin !== null) headers.origin = origin;
+      const request = new NextRequest(`${own}/api/stageflow/${entry.name}/${entry.path}`, {
+        method: entry.method, headers, ...(entry.method === "POST" ? { body: "{}" } : {}),
+      });
+      const before = calls;
+      const response = await entry.handler(request, context(entry.path));
+      assert.equal(response.status, expected, `${own} <- ${origin} (${fetchSite})`);
+      assert.equal(calls - before, expected === 200 ? 1 : 0);
+      assert.doesNotMatch(await response.text(), new RegExp(secret));
+    }
+    for (const own of ["localhost", "127.0.0.1", "[::1]"]) {
+      for (const supplied of ["localhost", "127.0.0.1", "[::1]"]) {
+        await check(`http://${own}:3000`, `http://${supplied}:3000`, 200);
+        await check(`https://${own}:3000`, `https://${supplied}:3000`, 200);
+        await check(`http://${own}:3000`, `http://${supplied}:3001`, 403);
+        await check(`http://${own}:3000`, `https://${supplied}:3000`, 403);
+        await check(`https://${own}:3000`, `http://${supplied}:3000`, 403);
+        await check(`http://${own}:3000`, `http://${supplied}:3000`, 403, "cross-site");
+      }
+      for (const origin of ["http://producer.local:3000", "http://localhost.evil:3000", "null", "garbage", "http://user@localhost:3000", "http://localhost:3000/path", "http://localhost:3000?x=1"]) {
+        await check(`http://${own}:3000`, origin, 403);
+      }
+      await check(`http://${own}:3000`, null, 200);
+      await check(`http://${own}:3000`, null, 403, "cross-site");
+      await check("http://producer.local:3000", `http://${own}:3000`, 403);
+    }
+    await check("http://producer.local:3000", "http://producer.local:3000", 200);
+    for (const origin of ["http://other.local:3000", "http://PRODUCER.local:3000", "http://producer.local:3001", "https://producer.local:3000", "null"]) {
+      await check("http://producer.local:3000", origin, 403);
+    }
+    await check("http://producer.local:3000", null, 200);
+    await check("http://producer.local:3000", "http://producer.local:3000", 403, "cross-site");
+    // NextURL normalizes these unapproved request hosts to localhost; they must
+    // not acquire the new alias exception. Historical exact/null behavior stays.
+    for (const own of ["127.0.0.2", "127.1.2.3"]) {
+      await check(`http://${own}:3000`, "http://127.0.0.1:3000", 403);
+      await check(`http://${own}:3000`, "http://[::1]:3000", 403);
+      await check(`http://${own}:3000`, "http://localhost:3000", 200);
+      await check(`http://${own}:3000`, null, 200);
+    }
+  });
+}
