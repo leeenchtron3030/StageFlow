@@ -38,6 +38,16 @@ Rendering, publication, and delivery remain outside that review foundation
 
 ## Current runtime components
 
+The optional CPU media timing worker (`python -m app.demo.media_timing_worker`) inspects
+registered media through the Kernel media path resolver and an operator-installed LGPL
+ffprobe. It defaults to two concurrent leases on the shared Work Execution substrate.
+`[local_media_timing]` is absent/disabled by default. Enabled Demo reconciliation enqueues
+newly registered assets; a bounded human command can enqueue existing Event assets.
+Authenticated operation pages and latest per-asset summaries expose advisory MTE only.
+Creation time and measured duration never acquire registry, Session, association,
+membership, package, or recorder-qualification authority. The binary stays external to
+the repository and distribution, and inspection permits only local-file protocols.
+
 The optional local render worker (`python -m app.demo.render_worker`) is a separate
 process in the same modular monolith. It claims one render operation at a time through
 the shared Work Execution journal, resolves pinned Assembly inputs, executes an explicitly

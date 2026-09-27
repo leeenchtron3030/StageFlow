@@ -1194,7 +1194,18 @@ class PostgresWorkExecutionRepository[
                             "WHERE operation_id = %s",
                             (str(row["operation_id"]),),
                         ).fetchone()
-                    has_result = evidence is not None or rendered is not None
+                    timing = None
+                    if row["operation_kind"] == "media_timing":
+                        timing = connection.execute(
+                            "SELECT a.evidence_id "
+                            "FROM stageflow.media_timing_evidence_application a "
+                            "JOIN stageflow.media_timing_evidence e USING (evidence_id) "
+                            "WHERE a.operation_id=%s AND e.asset_id=%s AND e.manifest_id=%s "
+                            "AND e.manifest_version=%s",
+                            (str(row["operation_id"]), str(row["asset_id"]),
+                             str(row["manifest_id"]), row["manifest_version"]),
+                        ).fetchone()
+                    has_result = evidence is not None or rendered is not None or timing is not None
                     attempt_id = row["current_attempt_id"]
                     if attempt_id is not None:
                         connection.execute(
@@ -1229,7 +1240,19 @@ class PostgresWorkExecutionRepository[
                                 str(attempt_id),
                             ),
                         )
-                    if rendered is not None:
+                    if timing is not None:
+                        updated = connection.execute(
+                            """UPDATE stageflow.work_operation
+                               SET operation_status='succeeded', current_attempt_id=NULL,
+                                   lease_owner_worker_id=NULL, lease_expires_at=NULL,
+                                   terminal_result_type='media_timing_evidence',
+                                   terminal_result_media_timing_evidence_id=%s,
+                                   last_reason_code='result_reconciled',
+                                   row_revision=row_revision+1, updated_at=statement_timestamp()
+                               WHERE operation_id=%s RETURNING *""",
+                            (str(timing["evidence_id"]), str(row["operation_id"])),
+                        ).fetchone()
+                    elif rendered is not None:
                         updated = connection.execute(
                             """
                             UPDATE stageflow.work_operation

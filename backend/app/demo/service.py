@@ -9,6 +9,10 @@ from uuid import NAMESPACE_URL, uuid5
 from app.bootstrap.event_mode_kernel import KernelComponents
 from app.contexts.production.event_mode_kernel.contracts import AssociationStatus
 from app.contexts.production.event_mode_kernel.repository import KernelNotFoundError
+from app.contexts.production.media_timing_evidence.enqueue import (
+    MediaTimingEnqueue,
+    RegisteredTimingAsset,
+)
 from app.contexts.work_execution import (
     DurableOperation,
     EnqueueTranscriptionOperation,
@@ -18,6 +22,9 @@ from app.contexts.work_execution import (
     WorkExecutionStorageUnavailableError,
 )
 from app.infrastructure.postgres import PostgresWorkExecutionRepository
+from app.infrastructure.postgres.media_timing_work_repository import (
+    PostgresMediaTimingWorkRepository,
+)
 from app.shared.ids import EntityId
 from app.shared.time import require_aware_datetime
 
@@ -96,6 +103,26 @@ class DemoApplication:
             event_id=event.id,
             scope=request.scope,
         )
+        local_timing = self.components.configuration.deployment.local_media_timing
+        timing_failures: list[str] = []
+        if local_timing is not None and local_timing.enabled:
+            timing = MediaTimingEnqueue(
+                PostgresMediaTimingWorkRepository(self.components.configuration.postgres_dsn),
+                self.components.configuration.deployment.deployment_id,
+                self.components.kernel.clock,
+            )
+            for outcome in cycle.candidate_results:
+                if outcome.outcome == "registered":
+                    candidate = self.components.repository.get_candidate(outcome.candidate_id)
+                    asset = (None if candidate is None else
+                             self.components.repository.get_asset(candidate.proposed_asset_id))
+                    if asset is not None:
+                        try:
+                            timing.enqueue(event.id, RegisteredTimingAsset(
+                                asset.id, asset.manifest_id, asset.registered_at,
+                            ))
+                        except (ValueError, RuntimeError):
+                            timing_failures.append("media_timing_enqueue_failed")
         transcription = self.components.configuration.deployment.local_transcription
         if transcription is None:
             raise RuntimeError("local_transcription_not_configured")
@@ -116,7 +143,7 @@ class DemoApplication:
             if isinstance(operation.input, TranscriptionOperationInput)
         }
         operations: list[DurableOperation] = []
-        failures: list[str] = []
+        failures: list[str] = timing_failures
         enqueued = 0
         seen_assets: set[EntityId] = set()
 

@@ -8,6 +8,20 @@ event-critical path, and may be shared by future StageFlow nodes. Media content 
 outside PostgreSQL and is referenced by durable records. PostgreSQL unavailability must
 never redirect authoritative writes into process memory.
 
+## Production inspection transaction
+
+Migration `0017_media_timing_operation` (already introduced with the substrate) adds the
+`media_timing` kind and a terminal MTE foreign-key reference. It reuses asset, manifest,
+and execution-profile columns for inspection-profile identity. Existing transcription
+and render constraints retain their meanings; reversal refuses existing timing operations.
+
+Production inspection now binds the existing MTE repository to the operation transaction.
+Only `MediaTimingEvidenceApplication.apply` appends evidence. Fence verification,
+application, successful Attempt finalization, and terminal reference commit together;
+failure rolls them back together. Expired timing leases with committed matching MTE
+application records reconcile to success. There is no additional schema or migration,
+backfill, or authoritative media/Session update in this execution slice.
+
 ## Current implementation
 
 The current branch implements stable ingress, the bounded Durable Event-Mode Kernel,

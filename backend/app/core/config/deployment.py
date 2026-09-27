@@ -137,6 +137,34 @@ class LocalRenderConfiguration(BaseModel):
         return value
 
 
+class LocalMediaTimingConfiguration(BaseModel):
+    """Optional operator-installed ffprobe; absence leaves inspection disabled."""
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    enabled: bool = False
+    ffprobe_path: str | None = Field(default=None, repr=False)
+
+    @field_validator("ffprobe_path")
+    @classmethod
+    def external_absolute_path(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        try:
+            LocalRenderConfiguration.external_absolute_path(value)
+        except ValueError:
+            raise ValueError("local_media_timing_requires_external_absolute_local_path") from None
+        if (any(char in value for char in "\r\n\0")
+                or Path(value).suffix.casefold() in {".cmd", ".bat"}):
+            raise ValueError("local_media_timing_path_refused")
+        return value
+
+    @model_validator(mode="after")
+    def enabled_requires_path(self) -> LocalMediaTimingConfiguration:
+        if self.enabled and self.ffprobe_path is None:
+            raise ValueError("local_media_timing_path_required")
+        return self
+
+
 class SourceBindingConfiguration(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -270,6 +298,7 @@ class KernelDeploymentConfiguration(BaseModel):
     devcon_read: DevconReadConfiguration | None = None
     local_transcription: LocalTranscriptionConfiguration | None = None
     local_render: LocalRenderConfiguration | None = None
+    local_media_timing: LocalMediaTimingConfiguration | None = None
     autonomous_event_node: AutonomousEventNodeConfiguration = Field(
         default_factory=AutonomousEventNodeConfiguration
     )

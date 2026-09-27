@@ -87,3 +87,43 @@ changes. Filesystem roots must remain under operator control while execution is 
 - Secret storage or display.
 - Automatic business-state bootstrap while parsing configuration.
 - Runtime-profile authority over Session, association, package, or publication decisions.
+
+## Optional local media timing inspection
+
+The optional `[local_media_timing]` section has `enabled` (default `false`) and
+`ffprobe_path`. A disabled section may omit the path; enabling inspection requires it.
+Absence leaves existing behavior unchanged. Supply an explicit absolute
+local executable path outside the repository; relative paths, network locations,
+traversal, links, and Windows batch wrappers are refused. The operator installs the
+binary independently. StageFlow adds no dependency and never searches `PATH`.
+
+An enabled configuration enqueues one advisory timing operation for each asset newly
+registered by Demo reconciliation. Start the separate CPU worker with
+`python -m app.demo.media_timing_worker`; `--once` processes one bounded batch,
+`--concurrency` accepts 1–8 (default 2), and `--poll-seconds` accepts 0.1–30 (default 1).
+ffprobe identity is version plus SHA-256; GPL/nonfree builds are refused. Each invocation
+has a 30-second deadline and 1 MiB stdout cap. Inspection uses file-only protocols,
+closed stdin, discarded stderr, and sanitized selected JSON fields.
+
+Existing assets, including a missed automatic enqueue after a storage failure, can be
+requested using authenticated
+`POST /api/v1/media-timing/events/{event_id}/requests` with `actor_id`,
+`authority_kind: "human"`, `confirmed: "confirmed"`, `limit` (1–100, default 50), and
+optional `after` asset UUID. Follow `next_after` to process the next bounded page.
+Replaying a page returns the same operations by work key. The application command is
+`MediaTimingEnqueue.enqueue_existing`. Disabling enqueue does not hide retained results.
+
+Read operation pages using `GET /api/v1/media-timing/events/{event_id}/operations`
+(`limit`, `after` operation UUID); read one latest summary using
+`GET /api/v1/media-timing/assets/{asset_id}/latest`. Summaries explicitly label evidence
+advisory and unqualified. No paths, raw JSON, or diagnostics are returned. Worker failures
+use `media_timing_tool_unavailable`, `media_timing_tool_refused`,
+`media_timing_output_invalid`, `media_timing_timeout`, `input_missing`, or the bounded
+unexpected-error code `media_timing_internal`. They do not change transcription/render
+behavior or any authoritative Session/media state.
+
+Resolver failures preserve retryability: permanent missing/conflicting registration
+facts are terminal `input_missing`; unavailable media resources are retryable.
+Definite apply-time storage failures use retryable `media_timing_storage_unavailable`.
+An ambiguous result commit leaves the attempt for reconciliation rather than recording
+a terminal failure.

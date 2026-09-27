@@ -568,6 +568,24 @@ paginated operation/output reads. No automatic authority, audio, overlays, publi
 delivery or frontend is introduced. Host GPU/playability and security qualification
 remain separate from implementation evidence.
 
+## Production media timing inspection
+
+ADR-0033's production inspector is a separate CPU worker on the existing Durable
+Operation substrate, using the `media_timing` kind introduced by migration `0017`.
+Its default concurrency is two, bounded to eight. An explicit operator-installed LGPL
+ffprobe supplies bounded JSON fields; version/SHA-256 identity and GPL/nonfree refusal
+are enforced without a repository dependency. Inspection is offline and advisory.
+
+The `container-creation-time` v1 profile records creation time, container duration, and
+primary video stream timing as observations. Only valid aware creation time and duration
+produce `creation_time_plus_duration` v1; missing or naive timestamps stay limitations.
+Recorder semantics remain unqualified. The application boundary and terminal result
+commit under one fence and transaction, and expiry reconciliation recognizes committed
+MTE. Default-off Demo enqueue covers newly registered assets, while a human-only bounded
+command covers existing assets. Authenticated reads expose operation pages and latest
+MTE summaries. Assembly ordering and Editorial placement do not consume these intervals
+in this slice. Owner host comparison and security review remain qualification work.
+
 ## Progressive approval automation
 
 Automation is policy-scoped by decision type, Event/deployment, and version. It is never
