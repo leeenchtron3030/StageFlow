@@ -616,3 +616,16 @@ button:disabled { cursor: not-allowed; color: var(--subtle-foreground); backgrou
   .transcript-segments > section { grid-template-columns: 1fr; }
   .transcript-segment-time { flex-direction: row; gap: 8px; }
 }
+
+/* Read-only Session outputs: dense evidence rows with text-carried states. */
+.outputs-panel { font-variant-numeric: tabular-nums; }
+.outputs-section { padding: 14px; border-top: 1px solid var(--border); }
+.outputs-section h3, .outputs-section h4 { margin: 0 0 10px; }
+.outputs-section h4 { margin-top: 18px; }
+.outputs-facts { display: flex; flex-wrap: wrap; gap: 12px 28px; }
+.outputs-facts dt { color: var(--muted-foreground); font-size: 12px; }
+.outputs-facts dd { margin: 4px 0 0; }
+.outputs-rows { list-style: none; margin: 0; padding: 0; }
+.outputs-rows li { display: grid; gap: 5px; padding: 12px 0; border-top: 1px solid var(--border); overflow-wrap: anywhere; }
+.outputs-rows span { font-size: 13px; }
+.outputs-qualification { font-weight: 600; }

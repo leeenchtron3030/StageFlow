@@ -1,3 +1,4 @@
+import type { EditorialProvenance } from "./editorial-api.ts";
 import { generateUuidV4, type UuidCryptoSource } from "../shared/ids/uuid-v4.ts";
 
 export interface DemoCommandEnvelope {
@@ -79,15 +80,16 @@ export interface DemoTranscriptEvidence {
 }
 
 export interface DemoMoment {
-  operation_id: string;
+  operation_id: string | null;
   candidate_moment_id: string;
   session_id: string;
   expected_session_revision: number;
   timeline_start_microseconds: number;
   timeline_end_microseconds: number | null;
-  origin: "declared";
-  epistemic_kind: "declared";
-  reason_code: "human_mark_moment";
+  origin: "declared" | "derived";
+  epistemic_kind: "declared" | "derived";
+  reason_code: "human_mark_moment" | "transcript_phrase_match";
+  provenance?: EditorialProvenance | null;
   actor_id: string;
   note: string | null;
   declared_at: string;
