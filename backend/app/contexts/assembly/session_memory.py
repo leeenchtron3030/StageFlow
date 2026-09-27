@@ -22,13 +22,16 @@ from .session_contracts import (
     TemplatePage,
 )
 from .session_repository import AssemblyConflictError, AssemblyNotFoundError
+from .timing_reader import AssemblyTimingReader
 
 
 class InMemorySessionAssemblyRepository:
     def __init__(
         self, *, event_ids: frozenset[EntityId], inputs: Callable[[EntityId], AssemblyInputs],
         candidates: Callable[[], tuple[PackagingCandidate, ...]],
+        timing_reader: AssemblyTimingReader | None = None,
     ) -> None:
+        self._timing_reader = timing_reader
         self._events = frozenset(event_ids)
         # Supplied membership snapshots include the registry registration time.
         self._inputs = inputs
@@ -125,9 +128,12 @@ class InMemorySessionAssemblyRepository:
                 raise AssemblyConflictError("assembly_revision_conflict")
             if inputs.package_revision != expected_package_revision:
                 raise AssemblyConflictError("package_revision_conflict")
+            evidence = (() if self._timing_reader is None else self._timing_reader.read(
+                tuple(m.asset_id for m in inputs.membership),
+            ))
             revision = build_revision(command, revision_id, len(history) + 1,
                                       history[-1].id if history else None, template, inputs,
-                                      self._candidates(), explicit)
+                                      self._candidates(), explicit, evidence)
             self._revisions[session_id] = [*history, revision]
             self._commands[command.operation_id] = (command.request_digest, revision)
             return revision

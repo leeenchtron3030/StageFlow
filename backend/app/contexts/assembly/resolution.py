@@ -11,6 +11,7 @@ from .session_contracts import (
     AssemblyRevision,
     AssemblyTemplate,
     AssemblyValidation,
+    CompletionMember,
     ExplicitBinding,
     MediaOrderSource,
     MetadataField,
@@ -22,6 +23,25 @@ from .session_contracts import (
     ValidationIssue,
     ValidationReason,
 )
+from .timing_reader import AssemblyTimingEvidence
+
+
+def resolve_media_order(
+    member: CompletionMember, evidence: AssemblyTimingEvidence | None,
+) -> CompletionMember:
+    if member.media_started_at is not None:
+        source, key = MediaOrderSource.MEDIA_TIMING, member.media_started_at
+    elif evidence is not None:
+        return replace(member, order_source=MediaOrderSource.TIMING_EVIDENCE,
+                       order_key_at=evidence.candidate_started_at,
+                       order_evidence_id=evidence.evidence_id,
+                       order_evidence_revision=evidence.revision,
+                       order_evidence_qualification=evidence.qualification)
+    else:
+        source, key = MediaOrderSource.REGISTRATION_TIME, member.registered_at
+    return replace(member, order_source=source, order_key_at=key,
+                   order_evidence_id=None, order_evidence_revision=None,
+                   order_evidence_qualification=None)
 
 
 def resolve_metadata(
@@ -110,15 +130,14 @@ def build_revision(
     command: CommandIdentity, revision_id: EntityId, number: int, previous: EntityId | None,
     template: AssemblyTemplate, inputs: AssemblyInputs, candidates: Iterable[PackagingCandidate],
     explicit: tuple[ExplicitBinding, ...],
+    timing_evidence: tuple[AssemblyTimingEvidence, ...] = (),
 ) -> AssemblyRevision:
     if template.event_id != inputs.event_id:
         raise ValueError("template_not_in_session_event")
     bindings = resolve_bindings(template, inputs, candidates, explicit)
-    keyed = tuple(replace(
-        m, order_source=(MediaOrderSource.MEDIA_TIMING if m.media_started_at is not None
-                         else MediaOrderSource.REGISTRATION_TIME),
-        order_key_at=m.media_started_at if m.media_started_at is not None else m.registered_at,
-    ) for m in inputs.membership)
+    evidence_by_asset = {e.asset_id: e for e in timing_evidence}
+    keyed = tuple(resolve_media_order(m, evidence_by_asset.get(m.asset_id))
+                  for m in inputs.membership)
     membership = tuple(sorted(keyed, key=lambda m: (
         m.order_key_at if m.order_key_at is not None else m.registered_at, m.asset_id.value,
     )))

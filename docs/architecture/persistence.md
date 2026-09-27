@@ -199,6 +199,26 @@ while any `registration_time` row exists; `media_timing` rows do not block rever
 Allowed reversal drops only the two columns, three checks and ledger entry; timed
 rows hydrate identically after reapply, which performs no backfill.
 
+`0018_assembly_timing_evidence` follows `0017` by plain migration chaining. It widens
+only `assembly_member_order_source_check` to include `timing_evidence`, and adds nullable
+`order_evidence_id` (UUID), `order_evidence_revision` (bigint), and
+`order_evidence_qualification` (text). A composite foreign key binds `(asset_id,
+order_evidence_id)` to `media_timing_evidence(asset_id, evidence_id)`. Checks require all
+three fields exactly for `timing_evidence`, forbid them for other sources (including
+legacy NULL), and restrict qualification to `unqualified`, `qualified`, `rejected`, or
+`expired`. Existing pair/key constraints and immutability triggers remain unchanged.
+There is no backfill or row update. Proposal-time reads select the highest evidence
+revision per member asset, then require exactly one `creation_time_plus_duration`
+derivation, in one bounded PostgreSQL query. Selected provenance and the order key are
+inserted with the immutable member; hydration never re-resolves MTE.
+
+Reversal locks `assembly_member` and refuses with
+`assembly_timing_evidence_reverse_requires_no_timing_evidence_members` while evidence-ordered
+rows exist. Otherwise it drops the three columns and their constraints, restores the
+exact `0016` source check, and removes only its ledger entry. Reapply adds empty nullable
+columns without backfill. The existing `0016` reverse guard remains unchanged. Membership,
+Session/package authority, qualification, and staleness semantics are unaffected.
+
 Registration is at least once and idempotent. It does not claim exactly-once delivery.
 Only a newly created ingress record is eligible for the included dispatcher path; an
 exact replay does not repeat that caller-visible dispatch path. The asset-registration

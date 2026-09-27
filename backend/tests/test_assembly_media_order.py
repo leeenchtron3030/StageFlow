@@ -232,7 +232,8 @@ def test_api_exposes_member_order_source_and_key_without_paths() -> None:
         for actual, expected in zip(body["membership"], expected_order(harness.inputs.membership),
                                     strict=True):
             assert set(actual) == {"asset_id", "association_revision", "media_started_at",
-                                   "order_source", "order_key_at"}
+                                   "order_source", "order_key_at", "order_evidence_id",
+                                   "order_evidence_revision", "order_evidence_qualification"}
             assert actual["order_source"] == expected.order_source.value
             assert datetime.fromisoformat(actual["order_key_at"]) == expected.order_key_at
 

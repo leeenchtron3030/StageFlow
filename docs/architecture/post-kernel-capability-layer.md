@@ -18,7 +18,8 @@ human approval lineage, and bounded authenticated reads in the new Assembly cont
 ED-0077 implements Session Assembly templates, proposals, revisions, validation, and
 human approval. ED-0086 adds human-only, Session-local metadata overrides with frozen
 source provenance. ED-0087 implements the bounded render first slice, and ED-0088
-adds per-member ordering provenance and frozen slot-order expansion.
+adds per-member ordering provenance and frozen slot-order expansion. ED-0091 adds
+advisory Media Timing Evidence as the intermediate ordering source.
 
 The Kernel remains the protected operational foundation. New capabilities reference its
 Business Event, Stage, Program Expectation, realized Session, media registration,
@@ -474,11 +475,19 @@ the prior revision, with optimistic Assembly and package-revision guards.
 
 Proposals require a `complete` Kernel package and pin its completion decision and exact
 `session_completion_asset` membership, including association revisions. Ineligible
-packages produce a persisted invalid revision. ED-0088 orders each member by known
-`media_started_at` (`media_timing`), otherwise the registry's `registered_at`
-(`registration_time`), then asset ID for ties. Both the source and aware `order_key_at`
+packages produce a persisted invalid revision. ED-0091 preserves ED-0088's first and last
+choices: known `media_started_at` (`media_timing`), else the single
+`creation_time_plus_duration` Derived start from the latest active MTE revision
+(`timing_evidence`), else the registry's `registered_at` (`registration_time`). Missing
+MTE or zero/several matching derivations falls through; older evidence is never substituted
+for an unusable active revision. Asset ID breaks equal-key ties. The source and aware `order_key_at`
 are frozen per member and exposed on revision APIs before human approval confirms the
-order. All-untimed and mixed membership can be valid; unavailable membership still
+order. Evidence-ordered members also freeze the evidence ID, revision and recorder
+qualification, including `unqualified`. A newer MTE revision never stales or changes an
+existing Assembly revision; only a new proposal reads it. The Assembly-owned reader port
+has in-memory and transaction-bound PostgreSQL adapters; the latter reads all member
+assets in one bounded query joining active evidence and matching derivations.
+All-untimed and mixed membership can be valid; unavailable membership still
 blocks validation. New proposals never emit `MEDIA_TIMING_UNAVAILABLE`, though the
 reason remains readable for historical invalid revisions. Legacy NULL ordering fields
 hydrate as `media_timing` with the stored media start as key; untimed legacy invalid
