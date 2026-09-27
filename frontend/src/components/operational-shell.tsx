@@ -84,7 +84,6 @@ export function OperationalShell({
           <p className="nav-group-label nav-group-spaced">Editorial</p>
           <NavLink
             activePath={activePath}
-            count={workspace.editorialCandidates.filter((item) => item.state !== "approved").length}
             href="/editorial"
             label="Live Triage"
             workspace={workspace}

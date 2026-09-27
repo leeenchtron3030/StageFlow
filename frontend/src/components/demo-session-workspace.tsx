@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { SessionMoments } from "./session-moments";
+import { momentsRefreshToken } from "../experience/editorial-presentation.ts";
 
 import {
   createDemoCommandEnvelope,
@@ -335,7 +337,6 @@ export function DemoSessionWorkspace({
       <div className="demo-work-summary">
         <div><span>Evidence state</span><strong>{loading ? "Refreshing" : workspace ? "Connected" : "Unavailable"}</strong></div>
         <div><span>Operations</span><strong>{workspace ? stateSummary(workspace.operations.map((operation) => operation.status)) || "No operations" : "Unavailable"}</strong></div>
-        <div><span>Declared Moments</span><strong>{workspace?.moments.length ?? 0}</strong></div>
       </div>
 
       {workspace?.operations.some((operation) => operation.status !== "succeeded") ? (
@@ -409,17 +410,7 @@ export function DemoSessionWorkspace({
 
       </details>
 
-      {workspace?.moments.length ? (
-        <div className="declared-moment-list" aria-label="Declared Editorial Candidate Moments">
-          {workspace.moments.map((moment) => (
-            <article key={moment.candidate_moment_id}>
-              <strong>{formatOffset(moment.timeline_start_microseconds)}</strong>
-              <span>{moment.note ?? "Producer Mark Moment"}</span>
-              <span>Declared · Session r{moment.expected_session_revision}</span>
-            </article>
-          ))}
-        </div>
-      ) : null}
+      {workspace ? <SessionMoments key={sessionId} sessionId={sessionId} refreshToken={momentsRefreshToken(workspace.moments)} /> : null}
     </section>
   );
 }

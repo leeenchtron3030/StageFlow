@@ -30,6 +30,12 @@ export const editorialQueueSchema = z.object({
 export const phraseListSchema = z.object({ phrase_list_id: id, event_id: id, key: z.string(), version: revision, name: z.string(), phrases: z.array(z.string()), created_by: id, created_at: time });
 export const phraseListsSchema = z.object({ items: z.array(phraseListSchema), ...numberedPageFields });
 export const derivationRunSchema = z.object({ run_id: id, session_id: id, phrase_list_id: id, phrase_list_version: revision, created_by: id, created_at: time, input_asset_count: count, candidate_ids: z.array(id), skip_counts: z.record(z.string(), count) });
+export type EditorialCandidate = z.infer<typeof editorialCandidateSchema>;
+export type EditorialQueue = z.infer<typeof editorialQueueSchema>;
+export type EditorialMoments = z.infer<typeof editorialMomentsSchema>;
+export type PhraseList = z.infer<typeof phraseListSchema>;
+export type PhraseLists = z.infer<typeof phraseListsSchema>;
+export type DerivationRun = z.infer<typeof derivationRunSchema>;
 export function editorialApi(read: ApiRead = capabilityRead("editorial")) {
   return {
     moments: async (sessionId: string) => editorialMomentsSchema.parse(await read(`sessions/${id.parse(sessionId)}/moments?limit=100`)),

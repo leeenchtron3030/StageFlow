@@ -319,6 +319,7 @@ function renderDemo(workspace?: DemoWorkspace, loading = false) {
   const { DemoSessionWorkspace } = compileComponent("../components/demo-session-workspace.tsx", {
     react: { ...React, useState: () => [states.shift(), () => undefined] },
     "next/navigation": { useRouter: () => ({ refresh() {} }) },
+    "./session-moments": { SessionMoments: () => null },
     "@/experience/demo-api.ts": {}, "@/experience/demo-launch-context.ts": {}, "@/experience/demo-package-approval.ts": {},
   });
   return renderToStaticMarkup(React.createElement(DemoSessionWorkspace, {
