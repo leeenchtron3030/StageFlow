@@ -155,4 +155,5 @@ or architecture document unless those documents are explicitly updated.
 | [Producer outputs UI](producer-outputs-ui.md) | Approved (completed: phases 1–3, ED-0093–ED-0095) | StageFlow Frontend / Producer / Editorial | Owner request and decision D1 (2026-09-27); producer-ui-mvp; ED-0093–ED-0095 |
 | [Hardening follow-ups 2026-09-27](hardening-follow-ups-2026-09-27.md) | Completed - Green hardening follow-ups | StageFlow Backend / Frontend | Owner request 2026-09-27; ED-0096; ED-0097 |
 | [Render profile v3: audio](render-profile-v3-audio.md) | Completed - Green render profile v3 (audio); Run 003 found and fixed an audio-length defect | StageFlow Rendering / Backend / Frontend | ADR-0032 amendment 4A; ED-0098 |
-| [Render quality chosen per Event](event-render-quality.md) | Approved | StageFlow Rendering / Backend / Frontend | ADR-0032 amendment 4B; ED-0099 |
+| [Render quality chosen per Event](event-render-quality.md) | Completed - per-Event render quality; Run 004 passed (320 kbit/s audio undershoots, labelled "up to") | StageFlow Rendering / Backend / Frontend | ADR-0032 amendment 4B; ED-0099 |
+| [Render quality UX follow-ups](render-quality-ux-follow-ups.md) | Approved | StageFlow Frontend | ED-0099 UX checkpoint; Run 004; ED-0100 |

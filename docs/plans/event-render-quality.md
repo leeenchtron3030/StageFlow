@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved (2026-09-27). The owner approved the plan, including the preset catalog and
+Completed (2026-09-27). The owner approved the plan, including the preset catalog and
 adjustment ranges, when merging PR #133.
 
 ## Execution authority
@@ -367,18 +367,18 @@ Migration `0020`, additive only:
 
 ## Acceptance criteria
 
-- [ ] A producer can see and choose an Event's render quality (a preset plus bounded
+- [x] A producer can see and choose an Event's render quality (a preset plus bounded
   bitrates) in the Producer interface before and during an Event. The choice is recorded
   with actor and time.
-- [ ] Renders use the Event's current setting at request time. Changing it affects only
+- [x] Renders use the Event's current setting at request time. Changing it affects only
   later requests. Existing outputs and operations are unchanged, and re-rendering is
   explicit.
-- [ ] Out-of-bounds values and stale confirmations are refused with typed codes.
-- [ ] ED-0098 clients keep working. An unadjusted Standard render keeps its work key.
-- [ ] Migration `0020` forward and reverse tests pass. The demo database is backed up
+- [x] Out-of-bounds values and stale confirmations are refused with typed codes.
+- [x] ED-0098 clients keep working. An unadjusted Standard render keeps its work key.
+- [x] Migration `0020` forward and reverse tests pass. The demo database is backed up
   before applying it.
-- [ ] All required checks pass. The owner UX checkpoint is recorded.
-- [ ] **Run 004** on the reference GPU renders one validation revision at each preset's
+- [x] All required checks pass. The owner UX checkpoint is recorded.
+- [x] **Run 004** on the reference GPU renders one validation revision at each preset's
   default, plus 1080p High at 20 Mbit/s with 320 kbit/s audio and 720p Compact at
   3 Mbit/s with 96 kbit/s audio. Each output must show:
   - the expected resolution and stream set;
@@ -403,11 +403,44 @@ Migration `0020`, additive only:
 
 ## Completion record
 
-- Implemented revision:
-- Files and migrations actually changed:
-- Commands and tests actually run:
-- Results and warnings:
-- Execution authority used:
-- Approved deviations:
-- Rollback status:
-- Remaining work:
+- **Implemented revision:**
+  - PR #136 (branch `codex/ed-0099-event-render-quality`), merged as `6133fa4`.
+  - Codex implemented it. The owner rebased it onto the ED-0098 audio-length fix (#135),
+    resolved the `ffmpeg.py` stage 1 conflict and committed it.
+- **Files changed:**
+  - the rendering contracts (preset catalog, adjustments, `effective_profile`,
+    `require_requestable`), a new `settings.py`, the service and planning;
+  - work-execution contracts and the work key (schema v2 only for adjustments);
+  - `0020_event_render_setting` forward and reverse, and the migration registry;
+  - the render and transcription-work repositories (a shared-transaction enqueue);
+  - execution, the FFmpeg adapter and the render worker (every preset);
+  - the API routes;
+  - the Event page section, the outputs panel and actions, labels, zod clients, the
+    server-route allowlist and the audit log;
+  - three new backend test files and one new frontend test file;
+  - the glossary, the rendering README and the capability layer.
+  - No new dependency.
+- **Tests (host):** full backend suite 2,677 passed, 0 failed, 2 skipped. Ruff and Pyright
+  clean. Frontend 262/262; lint, typecheck and build pass. CI green.
+- **Review:**
+  - Codex stopped once as Yellow: the plan named `human_command_idempotency`, whose
+    constraint must not change.
+  - **Approved deviation:** a capability-owned `command_id` and `request_digest` on
+    `event_render_setting`, the 0012/0013/0019 pattern.
+  - `directive-reviewer` returned APPROVE. From its notes, the owner fixed ED-0098 body
+    compatibility (bodies with no expected version default to Standard v3) and documented
+    the retry behaviour of reuse-only commands.
+- **Owner steps:**
+  - The demo database was backed up with `pg_dump`, then migrated to `0020`.
+  - UX checkpoint: [operator feedback](../ux/operator-feedback.md), "ED-0099 review
+    checkpoint: render quality". The flows work. Four presentation changes were approved
+    and moved to ED-0100.
+  - [Run 004](../validation/results/render-durable-operation-004.md) passed with one
+    criterion not met as written:
+    - Every preset and adjustment bound renders at the right resolution, with video
+      within 5% of target and the ED-0098 sync guarantees unchanged.
+    - 320 kbit/s audio measured 261 kbit/s (native AAC). The owner decided to keep it,
+      labelled "up to 320 kbit/s".
+- **Rollback:** revert the code. Reverse `0020` only while no settings or adjusted inputs
+  exist.
+- **Remaining work:** ED-0100, the UX follow-ups.

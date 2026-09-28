@@ -279,3 +279,33 @@ line; preserve resolved entries as concise evidence rather than deleting them.
 - Classification: Green (UI terminology and presentation)
 - Status: validated (ED-0095)
 
+
+### 2026-09-27 - ED-0099 review checkpoint: render quality
+
+- Route/scenario:
+  - the Event page (`/event`) and Session Detail on the render validation Event, in kernel
+    mode;
+  - quality chosen twice through the UI (1080p High at 16 Mbit/s, then 720p Compact);
+  - the "Render again at current quality" confirmation opened on a Session whose outputs
+    are 1080p Standard.
+- Category: glance comprehension | prominence | terminology
+- Observation and owner-approved changes:
+  1. **Styling.** The Render quality section does not match the other Event panels: it
+     has no kicker-and-title header, cramped inline controls whose labels run together,
+     and unpadded history rows. Change: the same panel header as Authority and Attention,
+     one control per row with its label above, and a padded history list.
+  2. **Provenance line.** The "Chosen by" line shows a raw operator UUID and a raw ISO
+     timestamp. Change: the summary line reads "Chosen 10:17 PM" in local time. The
+     operator ID and the full timestamp move into a Details disclosure, as for other
+     evidence.
+  3. **Unexplained action.** "Render again at current quality" does not say what changed.
+     Change: one line next to the action, for example "Latest output: 1080p Standard ·
+     Current setting: 720p Compact".
+  4. **320 kbit/s audio choice.** 1080p High's 320 kbit/s choice measured 261 kbit/s in
+     [Run 004](../validation/results/render-durable-operation-004.md), because the native
+     AAC encoder undershoots. Owner decision: keep the choice, labelled "up to 320
+     kbit/s". There is no catalog change.
+- Unchanged: the confirmation that names the quality (validated), the collapsed history,
+  consequence-first wording, and all command, concurrency and authority behaviour.
+- Classification: Green (presentation and wording)
+- Status: implementing (ED-0100)
