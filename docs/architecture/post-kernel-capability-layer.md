@@ -583,9 +583,10 @@ share a transaction. All failures after running are bounded typed attempt outcom
 
 The current profile is h264-nvenc-1080p-video v3: unchanged v2 CUDA decode to H.264
 NVENC, p4, VBR 8 Mbit/s, GOP 60, 1080p MP4, constant 30000/1001 video, plus native
-AAC-LC 48 kHz stereo 192 kbit/s audio (ADR-0032 amendment 4A). Each input is probed,
-encoded once to NVENC video and 16-bit PCM audio in a temporary MOV, with the first
-audio stream resampled or silence supplied, padded/trimmed to that segment's video.
+AAC-LC 48 kHz stereo 192 kbit/s audio (ADR-0032 amendment 4A). Each input is probed and
+its video encoded once with NVENC; the first audio stream (resampled, or silence when
+absent) is then fitted to exactly that segment's video length by sample count and stored
+as 16-bit PCM in a temporary MOV.
 Stage 2 concatenates intermediates with video stream copy and a single AAC encode.
 Final ffprobe validation requires exactly one H.264 video and one AAC audio stream.
 Intermediates are removed on success, failure and cancellation and are never registered.

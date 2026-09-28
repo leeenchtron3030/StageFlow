@@ -154,5 +154,5 @@ or architecture document unless those documents are explicitly updated.
 | [Derived Editorial candidates](derived-editorial-candidates.md) | Completed - Green derived Editorial candidates | StageFlow Editorial / Transcription / Media Timing / Backend | Owner decision 2026-09-25; ADR-0033; ADR-0027; ED-0092 |
 | [Producer outputs UI](producer-outputs-ui.md) | Approved (completed: phases 1–3, ED-0093–ED-0095) | StageFlow Frontend / Producer / Editorial | Owner request and decision D1 (2026-09-27); producer-ui-mvp; ED-0093–ED-0095 |
 | [Hardening follow-ups 2026-09-27](hardening-follow-ups-2026-09-27.md) | Completed - Green hardening follow-ups | StageFlow Backend / Frontend | Owner request 2026-09-27; ED-0096; ED-0097 |
-| [Render profile v3: audio](render-profile-v3-audio.md) | Approved | StageFlow Rendering / Backend / Frontend | ADR-0032 amendment 4A; ED-0098 |
+| [Render profile v3: audio](render-profile-v3-audio.md) | Completed - Green render profile v3 (audio); Run 003 found and fixed an audio-length defect | StageFlow Rendering / Backend / Frontend | ADR-0032 amendment 4A; ED-0098 |
 | [Render quality chosen per Event](event-render-quality.md) | Approved | StageFlow Rendering / Backend / Frontend | ADR-0032 amendment 4B; ED-0099 |

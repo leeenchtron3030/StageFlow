@@ -267,20 +267,21 @@ def test_two_stages_mixed_audio_cleanup_and_stage2_measurements(
         if mode == "success":
             result = adapter.render(sources, output, store, CURRENT_RENDER_PROFILE, beats)
             assert result.frame_count == 120 and result.duration_microseconds == 4_000_000
-            assert len(commands) == 3 and beats.call_count == 6
-            assert "0:a:0" in commands[0] and "lavfi" not in commands[0]
-            assert "1:a:0" in commands[1] and "anullsrc=r=48000:cl=stereo" in commands[1]
+            assert len(commands) == 5 and beats.call_count == 10
+            assert "-an" in commands[0] and "-an" in commands[2]
+            assert "1:a:0" in commands[1] and "lavfi" not in commands[1]
+            assert "1:a:0" in commands[3] and "anullsrc=r=48000:cl=stereo" in commands[3]
             assert sum("h264_nvenc" in command for command in commands) == 2
             assert sum("aac" in command for command in commands) == 1
             assert all("Frozen title" not in str(command) for command in commands)
         else:
             with pytest.raises(RenderError, match="ffmpeg_exit_nonzero"):
                 adapter.render(sources, output, store, CURRENT_RENDER_PROFILE, beats)
-            assert len(commands) == (1 if mode == "fail" else 3)
+            assert len(commands) == (1 if mode == "fail" else 5)
     assert list(store.temp.iterdir()) == []
 
 
-@pytest.mark.parametrize("stage", [1, 2, 3])
+@pytest.mark.parametrize("stage", [1, 2, 3, 4, 5])
 def test_cancellation_cleans_all_intermediates(
     fake_ffmpeg: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, stage: int,
 ) -> None:
@@ -306,7 +307,7 @@ def test_cancellation_cleans_all_intermediates(
     assert list(store.temp.iterdir()) == []
 
 
-@pytest.mark.parametrize("failure_stage", [None, 1, 2, 3])
+@pytest.mark.parametrize("failure_stage", [None, 1, 2, 3, 4, 5])
 @pytest.mark.parametrize("failure_kind", ["exit", "cancel", "cuda", "nvenc"])
 def test_pipeline_process_heartbeats_and_cleanup_without_filesystem(
     monkeypatch: pytest.MonkeyPatch, failure_stage: int | None, failure_kind: str,
@@ -357,7 +358,8 @@ def test_pipeline_process_heartbeats_and_cleanup_without_filesystem(
         current_stage += 1
         commands.append(command)
         assert kwargs["shell"] is False
-        assert len(active) == (current_stage if current_stage < 3 else 3)
+        # Each video-only file is released once its audio-fitted copy exists.
+        assert len(active) == [1, 2, 2, 3, 3][current_stage - 1]
         process = Mock()
         process.__enter__ = Mock(return_value=process)
         process.__exit__ = Mock(return_value=False)
@@ -386,22 +388,36 @@ def test_pipeline_process_heartbeats_and_cleanup_without_filesystem(
     if failure_stage is None:
         result = adapter.render(sources, store.temp / "out.mp4", store,
                                 CURRENT_RENDER_PROFILE, heartbeat)
-        assert (result.frame_count, result.duration_microseconds) == (180, 6_000_000)
-        assert len(commands) == 3 and len(beats) == 9
-        assert commands[0][commands[0].index("-c:v") + 1] == "h264_nvenc"
-        assert "0:a:0" in commands[0] and "lavfi" not in commands[0]
-        assert "1:a:0" in commands[1] and "anullsrc=r=48000:cl=stereo" in commands[1]
-        assert commands[2][commands[2].index("-c:v") + 1] == "copy"
-        assert commands[2][commands[2].index("-c:a") + 1] == "aac"
+        assert (result.frame_count, result.duration_microseconds) == (300, 10_000_000)
+        assert len(commands) == 5 and len(beats) == 15
+        video, fitted = (commands[0], commands[2]), (commands[1], commands[3])
+        assert all(c[c.index("-c:v") + 1] == "h264_nvenc" and "-an" in c for c in video)
+        assert all(c[c.index("-c:v") + 1] == "copy" and "h264_nvenc" not in c for c in fitted)
+        assert "lavfi" not in commands[1] and commands[1][commands[1].index("-map") + 3] == "1:a:0"
+        assert "anullsrc=r=48000:cl=stereo" in commands[3]
+        # Each input's audio length comes from its own stage-1a frame count (60, then 180).
+        assert [c[c.index("-af") + 1].rsplit("end_sample=", 1)[1] for c in fitted] == [
+            "96096", "288288"]
+        assert commands[4][commands[4].index("-c:v") + 1] == "copy"
+        assert commands[4][commands[4].index("-c:a") + 1] == "aac"
         assert len(written) == 1 and "synthetic-input" not in written[0]
-        assert [command[command.index("-i") + 1] for command in commands[:2]] == [
+        assert [command[command.index("-i") + 1] for command in video] == [
             str(path) for path in sources
         ]
-        assert [Path(command[-1]).name for command in commands[:2]] == ["0.mov", "1.mov"]
+        assert [Path(command[-1]).name for command in commands[:4]] == [
+            "0.mov", "1.mov", "2.mov", "3.mov"]
+        assert [c[c.index("-i") + 1] for c in fitted] == [
+            str(store.temp / "0.mov"), str(store.temp / "2.mov")]
+        second_input = commands[1].index("-i", commands[1].index("-i") + 1)
+        assert commands[1][second_input + 1] == str(sources[0])
+        # The original media is opened again in stage 1b under the same demuxer allowlist.
+        assert commands[1][second_input - 4:second_input] == [
+            "-protocol_whitelist", "file,pipe", "-format_whitelist", RENDER_INPUT_FORMATS]
+        assert all("-an" not in command for command in (commands[1], commands[3], commands[4]))
         assert [line for line in written[0].splitlines() if line.startswith("file ")] == [
-            f"file '{(store.temp / name).as_posix()}'" for name in ("0.mov", "1.mov")
+            f"file '{(store.temp / name).as_posix()}'" for name in ("1.mov", "3.mov")
         ]
-        assert commands[2][commands[2].index("-i") + 1] == str(allocated[2])
+        assert commands[4][commands[4].index("-i") + 1] == str(allocated[4])
         assert probe.render_streams.call_count == 3
     else:
         error = KeyboardInterrupt if failure_kind == "cancel" else RenderError

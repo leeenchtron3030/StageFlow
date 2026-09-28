@@ -297,14 +297,18 @@ if "-version" in args:
 elif args[-1] == "-":
     sys.exit(1 if mode == "nvenc" else 0)
 else:
-    assert "-nostdin" in args and "-y" in args and "-an" not in args
+    assert "-nostdin" in args and "-y" in args
     assert args.index("-format_whitelist") < args.index("-i")
     assert args[args.index("-protocol_whitelist") + 1] == "file,pipe"
-    assert args[args.index("-ar") + 1] == "48000"
-    assert args[args.index("-ac") + 1] == "2"
-    stage2 = args[args.index("-c:v") + 1] == "copy"
+    stage2 = args[args.index("-f") + 1] == "concat"
+    video_only = "-an" in args
+    assert not (stage2 and video_only)
+    if not video_only:
+        assert args[args.index("-ar") + 1] == "48000"
+        assert args[args.index("-ac") + 1] == "2"
+        assert args[args.index("-c:v") + 1] == "copy"
+        assert "-vf" not in args and "-r" not in args and "-shortest" not in args
     if stage2:
-        assert args[args.index("-f") + 1] == "concat"
         assert args[args.index("-format_whitelist") + 1] == "concat"
         lines = pathlib.Path(args[args.index("-i") + 1]).read_text(encoding="utf-8").splitlines()
         assert lines[0] == "ffconcat version 1.0"
@@ -316,11 +320,12 @@ else:
                 "option format_whitelist mov,mp4,m4a,3gp,3g2,mj2,matroska,webm,mxf")
         assert args[args.index("-c:a") + 1] == "aac"
         assert args[args.index("-b:a") + 1] == "192000"
-        assert "-vf" not in args and "-r" not in args
         assert args[args.index("-f", args.index("-c:a")) + 1] == "mp4"
-    else:
+    elif video_only:
         assert args[args.index("-format_whitelist") + 1] == (
             "mov,mp4,m4a,3gp,3g2,mj2,matroska,webm,mxf")
+        assert args[args.index("-map") + 1] == "0:v:0" and args.count("-map") == 1
+        assert "-c:a" not in args and "-af" not in args
         assert args[args.index("-c:v") + 1] == "h264_nvenc"
         assert args[args.index("-preset") + 1] == "p4"
         assert args[args.index("-b:v") + 1] == "8000000"
@@ -332,10 +337,16 @@ else:
         assert args[args.index("-r") + 1] == "30000/1001"
         assert args.index("-r") > args.index("-i")
         assert args[args.index("-rc") + 1] == "vbr"
+        assert args[args.index("-f", args.index("-vf")) + 1] == "mov"
+    else:
+        assert "-hwaccel" not in args and "h264_nvenc" not in args
+        assert args[args.index("-format_whitelist") + 1] == "mov"
+        assert args[args.index("-i") + 1].endswith(".mov")
         assert args[args.index("-c:a") + 1] == "pcm_s16le"
+        # 60 fake frames at 30000/1001 fps are exactly 96,096 samples at 48 kHz.
         assert args[args.index("-af") + 1] == (
-            "aresample=48000,aformat=channel_layouts=stereo,apad")
-        assert "-shortest" in args
+            "aresample=48000:async=1:first_pts=0,aformat=channel_layouts=stereo,"
+            "apad=whole_len=96096,atrim=end_sample=96096")
         assert args[args.index("-f", args.index("-c:a")) + 1] == "mov"
     pathlib.Path(args[-1]).write_bytes(b"deterministic-render-bytes")
     print("frame=60\\nout_time_us=2000000\\nprogress=end")
