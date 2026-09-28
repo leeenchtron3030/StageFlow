@@ -96,16 +96,28 @@ def _output(output: RenderedOutput) -> dict[str, object]:
     }
 
 
+# ED-0098 bodies carried no setting version and defaulted to Standard v3; keep that meaning so
+# they succeed only while the Event's effective setting is exactly unadjusted Standard v3.
+LEGACY_PROFILE = ("h264-nvenc-1080p-video", "3")
+
+
+def _requested_profile(body: RequestBody) -> tuple[str | None, str | None]:
+    if "expected_setting_version" in body.model_fields_set:
+        return body.profile_id, body.profile_version
+    return (body.profile_id or LEGACY_PROFILE[0], body.profile_version or LEGACY_PROFILE[1])
+
+
 @router.post("/requests")
 def request_render(body: RequestBody, request: Request) -> dict[str, object]:
+    requested_id, requested_version = _requested_profile(body)
     try:
         return _operation(_service(request).request_render(
             EntityId(str(body.assembly_revision_id)),
             None,
             RenderActor(EntityId(str(body.actor_id))), EntityId(str(body.command_id)),
-            (body.expected_setting_version if "expected_setting_version" in body.model_fields_set
-             or (body.profile_id is None and body.profile_version is None) else "unspecified"),
-            requested_profile_id=body.profile_id, requested_profile_version=body.profile_version,
+            (body.expected_setting_version
+             if "expected_setting_version" in body.model_fields_set else "unspecified"),
+            requested_profile_id=requested_id, requested_profile_version=requested_version,
         ))
     except RenderError as exc:
         raise HTTPException(409, exc.code.value) from None

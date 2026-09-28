@@ -63,7 +63,9 @@ The request freezes preset, normalized adjustments and setting version in the op
 Optional profile fields must agree. Legacy Standard v3 bodies without an expected version
 work at unadjusted Standard; a conflicting adjusted or different preset is refused.
 Recorded command replay uses its frozen setting even if current quality has changed,
-including after a lost response. New unadjusted requests retain work-key schema v1;
+including after a lost response. A command that only reused an existing operation has no receipt of its
+own, so retrying it after a quality change returns `render_setting_changed`; nothing is
+enqueued and the Producer interface refreshes before a new confirmation. New unadjusted requests retain work-key schema v1;
 adjusted requests use schema v2 with an adjustments digest. Equal effective settings reuse
 the existing operation, retaining its original setting provenance. The command digest
 includes the effective settings. Changing quality never alters operations or outputs.

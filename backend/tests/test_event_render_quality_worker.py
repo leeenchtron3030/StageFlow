@@ -54,12 +54,14 @@ def test_effective_ffmpeg_arguments_without_filesystem(
     encode = Mock(return_value=EncodingResult(60, 2_000_000))
     monkeypatch.setattr(adapter, "_encode", encode)
     adapter.render([Path.cwd() / "synthetic.mp4"], store.temp / "out.mp4", store, profile, Mock())
-    video, audio = [call.args[0] for call in encode.call_args_list]
+    # One input: stage 1a video, stage 1b audio fit (video copy), stage 2 join and AAC encode.
+    video, fitted, audio = [call.args[0] for call in encode.call_args_list]
     assert video[video.index("-vf") + 1] == (
         f"scale_cuda={profile.width}:{profile.height}:format=nv12")
     assert video[video.index("-b:v") + 1] == str(profile.bit_rate)
     assert audio[audio.index("-b:a") + 1] == str(profile.audio_bit_rate)
     assert video[video.index("-c:v") + 1] == "h264_nvenc"
+    assert fitted[fitted.index("-c:v") + 1] == "copy" and "-b:v" not in fitted
     assert audio[audio.index("-c:v") + 1] == "copy"
 
 

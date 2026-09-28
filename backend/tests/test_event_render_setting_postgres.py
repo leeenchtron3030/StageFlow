@@ -203,7 +203,8 @@ def test_setting_api_shapes_legacy_body_and_bounded_refusals(
     body: dict[str, Any] = {"assembly_revision_id": approved_revision.id.value,
         "profile_version": "3", "actor_id": EntityId.new().value,
         "command_id": EntityId.new().value, "confirmed": "confirmed"}
-    assert client.post("/rendering/requests", json=body).status_code == 200
+    first = client.post("/rendering/requests", json=body)
+    assert first.status_code == 200
     for preset in RENDER_PRESETS[1:]:
         assert client.post("/rendering/requests", json={
             **{key: value for key, value in body.items() if key != "profile_version"},
@@ -252,6 +253,20 @@ def test_setting_api_shapes_legacy_body_and_bounded_refusals(
             **body, "profile_id": CURRENT_RENDER_PROFILE.id, "profile_version": version,
             "command_id": EntityId.new().value})
         assert response.json() == {"detail": "render_profile_unsupported"}
+    # ED-0098 bodies (no expected setting version) keep their Standard v3 meaning.
+    legacy = {key: value for key, value in body.items() if key != "expected_setting_version"}
+    response = client.post("/rendering/requests", json={
+        **legacy, "profile_version": "1", "command_id": EntityId.new().value})
+    assert response.json() == {"detail": "render_profile_unsupported"}
+    standard = repo.choose_setting(command(approved_revision.event_id, 0, high.version), NOW)
+    response = client.post("/rendering/requests", json={
+        **legacy, "command_id": EntityId.new().value})
+    assert response.status_code == 200
+    assert (response.json()["profile_id"], response.json()["profile_version"]) == (
+        CURRENT_RENDER_PROFILE.id, "3")
+    # Unadjusted Standard keeps the ED-0098 work key, so the first operation is reused.
+    assert standard.adjustments == RenderAdjustments()
+    assert response.json()["operation_id"] == first.json()["operation_id"]
 
 
 def test_setting_transaction_failure_rolls_back_row_and_receipt(
