@@ -614,12 +614,13 @@ button:disabled { cursor: not-allowed; color: var(--subtle-foreground); backgrou
 .output-command-result details { margin-top: 4px; font-size: 12px; }
 .output-confirmation { width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 32px); margin: auto; padding: 24px; overflow: auto; color: var(--foreground); background: var(--surface-raised); border: 1px solid var(--border); }
 .output-confirmation::backdrop { background: rgb(0 0 0 / 65%); }
-.output-confirmation form { display: grid; gap: 12px; }
+.output-confirmation form, .render-quality-panel form { display: grid; gap: 12px; }
+.render-quality-panel form { padding: 14px; }
 .output-confirmation p, .output-confirmation h4 { margin: 0; }
-.output-confirmation select, .output-confirmation textarea { width: 100%; padding: 8px; color: var(--foreground); background: var(--surface); border: 1px solid var(--border); }
+.output-confirmation select, .output-confirmation textarea, .render-quality-panel select { width: 100%; padding: 8px; color: var(--foreground); background: var(--surface); border: 1px solid var(--border); }
 .output-confirmation textarea { min-height: 88px; }
 .output-dialog-actions { display: flex; justify-content: flex-end; gap: 12px; }
-.output-actions button:focus-visible, .output-confirmation :is(select, textarea, button, summary):focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.output-actions button:focus-visible, .output-confirmation :is(select, textarea, button, summary):focus-visible, .render-quality-panel :is(select, button, summary):focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .output-actions button:disabled { cursor: not-allowed; }
 .output-actions .output-secondary-action { background: transparent; color: var(--muted-foreground); font-size: 12px; }
 /* Compact Editorial review: facts once, secondary evidence disclosed on demand. */

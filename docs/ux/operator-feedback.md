@@ -308,4 +308,4 @@ line; preserve resolved entries as concise evidence rather than deleting them.
 - Unchanged: the confirmation that names the quality (validated), the collapsed history,
   consequence-first wording, and all command, concurrency and authority behaviour.
 - Classification: Green (presentation and wording)
-- Status: implementing (ED-0100)
+- Status: validated (ED-0100)

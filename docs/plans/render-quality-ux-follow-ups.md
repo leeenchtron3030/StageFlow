@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved (2026-09-27).
+Completed (2026-09-28).
 
 ## Execution authority
 
@@ -48,7 +48,7 @@ anything other than the 320 label, and operator display names.
 
 ## Acceptance criteria
 
-- [ ] Items 1–4 are implemented. Frontend test, lint, typecheck and build pass on the
+- [x] Items 1–4 are implemented. Frontend test, lint, typecheck and build pass on the
   host. The owner reviews screenshots.
 
 ## Rollback
@@ -57,7 +57,23 @@ Revert the frontend change.
 
 ## Completion record
 
-- Implemented revision:
-- Commands and tests actually run:
-- Results:
-- Remaining work:
+- **Implemented revision:** branch `codex/ed-0100-render-quality-ux`. Codex implemented it
+  and the owner committed it.
+- **Changed files** (frontend only):
+  - `globals.css`, with one rule (`.render-quality-panel form` padding). Everything else
+    reuses the existing section-heading, form and outputs styles;
+  - `event-render-quality.tsx` and `session-output-actions.tsx`;
+  - `ui-labels.ts`;
+  - `render-quality.test.ts` and `output-actions-ui.test.ts`.
+- **Changed existing assertion:** one, `/Chosen by/` → `/Chosen \d{2}:\d{2}:\d{2}/`,
+  which is the wording the owner approved.
+- **Tests (host):**
+  - `npm run test` 266/266; lint, typecheck and build pass.
+  - The full backend suite was run as the gate.
+- **Review:** `directive-reviewer` returned APPROVE, with no blocking findings. Its
+  non-blocking notes are recorded for later:
+  - a possible hydration mismatch when the server's timezone differs from the browser's;
+  - history rows show a time with no date;
+  - the reason line is not in the button's `aria-describedby`.
+- **Owner screenshots:** `review-screenshots/ed-0100` (not in git).
+- **Remaining work:** none.
