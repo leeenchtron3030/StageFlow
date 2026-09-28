@@ -97,6 +97,19 @@ these defaults:
    `MediaTimingEvidenceApplication`, committing the terminal result reference together with
    the evidence.
 
+## Amendment
+
+*Owner amendment 2026-09-27 (ED-0096):*
+- Decision 4 is widened. When `[local_media_timing]` is enabled, each Demo
+  reconciliation cycle also enqueues inspection for every registered asset of the Event
+  that has no `media_timing` operation, including assets registered before inspection
+  was enabled or by startup and recovery media cycles.
+- The enqueue is bounded to 100 assets per cycle and idempotent by work key.
+- This remains evidence gathering only. It grants no authority, ADR-0026 is not engaged,
+  and MTE stays advisory under ADR-0027.
+- The explicit human backfill command remains available, but it is no longer the only
+  path for existing assets.
+
 ## Alternatives
 
 - **Populate `recorded_start_at` at discovery from container metadata.** Rejected. It turns

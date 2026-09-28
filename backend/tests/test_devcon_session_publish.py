@@ -58,6 +58,9 @@ class RejectedHandler(BaseHTTPRequestHandler):
 
     def do_PUT(self) -> None:  # noqa: N802
         type(self).calls += 1
+        # Drain the actual PUT before closing the HTTP/1.0 connection. Closing
+        # with unread request bytes can reset TCP before the client reads the JSON.
+        self.rfile.read(int(self.headers["Content-Length"]))
         response = json.dumps({"status": 400, "message": "No Body"}).encode(
             "utf-8"
         )

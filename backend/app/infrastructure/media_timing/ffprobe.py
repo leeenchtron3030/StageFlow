@@ -99,6 +99,7 @@ class FFprobeAdapter:
         if not path.is_absolute() or not path.is_file():
             raise MediaTimingError("input_missing", retryable=True)
         raw = self._run(["-protocol_whitelist", "file", "-v", "error", "-print_format", "json",
+                         "-format_whitelist", "mov,mp4,m4a,3gp,3g2,mj2,matroska,webm,mxf,wav",
                          "-show_format", "-show_streams", str(path)])
         try:
             document: object = json.loads(raw)

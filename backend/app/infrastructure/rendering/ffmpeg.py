@@ -16,6 +16,8 @@ from app.contexts.rendering.contracts import (
 
 from .storage import OutputStore, safe_path
 
+RENDER_INPUT_FORMATS = "mov,mp4,m4a,3gp,3g2,mj2,matroska,webm,mxf"
+
 
 def concat_list_content(inputs: Sequence[Path]) -> str:
     lines = ["ffconcat version 1.0"]
@@ -24,6 +26,9 @@ def concat_list_content(inputs: Sequence[Path]) -> str:
             raise RenderError(RenderReason.INPUT_MISSING)
         quoted = path.as_posix().replace("'", "'\\''")
         lines.append(f"file '{quoted}'")
+        # Concat inherits the outer whitelist. Per-file open options replace it so
+        # referenced media cannot itself be a concat/playlist, regardless of suffix.
+        lines.append(f"option format_whitelist {RENDER_INPUT_FORMATS}")
     return "\n".join(lines) + "\n"
 
 
@@ -102,6 +107,7 @@ class FFmpegAdapter:
             command = [str(self.binary), "-nostdin", "-hide_banner", "-y",
                        "-hwaccel", "cuda", "-hwaccel_output_format", "cuda",
                        "-f", "concat", "-safe", "0", "-protocol_whitelist", "file,pipe",
+                       "-format_whitelist", "concat",
                        "-i", str(concat), "-map", "0:v:0", "-map_metadata", "-1",
                        "-map_chapters", "-1",
                        "-vf", "scale_cuda=1920:1080:format=nv12", "-fps_mode", "cfr",

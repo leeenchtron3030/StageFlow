@@ -277,7 +277,10 @@ not-event-ready disclaimer retain their meaning.
   Recorder semantics remain unqualified. Inspection never sets `media_started_at`,
   Session boundaries, membership, association, or package state.
 - **Execution:** A separate bounded CPU worker shares the existing operation journal;
-  optional automatic enqueue gathers evidence only. Existing-asset enqueue is human-only.
+  when enabled, Demo reconciliation automatically enqueues up to 100 Event assets lacking
+  a timing operation per cycle, including existing assets, idempotently by work key.
+  The human backfill command remains available. Both paths gather evidence only; see the
+  [ADR-0033 Amendment](../adr/ADR-0033-production-media-timing-inspection.md#amendment).
 
 ### Editorial Candidate Moment
 

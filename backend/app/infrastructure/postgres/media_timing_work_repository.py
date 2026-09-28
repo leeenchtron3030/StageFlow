@@ -119,3 +119,29 @@ class PostgresMediaTimingWorkRepository(
                 return items, items[-1].asset_id if len(rows) > limit else None
         except (psycopg.InterfaceError, psycopg.OperationalError):
             raise WorkExecutionStorageUnavailableError("postgresql_unavailable") from None
+
+    def assets_without_operation(
+        self, event_id: EntityId, *, limit: int = 100,
+    ) -> tuple[RegisteredTimingAsset, ...]:
+        """Bound recovery work; durable enqueues remove assets from subsequent pages."""
+        if not 1 <= limit <= 100:
+            raise ValueError("media_timing_limit_out_of_bounds")
+        try:
+            with self._connect() as conn:
+                rows = conn.execute(
+                    """SELECT a.asset_id, a.manifest_id, a.registered_at
+                       FROM stageflow.completed_media_asset_registry a
+                       JOIN stageflow.stage s USING (stage_id)
+                       WHERE s.event_id=%s AND NOT EXISTS (
+                           SELECT 1 FROM stageflow.work_operation o
+                           WHERE o.event_id=s.event_id AND o.asset_id=a.asset_id
+                             AND o.operation_kind='media_timing')
+                       ORDER BY a.asset_id LIMIT %s""",
+                    (event_id.value, limit),
+                ).fetchall()
+                return tuple(RegisteredTimingAsset(
+                    EntityId(str(row["asset_id"])), EntityId(str(row["manifest_id"])),
+                    row["registered_at"],
+                ) for row in rows)
+        except (psycopg.InterfaceError, psycopg.OperationalError):
+            raise WorkExecutionStorageUnavailableError("postgresql_unavailable") from None

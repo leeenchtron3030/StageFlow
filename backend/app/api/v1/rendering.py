@@ -59,6 +59,8 @@ def _operation(operation: DurableOperation[RenderOperationInput]) -> dict[str, o
         "profile_id": operation.input.execution_profile_id,
         "profile_version": operation.input.execution_profile_version,
         "attempt_count": operation.attempt_count, "reason_code": operation.last_reason_code,
+        "created_at": operation.created_at.isoformat(),
+        "updated_at": operation.updated_at.isoformat(),
         "rendered_output_id": None if operation.terminal_result_rendered_output_id is None
         else operation.terminal_result_rendered_output_id.value,
     }
@@ -109,6 +111,7 @@ def operations(
         items, cursor = repository.list_render_operations(
             EntityId(str(event_id)), EntityId(str(session_id)), limit=limit,
             after=None if after is None else EntityId(str(after)),
+            newest_first=True,
         )
     except WorkExecutionStorageUnavailableError:
         raise HTTPException(503, "postgresql_unavailable") from None

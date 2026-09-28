@@ -90,8 +90,11 @@ state. Reversal remains an explicit isolated-database operator action.
 
 Production inspection uses the shared ADR-0025 lease, retry, fencing, capability, and
 presence substrate with the `media_timing` operation kind. The optional, default-off
-`[local_media_timing]` configuration enables enqueue during Demo reconciliation for newly
-registered assets. Existing assets require an explicit bounded human enqueue command.
+`[local_media_timing]` configuration enables automatic enqueue during Demo reconciliation
+for up to 100 registered Event assets lacking a timing operation per cycle, including
+existing assets, idempotently by work key. The explicit bounded human backfill command
+remains available under the
+[ADR-0033 Amendment](../adr/ADR-0033-production-media-timing-inspection.md#amendment).
 Neither path depends on Session association. The separate CPU worker
 `python -m app.demo.media_timing_worker` defaults to two concurrent inspections (maximum
 eight). Transcription and render capabilities and views remain isolated.

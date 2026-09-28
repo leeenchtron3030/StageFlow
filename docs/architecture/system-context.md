@@ -42,7 +42,10 @@ The optional CPU media timing worker (`python -m app.demo.media_timing_worker`) 
 registered media through the Kernel media path resolver and an operator-installed LGPL
 ffprobe. It defaults to two concurrent leases on the shared Work Execution substrate.
 `[local_media_timing]` is absent/disabled by default. Enabled Demo reconciliation enqueues
-newly registered assets; a bounded human command can enqueue existing Event assets.
+up to 100 registered Event assets lacking a timing operation per cycle, including existing
+assets, automatically and idempotently by work key. The bounded human backfill command
+remains available under the
+[ADR-0033 Amendment](../adr/ADR-0033-production-media-timing-inspection.md#amendment).
 Authenticated operation pages and latest per-asset summaries expose advisory MTE only.
 Creation time and measured duration never acquire registry, Session, association,
 membership, package, or recorder-qualification authority. The binary stays external to

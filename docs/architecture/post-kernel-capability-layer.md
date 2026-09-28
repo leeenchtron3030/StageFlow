@@ -608,8 +608,11 @@ primary video stream timing as observations. Only valid aware creation time and 
 produce `creation_time_plus_duration` v1; missing or naive timestamps stay limitations.
 Recorder semantics remain unqualified. The application boundary and terminal result
 commit under one fence and transaction, and expiry reconciliation recognizes committed
-MTE. Default-off Demo enqueue covers newly registered assets, while a human-only bounded
-command covers existing assets. Authenticated reads expose operation pages and latest
+MTE. When enabled, default-off Demo enqueue automatically covers up to 100 registered
+Event assets lacking a timing operation per cycle, including existing assets, idempotently
+by work key. The bounded human backfill command remains available under the
+[ADR-0033 Amendment](../adr/ADR-0033-production-media-timing-inspection.md#amendment).
+Authenticated reads expose operation pages and latest
 MTE summaries. Assembly ordering and Editorial placement do not consume these intervals
 in this slice. Owner host comparison and security review remain qualification work.
 
