@@ -1,5 +1,5 @@
 import { uiLabels, renderLabel, renderProfileLabel, slotLabel } from "../experience/ui-labels.ts";
-import { assemblyConsequence, memberOrderingLabel, memberOrderSummary, intervalDuration, wallClockLabel, qualificationLabel, sortedRenderOperations, newestOutputs, outputDuration, type SessionOutputs } from "../experience/session-outputs.ts";
+import { assemblyConsequence, memberOrderingLabel, memberOrderSummary, intervalDuration, wallClockLabel, qualificationLabel, sortedRenderOperations, renderTimeLabel, newestOutputs, outputDuration, type SessionOutputs } from "../experience/session-outputs.ts";
 import type { AssemblyItem, AssemblyMember } from "../experience/assembly-api.ts";
 
 function Unavailable({ section }: { section: string }) {
@@ -142,23 +142,25 @@ export function SessionOutputsPanel({ outputs, actions }: { outputs: SessionOutp
       {outputs.operations.state === "unavailable" ? <Unavailable section="Render operations" /> : <>
         {!outputs.operations.value.items.length ? <p>No render operations reported for this Session.</p> : null}
         {outputs.operations.value.items.length ? <>
-          <p>Rendering first, then done, then failed or other states. Order within each group is unchanged; operation times are unavailable.</p>
+          <p>{uiLabels.renderNewestFirst}</p>
           <div className="member-table-scroll"><table className="member-table" aria-label="Render operations">
-            <thead><tr><th scope="col">State</th><th scope="col">Format</th><th scope="col">Details</th></tr></thead>
+            <thead><tr><th scope="col">State</th><th scope="col">Format</th><th scope="col">{uiLabels.renderCreated}</th><th scope="col">Details</th></tr></thead>
             <tbody>{sortedRenderOperations(outputs.operations.value.items).map((operation) => <tr key={operation.operation_id}>
               <th scope="row">{renderLabel(operation.state)}{operation.reason_code ? ` · ${operation.reason_code}` : ""}</th>
               <td>{renderProfileLabel(operation.profile_id, operation.profile_version)}</td>
+              <td><time dateTime={operation.created_at}>{renderTimeLabel(operation.created_at)}</time></td>
               <td><details><summary>{uiLabels.details}</summary><p>{revisionLabel(operation.assembly_revision_id)} · {operation.state} · profile version {operation.profile_version}</p><dl className="outputs-facts">
                 <div><dt>Operation ID</dt><dd><code className="copyable-id" tabIndex={0}>{operation.operation_id}</code></dd></div>
                 <div><dt>Assembly revision ID</dt><dd><code>{operation.assembly_revision_id}</code></dd></div>
                 <div><dt>Profile ID</dt><dd>{operation.profile_id}</dd></div>
                 <div><dt>Attempts</dt><dd>{operation.attempt_count}</dd></div>
+                <div><dt>{uiLabels.renderUpdated}</dt><dd><time dateTime={operation.updated_at}>{renderTimeLabel(operation.updated_at)}</time></dd></div>
                 {operation.rendered_output_id ? <div><dt>Output ID</dt><dd><code>{operation.rendered_output_id}</code></dd></div> : null}
               </dl></details></td>
             </tr>)}</tbody>
           </table></div>
         </> : null}
-        {outputs.operations.value.truncated ? <p>Showing the first 100 render operations. More operations exist.</p> : null}
+        {outputs.operations.value.truncated ? <p>{uiLabels.renderMoreOperations}</p> : null}
       </>}
     </div>
     <div className="outputs-section">

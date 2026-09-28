@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { capabilityRead, countSchema as count, idSchema as id, hashSchema, operationStateSchema, pageFields, timestampSchema, query, type ApiRead } from "./outputs-api.ts";
-export const renderOperationSchema = z.object({ operation_id: id, state: operationStateSchema, assembly_revision_id: id, profile_id: z.string(), profile_version: z.string(), attempt_count: count, reason_code: z.string().nullable(), rendered_output_id: id.nullable() });
+export const renderOperationSchema = z.object({ operation_id: id, state: operationStateSchema, assembly_revision_id: id, profile_id: z.string(), profile_version: z.string(), attempt_count: count, reason_code: z.string().nullable(), rendered_output_id: id.nullable(), created_at: timestampSchema, updated_at: timestampSchema });
 export const renderedOutputSchema = z.object({
   output_id: id, assembly_revision_id: id, profile_id: z.string(), profile_version: z.string(), operation_id: id, producing_attempt_id: id,
   content_key: z.string(), sha256: hashSchema, manifest_content_key: z.string(), manifest_sha256: hashSchema,

@@ -22,7 +22,7 @@ export function fixtureAssembly() {
   });
 }
 export function fixtureRenderOperation() {
-  return renderOperationSchema.parse({ operation_id: fixtureId(30), state: "succeeded", assembly_revision_id: fixtureId(4), profile_id: "h264-nvenc-1080p-video", profile_version: "2", attempt_count: 1, reason_code: null, rendered_output_id: fixtureId(31) });
+  return renderOperationSchema.parse({ operation_id: fixtureId(30), state: "succeeded", assembly_revision_id: fixtureId(4), profile_id: "h264-nvenc-1080p-video", profile_version: "2", attempt_count: 1, reason_code: null, rendered_output_id: fixtureId(31), created_at: at, updated_at: at });
 }
 export function fixtureRenderedOutput() {
   return renderedOutputSchema.parse({
