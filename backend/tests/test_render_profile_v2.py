@@ -13,7 +13,6 @@ from app.api.v1.router import router
 from app.contexts.assembly.session_contracts import AssemblyRevision
 from app.contexts.rendering.contracts import (
     CURRENT_RENDER_PROFILE,
-    FIRST_RENDER_PROFILE,
     RENDER_PROFILE_V1,
     FFmpegIdentity,
     RenderActor,
@@ -48,10 +47,12 @@ from tests.test_rendering_phase_b import approved_revision as approved_revision
 def test_current_profile_rate_is_immutable_and_v1_is_recorded_only() -> None:
     profile = CURRENT_RENDER_PROFILE
     assert RenderProfile() == profile
-    assert FIRST_RENDER_PROFILE is profile
-    assert profile.version == "2" and profile.output_frame_rate == Fraction(30000, 1001)
+    assert CURRENT_RENDER_PROFILE is profile
+    assert profile.version == "3" and profile.output_frame_rate == Fraction(30000, 1001)
     assert RENDER_PROFILE_V1.version == "1" and RENDER_PROFILE_V1.output_frame_rate is None
-    assert replace(profile, version="1", output_frame_rate=None) == RENDER_PROFILE_V1
+    assert replace(profile, version="1", output_frame_rate=None, audio_codec=None,
+                   audio_sample_rate=None, audio_channels=None,
+                   audio_bit_rate=None) == RENDER_PROFILE_V1
     with pytest.raises(FrozenInstanceError):
         profile.__setattr__("output_frame_rate", Fraction(25))
     for unsupported in (RENDER_PROFILE_V1, replace(profile, output_frame_rate=Fraction(30))):
@@ -62,7 +63,7 @@ def test_current_profile_rate_is_immutable_and_v1_is_recorded_only() -> None:
             RenderProfile(output_frame_rate=cast(Fraction, not_a_fraction))
     output = output_for(EntityId.new(), EntityId.new(), EntityId.new())
     with pytest.raises(RenderError, match="render_output_invalid"):
-        replace(output, profile_version="3")
+        replace(output, profile_version="4")
 
 
 def test_service_refuses_v1_before_repository_access() -> None:
@@ -75,8 +76,8 @@ def test_service_refuses_v1_before_repository_access() -> None:
     assert repository.mock_calls == []
 
 
-@pytest.mark.parametrize("version", [None, "2", "1"])
-def test_api_defaults_to_v2_and_refuses_v1_bounded(
+@pytest.mark.parametrize("version", [None, "3", "1", "2"])
+def test_api_defaults_to_v3_and_refuses_v1_v2_bounded(
     monkeypatch: pytest.MonkeyPatch, version: str | None,
 ) -> None:
     memory = MemoryRendering()
@@ -93,23 +94,27 @@ def test_api_defaults_to_v2_and_refuses_v1_bounded(
     if version is not None:
         body["profile_version"] = version
     response = client.post("/api/v1/rendering/requests", headers=HEADERS, json=body)
-    if version == "1":
+    if version in {"1", "2"}:
         assert response.status_code == 409
         assert response.json() == {"detail": "render_profile_unsupported"}
         assert memory.work.operations == {}
     else:
         assert response.status_code == 200
-        assert response.json()["profile_version"] == "2"
-        assert next(iter(memory.work.operations.values())).input.execution_profile_version == "2"
+        assert response.json()["profile_version"] == "3"
+        assert next(iter(memory.work.operations.values())).input.execution_profile_version == "3"
 
 
-def test_v2_on_v1_rendered_revision_creates_new_operation_and_replays() -> None:
+@pytest.mark.parametrize("historical_version", ["1", "2"])
+def test_v3_on_historical_rendered_revision_creates_new_operation_and_replays(
+    historical_version: str,
+) -> None:
     memory = MemoryRendering()
     old_request = replace(render_request(), event_id=memory.source.revision.event_id,
-        input=RenderOperationInput(memory.source.revision.id, RENDER_PROFILE_V1.id, "1", "old"))
+        input=RenderOperationInput(memory.source.revision.id, RENDER_PROFILE_V1.id,
+                                   historical_version, "old"))
     old = memory.work.enqueue(pending_render_operation(old_request))
     output = replace(output_for(old.id, EntityId.new(), memory.source.revision.id),
-                     profile_version="1")
+                     profile_version=historical_version)
     memory.outputs.append(output)
     completed = replace(old, status=OperationStatus.SUCCEEDED,
                         terminal_result_type="rendered_output",
@@ -119,61 +124,67 @@ def test_v2_on_v1_rendered_revision_creates_new_operation_and_replays() -> None:
     current = memory.service().request_render(memory.source.revision.id, CURRENT_RENDER_PROFILE,
                                                actor, command)
     assert current.id != old.id and current.work_key != old.work_key
-    assert current.input.execution_profile_version == "2"
+    assert current.input.execution_profile_version == "3"
     for replay_command in (command, EntityId.new()):
         assert memory.service().request_render(memory.source.revision.id, CURRENT_RENDER_PROFILE,
                                                 actor, replay_command) == current
     assert memory.work.get_operation(old.id) == completed
-    assert memory.outputs == [output] and output.profile_version == "1"
+    assert memory.outputs == [output] and output.profile_version == historical_version
 
 
-def test_worker_v2_capability_claims_only_v2_leaving_v1_pending(harness: Harness) -> None:
+@pytest.mark.parametrize("historical_version", ["1", "2"])
+def test_worker_v3_capability_claims_only_v3_leaving_history_pending(
+    harness: Harness, historical_version: str,
+) -> None:
     old_request = replace(harness.request, input=replace(harness.request.input,
-        execution_profile_id=CURRENT_RENDER_PROFILE.id, execution_profile_version="1"))
+        execution_profile_id=CURRENT_RENDER_PROFILE.id,
+        execution_profile_version=historical_version))
     old = harness.repository.enqueue(pending_render_operation(old_request))
     renderer = worker(harness, "render")
     capability = render_capability(renderer.id, FFmpegIdentity("synthetic", "a" * 64), True, NOW)
     assert capability.execution_profile_id == CURRENT_RENDER_PROFILE.id
-    assert capability.execution_profile_version == "2"
+    assert capability.execution_profile_version == "3"
     harness.repository.register_capability(capability)
     request = replace(claim_request(renderer), operation_kind="render")
     assert harness.repository.claim_next(request) is None
-    new_request = replace(old_request, operation_id=EntityId.new(), idempotency_key="new-v2",
-                          input=replace(old_request.input, execution_profile_version="2"))
+    new_request = replace(old_request, operation_id=EntityId.new(), idempotency_key="new-v3",
+                          input=replace(old_request.input, execution_profile_version="3"))
     current = harness.repository.enqueue(pending_render_operation(new_request))
     claim = harness.repository.claim_next(request)
     assert claim is not None and claim.operation.id == current.id
-    assert claim.operation.input.execution_profile_version == "2"
+    assert claim.operation.input.execution_profile_version == "3"
     # ADR-0025 may promote due pending work to eligible before capability matching; the
-    # guarantee is that a v2 worker never claims, leases, or attempts v1 work.
+    # guarantee is that a v3 worker never claims, leases, or attempts v1 or v2 work.
     unclaimed = harness.repository.get_operation(old.id)
     assert unclaimed.status in {OperationStatus.PENDING, OperationStatus.ELIGIBLE}
     assert unclaimed.current_attempt_id is None and unclaimed.attempt_count == 0
     assert unclaimed.input == old.input and unclaimed.work_key == old.work_key
 
 
-def test_postgres_v1_history_hydrates_lists_and_v2_rerenders(
-    render_postgres_dsn: str, approved_revision: AssemblyRevision,
+@pytest.mark.parametrize("historical_version", ["1", "2"])
+def test_postgres_history_hydrates_lists_and_v3_rerenders(
+    historical_version: str, render_postgres_dsn: str, approved_revision: AssemblyRevision,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     # Seed an authentic historical operation through the generic substrate, which retains
-    # versioned history; new human requests still go through RenderingService's v2 guard.
+    # versioned history; new human requests still go through RenderingService's v3 guard.
     generic = general_repository(render_postgres_dsn)
     envelope = replace(render_request(), event_id=approved_revision.event_id,
-        input=RenderOperationInput(approved_revision.id, RENDER_PROFILE_V1.id, "1", "old"))
+        input=RenderOperationInput(approved_revision.id, RENDER_PROFILE_V1.id,
+                                   historical_version, "old"))
     old = generic.enqueue(pending_render_operation(envelope))
     harness_value = Harness(generic, envelope, MutableClock(), render_postgres_dsn)
     renderer = worker(harness_value, "render")
     historical_capability = replace(render_capability(renderer.id,
         FFmpegIdentity("synthetic", "a" * 64), True, NOW + timedelta(seconds=1)),
-        execution_profile_version="1")
+        execution_profile_version=historical_version)
     repo = PostgresRenderRepository(render_postgres_dsn)
     repo.register_render_capability(historical_capability)
     claim = repo.claim_next(replace(claim_request(renderer), operation_kind="render"))
     assert claim is not None and claim.operation.id == old.id
     claim = repo.mark_running(claim)
     output = replace(output_for(old.id, claim.attempt.id, approved_revision.id),
-                     profile_version="1")
+                     profile_version=historical_version)
     repo.apply_render_result(claim, output)
 
     restarted = PostgresRenderRepository(render_postgres_dsn)
@@ -181,7 +192,7 @@ def test_postgres_v1_history_hydrates_lists_and_v2_rerenders(
     actor, command = RenderActor(EntityId.new()), EntityId.new()
     current = service.request_render(approved_revision.id, CURRENT_RENDER_PROFILE, actor, command)
     assert current.id != old.id and current.work_key != old.work_key
-    assert current.input.execution_profile_version == "2"
+    assert current.input.execution_profile_version == "3"
     assert service.request_render(approved_revision.id, CURRENT_RENDER_PROFILE,
                                    actor, command) == current
     assert service.request_render(approved_revision.id, CURRENT_RENDER_PROFILE,
@@ -191,7 +202,8 @@ def test_postgres_v1_history_hydrates_lists_and_v2_rerenders(
                                    approved_revision.session_id) == ((output,), None)
     operations, _ = restarted.list_render_operations(approved_revision.event_id,
                                                       approved_revision.session_id)
-    assert {item.input.execution_profile_version for item in operations} == {"1", "2"}
+    assert {item.input.execution_profile_version for item in operations} == {
+        historical_version, "3"}
     def api_service(request: object) -> RenderingService:
         return service
 
@@ -203,5 +215,5 @@ def test_postgres_v1_history_hydrates_lists_and_v2_rerenders(
         f"?event_id={approved_revision.event_id.value}&session_id={approved_revision.session_id.value}",
         headers=HEADERS)
     assert response.status_code == 200
-    assert response.json()["items"][0]["profile_version"] == "1"
+    assert response.json()["items"][0]["profile_version"] == historical_version
     assert response.json()["items"][0]["output_id"] == output.id.value

@@ -3,6 +3,7 @@ import { test } from "node:test";
 import { nextOutputAction, outputActionDisabled, outputConfirmation, prepareOutputCommand, sendOutputCommand, type OutputActionContext } from "./output-actions.ts";
 import { fixtureAssembly, fixtureId as id } from "./session-outputs-fixtures.ts";
 import { demoLaunchContextHeader } from "./demo-launch-context.ts";
+import { renderProfileLabel } from "./ui-labels.ts";
 
 const context = (): OutputActionContext => ({ eventId: id(3), sessionId: id(2), packageRevision: 1, launchContext: "synthetic-launch-context", operatorAvailable: true, authoritative: true, fixture: false, assembly: { state: "available", value: fixtureAssembly() } });
 const cryptoSource = { randomUUID: () => id(99), getRandomValues: (bytes: Uint8Array) => bytes };
@@ -26,13 +27,13 @@ for (const action of ["approve", "reject"] as const) test(`${action} requires co
   assert.equal(command.path, `/api/stageflow/assembly/sessions/${id(2)}/approvals`);
   assert.deepEqual(command.body, { operation_id: id(99), confirmed: "confirmed", revision_number: 2, expected_revision: 2, expected_decision_count: 0, action, reason: "Checked" });
 });
-test("render requires approval and sends explicit default v2 with command_id", () => {
+test("render requires approval and sends explicit default v3 with command_id", () => {
   const ctx = context(), item = fixtureAssembly();
   assert.equal(prepareOutputCommand(ctx, "render", true), undefined);
   item.approval_state = "approved"; ctx.assembly = { state: "available", value: item };
   const command = prepareOutputCommand(ctx, "render", true, { cryptoSource })!;
   assert.equal(command.path, "/api/stageflow/rendering/requests");
-  assert.deepEqual(command.body, { command_id: id(99), confirmed: "confirmed", assembly_revision_id: id(1), profile_id: "h264-nvenc-1080p-video", profile_version: "2", authority_kind: "human" });
+  assert.deepEqual(command.body, { command_id: id(99), confirmed: "confirmed", assembly_revision_id: id(1), profile_id: "h264-nvenc-1080p-video", profile_version: "3", authority_kind: "human" });
   assert.equal(prepareOutputCommand(ctx, "render", false), undefined);
   item.stale = true; assert.equal(prepareOutputCommand(ctx, "render", true), undefined);
 });
@@ -46,7 +47,7 @@ test("proposal selection and confirmation gate UUID creation", () => {
 test("confirmations lead with consequences and explicitly name ordering exceptions and bound packaging", () => {
   for (const action of ["approve", "reject", "render"] as const) {
     const text = outputConfirmation(action, fixtureAssembly(), 1);
-    assert.match(text.split("\n")[0], action === "render" ? /^Queue a video-only render.*approved Assembly.*1080p \(v2\)/ : new RegExp(`^${action === "approve" ? "Approve" : "Reject"} this Assembly.*locked recording order and layout`));
+    assert.match(text.split("\n")[0], action === "render" ? /^Queue a render.*approved Assembly.*1080p with audio \(v3\)/ : new RegExp(`^${action === "approve" ? "Approve" : "Reject"} this Assembly.*locked recording order and layout`));
     assert.match(text, /Arrival time \(no recorder time\): recordings 3/);
     assert.match(text, /2: Recorder time \(unverified\).*Timing is an estimate/);
     assert.match(text, /Layout: Intro/);
@@ -112,4 +113,11 @@ test("unbounded HTTP error text is not displayed; malformed success is refreshed
   let refreshes = 0;
   assert.equal((await sendOutputCommand(command, async () => new Response("not JSON"), () => refreshes++)).kind, "failed");
   assert.equal(refreshes, 1);
+});
+
+test("render profile labels distinguish audio from video-only history", () => {
+  assert.equal(renderProfileLabel("h264-nvenc-1080p-video", "3"), "1080p with audio (v3)");
+  assert.equal(renderProfileLabel("h264-nvenc-1080p-video", "1"), "1080p (v1)");
+  assert.equal(renderProfileLabel("h264-nvenc-1080p-video", "2"), "1080p (v2)");
+  assert.equal(renderProfileLabel("synthetic", "3"), "synthetic (v3)");
 });

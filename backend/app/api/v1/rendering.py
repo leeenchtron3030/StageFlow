@@ -32,7 +32,7 @@ class RequestBody(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
     assembly_revision_id: UUID
     profile_id: Literal["h264-nvenc-1080p-video"] = "h264-nvenc-1080p-video"
-    profile_version: Literal["1", "2"] = "2"
+    profile_version: Literal["1", "2", "3"] = "3"
     actor_id: UUID
     command_id: UUID
     confirmed: Literal["confirmed"]

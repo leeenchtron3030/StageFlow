@@ -115,14 +115,14 @@ test("current render state replaces the primary render action; another render re
     assert.equal(bodies.length, 0);
     ui.click("Request another render");
     assert.equal(bodies.length, 0); assert.equal(ui.stats().open, true);
-    assert.match(ui.html(), /Queue a video-only render of the approved Assembly in 1080p \(v2\)/);
+    assert.match(ui.html(), /Queue a render of the approved Assembly in 1080p with audio \(v3\)/);
     assert.equal(ui.find("dialog")["aria-labelledby"], "output-consequence");
     assert.doesNotMatch(ui.html(), /<h4/);
     ui.click("Cancel"); assert.equal(bodies.length, 0);
     ui.click("Request another render"); ui.submit(); await settle(); ui.render();
     assert.equal(bodies.length, 1);
     assert.equal(bodies[0].assembly_revision_id, item.revision.revision_id);
-    assert.equal(bodies[0].profile_version, "2");
+    assert.equal(bodies[0].profile_version, "3");
     assert.equal(ui.stats().refreshes, 1);
   }
 });

@@ -55,7 +55,7 @@ export function prepareOutputCommand(context: OutputActionContext, action: Outpu
   if ((action === "approve" || action === "reject") && (!reason || reason.length > 500)) return undefined;
   const commandId = generateUuidV4(options.cryptoSource);
   const body = action === "propose" ? { operation_id: commandId, confirmed: "confirmed", template_id: options.templateId!, expected_revision: item?.current_revision_number ?? 0, expected_package_revision: context.packageRevision }
-    : action === "render" ? { command_id: commandId, confirmed: "confirmed", assembly_revision_id: item!.revision.revision_id, profile_id: "h264-nvenc-1080p-video", profile_version: "2", authority_kind: "human" }
+    : action === "render" ? { command_id: commandId, confirmed: "confirmed", assembly_revision_id: item!.revision.revision_id, profile_id: "h264-nvenc-1080p-video", profile_version: "3", authority_kind: "human" }
     : { operation_id: commandId, confirmed: "confirmed", revision_number: item!.revision.revision_number, expected_revision: item!.current_revision_number, expected_decision_count: item!.decision_count, action, reason };
   return Object.freeze({ action, path: action === "render" ? "/api/stageflow/rendering/requests" : `/api/stageflow/assembly/sessions/${context.sessionId}/${action === "propose" ? "revisions" : "approvals"}`, body: Object.freeze(body), launchContext: context.launchContext! });
 }

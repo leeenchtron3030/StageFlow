@@ -21,6 +21,7 @@ from app.contexts.work_execution import (
     WorkerHealth,
     WorkerPressure,
 )
+from app.infrastructure.media_timing.ffprobe import FFprobeAdapter
 from app.infrastructure.postgres.render_repository import PostgresRenderRepository
 from app.infrastructure.rendering.execution import LocalRenderExecution
 from app.infrastructure.rendering.ffmpeg import FFmpegAdapter
@@ -56,11 +57,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         local = config.deployment.local_render
         if local is None or not local.enabled:
             raise ValueError("local_render_not_enabled")
+        if local.ffprobe_path is None:
+            sys.stderr.write("stageflow_render_worker_error=local_render_ffprobe_path_required\n")
+            return 1
         event = components.repository.get_event_by_key(components.event_key)
         if event is None:
             raise ValueError("explicit_event_stage_bootstrap_required")
         clock = SystemClock()
-        ffmpeg = FFmpegAdapter(Path(local.ffmpeg_path))
+        ffmpeg = FFmpegAdapter(Path(local.ffmpeg_path),
+                               FFprobeAdapter(Path(local.ffprobe_path), clock))
         store = OutputStore(Path(local.output_root))
         execution = LocalRenderExecution(
             ffmpeg, store, PackagingContentResolver(Path(local.packaging_content_root)),

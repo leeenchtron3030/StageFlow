@@ -116,8 +116,20 @@ class LocalRenderConfiguration(BaseModel):
 
     enabled: bool = False
     ffmpeg_path: str = Field(repr=False)
+    ffprobe_path: str | None = Field(default=None, repr=False)
     output_root: str = Field(repr=False)
     packaging_content_root: str = Field(repr=False)
+
+    @field_validator("ffprobe_path")
+    @classmethod
+    def probe_path(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        cls.external_absolute_path(value)
+        if (any(char in value for char in "\r\n\0")
+                or Path(value).suffix.casefold() in {".cmd", ".bat"}):
+            raise ValueError("local_render_ffprobe_path_refused")
+        return value
 
     @field_validator("ffmpeg_path", "output_root", "packaging_content_root")
     @classmethod

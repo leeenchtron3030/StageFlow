@@ -72,6 +72,7 @@ from tests.test_rendering_phase_b import (
     RenderActor,
     output_for,
     plan_for,
+    synthetic_probe,
 )
 from tests.test_rendering_phase_b import approved_revision as approved_revision
 from tests.test_rendering_phase_b import fake_ffmpeg as fake_ffmpeg
@@ -136,7 +137,7 @@ def test_real_session_media_resolver_render_and_failure_classification(
     root = tmp_path / "output"
     root.mkdir()
     store = OutputStore(root)
-    execution = LocalRenderExecution(FFmpegAdapter(fake_ffmpeg), store,
+    execution = LocalRenderExecution(FFmpegAdapter(fake_ffmpeg, synthetic_probe()), store,
         PackagingContentResolver(source), resolver, kernel, FixedClock(NOW))
     memory = MemoryRendering()
     operation = memory.service().request_render(memory.source.revision.id, PROFILE,

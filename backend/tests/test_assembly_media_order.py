@@ -42,7 +42,7 @@ from app.contexts.production.event_mode_kernel.contracts import (
     StartSessionRequest,
 )
 from app.contexts.rendering.contracts import (
-    FIRST_RENDER_PROFILE,
+    CURRENT_RENDER_PROFILE,
     RenderError,
     RenderPlan,
     RenderProfile,
@@ -179,16 +179,16 @@ def test_render_intro_session_outro_uses_frozen_order(mode: str) -> None:
     }
     media = {m.asset_id: VideoInput(CompletedMediaAssetContent(m.asset_id), "video/mp4")
              for m in members}
-    plan = build_render_plan(source, FIRST_RENDER_PROFILE, packaging, media)
+    plan = build_render_plan(source, CURRENT_RENDER_PROFILE, packaging, media)
     assert plan.inputs == (
         packaging[intro], *(media[m.asset_id] for m in members), packaging[outro],
     )
     assert plan.manifest.metadata == source.revision.metadata
     with pytest.raises(RenderError) as failure:
-        build_render_plan(source, FIRST_RENDER_PROFILE, packaging, {})
+        build_render_plan(source, CURRENT_RENDER_PROFILE, packaging, {})
     assert failure.value.code == RenderReason.INPUT_MISSING
     with pytest.raises(RenderError) as failure:
-        build_render_plan(source, FIRST_RENDER_PROFILE, {intro: packaging[intro]}, media)
+        build_render_plan(source, CURRENT_RENDER_PROFILE, {intro: packaging[intro]}, media)
     assert failure.value.code == RenderReason.INPUT_MISSING
 
 
@@ -205,13 +205,13 @@ def test_render_bound_binding_without_revision_and_template_without_session_medi
         SlotBinding("intro", None, "bound"), SlotBinding("media", None, "session_media"),
     )))
     with pytest.raises(RenderError) as failure:
-        build_render_plan(broken, FIRST_RENDER_PROFILE, packaging, media)
+        build_render_plan(broken, CURRENT_RENDER_PROFILE, packaging, media)
     assert failure.value.code == RenderReason.INPUT_MISSING
     # A template without a session-media slot renders exactly its bound packaging inputs.
     packaging_only = replace(source, revision=replace(
         source.revision, membership=members, bindings=(SlotBinding("intro", intro, "bound"),),
     ))
-    plan = build_render_plan(packaging_only, FIRST_RENDER_PROFILE, packaging, media)
+    plan = build_render_plan(packaging_only, CURRENT_RENDER_PROFILE, packaging, media)
     assert plan.inputs == (packaging[intro],)
 
 
@@ -349,7 +349,7 @@ def test_postgres_order_sources_reload_approval_and_staleness(
     assert loaded.revision == revision and not loaded.stale
     assert loaded.approval_state == ApprovalState.APPROVED
     plan = IsolatedRenderRepository(render_postgres_dsn).load_plan(
-        revision.id, FIRST_RENDER_PROFILE,
+        revision.id, CURRENT_RENDER_PROFILE,
     )
     assert tuple(i.reference for i in plan.inputs) == (
         ExternalContent("intro", "a" * 64, 10, "video/mp4"),
@@ -363,7 +363,7 @@ def test_postgres_order_sources_reload_approval_and_staleness(
     stale = db.read(render_postgres_dsn)
     assert stale.stale and stale.revision == revision
     with pytest.raises(RenderError) as failure:
-        build_render_plan(stale, FIRST_RENDER_PROFILE, {}, {})
+        build_render_plan(stale, CURRENT_RENDER_PROFILE, {}, {})
     assert failure.value.code == RenderReason.STALE
 
 
@@ -451,13 +451,13 @@ def test_postgres_pre0016_null_rows_preserve_positions_and_invalid_validation(
             db.approve()
         with pytest.raises(RenderError) as failure:
             build_render_plan(replace(loaded, approval_state=ApprovalState.APPROVED),
-                              FIRST_RENDER_PROFILE, {}, {})
+                              CURRENT_RENDER_PROFILE, {}, {})
         assert failure.value.code == RenderReason.NOT_APPROVED
     else:
         assert loaded.revision.validation.state == "valid"
         db.approve()
         plan = IsolatedRenderRepository(render_postgres_dsn).load_plan(
-            revision_id, FIRST_RENDER_PROFILE,
+            revision_id, CURRENT_RENDER_PROFILE,
         )
         assert tuple(i.reference for i in plan.inputs) == tuple(
             CompletedMediaAssetContent(m.asset_id) for m in db.members

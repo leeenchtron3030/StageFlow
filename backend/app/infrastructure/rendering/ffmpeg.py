@@ -3,9 +3,11 @@ import hashlib
 import re
 import subprocess
 from collections.abc import Callable, Sequence
+from contextlib import ExitStack
 from dataclasses import dataclass
 from pathlib import Path
 
+from app.contexts.production.media_timing_evidence.inspection import MediaTimingError
 from app.contexts.rendering.contracts import (
     FFmpegIdentity,
     RenderError,
@@ -13,10 +15,13 @@ from app.contexts.rendering.contracts import (
     RenderReason,
     require_profile,
 )
+from app.infrastructure.media_timing.ffprobe import (
+    RENDER_INPUT_FORMATS,
+    FFprobeAdapter,
+    RenderStreamFacts,
+)
 
 from .storage import OutputStore, safe_path
-
-RENDER_INPUT_FORMATS = "mov,mp4,m4a,3gp,3g2,mj2,matroska,webm,mxf"
 
 
 def concat_list_content(inputs: Sequence[Path]) -> str:
@@ -49,7 +54,8 @@ class EncodingResult:
 
 
 class FFmpegAdapter:
-    def __init__(self, ffmpeg_path: Path) -> None:
+    def __init__(self, ffmpeg_path: Path, ffprobe: FFprobeAdapter) -> None:
+        self.ffprobe = ffprobe
         try:
             self.binary = safe_path(ffmpeg_path)
             # A batch wrapper would invoke a shell on Windows even with shell=False.
@@ -100,50 +106,91 @@ class FFmpegAdapter:
             raise RenderError(RenderReason.STORE_UNAVAILABLE)
         if self._identify() != self.identity:
             raise RenderError(RenderReason.IDENTITY_REFUSED)
-        for item in inputs:
-            safe_path(item)
-        with store.temporary(".ffconcat") as concat:
-            concat.write_text(concat_list_content(inputs), encoding="utf-8", newline="\n")
+        if not inputs:
+            raise RenderError(RenderReason.INPUT_MISSING)
+        facts = [self._probe(safe_path(item), heartbeat) for item in inputs]
+        if any(not fact.video_codecs for fact in facts):
+            raise RenderError(RenderReason.INPUT_MISSING)
+        # ExitStack owns every intermediate, including on cancellation/BaseException.
+        with ExitStack() as temporary:
+            intermediates: list[Path] = []
+            for item, fact in zip(inputs, facts, strict=True):
+                intermediate = temporary.enter_context(store.temporary(".mov"))
+                intermediates.append(intermediate)
+                command = [str(self.binary), "-nostdin", "-hide_banner", "-y",
+                           "-hwaccel", "cuda", "-hwaccel_output_format", "cuda",
+                           "-protocol_whitelist", "file,pipe",
+                           "-format_whitelist", RENDER_INPUT_FORMATS, "-i", str(safe_path(item))]
+                if not fact.has_audio:
+                    command += ["-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo"]
+                command += ["-map", "0:v:0", "-map", "0:a:0" if fact.has_audio else "1:a:0",
+                            "-map_metadata", "-1", "-map_chapters", "-1",
+                            "-vf", "scale_cuda=1920:1080:format=nv12", "-fps_mode", "cfr",
+                            "-r", str(profile.output_frame_rate),
+                            "-c:v", profile.encoder, "-preset", profile.preset,
+                            "-rc", profile.rate_control, "-b:v", str(profile.bit_rate),
+                            "-g", str(profile.gop),
+                            "-af", "aresample=48000,aformat=channel_layouts=stereo,apad",
+                            "-c:a", "pcm_s16le", "-ar", "48000", "-ac", "2", "-shortest",
+                            "-f", "mov", "-progress", "pipe:1", "-nostats", str(intermediate)]
+                self._encode(command, heartbeat)
+            concat = temporary.enter_context(store.temporary(".ffconcat"))
+            concat.write_text(concat_list_content(intermediates), encoding="utf-8", newline="\n")
             command = [str(self.binary), "-nostdin", "-hide_banner", "-y",
-                       "-hwaccel", "cuda", "-hwaccel_output_format", "cuda",
                        "-f", "concat", "-safe", "0", "-protocol_whitelist", "file,pipe",
-                       "-format_whitelist", "concat",
-                       "-i", str(concat), "-map", "0:v:0", "-map_metadata", "-1",
-                       "-map_chapters", "-1",
-                       "-vf", "scale_cuda=1920:1080:format=nv12", "-fps_mode", "cfr",
-                       "-r", str(profile.output_frame_rate),
-                       "-c:v", profile.encoder, "-preset", profile.preset,
-                       "-rc", profile.rate_control, "-b:v", str(profile.bit_rate),
-                       "-g", str(profile.gop), "-an", "-f", profile.container,
+                       "-format_whitelist", "concat", "-i", str(concat),
+                       "-map", "0:v:0", "-map", "0:a:0", "-map_metadata", "-1",
+                       "-map_chapters", "-1", "-c:v", "copy", "-c:a", "aac",
+                       "-b:a", "192000", "-ar", "48000", "-ac", "2", "-f", "mp4",
                        "-progress", "pipe:1", "-nostats", str(output)]
-            try:
-                with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                      encoding="utf-8", errors="replace", shell=False) as process:
-                    try:
-                        while True:
-                            try:
-                                stdout, stderr = process.communicate(timeout=5)
-                                break
-                            except subprocess.TimeoutExpired:
-                                heartbeat()
-                    except BaseException:
-                        process.kill()
-                        process.communicate()
-                        raise
-                    if cuda_decode_fallback(stderr):
-                        raise RenderError(RenderReason.CUDA_FALLBACK)
-                    if process.returncode:
-                        if any(marker in stderr.casefold() for marker in (
-                            "openencodesessionex failed", "no capable devices found",
-                            "cannot load nvcuda", "cannot load nvencode", "unknown encoder",
-                        )):
-                            raise RenderError(RenderReason.NVENC_UNAVAILABLE)
-                        raise RenderError(RenderReason.EXIT_NONZERO, retryable=True)
-                    frames = re.findall(r"(?:^|[\r\n])frame\s*=\s*(\d+)\s*(?:[\r\n]|$)", stdout)
-                    durations = re.findall(r"(?:^|[\r\n])out_time_us=(\d+)", stdout)
-                    if (not frames or not durations
-                            or int(frames[-1]) <= 0 or int(durations[-1]) <= 0):
-                        raise RenderError(RenderReason.OUTPUT_INVALID)
-                    return EncodingResult(int(frames[-1]), int(durations[-1]))
-            except OSError:
-                raise RenderError(RenderReason.EXIT_NONZERO, retryable=True) from None
+            encoded = self._encode(command, heartbeat)
+            output_facts = self._probe(safe_path(output), heartbeat, output=True)
+            if output_facts.video_codecs != ("h264",) or output_facts.audio_codecs != ("aac",):
+                raise RenderError(RenderReason.OUTPUT_INVALID)
+            return encoded
+
+    def _probe(
+        self, path: Path, heartbeat: Callable[[], None], *, output: bool = False,
+    ) -> RenderStreamFacts:
+        try:
+            return self.ffprobe.render_streams(path, heartbeat)
+        except MediaTimingError as exc:
+            code = (RenderReason.OUTPUT_INVALID if output else
+                    RenderReason.INPUT_MISSING if exc.code == "input_missing" else
+                    RenderReason.INTERNAL)
+            raise RenderError(code, retryable=exc.retryable) from None
+
+    def _encode(self, command: list[str], heartbeat: Callable[[], None]) -> EncodingResult:
+        heartbeat()
+        try:
+            with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                  encoding="utf-8", errors="replace", shell=False) as process:
+                try:
+                    while True:
+                        try:
+                            stdout, stderr = process.communicate(timeout=5)
+                            break
+                        except subprocess.TimeoutExpired:
+                            heartbeat()
+                except BaseException:
+                    process.kill()
+                    process.communicate()
+                    raise
+                heartbeat()
+                if cuda_decode_fallback(stderr):
+                    raise RenderError(RenderReason.CUDA_FALLBACK)
+                if process.returncode:
+                    if any(marker in stderr.casefold() for marker in (
+                        "openencodesessionex failed", "no capable devices found",
+                        "cannot load nvcuda", "cannot load nvencode", "unknown encoder",
+                    )):
+                        raise RenderError(RenderReason.NVENC_UNAVAILABLE)
+                    raise RenderError(RenderReason.EXIT_NONZERO, retryable=True)
+                frames = re.findall(r"(?:^|[\r\n])frame\s*=\s*(\d+)\s*(?:[\r\n]|$)", stdout)
+                durations = re.findall(r"(?:^|[\r\n])out_time_us=(\d+)", stdout)
+                if (not frames or not durations
+                        or int(frames[-1]) <= 0 or int(durations[-1]) <= 0):
+                    raise RenderError(RenderReason.OUTPUT_INVALID)
+                return EncodingResult(int(frames[-1]), int(durations[-1]))
+        except OSError:
+            raise RenderError(RenderReason.EXIT_NONZERO, retryable=True) from None

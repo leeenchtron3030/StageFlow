@@ -40,7 +40,7 @@ class RenderError(RuntimeError):
 @dataclass(frozen=True, slots=True)
 class RenderProfile:
     id: str = "h264-nvenc-1080p-video"
-    version: str = "2"
+    version: str = "3"
     encoder: Literal["h264_nvenc"] = "h264_nvenc"
     preset: Literal["p4"] = "p4"
     rate_control: Literal["vbr"] = "vbr"
@@ -50,23 +50,42 @@ class RenderProfile:
     height: int = 1080
     container: Literal["mp4"] = "mp4"
     decode: Literal["cuda"] = "cuda"
-    audio: Literal[False] = False
+    audio_codec: Literal["aac"] | None = "aac"
+    audio_sample_rate: int | None = 48000
+    audio_channels: int | None = 2
+    audio_bit_rate: int | None = 192000
     # None records v1's passthrough behavior; new requests require the current profile.
     output_frame_rate: Fraction | None = Fraction(30000, 1001)
 
     def __post_init__(self) -> None:
+        if self.audio_codec is not None and (
+            type(self.audio_codec) is not str or self.audio_codec != "aac"
+        ):
+            raise RenderError(RenderReason.PROFILE_UNSUPPORTED)
+        for value in (self.audio_sample_rate, self.audio_channels, self.audio_bit_rate):
+            if value is not None and (type(value) is not int or value <= 0):
+                raise RenderError(RenderReason.PROFILE_UNSUPPORTED)
         if self.output_frame_rate is not None and type(self.output_frame_rate) is not Fraction:
             raise RenderError(RenderReason.PROFILE_UNSUPPORTED)
 
 
 CURRENT_RENDER_PROFILE = RenderProfile()
-RENDER_PROFILE_V1 = RenderProfile(version="1", output_frame_rate=None)
-# Compatibility for existing planner callers; remove when those callers adopt CURRENT.
-FIRST_RENDER_PROFILE = CURRENT_RENDER_PROFILE
+RENDER_PROFILE_V1 = RenderProfile(version="1", output_frame_rate=None, audio_codec=None,
+                                 audio_sample_rate=None, audio_channels=None, audio_bit_rate=None)
+RENDER_PROFILE_V2 = RenderProfile(version="2", audio_codec=None, audio_sample_rate=None,
+                                 audio_channels=None, audio_bit_rate=None)
 
 
 def require_profile(profile: RenderProfile) -> None:
-    if profile != CURRENT_RENDER_PROFILE:
+    if (type(profile) is not RenderProfile or profile != CURRENT_RENDER_PROFILE
+            or any(type(value) is not int for value in (
+                profile.bit_rate, profile.gop, profile.width, profile.height,
+                profile.audio_sample_rate, profile.audio_channels, profile.audio_bit_rate,
+            ))
+            or any(type(value) is not str for value in (
+                profile.id, profile.version, profile.encoder, profile.preset,
+                profile.rate_control, profile.container, profile.decode, profile.audio_codec,
+            ))):
         raise RenderError(RenderReason.PROFILE_UNSUPPORTED)
 
 
@@ -163,6 +182,7 @@ class RenderedOutput:
         if (self.media_type != "video/mp4"
                 or self.profile_id != CURRENT_RENDER_PROFILE.id
                 or self.profile_version not in (RENDER_PROFILE_V1.version,
+                                                RENDER_PROFILE_V2.version,
                                                 CURRENT_RENDER_PROFILE.version)):
             raise RenderError(RenderReason.OUTPUT_INVALID)
         for name in ("content_key", "manifest_content_key"):

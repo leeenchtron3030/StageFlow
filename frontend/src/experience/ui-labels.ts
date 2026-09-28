@@ -51,7 +51,7 @@ export function slotLabel(value: string): string {
   return uiLabels.slot[value as keyof typeof uiLabels.slot] ?? value.replaceAll("_", " ");
 }
 export function renderProfileLabel(id: string, version: string): string {
-  return id === "h264-nvenc-1080p-video" ? `1080p (v${version})` : `${id} (v${version})`;
+  return id === "h264-nvenc-1080p-video" ? (version === "3" ? "1080p with audio (v3)" : `1080p (v${version})`) : `${id} (v${version})`;
 }
 export function unplacedRecordings(count: number): string {
   return `${count} ${count === 1 ? "recording needs" : "recordings need"} a decision: no Session fits ${count === 1 ? "it" : "them"}. Nothing was deleted.`;
@@ -64,7 +64,7 @@ export function assignmentReason(reasons: readonly string[], fallback: string): 
 export function outputConfirmation(action: "propose" | "render" | "approve" | "reject", item: import("./assembly-api.ts").AssemblyItem | null, _packageRevision: number, templateName?: string): string {
   const consequence = action === "propose"
     ? `Lock a new Assembly proposal using ${templateName ?? "the selected Event template"}.`
-    : action === "render" ? "Queue a video-only render of the approved Assembly in 1080p (v2)."
+    : action === "render" ? "Queue a render of the approved Assembly in 1080p with audio (v3)."
     : `${action === "approve" ? "Approve" : "Reject"} this Assembly, including its locked recording order and layout.`;
   if (action === "propose") return `${consequence}\nRecording order and layout will be locked. Recordings may use arrival time or unverified recorder time; review the result before approval.`;
   const members = item?.revision.membership ?? [];
