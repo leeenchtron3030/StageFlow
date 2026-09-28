@@ -52,6 +52,18 @@ test("render response schemas parse operations and exact output metadata; malfor
   for (const fields of [{ frame_count: "1799" }, { sha256: "bad" }, { produced_at: "2026-09-27T12:00:00" }]) assert.throws(() => rendering.renderedOutputSchema.parse({ ...fixtureRenderedOutput(), ...fields }));
   assert.throws(() => rendering.renderOperationSchema.parse({ ...fixtureRenderOperation(), state: "invented" }));
 });
+test("render operation timestamps retain aware backend values and reject absent or naive times", () => {
+  const operation = { ...fixtureRenderOperation(), created_at: "2026-09-27T07:00:00.123456-07:00", updated_at: "2026-09-27T14:01:00Z" };
+  const parsed = rendering.renderOperationsSchema.parse({ ...page, items: [operation], next_after: id });
+  assert.equal(parsed.items[0].created_at, operation.created_at);
+  assert.equal(parsed.items[0].updated_at, operation.updated_at);
+  assert.equal(parsed.next_after, id);
+  for (const field of ["created_at", "updated_at"]) {
+    for (const value of [undefined, null, "invalid", "2026-09-27T12:00:00"]) {
+      assert.throws(() => rendering.renderOperationSchema.parse({ ...operation, [field]: value }));
+    }
+  }
+});
 test("media timing schemas distinguish missing evidence from advisory unqualified evidence", () => {
   assert.equal(timing.mediaTimingSummarySchema.parse({ asset_id: id, evidence: null }).evidence, null);
   assert.equal(timing.mediaTimingSummarySchema.parse(fixtureTiming()).evidence?.qualification, "unqualified");

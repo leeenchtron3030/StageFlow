@@ -21,7 +21,14 @@ export function renderStateRank(state: RenderOperation["state"]): number {
   return ["pending", "leased", "running"].includes(state) ? 0 : state === "succeeded" ? 1 : 2;
 }
 export function sortedRenderOperations(items: RenderOperation[]) {
-  return [...items].sort((a, b) => renderStateRank(a.state) - renderStateRank(b.state));
+  // Python timestamps retain microseconds; Date.parse alone truncates them.
+  const micros = (value: string) => Number((value.match(/\.(\d+)/)?.[1] ?? "").padEnd(6, "0").slice(3, 6));
+  return [...items].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at)
+    || micros(b.created_at) - micros(a.created_at) || (b.operation_id > a.operation_id ? 1 : b.operation_id < a.operation_id ? -1 : 0));
+}
+export function renderTimeLabel(value: string): string {
+  // Fixed UTC display avoids server/browser timezone and hydration differences.
+  return new Date(value).toISOString().replace("T", " ").replace(/\.\d{3}Z$/, " UTC");
 }
 export function newestOutputs(items: OutputSummary[]) {
   return [...items].sort((a, b) => Date.parse(b.produced_at) - Date.parse(a.produced_at));

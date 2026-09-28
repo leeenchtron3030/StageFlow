@@ -144,3 +144,32 @@ Revert each directive independently. No data changes.
   - `ffprobe` still reads `creation_time`;
   - a disguised concat playlist named `.mp4` is refused by both tools ("Format not on
     whitelist").
+
+### ED-0097 (2026-09-27)
+
+- **Implemented revision:** branch `codex/ed-0097-frontend-hardening`, stacked on ED-0096.
+  Codex implemented it and the owner committed it.
+- **Delivered:**
+  1. A Node-runtime middleware that allows only loopback aliases on the actual listening
+     port, plus exact `STAGEFLOW_UI_ALLOWED_HOSTS` entries.
+     - It applies to every route, including API routes and static assets.
+     - Anything else gets an empty 421.
+     - Forwarding headers are never trusted, and it fails closed when the port is unknown.
+  2. A Unicode drift check: a backend test against `unicodedata.unidata_version`, a
+     frontend format test, and a committed generator that reproduces the table
+     byte-for-byte.
+  3. Render operations sorted newest first by `created_at`, with readable times.
+- **Review:** the `directive-reviewer` returned FIX-FIRST for one README instruction.
+  Browsers omit default ports, so entries naming 80 or 443 never match; the README now
+  says so. The owner also changed the tie-break to a code-point comparison.
+- **Tests:** frontend typecheck and lint pass, **256/256 tests pass**, and the build
+  succeeds (middleware registered). The backend drift test passes.
+- **Live check** (`next start -p 3000 -H 127.0.0.1`):
+  - loopback aliases and a configured LAN host return 200;
+  - a rebinding host returns 421 for a page, an API route, and a static file;
+  - a port mismatch returns 421;
+  - a missing Host returns 400.
+- **Remaining work:**
+  - Next.js 16 deprecates `middleware.ts` in favour of `proxy.ts`; rename it later.
+  - The generator script is not Ruff-clean (E501), because CI's Ruff only covers
+    `backend/`.

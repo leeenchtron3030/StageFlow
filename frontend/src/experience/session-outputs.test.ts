@@ -25,10 +25,10 @@ const page = { items: [], next_after: null, limit: 100 };
 const eventId = fixtureId(3), sessionId = fixtureId(2);
 const revisions = (items = [fixtureAssembly()]) => ({ ...page, event_id: eventId, session_id: sessionId, items, total_count: items.length, items_truncated: false });
 
-test("render tables preserve stable state groups, sort output instants, and disclose identities only in details", () => {
+test("render tables sort request and output instants newest first and disclose identities only in details", () => {
   const outputs = getFixtureSessionOutputs();
   const states = ["terminal_failed", "running", "succeeded", "pending", "cancelled", "leased", "succeeded"] as const;
-  const operations = states.map((state, index) => ({ ...fixtureRenderOperation(), state, operation_id: fixtureId(100 + index), assembly_revision_id: index === 0 ? fixtureId(1) : fixtureId(4) }));
+  const operations = states.map((state, index) => ({ ...fixtureRenderOperation(), state, operation_id: fixtureId(100 + index), assembly_revision_id: index === 0 ? fixtureId(1) : fixtureId(4), created_at: `2026-09-27T12:00:0${index}Z` }));
   outputs.operations = { state: "available", value: { items: operations, truncated: true } };
   const items = [
     { ...presentation.outputSummary(fixtureRenderedOutput()), output_id: fixtureId(200), produced_at: "2026-09-27T12:00:00Z" },
@@ -41,8 +41,8 @@ test("render tables preserve stable state groups, sort output instants, and disc
   const html = render(outputs);
   const operationTable = html.match(/<table[^>]*aria-label="Render operations">.*?<\/table>/)![0];
   const outputTable = html.match(/<table[^>]*aria-label="Rendered Outputs">.*?<\/table>/)![0];
-  assert.deepEqual([...operationTable.matchAll(/<th scope="row">([^<]+)<\/th>/g)].map((m) => m[1]), ["Rendering...", "Rendering...", "Rendering...", "Done", "Done", "Failed", "Cancelled"]);
-  assert.ok(operationTable.indexOf(fixtureId(102)) < operationTable.indexOf(fixtureId(106)));
+  assert.deepEqual([...operationTable.matchAll(/<th scope="row">([^<]+)<\/th>/g)].map((m) => m[1]), ["Done", "Rendering...", "Cancelled", "Rendering...", "Done", "Rendering...", "Failed"]);
+  assert.ok(operationTable.indexOf(fixtureId(106)) < operationTable.indexOf(fixtureId(102)));
   assert.ok(outputTable.indexOf(fixtureId(201)) < outputTable.indexOf(fixtureId(202)));
   assert.ok(outputTable.indexOf(fixtureId(202)) < outputTable.indexOf(fixtureId(200)));
   assert.match(outputTable, /Revision 1/); assert.match(outputTable, /Revision 2/); assert.match(outputTable, /earlier revision/);
@@ -56,9 +56,21 @@ test("render tables preserve stable state groups, sort output instants, and disc
   }
   assert.match(outputTable, /<details>.*SHA-256 prefix:.*aaaaaaaaaaaa/);
   assert.match(html, /Newest produced time first among the outputs shown/);
-  assert.match(html, /operation times are unavailable/);
-  assert.doesNotMatch(operationTable, /Produced time|newest|dateTime/);
+  assert.doesNotMatch(html, /operation times are unavailable/);
+  assert.match(operationTable, /<time dateTime="2026-09-27T12:00:06Z">2026-09-27 12:00:06 UTC<\/time>/);
+  assert.match(html, /Newest requests first/);
+  assert.match(operationTable, /Last updated.*<time dateTime="2026-09-27T12:00:00Z"/);
   assert.equal(JSON.stringify(outputs), before);
+});
+
+test("render requests sort by creation instant across zones and microseconds, then ID, without mutation", () => {
+  const times = ["2026-09-27T12:00:00.000002Z", "2026-09-27T07:00:00-07:00", "2026-09-27T12:00:00.000001Z", "2026-09-27T14:00:00Z"];
+  const operations = times.map((created_at, i) => ({ ...fixtureRenderOperation(), created_at, operation_id: fixtureId(100 + i), updated_at: `2026-09-28T12:00:0${i}Z` }));
+  const before = JSON.stringify(operations);
+  assert.deepEqual(presentation.sortedRenderOperations(operations).map((operation) => operation.operation_id), [fixtureId(103), fixtureId(101), fixtureId(100), fixtureId(102)]);
+  assert.equal(JSON.stringify(operations), before);
+  assert.equal(presentation.renderTimeLabel(times[1]), "2026-09-27 14:00:00 UTC");
+  assert.deepEqual(presentation.sortedRenderOperations([]), []);
 });
 
 test("current revision summary prioritizes in-flight over success over failure and chooses newest matching output", () => {

@@ -39,6 +39,53 @@ cd C:\Dev\StageFlow\frontend
 npm ci
 ```
 
+## UI Host allowlist
+
+Every page, API route and static asset passes through `middleware.ts`. It checks the
+original `Host` header and returns an empty **421** response for unapproved or missing
+hosts. The default authorities are `localhost:<port>`, `127.0.0.1:<port>` and
+`[::1]:<port>`, where `<port>` is the actual Next.js listening port.
+
+The Node-runtime middleware reads `process.env.PORT` on each request. The installed
+Next.js `next dev` / `next start` server sets this from `server.address().port` before
+handling requests (`next/dist/server/lib/start-server.js`), covering the default port,
+`PORT`, CLI `--port`, and automatic development fallback when a port is occupied.
+It never infers the port from `Host`, the request URL, or forwarded headers. A missing
+or invalid runtime port fails closed. Custom server launchers must supply their actual
+listening port in `PORT` before serving requests.
+
+For access over a trusted LAN, set the optional **server-only** variable before launch:
+
+```powershell
+$env:STAGEFLOW_UI_ALLOWED_HOSTS = "producer.lan:3000,192.168.1.20:3000,[fd00::1]:3000"
+```
+
+Entries are comma-separated exact `host:port` authorities (DNS names, IPv4, or bracketed
+IPv6); surrounding entry whitespace is removed and DNS letter case is ignored. Ports
+must be decimal 1–65535 without leading zeros. An explicit port is required. Browsers omit
+default ports, so a Host without a port is always refused: serve the UI (or its proxy) on a
+non-default port; entries naming 80 or 443 never match. No schemes, paths, credentials, wildcards, trailing-dot names, or suffix matches
+are accepted. Malformed entries are ignored individually and grant no access. Entries
+may explicitly name a different port, for example an operator-managed reverse proxy.
+No hosts are discovered automatically. This gate supplements the existing capability
+method/path allowlists, same-origin checks, launch context, and server-held API secret.
+
+## Editorial Unicode developer tooling
+
+`src/experience/editorial-unicode.ts` records the backend Python Unicode version.
+The backend drift test compares it with `unicodedata.unidata_version`; the frontend
+test requires one well-formed exported version. Regenerate using the backend virtual
+environment's Python from the repository root, then rerun both tests and the frontend
+normalization parity tests:
+
+```powershell
+.\backend\.venv\Scripts\python.exe frontend/scripts/generate-editorial-unicode.py
+.\backend\.venv\Scripts\python.exe frontend/scripts/generate-editorial-unicode.py --check
+```
+
+The script is developer tooling only, never imported by production. `--check` verifies
+the full generated file byte-for-byte, preserving the checkout's LF or CRLF line endings.
+
 ## Fixture-mode operator preview
 
 From the repository root, the dev-only preview helper keeps child output attached to the
