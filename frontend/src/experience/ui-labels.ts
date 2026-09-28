@@ -79,6 +79,7 @@ export function outputConfirmation(action: "propose" | "render" | "approve" | "r
 
 
 export const renderQualityLabels = {
+  kicker: "Event output settings", operator: "Operator ID", timestamp: "Chosen at",
   title: "Render quality", default: "Default", change: "Change", preset: "Preset",
   video: "Video bitrate", audio: "Audio bitrate", history: "Previous settings",
   consequence: "Applies to renders requested from now on. Existing outputs keep their quality.",
@@ -97,10 +98,17 @@ export function renderQualityLabel(value: { profile_id: string; profile_version:
     : value.profile_id === "h264-nvenc-720p" && value.profile_version === "1" ? [4000000, 128000] : undefined;
   if (!defaults) return renderProfileLabel(value.profile_id, value.profile_version);
   const name = renderQualityLabels.presets[value.profile_id as keyof typeof renderQualityLabels.presets];
-  return `${name} · video ${(value.video_bit_rate ?? defaults[0]) / 1000000} Mbit/s · audio ${(value.audio_bit_rate ?? defaults[1]) / 1000} kbit/s`;
+  return `${name} · video ${videoBitrateLabel(value.video_bit_rate ?? defaults[0])} · audio ${audioBitrateLabel(value.audio_bit_rate ?? defaults[1])}`;
 }
 export function renderSettingProvenance(value: import("./rendering-api.ts").EventRenderSetting): string {
-  return value.version === null ? renderQualityLabels.default : `Chosen by ${value.selected_by} · ${value.selected_at}`;
+  if (value.version === null) return renderQualityLabels.default;
+  const time = value.selected_at ? new Intl.DateTimeFormat("en-US", {
+    hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
+  }).format(new Date(value.selected_at)) : "";
+  return `Chosen ${time}`.trim();
+}
+export function renderQualityComparison(latest: string, current: string): string {
+  return `Latest output: ${latest} · Current setting: ${current}`;
 }
 export function videoBitrateLabel(value: number): string { return `${value / 1000000} Mbit/s`; }
-export function audioBitrateLabel(value: number): string { return `${value / 1000} kbit/s`; }
+export function audioBitrateLabel(value: number): string { return `${value === 320000 ? "up to " : ""}${value / 1000} kbit/s`; }

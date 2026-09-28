@@ -2,9 +2,19 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { RenderPreset, RenderSettingHistory } from "../experience/rendering-api.ts";
+import type { EventRenderSetting, RenderPreset, RenderSettingHistory } from "../experience/rendering-api.ts";
 import { prepareQualityCommand, sendQualityCommand, videoChoices } from "../experience/render-quality.ts";
-import { renderQualityLabel, renderQualityLabels as labels, renderSettingProvenance, videoBitrateLabel, audioBitrateLabel } from "../experience/ui-labels.ts";
+import { uiLabels, renderQualityLabel, renderQualityLabels as labels, renderSettingProvenance, videoBitrateLabel, audioBitrateLabel } from "../experience/ui-labels.ts";
+
+function ProvenanceDetails({ setting }: { setting: EventRenderSetting }) {
+  if (setting.version === null) return null;
+  return <details className="diagnostic-details"><summary>{uiLabels.details}</summary>
+    <dl className="outputs-facts">
+      <div><dt>{labels.operator}</dt><dd><code className="copyable-id" tabIndex={0}>{setting.selected_by}</code></dd></div>
+      <div><dt>{labels.timestamp}</dt><dd><time dateTime={setting.selected_at ?? undefined}>{setting.selected_at}</time></dd></div>
+    </dl>
+  </details>;
+}
 
 export function EventRenderQuality({ history, presets, launchContext, authorized }: {
   history?: RenderSettingHistory; presets?: RenderPreset[]; launchContext?: string; authorized: boolean;
@@ -32,10 +42,11 @@ export function EventRenderQuality({ history, presets, launchContext, authorized
       if (!result.retry) router.refresh();
     } finally { submitting.current = false; setBusy(false); }
   }
-  return <section className="detail-panel" aria-labelledby="render-quality-title">
-    <h2 id="render-quality-title">{labels.title}</h2>
+  return <section className="detail-panel render-quality-panel" aria-labelledby="render-quality-title">
+    <div className="section-heading"><div><span className="eyebrow">{labels.kicker}</span><h2 id="render-quality-title">{labels.title}</h2></div></div>
     {history && presets ? <>
       <p><strong>{renderQualityLabel(history.current)}</strong> · {renderSettingProvenance(history.current)}</p>
+      <ProvenanceDetails setting={history.current} />
       {!editing ? <button type="button" disabled={!enabled || busy || Boolean(retry)} onClick={() => { setEditing(true); setMessage(""); }}>{labels.change}</button> : null}
       {!enabled ? <p>{labels.readOnly}</p> : null}
       {editing && preset ? <form onSubmit={(event) => { event.preventDefault(); if (review) void submit(prepareQualityCommand(history, preset, video, audio)); else setReview(true); }}>
@@ -53,7 +64,7 @@ export function EventRenderQuality({ history, presets, launchContext, authorized
         <div className="output-dialog-actions"><button type="button" disabled={busy} onClick={() => { setEditing(false); setReview(false); }}>{labels.cancel}</button>
           <button type="submit" disabled={!enabled || busy}>{review ? labels.confirm : labels.review}</button></div>
       </form> : null}
-      {history.history.length > 1 ? <details><summary>{labels.history}</summary><ul>{history.history.filter((item) => item.version !== history.current.version).map((item) => <li key={item.version}>{renderQualityLabel(item)} · {renderSettingProvenance(item)}</li>)}</ul></details> : null}
+      {history.history.length > 1 ? <div className="outputs-section"><details><summary>{labels.history}</summary><ul className="outputs-rows">{history.history.filter((item) => item.version !== history.current.version).map((item) => <li key={item.version}><div>{renderQualityLabel(item)} · {renderSettingProvenance(item)}</div><ProvenanceDetails setting={item} /></li>)}</ul></details></div> : null}
     </> : <p>{labels.unavailable}</p>}
     {busy || message ? <p role="status">{busy ? labels.working : message}</p> : null}
     {retry ? <button type="button" disabled={!enabled || busy} onClick={() => void submit(retry)}>{labels.retry}</button> : null}

@@ -1,6 +1,6 @@
 "use client";
 
-import { uiLabels, renderQualityLabel, renderQualityLabels } from "../experience/ui-labels.ts";
+import { uiLabels, renderQualityLabel, renderQualityLabels, renderQualityComparison } from "../experience/ui-labels.ts";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { assemblyApi, type assemblyTemplatesSchema } from "../experience/assembly-api.ts";
@@ -87,6 +87,7 @@ export function SessionOutputActions({ context }: { context: OutputActionContext
     <button ref={trigger} className={renderSummary || qualityMismatch ? "output-secondary-action" : undefined} type="button" onClick={begin} disabled={Boolean(disabled) || busy || refreshing || Boolean(retry)} aria-describedby="output-action-state">
       {primary === "propose" ? "Propose Assembly" : primary === "approve" ? "Approve / Reject" : qualityMismatch ? renderQualityLabels.again : renderSummary ? "Request another render" : "Request render"}
     </button>
+    {primary === "render" && qualityMismatch && quality && latest ? <span>{renderQualityComparison(renderQualityLabel(latest), renderQualityLabel(quality))}</span> : null}
     <span ref={actionState} tabIndex={-1} id="output-action-state">{busy ? "Working…" : refreshing ? "Refreshing current state…" : disabled ?? (retry ? "Resolve the pending command before another action." : "")}</span>
     {result ? <div className="output-command-result">
       <p role="status">{result.message}</p>

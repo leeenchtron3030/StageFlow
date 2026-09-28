@@ -39,6 +39,36 @@ test("current quality mismatch offers one explicit action and freezes the confir
   }
 });
 
+test("quality reason appears once next to the mismatch action and only while that action is shown", () => {
+  for (const scenario of ["match", "preset", "video", "audio", "unapproved", "no-output", "unavailable-setting"] as const) {
+    const ctx = context();
+    const item = fixtureAssembly();
+    item.approval_state = scenario === "unapproved" ? "unreviewed" : "approved";
+    ctx.assembly = { state: "available", value: item };
+    ctx.outputs = { state: "available", value: { items: scenario === "no-output" ? [] : [presentation.outputSummary({ ...fixtureRenderedOutput(), profile_version: "3" })], truncated: false } };
+    ctx.renderSetting = scenario === "unavailable-setting" ? { state: "unavailable" } : { state: "available", value: {
+      event_id: id(3), version: 4, profile_id: scenario === "preset" ? "h264-nvenc-720p" : "h264-nvenc-1080p-video", profile_version: scenario === "preset" ? "1" : "3",
+      video_bit_rate: scenario === "video" ? 6500000 : null, audio_bit_rate: scenario === "audio" ? 256000 : null,
+      effective_video_bit_rate: scenario === "preset" ? 4000000 : scenario === "video" ? 6500000 : 8000000,
+      effective_audio_bit_rate: scenario === "preset" ? 128000 : scenario === "audio" ? 256000 : 192000,
+      selected_by: id(9), selected_at: "2026-09-27T00:00:00Z", command_id: id(8),
+    } };
+    if (scenario === "unapproved" && ctx.renderSetting.state === "available") ctx.renderSetting.value.video_bit_rate = 6500000;
+    const ui = harness(ctx, async () => { assert.fail("presentation must not submit"); });
+    const shown = ["preset", "video", "audio"].includes(scenario);
+    const html = ui.html();
+    assert.equal((html.match(/Latest output:/g) ?? []).length, shown ? 1 : 0, scenario);
+    assert.equal((html.match(/Current setting:/g) ?? []).length, shown ? 1 : 0, scenario);
+    assert.equal((html.match(/Render again at current quality/g) ?? []).length, shown ? 1 : 0, scenario);
+    if (shown) {
+      const current = scenario === "preset" ? "720p Compact · video 4 Mbit/s · audio 128 kbit/s"
+        : scenario === "video" ? "1080p Standard · video 6.5 Mbit/s · audio 192 kbit/s"
+        : "1080p Standard · video 8 Mbit/s · audio 256 kbit/s";
+      assert.ok(html.includes(`Render again at current quality</button><span>Latest output: 1080p Standard · video 8 Mbit/s · audio 192 kbit/s · Current setting: ${current}</span>`));
+    }
+  }
+});
+
 /** Invoke real event handlers with deterministic hook state; native dialog owns focus trapping. */
 function harness(initial: commands.OutputActionContext, fetcher: typeof fetch) {
   const slots: unknown[] = [], effects: Array<() => void> = [];
