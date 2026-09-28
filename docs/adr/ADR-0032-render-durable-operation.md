@@ -3,7 +3,9 @@
 ## Status
 
 Accepted (owner, 2026-09-25): additive generalization of the ADR-0025 substrate;
-video-only first slice without overlays; configured render output root.
+video-only first slice without overlays; configured render output root. Amended 2026-09-27
+(amendment 4): audio in profile v3, and render quality chosen per Event from a preset
+catalog.
 
 ## Date
 
@@ -126,6 +128,55 @@ Checks still require these columns for transcription, and the reverse restores `
 - A v2 request for a revision already rendered under v1 is a new operation, because the
   work key includes the profile version.
 - Implemented under ED-0089.
+
+*Owner amendment 4, 2026-09-27 (audio, and render quality chosen per Event):*
+
+The owner accepted the roadmap recommendation to add audio and asked that users choose the
+audio and video quality of final renders before an event begins. This amendment changes
+decision 5's "video only" and the approved default of "a single output profile". All
+other decisions stand, including human-only authority, one render lease per GPU, the
+operator-installed LGPL FFmpeg, and output identity.
+
+A. **Audio: render profile v3** (ED-0098).
+- v3 is identical to v2 and adds one audio stream: AAC-LC from FFmpeg's native `aac`
+  encoder (no `libfdk_aac` or other GPL or nonfree encoder), 48 kHz, stereo, 192 kbit/s.
+- The source audio is the first audio stream of each input, resampled to 48 kHz stereo.
+  No loudness normalization, gain, or mixing is applied; loudness normalization is
+  deferred.
+- An input without audio, such as a silent bumper, contributes digital silence for its
+  full video duration. A missing audio stream is not an error.
+- Audio stays in sync with video at every input boundary. Because concatenating
+  timestamps can shorten the output (Run 002: 0.334 s across twelve inputs), each input
+  is normalized separately before joining, so that sync does not depend on the joins.
+- The render worker learns whether each input has audio from an operator-installed LGPL
+  `ffprobe`, given by explicit path under the ADR-0033 rules.
+- v1 and v2 remain recorded identities that cannot be requested for new renders, and a
+  v3 request is a new operation.
+
+B. **Render quality chosen per Event** (ED-0099).
+- The single current profile becomes a small, closed catalog of owner-approved **render
+  presets**. Each preset is a versioned Render Profile validated on the reference GPU.
+- A preset may allow **bounded adjustments** to video bitrate and audio bitrate only.
+  Resolution, codec, frame rate, sample rate, channels, and container are fixed by the
+  preset.
+- Each Business Event has a versioned, append-only **Event Render Setting**: one preset
+  plus any adjustments, recorded with the human actor and the time.
+  - It is chosen in the Producer interface, normally before the event.
+  - It may be changed at any time. A change affects only render requests made after it.
+    Existing operations and Rendered Outputs keep the settings they recorded.
+  - Re-rendering at the new settings is an explicit human request, never automatic.
+- A render request uses the Event's current setting at receipt time, or the default
+  preset when the Event has none. The request freezes the effective settings into the
+  operation input, and the command may name the setting version the human confirmed, so
+  a setting that changed in between is refused rather than silently applied.
+- The work key stays the revision plus the profile ID and version. It adds a digest of
+  the adjustments only when adjustments are present, so an unadjusted preset keeps its
+  current key.
+- Adjustment bounds are checked when the setting is chosen and again by the worker.
+  Values out of bounds are refused with a typed reason. Only validated integers reach the
+  FFmpeg arguments, never caller text.
+- Storage is additive (migration `0020`), with a reverse that is conditional on no
+  ED-0099 rows existing.
 
 ## Alternatives
 
