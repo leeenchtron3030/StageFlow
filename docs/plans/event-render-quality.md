@@ -2,8 +2,8 @@
 
 ## Status
 
-Proposed (2026-09-27). The design follows owner decisions. The preset catalog below is
-this plan's recommendation, and approving this plan approves it.
+Approved (2026-09-27). The owner approved the plan, including the preset catalog and
+adjustment ranges, when merging PR #133.
 
 ## Execution authority
 
@@ -18,7 +18,7 @@ this plan's recommendation, and approving this plan approves it.
   - **Changeable mid-event, affecting future renders only.** Existing outputs keep their
     settings, and re-rendering is explicit.
   - [ADR-0032](../adr/ADR-0032-render-durable-operation.md) amendment 4B.
-- Implementation-ready: Yes, once this plan is approved. It depends on ED-0098 being
+- Implementation-ready: Yes (plan approved 2026-09-27). It depends on ED-0098 being
   merged, because the presets carry audio.
 - Required escalation: stop if the work needs:
   - adjustable values beyond video and audio bitrate;
@@ -399,8 +399,7 @@ Migration `0020`, additive only:
 
 ## Open questions
 
-- **Owner:** approve the preset catalog and adjustment ranges above, or change them.
-  Approving this plan approves them.
+- None. The owner approved the preset catalog and ranges as proposed (2026-09-27).
 
 ## Completion record
 
