@@ -33,12 +33,11 @@ from app.shared.ids import EntityId
 from app.shared.time import FixedClock
 
 
-@pytest.mark.parametrize("enabled,outcome,expected", [
-    (False, "registered", 0), (True, "registered", 1),
-    (True, "registered_effects_reconciled", 0),
+@pytest.mark.parametrize("enabled,asset_count", [
+    (False, 2), (True, 2), (True, 0),
 ])
-def test_demo_enqueues_only_new_assets_when_enabled(monkeypatch: pytest.MonkeyPatch,
-    enabled: bool, outcome: str, expected: int,
+def test_enabled_reconciliation_enqueues_assets_lacking_a_timing_operation(
+    monkeypatch: pytest.MonkeyPatch, enabled: bool, asset_count: int,
 ) -> None:
     components = Mock(spec=KernelComponents)
     components.event_key = "synthetic"
@@ -48,28 +47,33 @@ def test_demo_enqueues_only_new_assets_when_enabled(monkeypatch: pytest.MonkeyPa
         local_transcription=object(), deployment_id="synthetic",
     ))
     components.repository.get_event_by_key.return_value = SimpleNamespace(id=EntityId.new())
-    asset = SimpleNamespace(id=EntityId.new(), manifest_id=EntityId.new(), registered_at=NOW)
-    components.repository.get_asset.return_value = asset
-    components.repository.get_candidate.return_value = SimpleNamespace(proposed_asset_id=asset.id)
+    assets = tuple(RegisteredTimingAsset(EntityId.new(), EntityId.new(), NOW)
+                   for _ in range(asset_count))
     components.repository.list_recent_media.return_value = ()
     components.run_media_cycle.return_value = SimpleNamespace(
-        candidates_seen=1, assets_registered=1,
-        candidate_results=(SimpleNamespace(outcome=outcome, candidate_id=EntityId.new()),))
+        candidates_seen=0, assets_registered=0)
     work = Mock()
     work.list_operations.return_value = ()
     timing = Mock()
+    timing.assets_without_operation.return_value = assets
     monkeypatch.setattr(service, "PostgresMediaTimingWorkRepository", Mock(return_value=timing))
     app = DemoApplication(
         cast(KernelComponents, components), cast(TranscriptionOperationApplication, Mock()),
         cast(PostgresWorkExecutionRepository, work),
     )
     result = app.reconcile_media(ReconcileMediaRequest("synthetic", NOW))
-    assert timing.enqueue.call_count == expected
+    assert timing.enqueue.call_count == (asset_count if enabled else 0)
     assert result.operations == () and not result.enqueue_failures
-    if expected:
+    if enabled:
+        timing.assets_without_operation.assert_called_once_with(
+            components.repository.get_event_by_key.return_value.id, limit=100)
         # Association is deliberately not required to gather advisory evidence.
-        request = timing.enqueue.call_args.args[0].request
-        assert request.input.asset_id == asset.id
+        assert [(call.args[0].request.input.asset_id, call.args[0].request.input.manifest_id)
+                for call in timing.enqueue.call_args_list] == [
+                    (asset.asset_id, asset.manifest_id) for asset in assets]
+    else:
+        timing.assets_without_operation.assert_not_called()
+        timing.enqueue.assert_not_called()
 
 
 def test_kernel_resolution_failure_maps_to_input_missing() -> None:
@@ -110,6 +114,8 @@ def test_demo_timing_enqueue_storage_failure_still_enqueues_transcription(
         candidate_results=(SimpleNamespace(outcome="registered", candidate_id=candidate_id),))
     repository, work, timing = Mock(), Mock(), Mock()
     repository.list_operations.return_value = ()
+    timing.assets_without_operation.return_value = (
+        RegisteredTimingAsset(asset.id, asset.manifest_id, NOW),)
     timing.enqueue.side_effect = WorkExecutionStorageUnavailableError("synthetic")
     monkeypatch.setattr(service, "PostgresMediaTimingWorkRepository", Mock(return_value=timing))
     app = DemoApplication(cast(KernelComponents, components),

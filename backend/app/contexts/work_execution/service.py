@@ -56,61 +56,70 @@ class TranscriptionWorker[InputT: OperationInput = OperationInput]:
                 lease_duration=request.lease_duration,
             )
 
-        if not isinstance(active_claim.operation.input, TranscriptionOperationInput):
-            raise WorkExecutionConflictError("transcription_worker_requires_transcription")
-        execution_request = TranscriptionExecutionRequest(
-            operation_id=active_claim.operation.id,
-            attempt_id=active_claim.attempt.id,
-            fence_generation=active_claim.attempt.fence_generation,
-            work_key=active_claim.operation.work_key,
-            input=active_claim.operation.input,
-        )
-        try:
-            result = self.execution_port.execute(execution_request, renew_lease)
-        except TranscriptionExecutionError as exc:
-            operation = self.repository.record_failure(
-                active_claim,
-                OperationFailure(
+        def execute_attempt(
+            operation_input: TranscriptionOperationInput,
+        ) -> WorkerCycleResult | OperationFailure:
+            execution_request = TranscriptionExecutionRequest(
+                operation_id=active_claim.operation.id,
+                attempt_id=active_claim.attempt.id,
+                fence_generation=active_claim.attempt.fence_generation,
+                work_key=active_claim.operation.work_key,
+                input=operation_input,
+            )
+            try:
+                result = self.execution_port.execute(execution_request, renew_lease)
+            except TranscriptionExecutionError as exc:
+                return OperationFailure(
                     reason_code=exc.reason_code,
                     retryable=exc.retryable,
                     diagnostic_summary=exc.diagnostic_summary,
-                ),
-            )
-            return WorkerCycleResult(
-                outcome=(
-                    WorkerCycleOutcome.RETRY_SCHEDULED
-                    if operation.status is OperationStatus.RETRY_WAIT
-                    else WorkerCycleOutcome.TERMINAL_FAILED
-                ),
-                operation_id=operation.id,
-                attempt_id=active_claim.attempt.id,
-            )
+                )
 
-        if result.status is TranscriptEvidenceStatus.FAILED:
-            assert result.failure_reason is not None
-            operation = self.repository.record_failure(
-                active_claim,
-                OperationFailure(
+            if result.status is TranscriptEvidenceStatus.FAILED:
+                assert result.failure_reason is not None
+                return OperationFailure(
                     reason_code=result.failure_reason,
                     retryable=False,
                     diagnostic_summary="normalized provider failure",
-                ),
+                )
+
+            evidence: TranscriptEvidenceRevision = self.repository.apply_transcript_result(
+                active_claim,
+                prepare_transcript_evidence(active_claim, result),
             )
             return WorkerCycleResult(
-                outcome=WorkerCycleOutcome.TERMINAL_FAILED,
-                operation_id=operation.id,
+                outcome=WorkerCycleOutcome.SUCCEEDED,
+                operation_id=active_claim.operation.id,
                 attempt_id=active_claim.attempt.id,
+                evidence_id=evidence.id,
             )
 
-        evidence: TranscriptEvidenceRevision = self.repository.apply_transcript_result(
-            active_claim,
-            prepare_transcript_evidence(active_claim, result),
-        )
+        if not isinstance(active_claim.operation.input, TranscriptionOperationInput):
+            raise WorkExecutionConflictError("transcription_worker_requires_transcription")
+        try:
+            outcome = execute_attempt(active_claim.operation.input)
+        except TranscriptionExecutionError:
+            # Only the execution port's typed errors were handled previously.
+            raise
+        except Exception:
+            outcome = OperationFailure(
+                reason_code="transcription_internal_error",
+                retryable=True,
+                diagnostic_summary="transcription_internal_error",
+            )
+        if isinstance(outcome, WorkerCycleResult):
+            return outcome
+        # Outside the catch: failure recording is fenced, and lease loss or storage
+        # failure must propagate. Never claim a release that PostgreSQL refused.
+        operation = self.repository.record_failure(active_claim, outcome)
         return WorkerCycleResult(
-            outcome=WorkerCycleOutcome.SUCCEEDED,
-            operation_id=active_claim.operation.id,
+            outcome=(
+                WorkerCycleOutcome.RETRY_SCHEDULED
+                if operation.status is OperationStatus.RETRY_WAIT
+                else WorkerCycleOutcome.TERMINAL_FAILED
+            ),
+            operation_id=operation.id,
             attempt_id=active_claim.attempt.id,
-            evidence_id=evidence.id,
         )
 
 

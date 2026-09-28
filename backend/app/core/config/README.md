@@ -97,8 +97,12 @@ local executable path outside the repository; relative paths, network locations,
 traversal, links, and Windows batch wrappers are refused. The operator installs the
 binary independently. StageFlow adds no dependency and never searches `PATH`.
 
-An enabled configuration enqueues one advisory timing operation for each asset newly
-registered by Demo reconciliation. Start the separate CPU worker with
+An enabled configuration automatically enqueues advisory timing inspection during each
+Demo reconciliation cycle for up to 100 registered Event assets lacking a timing operation,
+including existing assets, idempotently by work key. The human backfill command remains
+available under the
+[ADR-0033 Amendment](../../../../docs/adr/ADR-0033-production-media-timing-inspection.md#amendment).
+Start the separate CPU worker with
 `python -m app.demo.media_timing_worker`; `--once` processes one bounded batch,
 `--concurrency` accepts 1–8 (default 2), and `--poll-seconds` accepts 0.1–30 (default 1).
 ffprobe identity is version plus SHA-256; GPL/nonfree builds are refused. Each invocation

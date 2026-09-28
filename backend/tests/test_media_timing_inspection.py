@@ -73,7 +73,9 @@ if "-version" in sys.argv:
     print("configuration: " + flag)
     raise SystemExit(0)
 assert sys.argv[1:3] == ["-protocol_whitelist", "file"]
-assert sys.argv[3:-1] == ["-v", "error", "-print_format", "json", "-show_format", "-show_streams"]
+assert sys.argv[3:-1] == ["-v", "error", "-print_format", "json",
+    "-format_whitelist", "mov,mp4,m4a,3gp,3g2,mj2,matroska,webm,mxf,wav",
+    "-show_format", "-show_streams"]
 assert sys.stdin.read() == ""
 sys.stderr.write("secret=never-persist /private/recording.mp4\n")
 if mode == "timeout": time.sleep(10)

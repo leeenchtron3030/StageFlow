@@ -248,9 +248,10 @@ class PostgresRenderRepository(PostgresWorkExecutionRepository[RenderOperationIn
 
     def list_render_operations(
         self, event_id: EntityId, session_id: EntityId, *, after: EntityId | None = None,
-        limit: int = 50,
+        limit: int = 50, newest_first: bool = False,
     ) -> tuple[tuple[DurableOperation[RenderOperationInput], ...], EntityId | None]:
-        rows = self._list(event_id, session_id, after, limit, outputs=False)
+        rows = self._list(event_id, session_id, after, limit, outputs=False,
+                          newest_first=newest_first)
         try:
             with self._connect() as conn:
                 items = tuple(self._operation(row, conn) for row in rows[:limit])
@@ -267,7 +268,7 @@ class PostgresRenderRepository(PostgresWorkExecutionRepository[RenderOperationIn
         return items, items[-1].id if len(rows) > limit else None
 
     def _list(self, event: EntityId, session: EntityId, after: EntityId | None,
-              limit: int, *, outputs: bool) -> list[Row]:
+              limit: int, *, outputs: bool, newest_first: bool = False) -> list[Row]:
         if not 1 <= limit <= 100:
             raise ValueError("render_limit_out_of_bounds")
         query: LiteralString
@@ -277,6 +278,15 @@ class PostgresRenderRepository(PostgresWorkExecutionRepository[RenderOperationIn
                        WHERE r.event_id=%s AND r.session_id=%s
                          AND (%s::uuid IS NULL OR o.output_id>%s::uuid)
                        ORDER BY o.output_id LIMIT %s"""
+        elif newest_first:
+            query = """SELECT o.* FROM stageflow.work_operation o
+                       JOIN stageflow.render_operation_input i USING (operation_id)
+                       JOIN stageflow.assembly_revision r ON r.revision_id=i.assembly_revision_id
+                       WHERE r.event_id=%s AND r.session_id=%s AND o.operation_kind='render'
+                         AND (%s::uuid IS NULL OR (o.created_at, o.operation_id) < (
+                             SELECT c.created_at, c.operation_id FROM stageflow.work_operation c
+                             WHERE c.operation_id=%s::uuid))
+                       ORDER BY o.created_at DESC, o.operation_id DESC LIMIT %s"""
         else:
             query = """SELECT o.* FROM stageflow.work_operation o
                        JOIN stageflow.render_operation_input i USING (operation_id)

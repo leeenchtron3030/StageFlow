@@ -291,6 +291,17 @@ elif "lavfi" in args:
     sys.exit(1 if mode == "nvenc" else 0)
 else:
     assert "-nostdin" in args and "-y" in args
+    assert args[args.index("-f") + 1] == "concat"
+    assert args[args.index("-format_whitelist") + 1] == "concat"
+    assert args.index("-format_whitelist") < args.index("-i")
+    assert args[args.index("-protocol_whitelist") + 1] == "file,pipe"
+    lines = pathlib.Path(args[args.index("-i") + 1]).read_text(encoding="utf-8").splitlines()
+    assert lines[0] == "ffconcat version 1.0"
+    assert len(lines) >= 3 and len(lines) % 2 == 1
+    for index in range(1, len(lines), 2):
+        assert lines[index].startswith("file ")
+        assert lines[index + 1] == (
+            "option format_whitelist mov,mp4,m4a,3gp,3g2,mj2,matroska,webm,mxf")
     assert args[args.index("-c:v") + 1] == "h264_nvenc"
     assert args[args.index("-preset") + 1] == "p4"
     assert args[args.index("-b:v") + 1] == "8000000"

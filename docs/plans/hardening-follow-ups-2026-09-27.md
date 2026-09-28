@@ -110,4 +110,37 @@ Revert each directive independently. No data changes.
 
 ## Completion record
 
-_(Filled in per directive.)_
+### ED-0096 (2026-09-27)
+
+- **Implemented revision:** branch `codex/ed-0096-backend-hardening`. Codex implemented
+  it and the owner committed it.
+- **Delivered:**
+  1. Render operation `created_at` and `updated_at`, with a newest-first API listing that
+     pages on `(created_at, operation_id)`.
+  2. The transcription worker records a typed, retryable `transcription_internal_error`
+     and releases the lease on unexpected errors after running. The wrong-kind guard and
+     every handled path are unchanged, and lost-lease or recording errors propagate.
+  3. The intermittent Devcon publish test is fixed. **Root cause:** the test's HTTP
+     handler closed without draining the PUT body, so Windows sometimes reset the TCP
+     connection before the rejection was read. Before the fix, 96 of 100 runs passed;
+     after it, 100 of 100.
+  4. Automatic, bounded (100 per cycle), idempotent timing enqueue for every Event asset
+     that lacks a timing operation.
+     - **Escalation:** the implementation went beyond ADR-0033 §4, because the plan
+       wording was wider than the ADR. The owner approved the wider behaviour on
+       2026-09-27, and ADR-0033 now carries an Amendment. Five documents were updated to
+       match.
+  5. Demuxer allowlists: `ffprobe` gets `-format_whitelist`; FFmpeg gets an outer
+     `concat` whitelist, and each file in the concat list gets its own media-only
+     whitelist.
+- **Review:** the `directive-reviewer` returned ESCALATE (item 4, resolved as above) plus
+  two fixes:
+  - the wrong-kind guard was restored;
+  - a composition test that its mock had emptied was rewritten.
+- **Tests:** host full suite **2,587 passed, 0 failed, 2 skipped**; Ruff and Pyright are
+  clean.
+- **Real-media check:** with FFmpeg 8.1.2 and `ffprobe` on the live-run recordings:
+  - a concat render with the per-file whitelists succeeded (3,598 frames);
+  - `ffprobe` still reads `creation_time`;
+  - a disguised concat playlist named `.mp4` is refused by both tools ("Format not on
+    whitelist").
