@@ -581,18 +581,28 @@ remain in a sidecar. The separate local render worker uses the shared ADR-0025 c
 leases, retries and fences, at one lease per worker. Output registration and operation success
 share a transaction. All failures after running are bounded typed attempt outcomes.
 
-The current profile is `h264-nvenc-1080p-video` v2: video-only CUDA decode to H.264
-NVENC, p4, VBR 8 Mbit/s, GOP 60, 1080p MP4, with constant 30000/1001 output frame rate
-(ADR-0032 amendment 3). Requests default to v2; explicit v1 requests receive the bounded
-`render_profile_unsupported` refusal. Existing v1 outputs retain their recorded identity
-and remain readable. The revision/profile/version work key makes v2 on a v1-rendered
-revision a new operation. Workers declare and claim v2 only; v1 operations remain visible
-and are never claimed by a v2 worker (ADR-0025 eligibility promotion still applies). GPU timestamp, decode, duration and throughput qualification
-for v2 remains the owner's Run 002 step. FFmpeg remains operator-installed and is
-identified and license-configuration checked at the infrastructure boundary. `[local_render]`
-is optional and disabled by default. The authenticated rendering API provides requests and Event/Session-scoped
-paginated operation/output reads. No automatic authority, audio, overlays, publication,
-delivery or frontend is introduced. Host GPU/playability and security qualification
+The current profile is h264-nvenc-1080p-video v3: unchanged v2 CUDA decode to H.264
+NVENC, p4, VBR 8 Mbit/s, GOP 60, 1080p MP4, constant 30000/1001 video, plus native
+AAC-LC 48 kHz stereo 192 kbit/s audio (ADR-0032 amendment 4A). Each input is probed,
+encoded once to NVENC video and 16-bit PCM audio in a temporary MOV, with the first
+audio stream resampled or silence supplied, padded/trimmed to that segment's video.
+Stage 2 concatenates intermediates with video stream copy and a single AAC encode.
+Final ffprobe validation requires exactly one H.264 video and one AAC audio stream.
+Intermediates are removed on success, failure and cancellation and are never registered.
+
+Requests default to v3; v1/v2 receive the bounded render_profile_unsupported refusal.
+Existing v1/v2 outputs retain their recorded identities and remain readable. The
+revision/profile/version work key makes v3 on a v2-rendered revision a new operation.
+Workers declare and claim v3 only; earlier operations remain visible and unclaimed
+(ADR-0025 eligibility promotion still applies). GPU audio sync, determinism and
+throughput qualification remain the owner's Run 003 step. FFmpeg identity checks are
+unchanged. ffprobe is operator-installed and identity-checked under ADR-0033 rules.
+The optional, default-off [local_render] section adds optional ffprobe_path; the render
+worker requires it, while existing configuration files and the API remain valid.
+The Producer requests v3 and labels its audio; v1/v2 retain their video-only labels.
+The authenticated API provides requests and Event/Session-scoped paginated reads.
+No automatic authority, overlays, publication or delivery is introduced.
+Host GPU/playability and security qualification
 remain separate from implementation evidence.
 
 ## Production media timing inspection

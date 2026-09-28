@@ -29,7 +29,7 @@ from app.contexts.production.media_timing_evidence.repository import (
     InMemoryMediaTimingEvidenceRepository,
     MediaTimingEvidenceRepository,
 )
-from app.contexts.rendering.contracts import FIRST_RENDER_PROFILE, VideoInput
+from app.contexts.rendering.contracts import CURRENT_RENDER_PROFILE, VideoInput
 from app.contexts.rendering.planning import build_render_plan
 from app.infrastructure.media_timing.assembly import InMemoryAssemblyTimingReader
 from app.infrastructure.postgres.assembly_timing_reader import PostgresAssemblyTimingReader
@@ -274,7 +274,7 @@ def test_api_discloses_frozen_provenance_and_render_preserves_order() -> None:
                  for c in h.candidates}
     media = {m.asset_id: VideoInput(CompletedMediaAssetContent(m.asset_id), "video/mp4")
              for m in frozen.membership}
-    plan = build_render_plan(source, FIRST_RENDER_PROFILE, packaging, media)
+    plan = build_render_plan(source, CURRENT_RENDER_PROFILE, packaging, media)
     assert plan.inputs == (*packaging.values(), *(media[m.asset_id] for m in frozen.membership))
 
 
@@ -306,7 +306,7 @@ def test_postgres_reader_one_bounded_query_and_reverse_refused(render_postgres_d
     assert schema_contract(dsn) == before
     assert db.read(dsn).revision == revision
     db.approve()
-    plan = IsolatedRenderRepository(dsn).load_plan(revision.id, FIRST_RENDER_PROFILE)
+    plan = IsolatedRenderRepository(dsn).load_plan(revision.id, CURRENT_RENDER_PROFILE)
     assert tuple(i.reference for i in plan.inputs) == tuple(
         CompletedMediaAssetContent(m.asset_id) for m in revision.membership
     )

@@ -76,6 +76,13 @@ downloads it or searches the executable search path. The worker checks files/dir
 reparse points, containment, binary identity and GPL/nonfree configuration before execution.
 No configured location is included in the effective redacted summary or render responses.
 
+The optional ffprobe_path must also be an absolute local executable path outside the
+repository, without traversal, links, control characters or Windows batch wrappers.
+Existing files may omit it, even with rendering enabled; the API still starts. The
+render worker requires it at startup and emits only local_render_ffprobe_path_required
+when absent. Operators install LGPL ffprobe separately; it is identity checked and
+uses the same input demuxer allowlist as FFmpeg. No path is printed.
+
 Enable the section explicitly and start `python -m app.demo.render_worker` separately.
 Its NVENC probe must succeed for its render capability to be eligible. Capacity is one
 lease; FFmpeg version and SHA-256 identify the runtime. Existing deployments without

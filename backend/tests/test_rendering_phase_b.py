@@ -55,7 +55,7 @@ from app.contexts.production.event_mode_kernel.contracts import (
     StartSessionRequest,
 )
 from app.contexts.rendering.contracts import (
-    FIRST_RENDER_PROFILE,
+    CURRENT_RENDER_PROFILE,
     FFmpegIdentity,
     RenderActor,
     RenderedOutput,
@@ -90,6 +90,7 @@ from app.demo import controller
 from app.demo.controller import worker_summary
 from app.demo.render_worker import render_capability
 from app.demo.service import DemoApplication, ReconcileMediaRequest
+from app.infrastructure.media_timing.ffprobe import FFprobeAdapter, RenderStreamFacts
 from app.infrastructure.postgres import (
     PostgresEventModeKernelRepository,
     PostgresWorkExecutionRepository,
@@ -118,7 +119,7 @@ from tests.test_render_work_execution import (
     render_postgres_dsn as render_postgres_dsn,
 )
 
-PROFILE = FIRST_RENDER_PROFILE
+PROFILE = CURRENT_RENDER_PROFILE
 
 
 def assembly() -> SessionAssembly:
@@ -280,6 +281,12 @@ def test_worker_all_exceptions_after_running_release_lease_typed(
     assert memory.outputs == []
 
 
+def synthetic_probe() -> FFprobeAdapter:
+    probe = Mock(spec=FFprobeAdapter)
+    probe.render_streams.return_value = RenderStreamFacts(("h264",), ("aac",))
+    return probe
+
+
 FAKE_FFMPEG = '''import os, pathlib, sys
 args = sys.argv[1:]
 mode = os.environ.get("STAGEFLOW_FAKE_RENDER", "success")
@@ -287,33 +294,49 @@ if "-version" in args:
     print("ffmpeg version synthetic-1")
     flag = "--enable-" + mode if mode in ("gpl", "nonfree") else "--enable-nvenc"
     print("configuration: " + flag)
-elif "lavfi" in args:
+elif args[-1] == "-":
     sys.exit(1 if mode == "nvenc" else 0)
 else:
-    assert "-nostdin" in args and "-y" in args
-    assert args[args.index("-f") + 1] == "concat"
-    assert args[args.index("-format_whitelist") + 1] == "concat"
+    assert "-nostdin" in args and "-y" in args and "-an" not in args
     assert args.index("-format_whitelist") < args.index("-i")
     assert args[args.index("-protocol_whitelist") + 1] == "file,pipe"
-    lines = pathlib.Path(args[args.index("-i") + 1]).read_text(encoding="utf-8").splitlines()
-    assert lines[0] == "ffconcat version 1.0"
-    assert len(lines) >= 3 and len(lines) % 2 == 1
-    for index in range(1, len(lines), 2):
-        assert lines[index].startswith("file ")
-        assert lines[index + 1] == (
-            "option format_whitelist mov,mp4,m4a,3gp,3g2,mj2,matroska,webm,mxf")
-    assert args[args.index("-c:v") + 1] == "h264_nvenc"
-    assert args[args.index("-preset") + 1] == "p4"
-    assert args[args.index("-b:v") + 1] == "8000000"
-    assert args[args.index("-g") + 1] == "60" and "-an" in args
-    assert args[args.index("-hwaccel") + 1] == "cuda"
-    assert args[args.index("-hwaccel_output_format") + 1] == "cuda"
-    assert args[args.index("-vf") + 1] == "scale_cuda=1920:1080:format=nv12"
-    assert args[args.index("-fps_mode") + 1] == "cfr"
-    assert args[args.index("-r") + 1] == "30000/1001"
-    assert args.index("-r") > args.index("-i")  # an output option, not an input rate
-    assert args[args.index("-rc") + 1] == "vbr"
-    assert args[args.index("-f", args.index("-an")) + 1] == "mp4"
+    assert args[args.index("-ar") + 1] == "48000"
+    assert args[args.index("-ac") + 1] == "2"
+    stage2 = args[args.index("-c:v") + 1] == "copy"
+    if stage2:
+        assert args[args.index("-f") + 1] == "concat"
+        assert args[args.index("-format_whitelist") + 1] == "concat"
+        lines = pathlib.Path(args[args.index("-i") + 1]).read_text(encoding="utf-8").splitlines()
+        assert lines[0] == "ffconcat version 1.0"
+        assert len(lines) >= 3 and len(lines) % 2 == 1
+        for index in range(1, len(lines), 2):
+            assert lines[index].startswith("file ")
+            assert ".mov" in lines[index]
+            assert lines[index + 1] == (
+                "option format_whitelist mov,mp4,m4a,3gp,3g2,mj2,matroska,webm,mxf")
+        assert args[args.index("-c:a") + 1] == "aac"
+        assert args[args.index("-b:a") + 1] == "192000"
+        assert "-vf" not in args and "-r" not in args
+        assert args[args.index("-f", args.index("-c:a")) + 1] == "mp4"
+    else:
+        assert args[args.index("-format_whitelist") + 1] == (
+            "mov,mp4,m4a,3gp,3g2,mj2,matroska,webm,mxf")
+        assert args[args.index("-c:v") + 1] == "h264_nvenc"
+        assert args[args.index("-preset") + 1] == "p4"
+        assert args[args.index("-b:v") + 1] == "8000000"
+        assert args[args.index("-g") + 1] == "60"
+        assert args[args.index("-hwaccel") + 1] == "cuda"
+        assert args[args.index("-hwaccel_output_format") + 1] == "cuda"
+        assert args[args.index("-vf") + 1] == "scale_cuda=1920:1080:format=nv12"
+        assert args[args.index("-fps_mode") + 1] == "cfr"
+        assert args[args.index("-r") + 1] == "30000/1001"
+        assert args.index("-r") > args.index("-i")
+        assert args[args.index("-rc") + 1] == "vbr"
+        assert args[args.index("-c:a") + 1] == "pcm_s16le"
+        assert args[args.index("-af") + 1] == (
+            "aresample=48000,aformat=channel_layouts=stereo,apad")
+        assert "-shortest" in args
+        assert args[args.index("-f", args.index("-c:a")) + 1] == "mov"
     pathlib.Path(args[-1]).write_bytes(b"deterministic-render-bytes")
     print("frame=60\\nout_time_us=2000000\\nprogress=end")
     if mode == "fallback":
@@ -321,7 +344,7 @@ else:
     if mode == "nvenc":
         print("OpenEncodeSessionEx failed: synthetic diagnostic", file=sys.stderr)
         sys.exit(1)
-    if mode == "fail":
+    if mode == "fail" or (mode == "stage2_fail" and stage2):
         print("synthetic private diagnostic", file=sys.stderr)
         sys.exit(1)
 '''
@@ -351,9 +374,9 @@ def test_fake_ffmpeg_identity_profile_failures_and_temp_cleanup(
     monkeypatch.setenv("STAGEFLOW_FAKE_RENDER", mode)
     if mode in {"gpl", "nonfree"}:
         with pytest.raises(RenderError, match="ffmpeg_identity_refused"):
-            FFmpegAdapter(fake_ffmpeg)
+            FFmpegAdapter(fake_ffmpeg, synthetic_probe())
         return
-    adapter = FFmpegAdapter(fake_ffmpeg)
+    adapter = FFmpegAdapter(fake_ffmpeg, synthetic_probe())
     assert adapter.identity.sha256 == hashlib.sha256(fake_ffmpeg.read_bytes()).hexdigest()
     assert adapter.nvenc_available() == (mode != "nvenc")
     store = OutputStore(tmp_path)
@@ -400,7 +423,8 @@ def test_output_and_profile_contracts_reject_paths_naive_time_and_changes() -> N
     with pytest.raises(ValueError):
         replace(value, produced_at=NOW.replace(tzinfo=None))
     with pytest.raises(RenderError, match="render_profile_unsupported"):
-        build_render_plan(assembly(), replace(PROFILE, audio=cast(Any, True)), {}, {})
+        build_render_plan(
+            assembly(), replace(PROFILE, audio_codec=cast(Any, "unsupported")), {}, {})
     with pytest.raises(RenderError, match="render_human_required"):
         RenderActor(EntityId.new(), cast(Any, "automatic"))
 
@@ -423,7 +447,7 @@ def test_execution_sidecar_frozen_provenance_and_no_partial_output(
     root = tmp_path / "output"
     root.mkdir()
     store = OutputStore(root)
-    execution = LocalRenderExecution(FFmpegAdapter(fake_ffmpeg), store,
+    execution = LocalRenderExecution(FFmpegAdapter(fake_ffmpeg, synthetic_probe()), store,
         PackagingContentResolver(tmp_path), Mock(spec=KernelMediaPathResolver), Mock(),
         memory.clock)
     if mode == "success":
@@ -432,7 +456,7 @@ def test_execution_sidecar_frozen_provenance_and_no_partial_output(
         sidecar = (root / output.manifest_content_key).read_bytes()
         assert hashlib.sha256(sidecar).hexdigest() == output.manifest_sha256
         document = json.loads(sidecar)
-        assert document["profile_version"] == output.profile_version == "2"
+        assert document["profile_version"] == output.profile_version == "3"
         assert document["metadata"][0]["source"] == "operator_override"
         assert document["metadata"][0]["source_id"] == plan.manifest.metadata[0].source_id.value
         assert document["metadata"][0]["values"] == ["Frozen title"]

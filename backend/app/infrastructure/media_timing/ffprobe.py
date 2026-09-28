@@ -3,6 +3,8 @@ import hashlib
 import json
 import re
 import subprocess
+import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from threading import Thread
@@ -23,6 +25,21 @@ class FFprobeIdentity:
     sha256: str
 
 
+RENDER_INPUT_FORMATS = "mov,mp4,m4a,3gp,3g2,mj2,matroska,webm,mxf"
+
+
+@dataclass(frozen=True, slots=True)
+class RenderStreamFacts:
+    """Only bounded stream facts; no tags, paths, or media payloads escape the probe."""
+
+    video_codecs: tuple[str, ...]
+    audio_codecs: tuple[str, ...]
+
+    @property
+    def has_audio(self) -> bool:
+        return bool(self.audio_codecs)
+
+
 class FFprobeAdapter:
     def __init__(self, path: Path, clock: Clock, *, timeout: float = 30,
                  output_limit: int = 1_048_576) -> None:
@@ -32,7 +49,7 @@ class FFprobeAdapter:
         self.timeout, self.output_limit = timeout, output_limit
         self.identity = self._identify()
 
-    def _run(self, arguments: list[str]) -> bytes:
+    def _run(self, arguments: list[str], heartbeat: Callable[[], None] | None = None) -> bytes:
         output = bytearray()
         oversized = False
         try:
@@ -54,11 +71,21 @@ class FFprobeAdapter:
                 reader = Thread(target=read, daemon=True)
                 reader.start()
                 try:
-                    process.wait(timeout=self.timeout)
-                except subprocess.TimeoutExpired:
+                    deadline = time.monotonic() + self.timeout
+                    while True:
+                        remaining = deadline - time.monotonic()
+                        if remaining <= 0:
+                            raise MediaTimingError("media_timing_timeout", retryable=True)
+                        try:
+                            process.wait(timeout=min(5, remaining))
+                            break
+                        except subprocess.TimeoutExpired:
+                            if heartbeat is not None:
+                                heartbeat()
+                except BaseException:
                     process.kill()
                     process.wait()
-                    raise MediaTimingError("media_timing_timeout", retryable=True) from None
+                    raise
                 finally:
                     reader.join()
                 if oversized or process.returncode:
@@ -67,7 +94,7 @@ class FFprobeAdapter:
             raise MediaTimingError("media_timing_tool_unavailable", retryable=True) from None
         return bytes(output)
 
-    def _identify(self) -> FFprobeIdentity:
+    def _identify(self, heartbeat: Callable[[], None] | None = None) -> FFprobeIdentity:
         path = self.binary
         if (not path.is_absolute() or ".." in path.parts
                 or path.suffix.casefold() in {".cmd", ".bat"}
@@ -83,7 +110,7 @@ class FFprobeAdapter:
                 digest = hashlib.file_digest(handle, "sha256").hexdigest()
         except OSError:
             raise MediaTimingError("media_timing_tool_unavailable", retryable=True) from None
-        text = self._run(["-version"]).decode("utf-8", errors="replace")
+        text = self._run(["-version"], heartbeat).decode("utf-8", errors="replace")
         lines = text.splitlines()
         match = re.fullmatch(r"ffprobe version ([A-Za-z0-9][A-Za-z0-9._-]{0,100})(?: .*?)?",
                              lines[0] if lines else "")
@@ -131,3 +158,42 @@ class FFprobeAdapter:
             raise MediaTimingError("media_timing_output_invalid") from None
         return inspection_result(fields, version=self.identity.version,
                                  digest=self.identity.sha256, inspected_at=self.clock.now())
+
+    def render_streams(self, path: Path, heartbeat: Callable[[], None]) -> RenderStreamFacts:
+        """Apply the render demuxer allowlist without changing timing inspection."""
+        heartbeat()
+        if self._identify(heartbeat) != self.identity:
+            raise MediaTimingError("media_timing_tool_refused")
+        if not path.is_absolute() or not path.is_file():
+            raise MediaTimingError("input_missing", retryable=True)
+        raw = self._run(["-protocol_whitelist", "file", "-v", "error", "-print_format", "json",
+                         "-format_whitelist", RENDER_INPUT_FORMATS,
+                         "-show_streams", str(path)], heartbeat)
+        try:
+            document = json.loads(raw)
+            if not isinstance(document, dict):
+                raise ValueError
+            document = cast(dict[str, Any], document)
+            streams: object = document.get("streams")
+            if not isinstance(streams, list) or not streams:
+                raise ValueError
+            streams = cast(list[object], streams)
+            video: list[str] = []
+            audio: list[str] = []
+            for stream in streams:
+                if not isinstance(stream, dict):
+                    raise ValueError
+                stream = cast(dict[str, Any], stream)
+                kind, codec = stream.get("codec_type"), stream.get("codec_name")
+                if not isinstance(kind, str) or kind not in {
+                    "video", "audio", "subtitle", "data", "attachment", "unknown",
+                }:
+                    raise ValueError
+                if kind in {"video", "audio"}:
+                    if (not isinstance(codec, str)
+                            or re.fullmatch(r"[a-z0-9_]{1,80}", codec) is None):
+                        raise ValueError
+                    (video if kind == "video" else audio).append(codec)
+            return RenderStreamFacts(tuple(video), tuple(audio))
+        except (ValueError, UnicodeError, RecursionError):
+            raise MediaTimingError("media_timing_output_invalid") from None

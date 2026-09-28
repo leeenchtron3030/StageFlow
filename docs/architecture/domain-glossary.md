@@ -30,7 +30,7 @@ collapsed Details for diagnosis; shared facts appear once and exceptions remain 
 | Lifecycle `declared` | Set by producer |
 | Current / stale / frozen proposal order | Up to date / Out of date: inputs changed / Order locked when proposed |
 | Render pending, leased, running / succeeded / terminal_failed | Rendering... / Done / Failed |
-| Render profile h264-nvenc-1080p-video v2 | 1080p (v2) |
+| Render profile h264-nvenc-1080p-video v3; v1/v2 history | 1080p with audio (v3); 1080p (v1/v2) |
 | Slot bindings | Layout: Intro ([asset name]) → Recording |
 | Timing ordering / registration fallback | Ordered by recorder time / N recordings ordered by arrival time (no recorder time) |
 | Live Triage / Review queue | Editorial review |
@@ -384,10 +384,11 @@ not-event-ready disclaimer retain their meaning.
 
 ### Rendering terms
 
-- **Render Profile:** immutable, versioned execution settings. The current profile, v2,
+- **Render Profile:** immutable, versioned execution settings. The current profile, v3,
   uses CUDA decode and H.264 NVENC at 1080p, preset p4, VBR 8 Mbit/s, GOP 60, MP4,
-  video only, with constant 30000/1001 output frame rate. v1 remains a readable recorded
-  identity but cannot be requested for new renders.
+  with constant 30000/1001 video and one native AAC-LC 48 kHz stereo 192 kbit/s
+  audio stream. Each input contributes its first audio stream or digital silence.
+  v1 and v2 remain readable video-only recorded identities, refused for new renders.
 - **Render Request:** human-authorized, idempotent command for an approved, non-stale
   Assembly revision and one Render Profile. It enqueues a Durable Operation, not publication.
 - **Rendered Output:** immutable rendering-owned identity for completed output bytes and
