@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved (2026-09-27).
+Completed (2026-09-27).
 
 ## Execution authority
 
@@ -266,11 +266,11 @@ already records the profile ID and version, and the version now implies audio.
 
 ## Acceptance criteria
 
-- [ ] New renders use v3. v1 and v2 are refused with a typed error, and their history
+- [x] New renders use v3. v1 and v2 are refused with a typed error, and their history
   still reads.
-- [ ] The Producer render action works end to end against v3.
-- [ ] All required checks pass. No migration and no dependency were added.
-- [ ] **Run 003** on the reference GPU. Media must be synthetic or already-approved
+- [x] The Producer render action works end to end against v3.
+- [x] All required checks pass. No migration and no dependency were added.
+- [x] **Run 003** on the reference GPU. Media must be synthetic or already-approved
   validation media, and no media paths or names are recorded.
   - Revision A: synthetic inputs generated with FFmpeg `lavfi`. Each carries a timed
     beep and a white flash at the same instants. The set includes one input with no
@@ -305,11 +305,55 @@ already records the profile ID and version, and the version now implies audio.
 
 ## Completion record
 
-- Implemented revision:
-- Files and migrations actually changed:
-- Commands and tests actually run:
-- Results and warnings:
-- Execution authority used:
-- Approved deviations:
-- Rollback status:
-- Remaining work:
+- **Implemented revision:**
+  - PR #134, branch `codex/ed-0098-render-audio`, merged as `813144b`. Codex implemented it
+    and the owner committed it.
+  - Defect fix and validation records: branch `fix/ed-0098-exact-audio-length`.
+- **Files changed:**
+  - rendering contracts: audio fields, v3 current, `RENDER_PROFILE_V2`, and the
+    `FIRST_RENDER_PROFILE` alias removed;
+  - deployment configuration: optional `[local_render] ffprobe_path`;
+  - the ffprobe adapter: render stream facts and heartbeats;
+  - the FFmpeg adapter: the two-stage encode, then the exact audio fit in the fix;
+  - the API and render worker: v3;
+  - frontend `output-actions.ts` and `ui-labels.ts`;
+  - `tests/test_render_profile_v3.py`, plus updates to the v2, phase B, phase B review and
+    Assembly tests;
+  - the rendering and config READMEs, the capability layer and the glossary.
+  - No migration and no dependency.
+- **Tests:**
+  - ED-0098 on the host: full backend suite 2,642 passed, 0 failed, 2 skipped; Ruff and
+    Pyright clean; frontend test 257/257, lint, typecheck and build pass; CI green.
+  - The fix, on the host: full backend suite 2,652 passed, 0 failed, 2 skipped (before the
+    review follow-up; rerun before push). Rendering tests, Ruff and Pyright are clean.
+  - The plan's "no `-an`" test item now applies to stage 1b and stage 2. Stage 1a is
+    deliberately video-only (`-an`), and the tests assert that `-an` appears nowhere else.
+- **Review:**
+  - Codex stopped twice for test changes outside the pre-authorized list: the unknown
+    version example `"3"` → `"4"`, and two v1/audio test inputs. The owner approved both.
+  - The `directive-reviewer` returned FIX-FIRST for missing tests (input order, empty or
+    video-less inputs, probe heartbeat), then APPROVE.
+- **Owner real-GPU validation:**
+  [Run 003](../validation/results/render-durable-operation-003.md) **found a defect in the
+  merged code**:
+  - `apad` with `-shortest` does not stop the audio at the end of the video on FFmpeg 8.
+  - Each input's audio overran its video by minutes, leaving 200–270 s gaps at the joins.
+  - It was fixed by fitting each input's audio to
+    `round(frames × 1001/30000 × 48000)` samples, where the frames come from a video-only
+    stage 1a. This is the plan's "explicit `atrim`" option.
+  - After the fix, every acceptance criterion passed:
+    - A/V duration difference 0.0 ms;
+    - 0 irregular frame steps and 0 duplicate timestamps;
+    - maximum marker offset 18.1 ms, with no drift added over the source clips;
+    - digital silence for the silent input;
+    - byte-identical re-renders of **both** revisions on the final code.
+- **Deviations:**
+  - Stage 1 is two FFmpeg processes per input rather than one.
+  - A review of the fix (FIX-FIRST, then fixed) added a test that the second opening of the
+    original media keeps the demuxer allowlist, and a test that `-an` appears only in stage
+    1a. It also frees each video-only temporary file early, so temp use stays about 2×.
+  - Throughput is 88.1 s against 52.4 s for v2 on the same inputs.
+  - The defective v3 output of Run 002 revision 1 stays in validation history. The profile
+    version was not bumped, because the v3 definition did not change.
+- **Rollback:** revert the code. There is no data change.
+- **Remaining work:** none for ED-0098. ED-0099 builds on this pipeline.

@@ -5,6 +5,7 @@ import subprocess
 from collections.abc import Callable, Sequence
 from contextlib import ExitStack
 from dataclasses import dataclass
+from fractions import Fraction
 from pathlib import Path
 
 from app.contexts.production.media_timing_evidence.inspection import MediaTimingError
@@ -100,7 +101,7 @@ class FFmpegAdapter:
         profile: RenderProfile, heartbeat: Callable[[], None],
     ) -> EncodingResult:
         require_profile(profile)
-        assert profile.output_frame_rate is not None
+        assert profile.output_frame_rate is not None and profile.audio_sample_rate is not None
         store.validate()
         if safe_path(output).parent != store.temp:
             raise RenderError(RenderReason.STORE_UNAVAILABLE)
@@ -115,25 +116,45 @@ class FFmpegAdapter:
         with ExitStack() as temporary:
             intermediates: list[Path] = []
             for item, fact in zip(inputs, facts, strict=True):
-                intermediate = temporary.enter_context(store.temporary(".mov"))
-                intermediates.append(intermediate)
-                command = [str(self.binary), "-nostdin", "-hide_banner", "-y",
-                           "-hwaccel", "cuda", "-hwaccel_output_format", "cuda",
-                           "-protocol_whitelist", "file,pipe",
-                           "-format_whitelist", RENDER_INPUT_FORMATS, "-i", str(safe_path(item))]
-                if not fact.has_audio:
-                    command += ["-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo"]
-                command += ["-map", "0:v:0", "-map", "0:a:0" if fact.has_audio else "1:a:0",
-                            "-map_metadata", "-1", "-map_chapters", "-1",
-                            "-vf", "scale_cuda=1920:1080:format=nv12", "-fps_mode", "cfr",
-                            "-r", str(profile.output_frame_rate),
-                            "-c:v", profile.encoder, "-preset", profile.preset,
-                            "-rc", profile.rate_control, "-b:v", str(profile.bit_rate),
-                            "-g", str(profile.gop),
-                            "-af", "aresample=48000,aformat=channel_layouts=stereo,apad",
-                            "-c:a", "pcm_s16le", "-ar", "48000", "-ac", "2", "-shortest",
-                            "-f", "mov", "-progress", "pipe:1", "-nostats", str(intermediate)]
-                self._encode(command, heartbeat)
+                # Stage 1a encodes the video exactly once; its frame count fixes the length.
+                # The video-only file lives only until its audio-fitted copy exists.
+                with store.temporary(".mov") as video:
+                    command = [str(self.binary), "-nostdin", "-hide_banner", "-y",
+                               "-hwaccel", "cuda", "-hwaccel_output_format", "cuda",
+                               "-protocol_whitelist", "file,pipe",
+                               "-format_whitelist", RENDER_INPUT_FORMATS,
+                               "-i", str(safe_path(item)), "-map", "0:v:0", "-an",
+                               "-map_metadata", "-1", "-map_chapters", "-1",
+                               "-vf", "scale_cuda=1920:1080:format=nv12", "-fps_mode", "cfr",
+                               "-r", str(profile.output_frame_rate),
+                               "-c:v", profile.encoder, "-preset", profile.preset,
+                               "-rc", profile.rate_control, "-b:v", str(profile.bit_rate),
+                               "-g", str(profile.gop),
+                               "-f", "mov", "-progress", "pipe:1", "-nostats", str(video)]
+                    frames = self._encode(command, heartbeat).frame_count
+                    # Stage 1b fits audio to exactly that video length. `apad` with `-shortest`
+                    # overran by minutes on FFmpeg 8 (Run 003), so the length is explicit samples.
+                    samples = round(Fraction(frames) / profile.output_frame_rate
+                                    * profile.audio_sample_rate)
+                    if samples <= 0:
+                        raise RenderError(RenderReason.OUTPUT_INVALID)
+                    intermediate = temporary.enter_context(store.temporary(".mov"))
+                    intermediates.append(intermediate)
+                    command = [str(self.binary), "-nostdin", "-hide_banner", "-y",
+                               "-protocol_whitelist", "file,pipe", "-format_whitelist", "mov",
+                               "-i", str(video)]
+                    command += (["-protocol_whitelist", "file,pipe",
+                                 "-format_whitelist", RENDER_INPUT_FORMATS,
+                                 "-i", str(safe_path(item))] if fact.has_audio else
+                                ["-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo"])
+                    command += ["-map", "0:v:0", "-map", "1:a:0",
+                                "-map_metadata", "-1", "-map_chapters", "-1", "-c:v", "copy",
+                                "-af", "aresample=48000:async=1:first_pts=0,"
+                                f"aformat=channel_layouts=stereo,apad=whole_len={samples},"
+                                f"atrim=end_sample={samples}",
+                                "-c:a", "pcm_s16le", "-ar", "48000", "-ac", "2",
+                                "-f", "mov", "-progress", "pipe:1", "-nostats", str(intermediate)]
+                    self._encode(command, heartbeat)
             concat = temporary.enter_context(store.temporary(".ffconcat"))
             concat.write_text(concat_list_content(intermediates), encoding="utf-8", newline="\n")
             command = [str(self.binary), "-nostdin", "-hide_banner", "-y",

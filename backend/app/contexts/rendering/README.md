@@ -6,12 +6,16 @@ with constant 30000/1001 video and one native AAC-LC audio stream at 48 kHz,
 stereo, 192 kbit/s. These video settings are unchanged from v2.
 
 Each resolved input is probed with the operator-installed LGPL ffprobe under the render
-demuxer allowlist. Probe errors are typed failures, never assumed silence. Each input is
-encoded once using CUDA decode, scale_cuda and NVENC. Its first audio stream is resampled
-to 48 kHz stereo, or digital silence is supplied when audio is absent. Audio is padded
-and trimmed to the segment video with apad and -shortest, and stored as 16-bit PCM in a
-temporary MOV. The second stage concatenates these intermediates, copies video and encodes
-native AAC once, avoiding per-join AAC priming. Frame count and duration come from stage 2.
+demuxer allowlist. Probe errors are typed failures, never assumed silence. Stage 1a encodes
+each input's video once, video only, using CUDA decode, scale_cuda and NVENC; its reported
+frame count fixes the segment length. Stage 1b copies that video and adds audio of exactly
+round(frames x 1001/30000 x 48000) samples: the input's first audio stream, resampled to
+48 kHz stereo and anchored at time zero (`aresample=async=1:first_pts=0`), or digital
+silence when audio is absent, padded and trimmed by sample count (`apad=whole_len`,
+`atrim=end_sample`). It is stored as 16-bit PCM in a temporary MOV. `apad` with `-shortest`
+is not used: on FFmpeg 8 it overran each segment's audio by minutes (render validation
+Run 003). Stage 2 concatenates these intermediates, copies video and encodes native AAC
+once, avoiding per-join AAC priming. Frame count and duration come from stage 2.
 ffprobe must confirm exactly one H.264 video and one AAC audio stream before publication;
 otherwise the attempt fails with render_output_invalid.
 
@@ -19,7 +23,8 @@ Inputs with more than two audio channels (e.g. 5.1) are down-mixed to stereo by 
 
 Intermediates are never registered and are removed on success, failure and cancellation.
 They use the output store's .tmp directory. Operator note: allow approximately twice the
-output size during stage 2, with additional headroom for uncompressed PCM audio. Abrupt
+output size during stage 2, with additional headroom for uncompressed PCM audio. Each
+input's video-only file is removed as soon as its audio-fitted copy exists. Abrupt
 process termination can leave temp files; these remain unregistered and require operator
 cleanup, as with existing temporary outputs. No automatic historical-data deletion occurs.
 
