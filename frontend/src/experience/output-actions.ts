@@ -1,3 +1,4 @@
+import { renderQualityLabels } from "./ui-labels.ts";
 import type { AssemblyItem } from "./assembly-api.ts";
 import type { SessionOutputs } from "./session-outputs.ts";
 import { demoAuthorityHeaders } from "./demo-launch-context.ts";
@@ -14,6 +15,7 @@ export interface OutputActionContext {
   authoritative: boolean;
   fixture: boolean;
   assembly: SessionOutputs["assembly"];
+  renderSetting?: SessionOutputs["renderSetting"];
   operations?: SessionOutputs["operations"];
   outputs?: SessionOutputs["outputs"];
 }
@@ -30,6 +32,7 @@ export function outputActionDisabled(context: OutputActionContext, action: Outpu
   if (!context.operatorAvailable) return "Commands unavailable: operator identity is not configured.";
   if (context.assembly.state !== "available") return "Commands unavailable: refresh Assembly state first.";
   if (!idSchema.safeParse(context.sessionId).success || !idSchema.safeParse(context.eventId).success || !Number.isSafeInteger(context.packageRevision) || context.packageRevision < 1) return "Commands unavailable: Session identity or package revision is unavailable.";
+  if (action === "render" && context.renderSetting?.state === "unavailable") return renderQualityLabels.unavailable;
   const item = context.assembly.value;
   if (item && (item.revision.session_id !== context.sessionId || item.revision.event_id !== context.eventId || item.current_revision_number !== item.revision.revision_number)) return "Commands unavailable: refresh the current Assembly revision.";
   if (action === "propose") return nextOutputAction(item) === "propose" ? undefined : "A current valid revision already exists.";
@@ -55,7 +58,7 @@ export function prepareOutputCommand(context: OutputActionContext, action: Outpu
   if ((action === "approve" || action === "reject") && (!reason || reason.length > 500)) return undefined;
   const commandId = generateUuidV4(options.cryptoSource);
   const body = action === "propose" ? { operation_id: commandId, confirmed: "confirmed", template_id: options.templateId!, expected_revision: item?.current_revision_number ?? 0, expected_package_revision: context.packageRevision }
-    : action === "render" ? { command_id: commandId, confirmed: "confirmed", assembly_revision_id: item!.revision.revision_id, profile_id: "h264-nvenc-1080p-video", profile_version: "3", authority_kind: "human" }
+    : action === "render" ? { command_id: commandId, confirmed: "confirmed", assembly_revision_id: item!.revision.revision_id, profile_id: "h264-nvenc-1080p-video", profile_version: "3", authority_kind: "human", ...(context.renderSetting?.state === "available" ? { profile_id: context.renderSetting.value.profile_id, profile_version: context.renderSetting.value.profile_version, expected_setting_version: context.renderSetting.value.version } : {}) }
     : { operation_id: commandId, confirmed: "confirmed", revision_number: item!.revision.revision_number, expected_revision: item!.current_revision_number, expected_decision_count: item!.decision_count, action, reason };
   return Object.freeze({ action, path: action === "render" ? "/api/stageflow/rendering/requests" : `/api/stageflow/assembly/sessions/${context.sessionId}/${action === "propose" ? "revisions" : "approvals"}`, body: Object.freeze(body), launchContext: context.launchContext! });
 }

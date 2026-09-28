@@ -1,11 +1,11 @@
 "use client";
 
-import { uiLabels } from "../experience/ui-labels.ts";
+import { uiLabels, renderQualityLabel, renderQualityLabels } from "../experience/ui-labels.ts";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { assemblyApi, type assemblyTemplatesSchema } from "../experience/assembly-api.ts";
 import type { z } from "zod";
-import { currentRenderSummary } from "../experience/session-outputs.ts";
+import { currentRenderSummary, newestOutputs } from "../experience/session-outputs.ts";
 import { nextOutputAction, outputActionDisabled, outputConfirmation, prepareOutputCommand, sendOutputCommand, type OutputAction, type OutputActionContext, type OutputCommandResult, type PreparedOutputCommand } from "../experience/output-actions.ts";
 
 type Templates = z.infer<typeof assemblyTemplatesSchema>;
@@ -30,11 +30,14 @@ export function SessionOutputActions({ context }: { context: OutputActionContext
   const primary = nextOutputAction(item);
   const renderSummary = primary === "render" && item
     ? currentRenderSummary(item.revision.revision_id, context.operations, context.outputs) : undefined;
+  const quality = context.renderSetting?.state === "available" ? context.renderSetting.value : undefined;
+  const latest = context.outputs?.state === "available" ? newestOutputs(context.outputs.value.items)[0] : undefined;
+  const qualityMismatch = Boolean(quality && latest && renderQualityLabel(quality) !== renderQualityLabel(latest));
   const disabled = outputActionDisabled(context, primary);
   const stateKey = JSON.stringify(context);
   const changed = openedState !== stateKey;
   const template = templates?.items.find((entry) => entry.template_id === templateId);
-  const confirmation = outputConfirmation(action, item, context.packageRevision, template?.name);
+  const confirmation = outputConfirmation(action, item, context.packageRevision, template?.name, quality ? renderQualityLabel(quality) : undefined);
   const formDisabled = !open || busy || refreshing || changed || Boolean(outputActionDisabled(context, action)) ||
     (action === "propose" ? !template : (action === "approve" || action === "reject") && (!reason.trim() || reason.trim().length > 500));
 
@@ -81,8 +84,8 @@ export function SessionOutputActions({ context }: { context: OutputActionContext
   }
   return <div className="output-actions">
     {renderSummary ? <strong role="status">{renderSummary}</strong> : null}
-    <button ref={trigger} className={renderSummary ? "output-secondary-action" : undefined} type="button" onClick={begin} disabled={Boolean(disabled) || busy || refreshing || Boolean(retry)} aria-describedby="output-action-state">
-      {primary === "propose" ? "Propose Assembly" : primary === "approve" ? "Approve / Reject" : renderSummary ? "Request another render" : "Request render"}
+    <button ref={trigger} className={renderSummary || qualityMismatch ? "output-secondary-action" : undefined} type="button" onClick={begin} disabled={Boolean(disabled) || busy || refreshing || Boolean(retry)} aria-describedby="output-action-state">
+      {primary === "propose" ? "Propose Assembly" : primary === "approve" ? "Approve / Reject" : qualityMismatch ? renderQualityLabels.again : renderSummary ? "Request another render" : "Request render"}
     </button>
     <span ref={actionState} tabIndex={-1} id="output-action-state">{busy ? "Working…" : refreshing ? "Refreshing current state…" : disabled ?? (retry ? "Resolve the pending command before another action." : "")}</span>
     {result ? <div className="output-command-result">

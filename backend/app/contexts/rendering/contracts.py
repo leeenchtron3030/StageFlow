@@ -1,6 +1,6 @@
 """Immutable render intent and output identity. No filesystem or execution authority."""
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from enum import StrEnum
 from fractions import Fraction
@@ -28,6 +28,8 @@ class RenderReason(StrEnum):
     HUMAN_REQUIRED = "render_human_required"
     PROFILE_UNSUPPORTED = "render_profile_unsupported"
     METADATA_INVALID = "render_metadata_invalid"
+    ADJUSTMENT_OUT_OF_BOUNDS = "render_adjustment_out_of_bounds"
+    SETTING_CHANGED = "render_setting_changed"
 
 
 class RenderError(RuntimeError):
@@ -76,8 +78,74 @@ RENDER_PROFILE_V2 = RenderProfile(version="2", audio_codec=None, audio_sample_ra
                                  audio_channels=None, audio_bit_rate=None)
 
 
-def require_profile(profile: RenderProfile) -> None:
-    if (type(profile) is not RenderProfile or profile != CURRENT_RENDER_PROFILE
+@dataclass(frozen=True, slots=True)
+class RenderAdjustments:
+    video_bit_rate: int | None = None
+    audio_bit_rate: int | None = None
+
+    def __post_init__(self) -> None:
+        for value in (self.video_bit_rate, self.audio_bit_rate):
+            if value is not None and (type(value) is not int or value <= 0):
+                raise RenderError(RenderReason.ADJUSTMENT_OUT_OF_BOUNDS)
+
+
+@dataclass(frozen=True, slots=True)
+class RenderPreset:
+    profile: RenderProfile
+    label: str
+    video_min: int
+    video_max: int
+    audio_choices: tuple[int, ...]
+    video_step: int = 500_000
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "audio_choices", tuple(self.audio_choices))
+
+
+RENDER_PRESETS = (
+    RenderPreset(CURRENT_RENDER_PROFILE, "1080p Standard", 6_000_000, 12_000_000,
+                 (128_000, 160_000, 192_000, 256_000)),
+    RenderPreset(RenderProfile(id="h264-nvenc-1080p-high", version="1",
+                               bit_rate=14_000_000, audio_bit_rate=256_000),
+                 "1080p High", 10_000_000, 20_000_000, (192_000, 256_000, 320_000)),
+    RenderPreset(RenderProfile(id="h264-nvenc-720p", version="1", width=1280, height=720,
+                               bit_rate=4_000_000, audio_bit_rate=128_000),
+                 "720p Compact", 3_000_000, 6_000_000, (96_000, 128_000, 160_000, 192_000)),
+)
+
+
+def render_preset(profile_id: str, version: str) -> RenderPreset:
+    for preset in RENDER_PRESETS:
+        if (preset.profile.id, preset.profile.version) == (profile_id, version):
+            return preset
+    raise RenderError(RenderReason.PROFILE_UNSUPPORTED)
+
+
+def normalize_adjustments(
+    preset: RenderPreset, adjustments: RenderAdjustments,
+) -> RenderAdjustments:
+    if type(adjustments) is not RenderAdjustments:
+        raise RenderError(RenderReason.ADJUSTMENT_OUT_OF_BOUNDS)
+    video, audio = adjustments.video_bit_rate, adjustments.audio_bit_rate
+    if (video is not None and (not preset.video_min <= video <= preset.video_max
+                              or (video - preset.video_min) % preset.video_step)):
+        raise RenderError(RenderReason.ADJUSTMENT_OUT_OF_BOUNDS)
+    if audio is not None and audio not in preset.audio_choices:
+        raise RenderError(RenderReason.ADJUSTMENT_OUT_OF_BOUNDS)
+    return RenderAdjustments(None if video == preset.profile.bit_rate else video,
+                             None if audio == preset.profile.audio_bit_rate else audio)
+
+
+def effective_profile(preset: RenderPreset, adjustments: RenderAdjustments) -> RenderProfile:
+    if preset != render_preset(preset.profile.id, preset.profile.version):
+        raise RenderError(RenderReason.PROFILE_UNSUPPORTED)
+    value = normalize_adjustments(preset, adjustments)
+    return replace(preset.profile, bit_rate=value.video_bit_rate or preset.profile.bit_rate,
+                   audio_bit_rate=value.audio_bit_rate or preset.profile.audio_bit_rate)
+
+
+def require_requestable(profile: RenderProfile) -> None:
+    if (type(profile) is not RenderProfile
             or any(type(value) is not int for value in (
                 profile.bit_rate, profile.gop, profile.width, profile.height,
                 profile.audio_sample_rate, profile.audio_channels, profile.audio_bit_rate,
@@ -86,6 +154,14 @@ def require_profile(profile: RenderProfile) -> None:
                 profile.id, profile.version, profile.encoder, profile.preset,
                 profile.rate_control, profile.container, profile.decode, profile.audio_codec,
             ))):
+        raise RenderError(RenderReason.PROFILE_UNSUPPORTED)
+    preset = render_preset(profile.id, profile.version)
+    try:
+        expected = effective_profile(preset, RenderAdjustments(profile.bit_rate,
+                                                               profile.audio_bit_rate))
+    except RenderError:
+        raise RenderError(RenderReason.PROFILE_UNSUPPORTED) from None
+    if profile != expected:
         raise RenderError(RenderReason.PROFILE_UNSUPPORTED)
 
 
@@ -102,14 +178,22 @@ class RenderActor:
 @dataclass(frozen=True, slots=True)
 class RenderRequest:
     assembly_revision_id: EntityId
-    profile: RenderProfile
+    profile: RenderProfile | None
     actor: RenderActor
     command_id: EntityId
+    expected_setting_version: int | None | Literal["unspecified"] = "unspecified"
+    requested_profile_id: str | None = None
+    requested_profile_version: str | None = None
 
     def __post_init__(self) -> None:
-        require_profile(self.profile)
+        if self.profile is not None:
+            require_requestable(self.profile)
         if self.actor.authority_kind != "human":
             raise RenderError(RenderReason.HUMAN_REQUIRED)
+        if (self.expected_setting_version != "unspecified"
+                and self.expected_setting_version is not None):
+            if type(self.expected_setting_version) is not int or self.expected_setting_version <= 0:
+                raise ValueError("render_setting_version_invalid")
 
 
 @dataclass(frozen=True, slots=True)
@@ -144,7 +228,7 @@ class RenderPlan:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "inputs", tuple(self.inputs))
-        require_profile(self.profile)
+        require_requestable(self.profile)
 
 
 @dataclass(frozen=True, slots=True)
@@ -177,13 +261,16 @@ class RenderedOutput:
     frame_count: int
     ffmpeg: FFmpegIdentity
     produced_at: datetime
+    video_bit_rate: int | None = None
+    audio_bit_rate: int | None = None
+    event_render_setting_version: int | None = None
 
     def __post_init__(self) -> None:
         if (self.media_type != "video/mp4"
-                or self.profile_id != CURRENT_RENDER_PROFILE.id
-                or self.profile_version not in (RENDER_PROFILE_V1.version,
-                                                RENDER_PROFILE_V2.version,
-                                                CURRENT_RENDER_PROFILE.version)):
+                or (self.profile_id, self.profile_version) not in (
+                    *((p.profile.id, p.profile.version) for p in RENDER_PRESETS),
+                    (RENDER_PROFILE_V1.id, RENDER_PROFILE_V1.version),
+                    (RENDER_PROFILE_V2.id, RENDER_PROFILE_V2.version))):
             raise RenderError(RenderReason.OUTPUT_INVALID)
         for name in ("content_key", "manifest_content_key"):
             if re.fullmatch(r"[A-Za-z0-9_-]{1,128}", getattr(self, name)) is None:

@@ -1,20 +1,28 @@
 """Authenticated human render requests and bounded Event/Session reads."""
-from dataclasses import replace
+from datetime import UTC
 from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, Request
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, StrictInt
 
 from app.bootstrap.event_mode_kernel import KernelComponents
 from app.contexts.assembly.session_repository import AssemblyNotFoundError
 from app.contexts.rendering.contracts import (
-    CURRENT_RENDER_PROFILE,
+    RENDER_PRESETS,
     RenderActor,
+    RenderAdjustments,
     RenderedOutput,
     RenderError,
+    effective_profile,
+    render_preset,
 )
 from app.contexts.rendering.service import RenderingService
+from app.contexts.rendering.settings import (
+    ChooseRenderSetting,
+    EventRenderSetting,
+    RenderSettingsService,
+)
 from app.contexts.work_execution import (
     DurableOperation,
     RenderOperationInput,
@@ -31,8 +39,9 @@ router = APIRouter(prefix="/rendering", tags=["rendering"])
 class RequestBody(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
     assembly_revision_id: UUID
-    profile_id: Literal["h264-nvenc-1080p-video"] = "h264-nvenc-1080p-video"
-    profile_version: Literal["1", "2", "3"] = "3"
+    profile_id: str | None = None
+    profile_version: str | None = None
+    expected_setting_version: Annotated[StrictInt, Field(gt=0)] | None = None
     actor_id: UUID
     command_id: UUID
     confirmed: Literal["confirmed"]
@@ -58,6 +67,9 @@ def _operation(operation: DurableOperation[RenderOperationInput]) -> dict[str, o
         "assembly_revision_id": operation.input.assembly_revision_id.value,
         "profile_id": operation.input.execution_profile_id,
         "profile_version": operation.input.execution_profile_version,
+        "video_bit_rate": operation.input.video_bit_rate,
+        "audio_bit_rate": operation.input.audio_bit_rate,
+        "event_render_setting_version": operation.input.event_render_setting_version,
         "attempt_count": operation.attempt_count, "reason_code": operation.last_reason_code,
         "created_at": operation.created_at.isoformat(),
         "updated_at": operation.updated_at.isoformat(),
@@ -71,6 +83,8 @@ def _output(output: RenderedOutput) -> dict[str, object]:
         "output_id": output.id.value, "assembly_revision_id": output.assembly_revision_id.value,
         "profile_id": output.profile_id, "profile_version": output.profile_version,
         "operation_id": output.operation_id.value,
+        "video_bit_rate": output.video_bit_rate, "audio_bit_rate": output.audio_bit_rate,
+        "event_render_setting_version": output.event_render_setting_version,
         "producing_attempt_id": output.producing_attempt_id.value,
         "content_key": output.content_key, "sha256": output.sha256,
         "manifest_content_key": output.manifest_content_key,
@@ -87,8 +101,11 @@ def request_render(body: RequestBody, request: Request) -> dict[str, object]:
     try:
         return _operation(_service(request).request_render(
             EntityId(str(body.assembly_revision_id)),
-            replace(CURRENT_RENDER_PROFILE, version=body.profile_version),
+            None,
             RenderActor(EntityId(str(body.actor_id))), EntityId(str(body.command_id)),
+            (body.expected_setting_version if "expected_setting_version" in body.model_fields_set
+             or (body.profile_id is None and body.profile_version is None) else "unspecified"),
+            requested_profile_id=body.profile_id, requested_profile_version=body.profile_version,
         ))
     except RenderError as exc:
         raise HTTPException(409, exc.code.value) from None
@@ -135,3 +152,83 @@ def outputs(
         raise HTTPException(503, "postgresql_unavailable") from None
     return {"items": [_output(item) for item in items], "limit": limit,
             "next_after": None if cursor is None else cursor.value}
+
+
+class SettingBody(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    profile_id: str
+    profile_version: str
+    video_bit_rate: StrictInt | None = None
+    audio_bit_rate: StrictInt | None = None
+    expected_version: Annotated[StrictInt, Field(gt=0)] | None
+    actor_id: UUID
+    command_id: UUID
+    confirmed: Literal["confirmed"]
+    authority_kind: Literal["human"] = "human"
+
+
+def _setting_document(event_id: EntityId, value: EventRenderSetting | None) -> dict[str, object]:
+    preset = RENDER_PRESETS[0] if value is None else render_preset(value.profile_id,
+                                                                 value.profile_version)
+    adjustments = RenderAdjustments() if value is None else value.adjustments
+    profile = effective_profile(preset, adjustments)
+    return {
+        "event_id": event_id.value, "version": None if value is None else value.version,
+        "profile_id": profile.id, "profile_version": profile.version,
+        "video_bit_rate": adjustments.video_bit_rate, "audio_bit_rate": adjustments.audio_bit_rate,
+        "effective_video_bit_rate": profile.bit_rate,
+        "effective_audio_bit_rate": profile.audio_bit_rate,
+        "selected_by": None if value is None else value.selected_by.value,
+        "selected_at": None if value is None else value.selected_at.astimezone(UTC).isoformat(),
+        "command_id": None if value is None else value.command_id.value,
+    }
+
+
+@router.get("/presets")
+def presets() -> dict[str, object]:
+    return {"items": [{
+        "profile_id": p.profile.id, "profile_version": p.profile.version,
+        "width": p.profile.width, "height": p.profile.height,
+        "video_bit_rate": p.profile.bit_rate, "video_min": p.video_min,
+        "video_max": p.video_max, "video_step": p.video_step,
+        "audio_bit_rate": p.profile.audio_bit_rate, "audio_choices": p.audio_choices,
+        "default": p == RENDER_PRESETS[0],
+    } for p in RENDER_PRESETS]}
+
+
+@router.get("/events/{event_id}/render-setting")
+def render_setting(event_id: UUID, request: Request) -> dict[str, object]:
+    repository = _service(request).repository
+    assert isinstance(repository, PostgresRenderRepository)
+    event = EntityId(str(event_id))
+    try:
+        history = repository.setting_history(event)
+        return {"current": _setting_document(event, history[0] if history else None),
+                "history": [_setting_document(event, item) for item in history]}
+    except WorkExecutionNotFoundError:
+        raise HTTPException(404, "render_reference_not_found") from None
+    except WorkExecutionStorageUnavailableError:
+        raise HTTPException(503, "postgresql_unavailable") from None
+
+
+@router.post("/events/{event_id}/render-setting")
+def choose_render_setting(event_id: UUID, body: SettingBody, request: Request) -> dict[str, object]:
+    service = _service(request)
+    repository = service.repository
+    assert isinstance(repository, PostgresRenderRepository)
+    event = EntityId(str(event_id))
+    try:
+        command = ChooseRenderSetting(event, body.profile_id, body.profile_version,
+            RenderAdjustments(body.video_bit_rate, body.audio_bit_rate),
+            RenderActor(EntityId(str(body.actor_id))), EntityId(str(body.command_id)),
+            body.expected_version)
+        chosen = RenderSettingsService(repository, service.clock).choose(command)
+        return _setting_document(event, chosen)
+    except RenderError as exc:
+        raise HTTPException(409, exc.code.value) from None
+    except WorkExecutionConflictError:
+        raise HTTPException(409, "render_setting_command_conflict") from None
+    except WorkExecutionNotFoundError:
+        raise HTTPException(404, "render_reference_not_found") from None
+    except WorkExecutionStorageUnavailableError:
+        raise HTTPException(503, "postgresql_unavailable") from None

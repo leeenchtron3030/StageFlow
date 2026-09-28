@@ -11,6 +11,15 @@ const freeText = "Private synthetic operator explanation";
 const originalFetch = globalThis.fetch, originalInfo = console.info;
 const envKeys = ["STAGEFLOW_API_SHARED_SECRET", "STAGEFLOW_DEMO_LAUNCH_CONTEXT", "STAGEFLOW_DEMO_OPERATOR_ID", "STAGEFLOW_ASSEMBLY_API_BASE_URL"];
 const originalEnv = Object.fromEntries(envKeys.map((key) => [key, process.env[key]]));
+
+test("choose quality audit records Event, command, bounded outcome and resulting version", async () => {
+  globalThis.fetch = async () => Response.json({ version: 3, selected_by: id(9), note: freeText });
+  const response = await command({ capability: "rendering", path: `events/${id(2)}/render-setting` });
+  assert.equal(response.status, 200);
+  const { received, result } = pair("accepted", "succeeded", 200);
+  assert.equal(received.resource_ids.event_id, id(2));
+  assert.equal(received.command_id, id(3)); assert.equal(result.setting_version, 3);
+});
 let lines: string[] = [];
 beforeEach(() => {
   lines = []; console.info = (line) => { lines.push(String(line)); };

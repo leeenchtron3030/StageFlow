@@ -19,7 +19,7 @@ from app.contexts.rendering.contracts import (
     RenderError,
     RenderProfile,
     RenderReason,
-    require_profile,
+    require_requestable,
 )
 from app.contexts.rendering.service import RenderingService
 from app.contexts.work_execution import OperationStatus, RenderOperationInput
@@ -57,7 +57,7 @@ def test_current_profile_rate_is_immutable_and_v1_is_recorded_only() -> None:
         profile.__setattr__("output_frame_rate", Fraction(25))
     for unsupported in (RENDER_PROFILE_V1, replace(profile, output_frame_rate=Fraction(30))):
         with pytest.raises(RenderError, match="render_profile_unsupported"):
-            require_profile(unsupported)
+            require_requestable(unsupported)
     for not_a_fraction in (29.97, 30):
         with pytest.raises(RenderError, match="render_profile_unsupported"):
             RenderProfile(output_frame_rate=cast(Fraction, not_a_fraction))

@@ -23,7 +23,7 @@ from app.contexts.rendering.contracts import (
     FFmpegIdentity,
     RenderError,
     RenderReason,
-    require_profile,
+    require_requestable,
 )
 from app.core.config.deployment import LocalRenderConfiguration
 from app.demo import render_worker
@@ -55,7 +55,7 @@ def test_v3_audio_fields_exact_immutable_and_history_has_no_audio() -> None:
             with pytest.raises(RenderError, match="render_profile_unsupported"):
                 replace(profile, **{name: invalid})
         with pytest.raises(RenderError, match="render_profile_unsupported"):
-            require_profile(replace(profile, **{name: None}))
+            require_requestable(replace(profile, **{name: None}))
     assert type(profile.audio_codec) is str
     with pytest.raises(FrozenInstanceError):
         profile.__setattr__("audio_codec", None)
@@ -63,7 +63,7 @@ def test_v3_audio_fields_exact_immutable_and_history_has_no_audio() -> None:
         assert (old.audio_codec, old.audio_sample_rate, old.audio_channels,
                 old.audio_bit_rate) == (None, None, None, None)
         with pytest.raises(RenderError, match="render_profile_unsupported"):
-            require_profile(old)
+            require_requestable(old)
     assert replace(RENDER_PROFILE_V2, version="3", audio_codec="aac", audio_sample_rate=48000,
                    audio_channels=2, audio_bit_rate=192000) == profile
 
@@ -439,7 +439,7 @@ def test_pipeline_process_heartbeats_and_cleanup_without_filesystem(
 @pytest.mark.parametrize("value", [8_000_000.0, True, "8000000"])
 def test_equal_or_caller_text_video_settings_never_reach_process(value: object) -> None:
     with pytest.raises(RenderError, match="render_profile_unsupported"):
-        require_profile(replace(CURRENT_RENDER_PROFILE, bit_rate=cast(int, value)))
+        require_requestable(replace(CURRENT_RENDER_PROFILE, bit_rate=cast(int, value)))
 
 
 @pytest.mark.parametrize("streams,expected", [

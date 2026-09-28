@@ -138,6 +138,13 @@ class PostgresMigrationRunner:
             version="0019_derived_editorial_candidates",
         )
 
+        self.apply_event_render_setting_v1()
+
+    def apply_event_render_setting_v1(self) -> None:
+        self._execute_if_missing(
+            "0020_event_render_setting_forward.sql", version="0020_event_render_setting",
+        )
+
     def reverse_event_mode_kernel_v1(self) -> None:
         self.reverse_demo_vertical_slice_v1()
         self.reverse_transcription_worker_v1()
@@ -245,9 +252,15 @@ class PostgresMigrationRunner:
         )
 
     def reverse_derived_editorial_candidates_v1(self) -> None:
+        self.reverse_event_render_setting_v1()
         self._execute_if_present(
             "0019_derived_editorial_candidates_reverse.sql",
             version="0019_derived_editorial_candidates",
+        )
+
+    def reverse_event_render_setting_v1(self) -> None:
+        self._execute_if_present(
+            "0020_event_render_setting_reverse.sql", version="0020_event_render_setting",
         )
 
     def _execute(self, filename: str) -> None:

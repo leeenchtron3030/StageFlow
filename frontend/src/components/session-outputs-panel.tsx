@@ -1,4 +1,4 @@
-import { uiLabels, renderLabel, renderProfileLabel, slotLabel } from "../experience/ui-labels.ts";
+import { uiLabels, renderLabel, renderQualityLabel, slotLabel } from "../experience/ui-labels.ts";
 import { assemblyConsequence, memberOrderingLabel, memberOrderSummary, intervalDuration, wallClockLabel, qualificationLabel, sortedRenderOperations, renderTimeLabel, newestOutputs, outputDuration, type SessionOutputs } from "../experience/session-outputs.ts";
 import type { AssemblyItem, AssemblyMember } from "../experience/assembly-api.ts";
 
@@ -147,7 +147,7 @@ export function SessionOutputsPanel({ outputs, actions }: { outputs: SessionOutp
             <thead><tr><th scope="col">State</th><th scope="col">Format</th><th scope="col">{uiLabels.renderCreated}</th><th scope="col">Details</th></tr></thead>
             <tbody>{sortedRenderOperations(outputs.operations.value.items).map((operation) => <tr key={operation.operation_id}>
               <th scope="row">{renderLabel(operation.state)}{operation.reason_code ? ` · ${operation.reason_code}` : ""}</th>
-              <td>{renderProfileLabel(operation.profile_id, operation.profile_version)}</td>
+              <td>{renderQualityLabel(operation)}</td>
               <td><time dateTime={operation.created_at}>{renderTimeLabel(operation.created_at)}</time></td>
               <td><details><summary>{uiLabels.details}</summary><p>{revisionLabel(operation.assembly_revision_id)} · {operation.state} · profile version {operation.profile_version}</p><dl className="outputs-facts">
                 <div><dt>Operation ID</dt><dd><code className="copyable-id" tabIndex={0}>{operation.operation_id}</code></dd></div>
@@ -171,7 +171,7 @@ export function SessionOutputsPanel({ outputs, actions }: { outputs: SessionOutp
         {outputs.outputs.value.items.length ? <div className="member-table-scroll"><table className="member-table" aria-label="Rendered Outputs">
           <thead><tr><th scope="col">State</th><th scope="col">Format</th><th scope="col">Duration / frames</th><th scope="col">Produced time</th><th scope="col">Details</th></tr></thead>
           <tbody>{newestOutputs(outputs.outputs.value.items).map((output) => <tr key={output.output_id}>
-            <th scope="row">{uiLabels.render.succeeded}</th><td>{renderProfileLabel(output.profile_id, output.profile_version)}</td>
+            <th scope="row">{uiLabels.render.succeeded}</th><td>{renderQualityLabel(output)}</td>
             <td>{outputDuration(output)} · {output.frame_count} frames</td>
             <td><time dateTime={output.produced_at}>{output.produced_at}</time></td>
             <td><details><summary>{uiLabels.details}</summary><p>{revisionLabel(output.assembly_revision_id)} · profile version {output.profile_version}</p><dl className="outputs-facts">

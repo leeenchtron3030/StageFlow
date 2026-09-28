@@ -12,7 +12,7 @@ from .contracts import (
     RenderProfile,
     RenderReason,
     VideoInput,
-    require_profile,
+    require_requestable,
 )
 
 
@@ -20,7 +20,7 @@ def build_render_plan(
     assembly: SessionAssembly, profile: RenderProfile,
     packaging: Mapping[EntityId, VideoInput], media: Mapping[EntityId, VideoInput],
 ) -> RenderPlan:
-    require_profile(profile)
+    require_requestable(profile)
     revision = assembly.revision
     if assembly.approval_state != ApprovalState.APPROVED or revision.validation.state != "valid":
         raise RenderError(RenderReason.NOT_APPROVED)
