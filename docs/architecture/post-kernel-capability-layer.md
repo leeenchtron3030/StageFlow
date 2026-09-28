@@ -581,7 +581,7 @@ remain in a sidecar. The separate local render worker uses the shared ADR-0025 c
 leases, retries and fences, at one lease per worker. Output registration and operation success
 share a transaction. All failures after running are bounded typed attempt outcomes.
 
-The current profile is h264-nvenc-1080p-video v3: unchanged v2 CUDA decode to H.264
+The default profile is h264-nvenc-1080p-video v3: unchanged v2 CUDA decode to H.264
 NVENC, p4, VBR 8 Mbit/s, GOP 60, 1080p MP4, constant 30000/1001 video, plus native
 AAC-LC 48 kHz stereo 192 kbit/s audio (ADR-0032 amendment 4A). Each input is probed and
 its video encoded once with NVENC; the first audio stream (resampled, or silence when
@@ -591,20 +591,51 @@ Stage 2 concatenates intermediates with video stream copy and a single AAC encod
 Final ffprobe validation requires exactly one H.264 video and one AAC audio stream.
 Intermediates are removed on success, failure and cancellation and are never registered.
 
-Requests default to v3; v1/v2 receive the bounded render_profile_unsupported refusal.
+Without an Event setting, requests default to Standard v3; Standard v1/v2 receive
+the bounded render_profile_unsupported refusal.
 Existing v1/v2 outputs retain their recorded identities and remain readable. The
 revision/profile/version work key makes v3 on a v2-rendered revision a new operation.
-Workers declare and claim v3 only; earlier operations remain visible and unclaimed
+Workers declare every catalog preset; earlier Standard v1/v2 operations remain visible and unclaimed
 (ADR-0025 eligibility promotion still applies). GPU audio sync, determinism and
 throughput qualification remain the owner's Run 003 step. FFmpeg identity checks are
 unchanged. ffprobe is operator-installed and identity-checked under ADR-0033 rules.
 The optional, default-off [local_render] section adds optional ffprobe_path; the render
 worker requires it, while existing configuration files and the API remain valid.
-The Producer requests v3 and labels its audio; v1/v2 retain their video-only labels.
+The Producer names effective quality; Standard v1/v2 retain their video-only labels.
 The authenticated API provides requests and Event/Session-scoped paginated reads.
 No automatic authority, overlays, publication or delivery is introduced.
 Host GPU/playability and security qualification
 remain separate from implementation evidence.
+
+Under ADR-0032 amendment 4B, the rendering context owns a closed catalog: 1080p Standard
+(`h264-nvenc-1080p-video` v3), 1080p High (`h264-nvenc-1080p-high` v1), and 720p Compact
+(`h264-nvenc-720p` v1). Only video/audio bitrate may vary within catalog bounds; defaults
+normalize to absent adjustments. The [rendering README](../../backend/app/contexts/rendering/README.md)
+records the catalog and API contracts.
+
+Migration `0020` adds an immutable Event Render Setting history with unique command ID
+and SHA-256 request digest, plus nullable frozen bitrate adjustments and setting version
+on render operation input. Choose-setting idempotency belongs to this capability, not
+the Kernel human-command table. Human commands use expected-version concurrency;
+refusals create no setting or command receipt. An Event-scoped transaction lock shared
+by selection and render enqueue ensures the requested setting is checked and frozen
+together. Existing command replay resolves its recorded setting before checking the
+digest, preserving recovery after a lost response and subsequent quality changes.
+
+Unadjusted work-key schema v1 is unchanged; adjustments add a digest under schema v2.
+Equal effective settings reuse an operation. Changes affect future requests only and
+never mutate previous operations or outputs or trigger automatic re-rendering. Workers
+and the adapter recheck bounds and pass only validated integers into varying FFmpeg
+arguments; sidecars record effective bitrates. The migration reverse refuses while
+setting history or non-null new input values exist. No Kernel Event facts, dependency,
+deployment topology or runtime configuration changes.
+
+The Event page has a summary-first Render quality section with bounded controls,
+consequence-first confirmation and collapsed history. Session outputs show quality,
+name it in render confirmations and offer one re-render action when the latest output
+differs. New same-origin rendering routes use the explicit capability allowlist; setting
+commands log bounded outcomes and resulting versions. Owner UX checkpoint and reference
+GPU Run 004 remain separate from implementation validation.
 
 ## Production media timing inspection
 

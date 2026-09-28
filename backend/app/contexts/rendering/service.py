@@ -2,7 +2,7 @@
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 from datetime import timedelta
-from typing import Protocol
+from typing import Literal, Protocol
 
 from app.contexts.work_execution import (
     ClaimRequest,
@@ -23,14 +23,20 @@ from app.shared.ids import EntityId
 from app.shared.time import Clock
 
 from .contracts import (
+    RENDER_PRESETS,
     RenderActor,
+    RenderAdjustments,
     RenderedOutput,
     RenderError,
     RenderPlan,
     RenderProfile,
     RenderReason,
     RenderRequest,
+    effective_profile,
+    normalize_adjustments,
+    render_preset,
 )
+from .settings import EventRenderSetting
 
 
 class RenderResultCommitAmbiguousError(WorkExecutionStorageUnavailableError):
@@ -41,6 +47,11 @@ class RenderRepository(Protocol):
     def request(self, pending: PendingOperation[RenderOperationInput]) -> DurableOperation[
         RenderOperationInput
     ]: ...
+
+    def request_at_setting(
+        self, event_id: EntityId, command_id: EntityId,
+        build: Callable[[EventRenderSetting | None], PendingOperation[RenderOperationInput]],
+    ) -> DurableOperation[RenderOperationInput]: ...
 
     def event_for_revision(self, revision_id: EntityId) -> EntityId: ...
 
@@ -58,27 +69,74 @@ class RenderingService:
     deployment_id: str
 
     def request_render(
-        self, assembly_revision_id: EntityId, profile: RenderProfile,
+        self, assembly_revision_id: EntityId, profile: RenderProfile | None,
         actor: RenderActor, command_id: EntityId,
+        expected_setting_version: int | None | Literal["unspecified"] = "unspecified",
+        *, requested_profile_id: str | None = None, requested_profile_version: str | None = None,
     ) -> DurableOperation[RenderOperationInput]:
-        request = RenderRequest(assembly_revision_id, profile, actor, command_id)
+        request = RenderRequest(assembly_revision_id, profile, actor, command_id,
+                                expected_setting_version, requested_profile_id,
+                                requested_profile_version)
         now = self.clock.now()
-        envelope = EnqueueRenderOperation(
-            command_id, "render:" + command_id.value, self.deployment_id,
-            self.repository.event_for_revision(assembly_revision_id),
-            RenderOperationInput(assembly_revision_id, profile.id, profile.version,
-                                 command_id.value.replace("-", "")),
-            0, now, 3, timedelta(seconds=30), False, now,
-        )
-        # Time is receipt time, not caller intent. Actor is part of exact command replay.
-        digest = human_command_digest({
-            "kind": "render_request", "revision": request.assembly_revision_id.value,
-            "profile": profile.id, "version": profile.version,
-            "actor": actor.id.value, "authority": actor.authority_kind,
-        })
-        return self.repository.request(PendingOperation(
-            envelope, digest, render_work_key(envelope),
-        ))
+        event_id = self.repository.event_for_revision(assembly_revision_id)
+
+        def build(setting: EventRenderSetting | None) -> PendingOperation[RenderOperationInput]:
+            preset = RENDER_PRESETS[0] if setting is None else render_preset(
+                setting.profile_id, setting.profile_version)
+            adjustments = normalize_adjustments(preset, RenderAdjustments() if setting is None
+                                                else setting.adjustments)
+            version = None if setting is None else setting.version
+            effective = effective_profile(preset, adjustments)
+            named_profile = profile
+            if (request.requested_profile_id is not None
+                    or request.requested_profile_version is not None):
+                standard_id = RENDER_PRESETS[0].profile.id
+                # Keep explicit historical Standard requests refused, including the
+                # legacy version-only form when the resolved preset is Standard.
+                if request.requested_profile_version in {"1", "2"} and (
+                    request.requested_profile_id == standard_id
+                    or (request.requested_profile_id is None and effective.id == standard_id)
+                ):
+                    raise RenderError(RenderReason.PROFILE_UNSUPPORTED)
+                if (request.requested_profile_id is not None
+                        and request.requested_profile_id not in {
+                            p.profile.id for p in RENDER_PRESETS}):
+                    raise RenderError(RenderReason.PROFILE_UNSUPPORTED)
+                if ((request.requested_profile_id is not None
+                     and request.requested_profile_id != effective.id)
+                        or (request.requested_profile_version is not None
+                            and request.requested_profile_version != effective.version)):
+                    raise RenderError(RenderReason.SETTING_CHANGED)
+                named_profile = preset.profile
+            if (request.expected_setting_version != "unspecified"
+                    and request.expected_setting_version != version):
+                raise RenderError(RenderReason.SETTING_CHANGED)
+            if named_profile is not None and (
+                (named_profile.id, named_profile.version) != (effective.id, effective.version)
+                or (request.expected_setting_version == "unspecified"
+                    and named_profile != effective)
+            ):
+                raise RenderError(RenderReason.SETTING_CHANGED)
+            envelope = EnqueueRenderOperation(
+                command_id, "render:" + command_id.value, self.deployment_id, event_id,
+                RenderOperationInput(assembly_revision_id, effective.id, effective.version,
+                    command_id.value.replace("-", ""), adjustments.video_bit_rate,
+                    adjustments.audio_bit_rate, version),
+                0, now, 3, timedelta(seconds=30), False, now,
+            )
+            # Time is receipt time, not caller intent. Preserve the unadjusted v3 digest.
+            document: dict[str, object] = {
+                "kind": "render_request", "revision": request.assembly_revision_id.value,
+                "profile": effective.id, "version": effective.version,
+                "actor": actor.id.value, "authority": actor.authority_kind,
+            }
+            if adjustments != RenderAdjustments():
+                document.update(video_bit_rate=effective.bit_rate,
+                                audio_bit_rate=effective.audio_bit_rate)
+            return PendingOperation(envelope, human_command_digest(document),
+                                    render_work_key(envelope))
+
+        return self.repository.request_at_setting(event_id, command_id, build)
 
 
 class RenderExecutionPort(Protocol):
@@ -112,8 +170,14 @@ class RenderWorker:
             )
 
         try:
-            plan = self.repository.load_plan(active.operation.input.assembly_revision_id,
-                                             self.profile)
+            value = active.operation.input
+            try:
+                profile = effective_profile(render_preset(value.execution_profile_id,
+                                                          value.execution_profile_version),
+                    RenderAdjustments(value.video_bit_rate, value.audio_bit_rate))
+            except RenderError:
+                raise RenderError(RenderReason.PROFILE_UNSUPPORTED) from None
+            plan = self.repository.load_plan(value.assembly_revision_id, profile)
             output = self.execution.execute(active, plan, heartbeat)
             try:
                 self.repository.apply_render_result(active, output)

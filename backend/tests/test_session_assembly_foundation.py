@@ -488,10 +488,11 @@ def test_migration_registration_order(monkeypatch: pytest.MonkeyPatch) -> None:
     assert applied == ["0012_packaging_asset_foundation", "0013_session_assembly_foundation",
                        "0014_assembly_metadata_overrides", "0015_render_durable_operation",
                        "0016_assembly_media_order", "0017_media_timing_operation",
-                       "0018_assembly_timing_evidence", "0019_derived_editorial_candidates"]
+                       "0018_assembly_timing_evidence", "0019_derived_editorial_candidates",
+                       "0020_event_render_setting"]
     applied.clear()
     runner.reverse_packaging_asset_foundation_v1()
-    assert applied == ["0019_derived_editorial_candidates",
+    assert applied == ["0020_event_render_setting", "0019_derived_editorial_candidates",
                        "0018_assembly_timing_evidence", "0017_media_timing_operation",
                        "0016_assembly_media_order",
                        "0015_render_durable_operation",

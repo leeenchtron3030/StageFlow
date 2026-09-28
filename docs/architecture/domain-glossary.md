@@ -31,6 +31,10 @@ collapsed Details for diagnosis; shared facts appear once and exceptions remain 
 | Current / stale / frozen proposal order | Up to date / Out of date: inputs changed / Order locked when proposed |
 | Render pending, leased, running / succeeded / terminal_failed | Rendering... / Done / Failed |
 | Render profile h264-nvenc-1080p-video v3; v1/v2 history | 1080p with audio (v3); 1080p (v1/v2) |
+| Render Preset | 1080p Standard / 1080p High / 720p Compact |
+| Event Render Setting | Render quality; Default when no setting has been chosen |
+| Render Adjustment | Video bitrate / Audio bitrate |
+| Explicit render with different current settings | Render again at current quality |
 | Slot bindings | Layout: Intro ([asset name]) → Recording |
 | Timing ordering / registration fallback | Ordered by recorder time / N recordings ordered by arrival time (no recorder time) |
 | Live Triage / Review queue | Editorial review |
@@ -389,8 +393,20 @@ not-event-ready disclaimer retain their meaning.
   with constant 30000/1001 video and one native AAC-LC 48 kHz stereo 192 kbit/s
   audio stream. Each input contributes its first audio stream or digital silence.
   v1 and v2 remain readable video-only recorded identities, refused for new renders.
+- **Render Preset:** one code-defined, versioned Render Profile in the closed catalog,
+  with default bitrates and permitted video and audio bitrate adjustments. Standard
+  (1080p v3) is the default; High (1080p v1) and Compact (720p v1) are alternatives.
+- **Render Adjustment:** immutable optional video or audio bitrate within the preset's
+  bounds. A value equal to the preset default normalizes to no adjustment. All other
+  profile properties remain fixed.
+- **Event Render Setting:** rendering-owned, immutable, append-only version for a
+  Business Event, recording the preset, adjustments, human actor, command and aware
+  selection time. The highest version is current; absence means unadjusted Standard.
+  Changes affect future requests only and never cause automatic re-rendering.
 - **Render Request:** human-authorized, idempotent command for an approved, non-stale
-  Assembly revision and one Render Profile. It enqueues a Durable Operation, not publication.
+  Assembly revision. It freezes the Event's current preset, adjustments and setting
+  version in the enqueue transaction. The expected setting version guards the human's
+  confirmation against concurrent changes. It enqueues a Durable Operation, not publication.
 - **Rendered Output:** immutable rendering-owned identity for completed output bytes and
   their frozen-metadata sidecar. It records opaque content keys and SHA-256 identities,
   size, duration, frame count, source revision, profile, FFmpeg identity, producing

@@ -78,12 +78,18 @@ def enqueue_request_digest(request: EnqueueTranscriptionOperation) -> str:
 
 def render_work_key(request: EnqueueRenderOperation) -> str:
     value = request.input
-    return _sha({
+    document = {
         "schema": "stageflow.render_operation.work-key.v1",
         "assembly_revision_id": value.assembly_revision_id.value,
         "execution_profile_id": value.execution_profile_id,
         "execution_profile_version": value.execution_profile_version,
-    })
+    }
+    if value.video_bit_rate is not None or value.audio_bit_rate is not None:
+        document["schema"] = "stageflow.render_operation.work-key.v2"
+        document["adjustments_digest"] = _sha({
+            "video_bit_rate": value.video_bit_rate, "audio_bit_rate": value.audio_bit_rate,
+        })
+    return _sha(document)
 
 
 def pending_render_operation(

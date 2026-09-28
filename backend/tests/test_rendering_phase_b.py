@@ -197,6 +197,11 @@ class MemoryRendering:
     def event_for_revision(self, revision_id: EntityId) -> EntityId:
         return self.source.revision.event_id
 
+    def request_at_setting(
+        self, event_id: EntityId, command_id: EntityId, build: Any,
+    ) -> DurableOperation[RenderOperationInput]:
+        return self.request(build(None))
+
     def request(self, pending: PendingOperation[RenderOperationInput]) -> DurableOperation[
         RenderOperationInput
     ]:

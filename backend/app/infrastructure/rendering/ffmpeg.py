@@ -14,7 +14,7 @@ from app.contexts.rendering.contracts import (
     RenderError,
     RenderProfile,
     RenderReason,
-    require_profile,
+    require_requestable,
 )
 from app.infrastructure.media_timing.ffprobe import (
     RENDER_INPUT_FORMATS,
@@ -100,7 +100,7 @@ class FFmpegAdapter:
         self, inputs: Sequence[Path], output: Path, store: OutputStore,
         profile: RenderProfile, heartbeat: Callable[[], None],
     ) -> EncodingResult:
-        require_profile(profile)
+        require_requestable(profile)
         assert profile.output_frame_rate is not None and profile.audio_sample_rate is not None
         store.validate()
         if safe_path(output).parent != store.temp:
@@ -125,7 +125,8 @@ class FFmpegAdapter:
                                "-format_whitelist", RENDER_INPUT_FORMATS,
                                "-i", str(safe_path(item)), "-map", "0:v:0", "-an",
                                "-map_metadata", "-1", "-map_chapters", "-1",
-                               "-vf", "scale_cuda=1920:1080:format=nv12", "-fps_mode", "cfr",
+                               "-vf", f"scale_cuda={profile.width}:{profile.height}:format=nv12",
+                               "-fps_mode", "cfr",
                                "-r", str(profile.output_frame_rate),
                                "-c:v", profile.encoder, "-preset", profile.preset,
                                "-rc", profile.rate_control, "-b:v", str(profile.bit_rate),
@@ -162,7 +163,7 @@ class FFmpegAdapter:
                        "-format_whitelist", "concat", "-i", str(concat),
                        "-map", "0:v:0", "-map", "0:a:0", "-map_metadata", "-1",
                        "-map_chapters", "-1", "-c:v", "copy", "-c:a", "aac",
-                       "-b:a", "192000", "-ar", "48000", "-ac", "2", "-f", "mp4",
+                       "-b:a", str(profile.audio_bit_rate), "-ar", "48000", "-ac", "2", "-f", "mp4",
                        "-progress", "pipe:1", "-nostats", str(output)]
             encoded = self._encode(command, heartbeat)
             output_facts = self._probe(safe_path(output), heartbeat, output=True)

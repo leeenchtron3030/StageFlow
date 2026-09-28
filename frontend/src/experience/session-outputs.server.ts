@@ -1,4 +1,5 @@
 import "server-only";
+import { renderingApi } from "./rendering-api.ts";
 import { readCapability } from "./capability-proxy.server.ts";
 import { getFixtureSessionOutputs } from "./session-outputs-fixtures.ts";
 import { readSessionOutputs } from "./session-outputs.ts";
@@ -14,4 +15,8 @@ export async function loadSessionOutputs(workspace: OperationalWorkspace, sessio
       rendering: (path) => readCapability("rendering", path),
       timing: (path) => readCapability("media-timing", path),
     }, budget);
+}
+
+export async function loadRenderSetting(eventId: string, budget: ReadBudget) {
+  return budget.read(() => renderingApi((path) => readCapability("rendering", path)).setting(eventId));
 }

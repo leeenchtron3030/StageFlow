@@ -1,14 +1,15 @@
 import { uiLabels, timingLabel, renderLabel } from "./ui-labels.ts";
 import { assemblyApi, type AssemblyItem, type AssemblyMember } from "./assembly-api.ts";
-import { renderingApi, type RenderOperation, type RenderedOutput } from "./rendering-api.ts";
+import { renderingApi, type RenderOperation, type RenderedOutput, type EventRenderSetting } from "./rendering-api.ts";
 import { mediaTimingApi, type MediaTimingSummary } from "./media-timing-api.ts";
 import type { ApiRead } from "./outputs-api.ts";
 import { createReadBudget, type ReadBudget } from "./read-budget.ts";
 
 export type ReadResult<T> = { state: "available"; value: T } | { state: "unavailable" };
-export type OutputSummary = Pick<RenderedOutput, "output_id" | "assembly_revision_id" | "profile_id" | "profile_version" | "duration_microseconds" | "frame_count" | "sha256" | "produced_at">;
+export type OutputSummary = Pick<RenderedOutput, "output_id" | "assembly_revision_id" | "profile_id" | "profile_version" | "duration_microseconds" | "frame_count" | "sha256" | "produced_at" | "video_bit_rate" | "audio_bit_rate" | "event_render_setting_version">;
 export interface SessionOutputs {
   fixture: boolean;
+  renderSetting?: ReadResult<EventRenderSetting>;
   assembly: ReadResult<AssemblyItem | null>;
   operations: ReadResult<{ items: RenderOperation[]; truncated: boolean }>;
   outputs: ReadResult<{ items: OutputSummary[]; truncated: boolean }>;
@@ -94,7 +95,7 @@ export function assemblyConsequence(item: AssemblyItem): string {
   return "Review required · Assembly is not approved.";
 }
 export function outputSummary(output: RenderedOutput): OutputSummary {
-  return { output_id: output.output_id, assembly_revision_id: output.assembly_revision_id, profile_id: output.profile_id, profile_version: output.profile_version, duration_microseconds: output.duration_microseconds, frame_count: output.frame_count, sha256: output.sha256.slice(0, 12), produced_at: output.produced_at };
+  return { output_id: output.output_id, assembly_revision_id: output.assembly_revision_id, profile_id: output.profile_id, profile_version: output.profile_version, duration_microseconds: output.duration_microseconds, frame_count: output.frame_count, sha256: output.sha256.slice(0, 12), produced_at: output.produced_at, video_bit_rate: output.video_bit_rate, audio_bit_rate: output.audio_bit_rate, event_render_setting_version: output.event_render_setting_version };
 }
 async function available<T>(read: () => Promise<T>): Promise<ReadResult<T>> {
   try { return { state: "available", value: await read() }; }

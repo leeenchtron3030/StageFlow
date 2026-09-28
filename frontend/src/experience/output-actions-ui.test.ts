@@ -22,6 +22,23 @@ function nodes(value: unknown): Node[] {
 }
 const settle = () => new Promise<void>((resolve) => setImmediate(resolve));
 
+test("current quality mismatch offers one explicit action and freezes the confirmed version", async () => {
+  for (const mismatch of [false, true]) {
+    const ctx = context();
+    const item = fixtureAssembly(); item.approval_state = "approved";
+    ctx.assembly = { state: "available", value: item };
+    ctx.outputs = { state: "available", value: { items: [presentation.outputSummary({ ...fixtureRenderedOutput(), profile_version: "3" })], truncated: false } };
+    ctx.renderSetting = { state: "available", value: { event_id: id(3), version: 4, profile_id: "h264-nvenc-1080p-video", profile_version: "3", video_bit_rate: mismatch ? 6500000 : null, audio_bit_rate: null, effective_video_bit_rate: mismatch ? 6500000 : 8000000, effective_audio_bit_rate: 192000, selected_by: id(9), selected_at: "2026-09-27T00:00:00Z", command_id: id(8) } };
+    let body: Record<string, unknown> | undefined;
+    const ui = harness(ctx, async (_url, init) => { body = JSON.parse(String(init?.body)); return Response.json({ operation_id: id(20) }); });
+    assert.equal((ui.html().match(/Render again at current quality/g) ?? []).length, mismatch ? 1 : 0);
+    ui.click(mismatch ? "Render again at current quality" : "Request render");
+    assert.match(ui.html(), new RegExp(`1080p Standard · video ${mismatch ? "6.5" : "8"} Mbit/s`));
+    ui.submit(); await settle();
+    assert.equal(body?.expected_setting_version, 4);
+  }
+});
+
 /** Invoke real event handlers with deterministic hook state; native dialog owns focus trapping. */
 function harness(initial: commands.OutputActionContext, fetcher: typeof fetch) {
   const slots: unknown[] = [], effects: Array<() => void> = [];

@@ -1,4 +1,6 @@
 """Rendering over the shared lease journal and existing Assembly authority."""
+from collections.abc import Callable
+from datetime import datetime
 from pathlib import Path
 from typing import LiteralString
 
@@ -12,17 +14,21 @@ from app.contexts.assembly.contracts import (
 from app.contexts.assembly.resolution import is_stale
 from app.contexts.assembly.session_contracts import SessionAssembly
 from app.contexts.rendering.contracts import (
-    CURRENT_RENDER_PROFILE,
+    RENDER_PRESETS,
     FFmpegIdentity,
+    RenderAdjustments,
     RenderedOutput,
     RenderError,
     RenderPlan,
     RenderProfile,
     RenderReason,
     VideoInput,
+    effective_profile,
+    render_preset,
 )
 from app.contexts.rendering.planning import build_render_plan
 from app.contexts.rendering.service import RenderResultCommitAmbiguousError
+from app.contexts.rendering.settings import ChooseRenderSetting, EventRenderSetting
 from app.contexts.work_execution import (
     DurableOperation,
     OperationClaim,
@@ -50,7 +56,7 @@ class PostgresRenderRepository(PostgresWorkExecutionRepository[RenderOperationIn
         self.assembly = PostgresSessionAssemblyRepository(dsn)
 
     def register_render_capability(self, capability: WorkerCapability) -> WorkerCapability:
-        """One current declaration per render worker, including unavailable GPU observations."""
+        """Current preset declarations, including unavailable GPU observations."""
         if (capability.operation_kind != "render" or capability.effective_until is not None
                 or capability.accepted_asset_formats is not None
                 or capability.supports_word_timing or capability.supports_speaker_labels):
@@ -65,8 +71,10 @@ class PostgresRenderRepository(PostgresWorkExecutionRepository[RenderOperationIn
             current = capability
             conn.execute(
                 """UPDATE stageflow.work_worker_capability SET effective_until=%s
-                   WHERE worker_id=%s AND operation_kind='render' AND effective_until IS NULL""",
-                (current.effective_from, current.worker_id.value),
+                   WHERE worker_id=%s AND operation_kind='render' AND effective_until IS NULL
+                     AND (execution_profile_id=%s OR NOT (execution_profile_id=ANY(%s)))""",
+                (current.effective_from, current.worker_id.value, current.execution_profile_id,
+                 [preset.profile.id for preset in RENDER_PRESETS]),
             )
             conn.execute(
                 """INSERT INTO stageflow.work_worker_capability
@@ -89,6 +97,94 @@ class PostgresRenderRepository(PostgresWorkExecutionRepository[RenderOperationIn
     ]:
         return self.enqueue(pending)
 
+    def request_at_setting(
+        self, event_id: EntityId, command_id: EntityId,
+        build: Callable[[EventRenderSetting | None], PendingOperation[RenderOperationInput]],
+    ) -> DurableOperation[RenderOperationInput]:
+        try:
+            with self._connect() as conn:
+                self._lock_setting(conn, event_id)
+                # Resolve a recorded command against its frozen setting before checking
+                # optimistic concurrency: a lost response must remain safely replayable.
+                old = conn.execute(
+                    """SELECT i.event_render_setting_version FROM stageflow.work_operation o
+                       JOIN stageflow.render_operation_input i USING (operation_id)
+                       WHERE o.operation_id=%s AND o.event_id=%s""",
+                    (command_id.value, event_id.value),
+                ).fetchone()
+                if old is not None:
+                    row = conn.execute(
+                        "SELECT * FROM stageflow.event_render_setting "
+                        "WHERE event_id=%s AND version=%s",
+                        (event_id.value, old["event_render_setting_version"]),
+                    ).fetchone()
+                else:
+                    row = conn.execute(
+                        "SELECT * FROM stageflow.event_render_setting WHERE event_id=%s "
+                        "ORDER BY version DESC LIMIT 1", (event_id.value,),
+                    ).fetchone()
+                return self._enqueue(conn, build(None if row is None else _setting(row)))
+        except (psycopg.InterfaceError, psycopg.OperationalError):
+            raise WorkExecutionStorageUnavailableError("postgresql_unavailable") from None
+
+    def _lock_setting(self, conn: psycopg.Connection[Row], event_id: EntityId) -> None:
+        conn.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 20))", (event_id.value,))
+        if conn.execute("SELECT 1 FROM stageflow.business_event WHERE event_id=%s",
+                        (event_id.value,)).fetchone() is None:
+            raise WorkExecutionNotFoundError("event_not_found")
+
+    def choose_setting(self, command: ChooseRenderSetting, now: datetime) -> EventRenderSetting:
+        try:
+            with self._connect() as conn:
+                conn.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 21))",
+                             (command.command_id.value,))
+                old = conn.execute(
+                    "SELECT * FROM stageflow.event_render_setting WHERE command_id=%s",
+                    (command.command_id.value,),
+                ).fetchone()
+                if old is not None:
+                    if old["request_digest"] != command.digest:
+                        raise WorkExecutionConflictError("render_setting_command_conflict")
+                    return _setting(old)
+                self._lock_setting(conn, command.event_id)
+                current = conn.execute(
+                    "SELECT max(version) AS version FROM stageflow.event_render_setting "
+                    "WHERE event_id=%s", (command.event_id.value,),
+                ).fetchone()
+                version = current["version"] if current else None
+                if version != command.expected_version:
+                    raise RenderError(RenderReason.SETTING_CHANGED)
+                value = EventRenderSetting(command.event_id, (version or 0) + 1,
+                    command.profile_id, command.profile_version, command.adjustments,
+                    command.command_id, command.digest, command.actor.id, now)
+                conn.execute(
+                    """INSERT INTO stageflow.event_render_setting
+                       (event_id,version,render_profile_id,render_profile_version,
+                        video_bit_rate,audio_bit_rate,command_id,request_digest,selected_by,selected_at)
+                       VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                    (value.event_id.value, value.version, value.profile_id, value.profile_version,
+                     value.adjustments.video_bit_rate, value.adjustments.audio_bit_rate,
+                     value.command_id.value, value.request_digest, value.selected_by.value,
+                     value.selected_at),
+                )
+                return value
+        except (psycopg.InterfaceError, psycopg.OperationalError):
+            raise WorkExecutionStorageUnavailableError("postgresql_unavailable") from None
+
+    def setting_history(self, event_id: EntityId) -> tuple[EventRenderSetting, ...]:
+        try:
+            with self._connect() as conn:
+                if conn.execute("SELECT 1 FROM stageflow.business_event WHERE event_id=%s",
+                                (event_id.value,)).fetchone() is None:
+                    raise WorkExecutionNotFoundError("event_not_found")
+                rows = conn.execute(
+                    "SELECT * FROM stageflow.event_render_setting WHERE event_id=%s "
+                    "ORDER BY version DESC", (event_id.value,),
+                ).fetchall()
+                return tuple(_setting(row) for row in rows)
+        except (psycopg.InterfaceError, psycopg.OperationalError):
+            raise WorkExecutionStorageUnavailableError("postgresql_unavailable") from None
+
     def event_for_revision(self, revision_id: EntityId) -> EntityId:
         try:
             with self._connect() as conn:
@@ -106,10 +202,10 @@ class PostgresRenderRepository(PostgresWorkExecutionRepository[RenderOperationIn
         self, connection: psycopg.Connection[Row], pending: PendingOperation[RenderOperationInput],
     ) -> None:
         value = pending.request.input
-        if (value.execution_profile_id != CURRENT_RENDER_PROFILE.id
-                or value.execution_profile_version != CURRENT_RENDER_PROFILE.version):
-            raise RenderError(RenderReason.PROFILE_UNSUPPORTED)
-        plan = self._plan(connection, value.assembly_revision_id, CURRENT_RENDER_PROFILE, lock=True)
+        profile = effective_profile(render_preset(value.execution_profile_id,
+                                                  value.execution_profile_version),
+                                    RenderAdjustments(value.video_bit_rate, value.audio_bit_rate))
+        plan = self._plan(connection, value.assembly_revision_id, profile, lock=True)
         if plan.revision.event_id != pending.request.event_id:
             raise WorkExecutionConflictError("render_event_conflict")
 
@@ -191,7 +287,10 @@ class PostgresRenderRepository(PostgresWorkExecutionRepository[RenderOperationIn
                 or output.producing_attempt_id != claim.attempt.id
                 or output.assembly_revision_id != value.assembly_revision_id
                 or output.profile_id != value.execution_profile_id
-                or output.profile_version != value.execution_profile_version):
+                or output.profile_version != value.execution_profile_version
+                or output.video_bit_rate != value.video_bit_rate
+                or output.audio_bit_rate != value.audio_bit_rate
+                or output.event_render_setting_version != value.event_render_setting_version):
             raise WorkExecutionConflictError("render_result_identity_conflict")
         commit_started = False
         try:
@@ -201,8 +300,12 @@ class PostgresRenderRepository(PostgresWorkExecutionRepository[RenderOperationIn
                        FROM stageflow.work_operation o WHERE operation_id=%s FOR UPDATE""",
                     (claim.operation.id.value,),
                 ).fetchone()
-                old = conn.execute("SELECT * FROM stageflow.rendered_output WHERE operation_id=%s",
-                                   (claim.operation.id.value,)).fetchone()
+                old = conn.execute(
+                    """SELECT o.*, i.video_bit_rate, i.audio_bit_rate,
+                              i.event_render_setting_version FROM stageflow.rendered_output o
+                       JOIN stageflow.render_operation_input i USING (operation_id)
+                       WHERE operation_id=%s""", (claim.operation.id.value,),
+                ).fetchone()
                 if old is not None:
                     if _output(old) != output:
                         raise WorkExecutionConflictError("render_result_identity_conflict")
@@ -273,7 +376,10 @@ class PostgresRenderRepository(PostgresWorkExecutionRepository[RenderOperationIn
             raise ValueError("render_limit_out_of_bounds")
         query: LiteralString
         if outputs:
-            query = """SELECT o.* FROM stageflow.rendered_output o
+            query = """SELECT o.*, i.video_bit_rate, i.audio_bit_rate,
+                              i.event_render_setting_version
+                       FROM stageflow.rendered_output o
+                       JOIN stageflow.render_operation_input i USING (operation_id)
                        JOIN stageflow.assembly_revision r ON r.revision_id=o.assembly_revision_id
                        WHERE r.event_id=%s AND r.session_id=%s
                          AND (%s::uuid IS NULL OR o.output_id>%s::uuid)
@@ -312,4 +418,15 @@ def _output(row: Row) -> RenderedOutput:
         row["manifest_content_key"], row["manifest_sha256"], row["byte_size"], row["media_type"],
         row["duration_microseconds"], row["frame_count"],
         FFmpegIdentity(row["ffmpeg_version"], row["ffmpeg_sha256"]), row["produced_at"],
+        row["video_bit_rate"], row["audio_bit_rate"], row["event_render_setting_version"],
+    )
+
+
+def _setting(row: Row) -> EventRenderSetting:
+    return EventRenderSetting(
+        EntityId(str(row["event_id"])), row["version"], row["render_profile_id"],
+        row["render_profile_version"],
+        RenderAdjustments(row["video_bit_rate"], row["audio_bit_rate"]),
+        EntityId(str(row["command_id"])), row["request_digest"],
+        EntityId(str(row["selected_by"])), row["selected_at"],
     )

@@ -140,6 +140,9 @@ class RenderOperationInput:
     execution_profile_id: str
     execution_profile_version: str
     output_token: str
+    video_bit_rate: int | None = None
+    audio_bit_rate: int | None = None
+    event_render_setting_version: int | None = None
     kind: Literal["render"] = field(default="render", init=False)
     requires_cloud: Literal[False] = field(default=False, init=False)
 

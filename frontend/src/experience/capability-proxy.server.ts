@@ -396,6 +396,7 @@ function capabilityAudit(request: NextRequest, segments: string[], method: strin
         outcome: response.ok ? "succeeded" : response.status >= 400 && response.status < 500 ? "rejected" : "failed",
         error_code: response.ok ? null : code, duration_ms: Math.max(0, Math.round(performance.now() - started)),
         ...ids(value, ["revision_id", "decision_id", "operation_id", "template_id", "packaging_asset_id", "override_id", "review_id", "clip_id", "run_id", "output_id", "phrase_list_id"]),
+        ...(capability === "rendering" && segments.at(-1) === "render-setting" && response.ok && Number.isSafeInteger(object.version) && Number(object.version) > 0 ? { setting_version: object.version } : {}),
         ...ids(object.decision, ["review_decision_id", "operation_id"]), ...ids(object.clip, ["clip_id"]),
         ...(Array.isArray(object.candidate_ids) ? { candidate_ids: object.candidate_ids.filter((id) => typeof id === "string" && uuidPattern.test(id) && safe(id)) } : {}),
       });
@@ -422,7 +423,8 @@ export const capabilityRoutes = {
     route("POST", `packaging-assets/${uuid}/revisions`),
     route("POST", `packaging-assets/${uuid}/approvals`),
   ],
-  rendering: [route("GET", "operations"), route("GET", "outputs"), route("POST", "requests")],
+  rendering: [route("GET", "operations"), route("GET", "outputs"), route("POST", "requests"),
+    route("GET", "presets"), route("GET", `events/${uuid}/render-setting`), route("POST", `events/${uuid}/render-setting`)],
   editorial: [
     route("POST", `moments/${uuid}/reviews`),
     route("GET", `sessions/${uuid}/moments`),

@@ -60,6 +60,8 @@ class LocalRenderExecution:
                     "session_id": plan.manifest.session_id.value,
                     "profile_id": plan.manifest.profile_id,
                     "profile_version": plan.manifest.profile_version,
+                    "video_bit_rate": plan.profile.bit_rate,
+                    "audio_bit_rate": plan.profile.audio_bit_rate,
                     "metadata": [{"field": m.field.value, "values": list(m.values),
                                   "source": m.source, "source_id": m.source_id.value,
                                   "source_revision": m.source_revision}
@@ -75,7 +77,9 @@ class LocalRenderExecution:
                     claim.operation.id, claim.attempt.id, content.key, content.sha256,
                     manifest.key, manifest.sha256, content.byte_size, "video/mp4",
                     encoded.duration_microseconds, encoded.frame_count, self.ffmpeg.identity,
-                    self.clock.now(),
+                    self.clock.now(), claim.operation.input.video_bit_rate,
+                    claim.operation.input.audio_bit_rate,
+                    claim.operation.input.event_render_setting_version,
                 )
         except TranscriptionExecutionError as exc:
             raise RenderError(RenderReason.INPUT_MISSING, retryable=exc.retryable) from None

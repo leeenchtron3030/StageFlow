@@ -10,7 +10,13 @@ from pathlib import Path
 from uuid import NAMESPACE_URL, uuid5
 
 from app.bootstrap.event_mode_kernel import load_kernel_components_from_environment
-from app.contexts.rendering.contracts import CURRENT_RENDER_PROFILE, FFmpegIdentity, RenderError
+from app.contexts.rendering.contracts import (
+    CURRENT_RENDER_PROFILE,
+    RENDER_PRESETS,
+    FFmpegIdentity,
+    RenderError,
+    RenderProfile,
+)
 from app.contexts.rendering.service import RenderWorker
 from app.contexts.work_execution import (
     ClaimRequest,
@@ -33,11 +39,12 @@ from app.shared.time import SystemClock
 
 def render_capability(
     worker_id: EntityId, identity: FFmpegIdentity, nvenc: bool, observed_at: datetime,
+    profile: RenderProfile = CURRENT_RENDER_PROFILE,
 ) -> WorkerCapability:
     token = base64.urlsafe_b64encode(identity.version.encode("ascii")).decode("ascii").rstrip("=")
     return WorkerCapability(
-        EntityId.new(), worker_id, "render", "v1", CURRENT_RENDER_PROFILE.id,
-        CURRENT_RENDER_PROFILE.version, ExecutionLocality.LOCAL, None, False, False,
+        EntityId.new(), worker_id, "render", "v1", profile.id,
+        profile.version, ExecutionLocality.LOCAL, None, False, False,
         None, None, None, None, "ffmpeg:" + token, identity.sha256, nvenc, observed_at,
     )
 
@@ -82,9 +89,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         ))
         profile = CURRENT_RENDER_PROFILE
         nvenc = ffmpeg.nvenc_available()
-        repository.register_render_capability(render_capability(
-            worker_id, ffmpeg.identity, nvenc, now,
-        ))
+        for preset in RENDER_PRESETS:
+            repository.register_render_capability(render_capability(
+                worker_id, ffmpeg.identity, nvenc, now, preset.profile,
+            ))
         service = RenderWorker(repository, repository, execution, profile)
         request = ClaimRequest(worker_id, EventNetworkPolicy.LOCAL_ONLY,
                                timedelta(minutes=5), "render")

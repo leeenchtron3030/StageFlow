@@ -98,150 +98,167 @@ class PostgresWorkExecutionRepository[
             raise WorkExecutionConflictError("operation_kind_not_supported")
         try:
             with self._connect() as connection:
-                connection.execute(
-                    "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
-                    (request.idempotency_key,),
-                )
-                connection.execute(
-                    "SELECT pg_advisory_xact_lock(hashtextextended(%s, 1))",
-                    (pending.work_key,),
-                )
-                connection.execute(
-                    "SELECT pg_advisory_xact_lock(hashtextextended(%s, 2))",
-                    (request.operation_id.value,),
-                )
-                replays = connection.execute(
-                    """
-                    SELECT * FROM stageflow.work_operation
-                    WHERE operation_id = %s OR idempotency_key = %s OR work_key = %s
-                    FOR UPDATE
-                    """,
-                    (
-                        request.operation_id.value,
-                        request.idempotency_key,
-                        pending.work_key,
-                    ),
-                ).fetchall()
-                if len(replays) > 1:
-                    raise WorkExecutionConflictError("transcription_enqueue_identity_conflict")
-                replay = replays[0] if replays else None
-                if replay is not None:
-                    if (
-                        isinstance(request.input, (RenderOperationInput, MediaTimingOperationInput))
-                        and replay["operation_kind"] == request.input.kind
-                        and str(replay["work_key"]) == pending.work_key
-                        and str(replay["operation_id"]) != request.operation_id.value
-                        and replay["idempotency_key"] != request.idempotency_key
-                        and replay["deployment_id"] == request.deployment_id
-                        and _optional_entity(replay["event_id"]) == request.event_id
-                    ):
-                        return self._operation(replay, connection)
-                    if (
-                        str(replay["operation_id"]) != request.operation_id.value
-                        or str(replay["idempotency_key"]) != request.idempotency_key
-                        or str(replay["work_key"]) != pending.work_key
-                        or str(replay["request_digest"]) != pending.request_digest
-                    ):
-                        raise WorkExecutionConflictError(
-                            "transcription_enqueue_identity_conflict"
-                        )
-                    return self._operation(replay, connection)
-
-                self._validate_new_operation(connection, pending)
-                if isinstance(request.input, (TranscriptionOperationInput,
-                                              MediaTimingOperationInput)):
-                    asset = connection.execute(
-                        """
-                        SELECT manifest_id
-                        FROM stageflow.completed_media_asset_registry
-                        WHERE asset_id = %s
-                        FOR UPDATE
-                        """,
-                        (request.input.asset_id.value,),
-                    ).fetchone()
-                    if asset is None:
-                        raise WorkExecutionNotFoundError(
-                            "completed_media_asset_not_found"
-                        )
-                    if str(asset["manifest_id"]) != request.input.manifest_id.value:
-                        raise WorkExecutionConflictError(
-                            "asset_manifest_identity_conflict"
-                        )
-                row = connection.execute(
-                    """
-                    INSERT INTO stageflow.work_operation (
-                        operation_id, operation_kind, operation_schema_version,
-                        deployment_id, event_id, asset_id, manifest_id,
-                        manifest_version, asset_format, execution_profile_id,
-                        execution_profile_version, requested_language,
-                        request_word_timing, request_speaker_labels,
-                        requires_cloud, required_for_event, idempotency_key,
-                        request_digest, work_key, priority, eligible_at,
-                        operation_status, max_attempts, retry_delay_microseconds,
-                        created_at, updated_at
-                    ) VALUES (
-                        %s, %s, 'v1', %s, %s, %s, %s, %s, %s,
-                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                        'pending', %s, %s, %s, %s
-                    )
-                    RETURNING *
-                    """,
-                    (
-                        request.operation_id.value,
-                        request.input.kind,
-                        request.deployment_id,
-                        None if request.event_id is None else request.event_id.value,
-                        (request.input.asset_id.value
-                         if isinstance(request.input, (TranscriptionOperationInput,
-                                                       MediaTimingOperationInput)) else None),
-                        (request.input.manifest_id.value
-                         if isinstance(request.input, (TranscriptionOperationInput,
-                                                       MediaTimingOperationInput)) else None),
-                        (request.input.manifest_version
-                         if isinstance(request.input, (TranscriptionOperationInput,
-                                                       MediaTimingOperationInput)) else None),
-                        (request.input.asset_format
-                         if isinstance(request.input, TranscriptionOperationInput) else None),
-                        request.input.execution_profile_id,
-                        request.input.execution_profile_version,
-                        (request.input.requested_language
-                         if isinstance(request.input, TranscriptionOperationInput) else None),
-                        (request.input.request_word_timing
-                         if isinstance(request.input, TranscriptionOperationInput) else False),
-                        (request.input.request_speaker_labels
-                         if isinstance(request.input, TranscriptionOperationInput) else False),
-                        request.input.requires_cloud,
-                        request.required_for_event,
-                        request.idempotency_key,
-                        pending.request_digest,
-                        pending.work_key,
-                        request.priority,
-                        request.eligible_at,
-                        request.max_attempts,
-                        _microseconds(request.retry_delay),
-                        request.requested_at,
-                        request.requested_at,
-                    ),
-                ).fetchone()
-                assert row is not None
-                if isinstance(request.input, RenderOperationInput):
-                    connection.execute(
-                        """
-                        INSERT INTO stageflow.render_operation_input (
-                            operation_id, assembly_revision_id, render_profile_id,
-                            render_profile_version, output_token
-                        ) VALUES (%s, %s, %s, %s, %s)
-                        """,
-                        (request.operation_id.value, request.input.assembly_revision_id.value,
-                         request.input.execution_profile_id,
-                         request.input.execution_profile_version,
-                         request.input.output_token),
-                    )
-                return self._operation(row, connection)
+                return self._enqueue(connection, pending)
         except (psycopg.InterfaceError, psycopg.OperationalError) as exc:
             raise WorkExecutionStorageUnavailableError(
                 "postgresql_work_execution_unavailable"
             ) from exc
+
+    def _enqueue(
+        self, connection: psycopg.Connection[Row], pending: PendingOperation[InputT],
+    ) -> DurableOperation[InputT]:
+        request = pending.request
+        connection.execute(
+            "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
+            (request.idempotency_key,),
+        )
+        connection.execute(
+            "SELECT pg_advisory_xact_lock(hashtextextended(%s, 1))",
+            (pending.work_key,),
+        )
+        connection.execute(
+            "SELECT pg_advisory_xact_lock(hashtextextended(%s, 2))",
+            (request.operation_id.value,),
+        )
+        replays = connection.execute(
+            """
+            SELECT * FROM stageflow.work_operation
+            WHERE operation_id = %s OR idempotency_key = %s OR work_key = %s
+            FOR UPDATE
+            """,
+            (
+                request.operation_id.value,
+                request.idempotency_key,
+                pending.work_key,
+            ),
+        ).fetchall()
+        if len(replays) > 1:
+            raise WorkExecutionConflictError("transcription_enqueue_identity_conflict")
+        replay = replays[0] if replays else None
+        if replay is not None:
+            if (
+                isinstance(request.input, (RenderOperationInput, MediaTimingOperationInput))
+                and replay["operation_kind"] == request.input.kind
+                and str(replay["work_key"]) == pending.work_key
+                and str(replay["operation_id"]) != request.operation_id.value
+                and replay["idempotency_key"] != request.idempotency_key
+                and replay["deployment_id"] == request.deployment_id
+                and _optional_entity(replay["event_id"]) == request.event_id
+            ):
+                return self._operation(replay, connection)
+            if (
+                str(replay["operation_id"]) != request.operation_id.value
+                or str(replay["idempotency_key"]) != request.idempotency_key
+                or str(replay["work_key"]) != pending.work_key
+                or str(replay["request_digest"]) != pending.request_digest
+            ):
+                raise WorkExecutionConflictError(
+                    "transcription_enqueue_identity_conflict"
+                )
+            return self._operation(replay, connection)
+
+        self._validate_new_operation(connection, pending)
+        if isinstance(request.input, (TranscriptionOperationInput,
+                                      MediaTimingOperationInput)):
+            asset = connection.execute(
+                """
+                SELECT manifest_id
+                FROM stageflow.completed_media_asset_registry
+                WHERE asset_id = %s
+                FOR UPDATE
+                """,
+                (request.input.asset_id.value,),
+            ).fetchone()
+            if asset is None:
+                raise WorkExecutionNotFoundError(
+                    "completed_media_asset_not_found"
+                )
+            if str(asset["manifest_id"]) != request.input.manifest_id.value:
+                raise WorkExecutionConflictError(
+                    "asset_manifest_identity_conflict"
+                )
+        row = connection.execute(
+            """
+            INSERT INTO stageflow.work_operation (
+                operation_id, operation_kind, operation_schema_version,
+                deployment_id, event_id, asset_id, manifest_id,
+                manifest_version, asset_format, execution_profile_id,
+                execution_profile_version, requested_language,
+                request_word_timing, request_speaker_labels,
+                requires_cloud, required_for_event, idempotency_key,
+                request_digest, work_key, priority, eligible_at,
+                operation_status, max_attempts, retry_delay_microseconds,
+                created_at, updated_at
+            ) VALUES (
+                %s, %s, 'v1', %s, %s, %s, %s, %s, %s,
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                'pending', %s, %s, %s, %s
+            )
+            RETURNING *
+            """,
+            (
+                request.operation_id.value,
+                request.input.kind,
+                request.deployment_id,
+                None if request.event_id is None else request.event_id.value,
+                (request.input.asset_id.value
+                 if isinstance(request.input, (TranscriptionOperationInput,
+                                               MediaTimingOperationInput)) else None),
+                (request.input.manifest_id.value
+                 if isinstance(request.input, (TranscriptionOperationInput,
+                                               MediaTimingOperationInput)) else None),
+                (request.input.manifest_version
+                 if isinstance(request.input, (TranscriptionOperationInput,
+                                               MediaTimingOperationInput)) else None),
+                (request.input.asset_format
+                 if isinstance(request.input, TranscriptionOperationInput) else None),
+                request.input.execution_profile_id,
+                request.input.execution_profile_version,
+                (request.input.requested_language
+                 if isinstance(request.input, TranscriptionOperationInput) else None),
+                (request.input.request_word_timing
+                 if isinstance(request.input, TranscriptionOperationInput) else False),
+                (request.input.request_speaker_labels
+                 if isinstance(request.input, TranscriptionOperationInput) else False),
+                request.input.requires_cloud,
+                request.required_for_event,
+                request.idempotency_key,
+                pending.request_digest,
+                pending.work_key,
+                request.priority,
+                request.eligible_at,
+                request.max_attempts,
+                _microseconds(request.retry_delay),
+                request.requested_at,
+                request.requested_at,
+            ),
+        ).fetchone()
+        assert row is not None
+        if isinstance(request.input, RenderOperationInput):
+            additions = (request.input.video_bit_rate, request.input.audio_bit_rate,
+                         request.input.event_render_setting_version)
+            # Default inputs also work during a schema-only reversal: no new facts
+            # are silently discarded when the additional columns are absent.
+            adjusted = any(value is not None for value in additions)
+            connection.execute(
+                """
+                INSERT INTO stageflow.render_operation_input (
+                    operation_id, assembly_revision_id, render_profile_id,
+                    render_profile_version, output_token, video_bit_rate, audio_bit_rate,
+                    event_render_setting_version
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                """ if adjusted else """
+                INSERT INTO stageflow.render_operation_input (
+                    operation_id, assembly_revision_id, render_profile_id,
+                    render_profile_version, output_token
+                ) VALUES (%s, %s, %s, %s, %s)
+                """,
+                (request.operation_id.value, request.input.assembly_revision_id.value,
+                 request.input.execution_profile_id,
+                 request.input.execution_profile_version,
+                 request.input.output_token) + (additions if adjusted else ()),
+            )
+        return self._operation(row, connection)
 
     def _validate_new_operation(
         self, connection: psycopg.Connection[Row], pending: PendingOperation[InputT],
@@ -1696,6 +1713,9 @@ def _operation(
             execution_profile_id=str(render["render_profile_id"]),
             execution_profile_version=str(render["render_profile_version"]),
             output_token=str(render["output_token"]),
+            video_bit_rate=render.get("video_bit_rate"),
+            audio_bit_rate=render.get("audio_bit_rate"),
+            event_render_setting_version=render.get("event_render_setting_version"),
         ) if render is not None else MediaTimingOperationInput(
             asset_id=_entity(row["asset_id"]),
             manifest_id=_entity(row["manifest_id"]),
