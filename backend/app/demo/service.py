@@ -9,6 +9,7 @@ from uuid import NAMESPACE_URL, uuid5
 from app.bootstrap.event_mode_kernel import KernelComponents
 from app.contexts.production.event_mode_kernel.contracts import AssociationStatus
 from app.contexts.production.event_mode_kernel.repository import KernelNotFoundError
+from app.contexts.production.media_segmentation_evidence.enqueue import MediaSegmentationEnqueue
 from app.contexts.production.media_timing_evidence.enqueue import (
     MediaTimingEnqueue,
 )
@@ -21,6 +22,9 @@ from app.contexts.work_execution import (
     WorkExecutionStorageUnavailableError,
 )
 from app.infrastructure.postgres import PostgresWorkExecutionRepository
+from app.infrastructure.postgres.media_segmentation_repository import (
+    PostgresMediaSegmentationRepository,
+)
 from app.infrastructure.postgres.media_timing_work_repository import (
     PostgresMediaTimingWorkRepository,
 )
@@ -122,6 +126,25 @@ class DemoApplication:
                         timing.enqueue(event.id, asset)
                     except (ValueError, RuntimeError):
                         timing_failures.append("media_timing_enqueue_failed")
+        local_segmentation = getattr(
+            self.components.configuration.deployment, "local_media_segmentation", None)
+        if local_segmentation is not None and local_segmentation.enabled:
+            segmentation_repository = PostgresMediaSegmentationRepository(
+                self.components.configuration.postgres_dsn)
+            segmentation = MediaSegmentationEnqueue(segmentation_repository,
+                self.components.configuration.deployment.deployment_id,
+                self.components.kernel.clock)
+            try:
+                segmentation_assets = segmentation_repository.assets_without_operation(
+                    event.id, limit=100)
+            except (ValueError, RuntimeError):
+                timing_failures.append("media_segmentation_enqueue_failed")
+            else:
+                for segmentation_asset in segmentation_assets:
+                    try:
+                        segmentation.enqueue(event.id, segmentation_asset)
+                    except (ValueError, RuntimeError):
+                        timing_failures.append("media_segmentation_enqueue_failed")
         transcription = self.components.configuration.deployment.local_transcription
         if transcription is None:
             raise RuntimeError("local_transcription_not_configured")

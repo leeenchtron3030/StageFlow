@@ -10,6 +10,7 @@ from .contracts import (
     EnqueueOperation,
     EnqueueRenderOperation,
     EnqueueTranscriptionOperation,
+    MediaSegmentationOperationInput,
     MediaTimingOperationInput,
     OperationInput,
     PendingOperation,
@@ -143,6 +144,42 @@ def pending_media_timing_operation(
             "deployment_id": request.deployment_id,
             "event_id": None if request.event_id is None else request.event_id.value,
             "work_key": media_timing_work_key(request),
+            "priority": request.priority,
+            "eligible_at": request.eligible_at.isoformat(),
+            "max_attempts": request.max_attempts,
+            "retry_delay_microseconds": int(request.retry_delay.total_seconds() * 1_000_000),
+            "required_for_event": request.required_for_event,
+            "requested_at": request.requested_at.isoformat(),
+        }),
+    )
+
+
+def media_segmentation_work_key(request: EnqueueOperation[MediaSegmentationOperationInput]) -> str:
+    value = request.input
+    return _sha({
+        "schema": "stageflow.media_segmentation_operation.work-key.v1",
+        "asset_id": value.asset_id.value,
+        "manifest_id": value.manifest_id.value,
+        "manifest_version": value.manifest_version,
+        "segmentation_profile_id": value.segmentation_profile_id,
+        "segmentation_profile_version": value.segmentation_profile_version,
+    })
+
+
+def pending_media_segmentation_operation(
+    request: EnqueueOperation[MediaSegmentationOperationInput],
+) -> PendingOperation[MediaSegmentationOperationInput]:
+    """Persistence envelope only; segmentation enqueue owns authorization."""
+    return PendingOperation(
+        request=request,
+        work_key=media_segmentation_work_key(request),
+        request_digest=_sha({
+            "schema": "stageflow.media_segmentation_operation.enqueue.v1",
+            "operation_id": request.operation_id.value,
+            "idempotency_key": request.idempotency_key,
+            "deployment_id": request.deployment_id,
+            "event_id": None if request.event_id is None else request.event_id.value,
+            "work_key": media_segmentation_work_key(request),
             "priority": request.priority,
             "eligible_at": request.eligible_at.isoformat(),
             "max_attempts": request.max_attempts,

@@ -12,6 +12,7 @@ from .contracts import (
     EnqueueTranscriptionOperation,
     EventNetworkPolicy,
     ExecutionLocality,
+    MediaSegmentationOperationInput,
     MediaTimingOperationInput,
     OperationAttempt,
     OperationClaim,
@@ -44,6 +45,7 @@ from .service import (
 
 __all__ = [
     "MediaTimingOperationInput",
+    "MediaSegmentationOperationInput",
     "AttemptOutcome",
     "AttemptStatus",
     "ClaimRequest",

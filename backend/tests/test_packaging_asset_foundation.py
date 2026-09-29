@@ -409,7 +409,8 @@ def test_migration_runner_orders_0012_before_0011(monkeypatch: pytest.MonkeyPatc
         executed.append(version)
     monkeypatch.setattr(PostgresMigrationRunner, "_execute_if_present", record)
     PostgresMigrationRunner("unused").reverse_editorial_review_foundation_v1()
-    assert executed == ["0020_event_render_setting", "0019_derived_editorial_candidates",
+    assert executed == ["0021_media_segmentation", "0020_event_render_setting",
+                        "0019_derived_editorial_candidates",
                         "0018_assembly_timing_evidence", "0017_media_timing_operation",
                        "0016_assembly_media_order",
                         "0015_render_durable_operation",

@@ -146,4 +146,37 @@ Revert the code. Reverse `0021` only while no segmentation rows exist.
 
 ## Completion record
 
-- Phase 1 (ED-0103):
+- **Phase 1 (ED-0103), implemented revision:** branch `codex/ed-0103-media-segmentation`.
+  Codex implemented it and the owner committed it.
+- **Changed files:**
+  - migration `0021` (a `media_segmentation` operation kind; three kind-membership
+    constraints widened, with exact requirements kept for existing kinds; evidence and
+    interval tables; a guarded reverse);
+  - the `media_segmentation_evidence` context;
+  - the FFmpeg segmentation adapter (shares the render identity check through
+    `identify_ffmpeg`);
+  - the CPU worker and the `[local_media_segmentation]` config;
+  - default-off bounded enqueue and backfill;
+  - the bounded API;
+  - the PostgreSQL repository;
+  - tests and documentation.
+  - No dependency.
+- **Changed existing assertions:** three migration-order lists, which were pre-authorized.
+- **Review:** `directive-reviewer` returned FIX-FIRST, then APPROVE.
+  - F1: an end-of-file silence end overshooting the measured duration made the asset fail
+    permanently. The owner fixed it: only an *end* offset up to 1 s past the duration is
+    clamped, and starts stay strict.
+  - F2: tests now use the real FFmpeg 8.1 line shapes.
+- **Tests (host):** full backend suite **2,765 passed, 0 failed, 2 skipped**, on a freshly
+  reset test database. Earlier parallel sandbox runs had left the shared test schema
+  inconsistent. Ruff and Pyright clean.
+- **Owner real-FFmpeg run:**
+  [Segmentation Run 001](../validation/results/media-segmentation-001.md).
+- **Remaining work:**
+  - migrate the demo database to `0021` after merge, backing it up first;
+  - Phase 2 (the suggestions core and policy) needs its detailed section.
+  - Non-blocking review notes for later:
+    - the fixed 3600 s timeout does not scale with asset length;
+    - `N/A` `out_time_us` handling;
+    - only the first audio track is analysed;
+    - results are tied to the current profile version.

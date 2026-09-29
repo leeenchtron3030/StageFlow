@@ -29,6 +29,7 @@ from app.contexts.work_execution import (
     DurableOperation,
     EventNetworkPolicy,
     ExecutionLocality,
+    MediaSegmentationOperationInput,
     MediaTimingOperationInput,
     OperationAttempt,
     OperationClaim,
@@ -78,7 +79,7 @@ class PostgresWorkExecutionRepository[
         # General callers explicitly opt into the closed union; workers may opt into one kind.
         if not input_types or any(
             value not in (TranscriptionOperationInput, RenderOperationInput,
-                          MediaTimingOperationInput)
+                          MediaTimingOperationInput, MediaSegmentationOperationInput)
             for value in input_types
         ):
             raise ValueError("unsupported operation input type")
@@ -137,7 +138,9 @@ class PostgresWorkExecutionRepository[
         replay = replays[0] if replays else None
         if replay is not None:
             if (
-                isinstance(request.input, (RenderOperationInput, MediaTimingOperationInput))
+                isinstance(request.input, (
+                    RenderOperationInput, MediaTimingOperationInput,
+                    MediaSegmentationOperationInput))
                 and replay["operation_kind"] == request.input.kind
                 and str(replay["work_key"]) == pending.work_key
                 and str(replay["operation_id"]) != request.operation_id.value
@@ -159,7 +162,7 @@ class PostgresWorkExecutionRepository[
 
         self._validate_new_operation(connection, pending)
         if isinstance(request.input, (TranscriptionOperationInput,
-                                      MediaTimingOperationInput)):
+                                      MediaTimingOperationInput, MediaSegmentationOperationInput)):
             asset = connection.execute(
                 """
                 SELECT manifest_id
@@ -203,13 +206,16 @@ class PostgresWorkExecutionRepository[
                 None if request.event_id is None else request.event_id.value,
                 (request.input.asset_id.value
                  if isinstance(request.input, (TranscriptionOperationInput,
-                                               MediaTimingOperationInput)) else None),
+                                               MediaTimingOperationInput,
+                                               MediaSegmentationOperationInput)) else None),
                 (request.input.manifest_id.value
                  if isinstance(request.input, (TranscriptionOperationInput,
-                                               MediaTimingOperationInput)) else None),
+                                               MediaTimingOperationInput,
+                                               MediaSegmentationOperationInput)) else None),
                 (request.input.manifest_version
                  if isinstance(request.input, (TranscriptionOperationInput,
-                                               MediaTimingOperationInput)) else None),
+                                               MediaTimingOperationInput,
+                                               MediaSegmentationOperationInput)) else None),
                 (request.input.asset_format
                  if isinstance(request.input, TranscriptionOperationInput) else None),
                 request.input.execution_profile_id,
@@ -1222,7 +1228,18 @@ class PostgresWorkExecutionRepository[
                             (str(row["operation_id"]), str(row["asset_id"]),
                              str(row["manifest_id"]), row["manifest_version"]),
                         ).fetchone()
-                    has_result = evidence is not None or rendered is not None or timing is not None
+                    segmentation = None
+                    if row["operation_kind"] == "media_segmentation":
+                        segmentation = connection.execute(
+                            "SELECT evidence_id FROM stageflow.media_segmentation_evidence "
+                            "WHERE operation_id=%s AND asset_id=%s AND manifest_id=%s "
+                            "AND manifest_version=%s AND profile_id=%s AND profile_version=%s",
+                            (str(row["operation_id"]), str(row["asset_id"]),
+                             str(row["manifest_id"]), row["manifest_version"],
+                             row["execution_profile_id"], row["execution_profile_version"]),
+                        ).fetchone()
+                    has_result = any(value is not None for value in (
+                        evidence, rendered, timing, segmentation))
                     attempt_id = row["current_attempt_id"]
                     if attempt_id is not None:
                         connection.execute(
@@ -1257,7 +1274,19 @@ class PostgresWorkExecutionRepository[
                                 str(attempt_id),
                             ),
                         )
-                    if timing is not None:
+                    if segmentation is not None:
+                        updated = connection.execute(
+                            """UPDATE stageflow.work_operation SET operation_status='succeeded',
+                               current_attempt_id=NULL, lease_owner_worker_id=NULL,
+                               lease_expires_at=NULL,
+                               terminal_result_type='media_segmentation_evidence',
+                               terminal_result_media_segmentation_evidence_id=%s,
+                               last_reason_code='result_reconciled', row_revision=row_revision+1,
+                               updated_at=statement_timestamp()
+                               WHERE operation_id=%s RETURNING *""",
+                            (str(segmentation["evidence_id"]), str(row["operation_id"])),
+                        ).fetchone()
+                    elif timing is not None:
                         updated = connection.execute(
                             """UPDATE stageflow.work_operation
                                SET operation_status='succeeded', current_attempt_id=NULL,
@@ -1722,7 +1751,13 @@ def _operation(
             manifest_version=str(row["manifest_version"]),
             inspection_profile_id=str(row["execution_profile_id"]),
             inspection_profile_version=str(row["execution_profile_version"]),
-        ) if row["operation_kind"] == "media_timing" else TranscriptionOperationInput(
+        ) if row["operation_kind"] == "media_timing" else MediaSegmentationOperationInput(
+            asset_id=_entity(row["asset_id"]),
+            manifest_id=_entity(row["manifest_id"]),
+            manifest_version=str(row["manifest_version"]),
+            segmentation_profile_id=str(row["execution_profile_id"]),
+            segmentation_profile_version=str(row["execution_profile_version"]),
+        ) if row["operation_kind"] == "media_segmentation" else TranscriptionOperationInput(
             asset_id=_entity(row["asset_id"]),
             manifest_id=_entity(row["manifest_id"]),
             manifest_version=str(row["manifest_version"]),
@@ -1761,6 +1796,9 @@ def _operation(
         ),
         terminal_result_media_timing_evidence_id=_optional_entity(
             row.get("terminal_result_media_timing_evidence_id"),
+        ),
+        terminal_result_media_segmentation_evidence_id=_optional_entity(
+            row.get("terminal_result_media_segmentation_evidence_id"),
         ),
         terminal_result_revision=cast(
             int | None,

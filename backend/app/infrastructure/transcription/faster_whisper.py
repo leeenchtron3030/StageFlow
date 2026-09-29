@@ -23,6 +23,7 @@ from app.contexts.transcription_evidence.application import (
     TranscriptionExecutionRequest,
 )
 from app.contexts.work_execution.contracts import (
+    MediaSegmentationOperationInput,
     MediaTimingOperationInput,
     TranscriptionOperationInput,
 )
@@ -86,7 +87,10 @@ class KernelMediaPathResolver:
         self._repository = repository
         self._source_roots = dict(source_roots)
 
-    def resolve(self, input: TranscriptionOperationInput | MediaTimingOperationInput) -> Path:
+    def resolve(
+        self, input: TranscriptionOperationInput | MediaTimingOperationInput
+        | MediaSegmentationOperationInput,
+    ) -> Path:
         asset = self._repository.get_asset(input.asset_id)
         if asset is None:
             raise TranscriptionExecutionError(
