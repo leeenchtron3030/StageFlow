@@ -2,8 +2,17 @@
 
 ## Status
 
-Proposed (drafted 2026-09-28 at the owner's direction; not accepted). Nothing here is
-authorized for implementation until the owner accepts a decision below.
+Accepted (owner, 2026-09-28), with these decisions:
+
+- **Scope B:** suggested Sessions plus boundary proposals.
+- **Evidence:** schedule, recorder timing and content changeover signals, **plus
+  transcript cues in v1**. The owner chose to include transcript cues now rather than
+  defer them.
+- **v1 quality target** as proposed under Validation approach.
+- **Surfaces:** as recommended (Work Queue and Session Detail).
+
+Implementation follows the phased plan
+[session-boundary-suggestions.md](../plans/session-boundary-suggestions.md).
 
 ## Date
 
@@ -102,8 +111,12 @@ multi-stage event is kept outside the repository; this is a sanitized summary.
    `media_segmentation` Durable Operation kind on the existing substrate, the ADR-0033
    pattern, using the operator-installed LGPL FFmpeg by explicit path. Outputs are
    advisory intervals with filter parameters as lineage.
-4. **Later, optional:** transcript cues (existing phrase-list matching: introductions,
-   thanks) and title-card or slide detection.
+4. **Transcript cues (in v1, owner decision):** reuse ED-0092 phrase matching over the
+   latest complete Transcription Evidence of each asset. It matches operator-supplied,
+   versioned boundary-cue phrase lists such as introductions, thanks and applause
+   prompts. Transcription is optional and operator-installed (ED-0075), so suggestions
+   must work without transcripts, with the cue component simply absent.
+5. **Later, optional:** title-card or slide detection.
 
 **Combining evidence**
 
@@ -119,7 +132,7 @@ multi-stage event is kept outside the repository; this is a sanitized summary.
 ## Recommended default
 
 - Scope **B**.
-- Evidence **1 + 2 + 3** first, with transcript cues deferred.
+- Evidence **1 + 2 + 3**, with **4 (transcript cues) also in v1** by owner decision.
 - A deterministic `boundary-suggestion` policy v1.
 - Suggestions shown in the Work Queue (an additive item type) and on Session Detail.
 
