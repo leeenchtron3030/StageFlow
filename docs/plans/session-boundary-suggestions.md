@@ -36,7 +36,7 @@ policy v2) is detailed below (2026-09-29), after the early accuracy check. After
 | 2. Session Suggestions core | Suggestion aggregate, deterministic `boundary-suggestion` policy v1 (schedule, timing, segmentation, transcript cues), human-invoked suggestion run, confirm and reject commands (confirm reuses the existing human Session realization and boundary commands) | `0022` |
 | 3. Boundary proposals for realized Sessions | The same policy produces `session_boundary_proposal` rows (existing table) for confirmed Sessions | none expected |
 | 4. Producer surfaces | Work Queue item "confirm presentation" (additive), and suggestion review on Session Detail and Mission Control under the owner's scanning rule; UX checkpoint | none |
-| 2c. Policy v3, schedule offset (ED-0106, Approved) | Per-block schedule offset (estimated or producer override) before v2 alignment; Stage offset override setting | `0024` |
+| 2c. Policy v3, schedule offset (ED-0106, Completed) | Per-block schedule offset (estimated or producer override) before v2 alignment; Stage offset override setting | `0024` |
 | 2d. Transcript cues as edges, phrase presets (outline) | 2d-1 preset catalog and composition of cue lists; 2d-2 policy v4 with `cue` edges | to be detailed |
 | 5. Validation harness and Run 001 | Replay the ground-truth corpus (outside the repo) and measure recall, precision and start/end error against the ADR target; sanitized result | none |
 
@@ -987,5 +987,39 @@ as support for **both** edges of a shared changeover.
     - They are not met at ±10 or ±15 min: recall is 0.68–0.86 and medians reach minutes.
     - ED-0105 stays Approved pending an owner decision among options A, B and C in the
       result.
-    - The demo database was backed up (`stageflow_demo-pre-ed0105-0023-*`). Migration
-      to `0023` awaits the owner's explicit approval.
+    - The demo database was backed up (`stageflow_demo-pre-ed0105-0023-*`) and, with the
+      owner's explicit approval, migrated to `0023` on 2026-09-29.
+    - **Disposition:** the owner chose Option B (Phase 2c, ED-0106). ED-0105's
+      implementation is complete; its drift acceptance is superseded by ED-0106.
+- **Phase 2c (ED-0106), implemented revision:** `6c4e41c`, merged in PR #151 (`main`
+  `1e54ff4`). Codex implemented it and the owner committed it.
+  - **Changed files:**
+    - `policy_v3.py` (new);
+    - the session-suggestion contracts, service, repository, in-memory repository,
+      serialization and API;
+    - the PostgreSQL repository and migration registry;
+    - migration `0024` (forward and reverse);
+    - the context README, capability layer and glossary;
+    - tests: `test_session_suggestion_policy_v3.py`, `test_stage_schedule_offset.py`,
+      `test_session_suggestions_policy_v3_postgres.py`, plus pre-authorized updates.
+  - **Changed existing assertions:** all pre-authorized.
+    - `0024` added to the migration-order lists in three test files;
+    - the new-run policy version changed from "2" to "3" in the v2 policy test and the
+      API test. The v2 policy test's v1 construction clears the v3-only blocks.
+  - **Review:** `directive-reviewer` returned FIX-FIRST, then APPROVE.
+    - The finding: nothing tested that the latest applicable override entry wins.
+    - The fix was test-only. It adds a precedence test, proven by an in-memory mutation
+      check, and an overlapping-talks block case.
+  - **Tests (host):** full backend suite **2,910 passed, 0 failed, 2 skipped**. Ruff and
+    Pyright clean. CI green.
+  - **Demo database:** backed up (`stageflow_demo-pre-ed0106-0024-*`) and migrated to
+    `0024` with the owner's approval.
+  - **Accuracy Run 003 (2026-09-29):**
+    [result](../validation/results/session-suggestions-accuracy-003.md).
+    - Every approved numeric target is met.
+    - The override criterion is met within 1.1 s in 7 of 8 cases. The exception is
+      two-part lateness at ±30 min (7 s): a shrunken planned break kept the day as one
+      block, and an override entry cannot split a block.
+  - **Status:** Completed.
+  - **Follow-up candidate, not yet prioritized:** let override entries act as block
+    boundaries. This needs a new policy version.
