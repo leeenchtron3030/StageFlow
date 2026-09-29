@@ -3,7 +3,7 @@
 ## Status
 
 Approved (2026-09-28). Phase 1 (ED-0103) and Phase 2 (ED-0104) are complete. Phase 2b (ED-0105,
-policy v2) is detailed below (2026-09-29), after the early accuracy check. Phases 3–5 are outlined here; each gets a detailed section, reviewed by the owner, before it starts.
+policy v2) is detailed below (2026-09-29), after the early accuracy check. After Accuracy Run 002, the owner chose Option B (Phase 2c, ED-0106, Proposed) and asked for Option C to be planned (Phase 2d, outline). Phases 3–5 are outlined here; each gets a detailed section, reviewed by the owner, before it starts.
 
 ## Execution authority
 
@@ -36,6 +36,8 @@ policy v2) is detailed below (2026-09-29), after the early accuracy check. Phase
 | 2. Session Suggestions core | Suggestion aggregate, deterministic `boundary-suggestion` policy v1 (schedule, timing, segmentation, transcript cues), human-invoked suggestion run, confirm and reject commands (confirm reuses the existing human Session realization and boundary commands) | `0022` |
 | 3. Boundary proposals for realized Sessions | The same policy produces `session_boundary_proposal` rows (existing table) for confirmed Sessions | none expected |
 | 4. Producer surfaces | Work Queue item "confirm presentation" (additive), and suggestion review on Session Detail and Mission Control under the owner's scanning rule; UX checkpoint | none |
+| 2c. Policy v3, schedule offset (ED-0106, Proposed) | Per-block schedule offset (estimated or producer override) before v2 alignment; Stage offset override setting | `0024` |
+| 2d. Transcript cues as edges, phrase presets (outline) | 2d-1 preset catalog and composition of cue lists; 2d-2 policy v4 with `cue` edges | to be detailed |
 | 5. Validation harness and Run 001 | Replay the ground-truth corpus (outside the repo) and measure recall, precision and start/end error against the ADR target; sanitized result | none |
 
 ## Phase 1: media segmentation evidence (ED-0103)
@@ -501,6 +503,346 @@ through confirmation are ordinary human-realized Sessions and stay.
 ### Rollback
 
 Revert the code. Reverse `0023` only while no v2 rows exist.
+
+## Phase 2c: policy v3, schedule offset (ED-0106)
+
+### Status
+
+- **Proposed** (2026-09-29). It becomes Green and implementation-ready when the owner
+  approves this section, including the constants and targets marked for owner approval.
+- **Owner decision (2026-09-29, after Accuracy Run 002):** Option B now. Option C is
+  planned in Phase 2d.
+
+### Why
+
+- [Accuracy Run 002](../validation/results/session-suggestions-accuracy-002.md) showed
+  that v2 meets the target at zero drift. It fails at ±10 and ±15 min, even when a whole
+  day is uniformly late.
+  - Worst seed under a whole-day shift of ±10 min: recall 0.75, medians 150 s / 143 s.
+- **Cause:** v2 charges distance from the **printed** plan. When a Stage runs late, weaker
+  in-talk freezes near the printed times outscore the true changeovers.
+- Events usually run late as a block: a late start, then a different lateness after
+  lunch. That shared offset is the thing v2 does not estimate.
+- **Scratch prototype (2026-09-29):**
+  - The setup: estimate one offset per schedule block, split at planned breaks of 20 min
+    or more; shift the plan by it; run unmodified v2.
+  - The corpus, harness and evaluator are the same as in Run 002. The prototype is not
+    committed.
+
+  Worst of five seeds, official evaluator. Cells show recall, then median start / end
+  error. The **whole-day** model shifts each day by one offset in ±D, plus ±60 s of
+  jitter per edge. The **two-part** model uses a different offset after the day's
+  largest planned break. The **independent** model is Run 002's drift of ±D per edge.
+  The v2 whole-day column is from Run 002 (same drift model, different seeds). The v2
+  two-part cells show "—" because v2 was not run on that model. The ground truth caps
+  recall at 0.96.
+
+  | Model and drift | v2 (as merged) | v3 prototype, gate 3 | v3 prototype, gate 6 |
+  | --- | --- | --- | --- |
+  | whole-day ±0 | 0.93, 22 s / 25 s | 0.93, 22 s / 29 s | 0.93, 22 s / 29 s |
+  | whole-day ±5 min | 0.89, 47 s / 66 s | 0.93, 28 s / 36 s | 0.93, 29 s / 33 s |
+  | whole-day ±10 min | 0.75, 150 s / 143 s | 0.93, 25 s / 30 s | 0.93, 25 s / 30 s |
+  | whole-day ±15 min | 0.71, 133 s / 125 s | 0.93, 29 s / 19 s | 0.93, 29 s / 29 s |
+  | whole-day ±30 min | — | 0.93, 22 s / 30 s | 0.89, 22 s / 30 s |
+  | two-part ±5 min | — | 0.93, 29 s / 24 s | 0.93, 29 s / 24 s |
+  | two-part ±10 min | — | 0.96, 25 s / 29 s | 0.93, 25 s / 36 s |
+  | two-part ±15 min | — | 0.93, 29 s / 36 s | 0.93, 29 s / 33 s |
+  | two-part ±30 min | — | 0.79, 29 s / 33 s | 0.79, 29 s / 33 s |
+  | independent 0 | 0.93, 14 s / 18 s | 0.93, 14 s / 18 s | 0.93, 14 s / 18 s |
+  | independent ±5 min | 0.89, 30 s / 66 s | 0.75, 37 s / 41 s | 0.89, 37 s / 41 s |
+  | independent ±10 min | 0.82, 133 s / 46 s | 0.57, 43 s / 56 s | 0.57, 47 s / 66 s |
+  | independent ±15 min | 0.68, 47 s / 184 s | 0.54, 65 s / 181 s | 0.50, 178 s / 66 s |
+
+  - **Where v3 wins:** a block-wide offset recovers the late-running cases. Widening the
+    edge window made no difference once the plan was shifted.
+  - **Where it loses:** under independent drift of ±10 min or more, the planned
+    **durations** are wrong by up to 20–30 min, and one offset per block cannot fit them.
+    There, v3 is worse than v2. A producer override of 0 restores v2's behaviour exactly.
+  - **Rejected estimator:** choosing the offset that maximizes v2's own alignment score
+    reached recall of only 0.82–0.86 on the whole-day and two-part models.
+
+### Desired behavior
+
+- **Policy `boundary-suggestion` v3** is deterministic, and its constants are versioned
+  lineage.
+  - v1 and v2 stay readable for recorded runs, and new runs use v3.
+  - Everything from v2 is unchanged except the steps below. That includes the ±20 min
+    edge window, now measured around the **shifted** plan; the prototype found no gain
+    from widening it once the plan is shifted.
+- **Schedule blocks:**
+  - A Stage's current, planned Program Expectations are sorted as in v2.
+  - A new block starts wherever the planned gap between one talk's end and the next
+    talk's start is **20 min or more** (for example breaks or lunch).
+  - Each block gets one offset.
+- **Offset for each block, in order of precedence:**
+  1. **Producer override**, if one applies to the block (see below). Source `producer`.
+  2. **Estimate.** Source `estimated`.
+     - **Changeover support:** for a candidate offset δ, sum over the block's planned
+       starts and ends, each shifted by δ, of the best nearby changeover:
+       `strength × (1 − distance / 180 s)` within ±180 s. Starts use changeover ends,
+       and ends use changeover starts. Strength is v2's. Subtract `|δ| / 600 s`.
+     - Offsets from **−60 to +60 min** are tried: a 60 s grid, then a 10 s refinement
+       around the best.
+     - Ties go to the smaller absolute offset, then the earlier one.
+     - A **confidence gate** applies: the estimate is used only if it beats offset 0 by
+       at least **6 points per talk in the block**. Otherwise the offset is 0 and the source is `none`.
+  3. No planned talks, or no changeover evidence: offset 0, source `none`.
+- **Alignment:**
+  - The v2 joint alignment runs against the shifted plan: each planned start and end,
+    plus its block's offset.
+  - Distance penalties and the ±20 min window use the shifted times.
+- **Suggestion components** (first-class, not metadata):
+  - `start_plan_offset_seconds` and `end_plan_offset_seconds` stay relative to the
+    **printed** plan, as today. A producer sees "14 min after the printed start".
+  - New fields: `schedule_offset_seconds` (the block offset used) and
+    `schedule_offset_source` (`producer`, `estimated` or `none`).
+  - Strength rules are unchanged from v2. An offset alone never raises strength.
+- **Run record:** the run stores one row per block:
+  - its ordinal;
+  - the first and last planned start of its talks;
+  - the talk count;
+  - the offset, its source, and the estimate's score margin over offset 0 (a bounded
+    number);
+  - the override setting version, if one was used.
+- **Producer override (Stage schedule offset):**
+  - An Event and Stage-scoped, versioned, append-only setting. It follows the
+    `event_render_setting` pattern (ED-0099): `command_id` plus `request_digest`
+    idempotency, set by, set at, and immutable history.
+  - Each version holds 0–20 entries, ordered by time. Each entry has:
+    - `effective_from`, an aware timestamp on the planned-time scale, for example
+      "from 13:00";
+    - `offset_seconds`, an integer from −7,200 to +7,200.
+  - A block takes the latest entry whose `effective_from` is at or before the block's
+    first planned start. Blocks before the first entry are estimated.
+  - A version with no entries clears all overrides.
+  - The run's input digest includes the override version, so changing the override and
+    rerunning produces a new run. Rerunning without a change produces nothing new.
+- **API** (authenticated, bounded, Event-scoped, following the ED-0104 conventions):
+  - set a Stage's offset override;
+  - read the current override and its history;
+  - the run and suggestion responses carry the block offsets and the new components.
+- **UI:** none in this phase. Phase 4 gains a Stage summary line, for example "Running
+  about 12 min behind the printed schedule (estimated)", with an override control,
+  under the owner's scanning rule.
+
+### In scope
+
+1. Policy v3, keeping v1 and v2 intact for recorded runs. The service uses v3 for new
+   runs.
+2. The Stage schedule offset override: domain, service, repository and API.
+3. Migration `0024`, forward and guarded reverse.
+4. Tests (see Test strategy).
+5. Harness support for Accuracy Run 003:
+   - the ED-0105 evaluator is unchanged;
+   - drift models live in the external harness, not in the repository.
+6. Documentation: the context README, the capability layer, the glossary (schedule
+   offset, schedule block), and this plan's completion record.
+
+### Out of scope
+
+- Transcript cues as edges and phrase presets (Phase 2d).
+- Phases 3–5, and all UI.
+- Any change to Kernel, confirmation or decision semantics.
+- Automatic offset learning across Events.
+
+### Constraints
+
+- Pure and deterministic. No dependency. Aware timestamps. No real-event data in tests.
+- v1 and v2 runs and suggestions stay exact and readable.
+- **Bounded cost:** at most 10,000 inputs as in v1. Estimation evaluates at most
+  about 134 offsets per block (121 on the 60 s grid, then 13 in refinement). The
+  implementation documents its complexity, and a run on a full day (~50 changeovers,
+  ~12 talks) must finish in seconds on the host.
+- The override is advisory input to a suggestion policy. It never changes Program
+  Expectations, Sessions or any Kernel fact.
+
+### Data and migration (`0024`)
+
+- Run and suggestion CHECK constraints accept version `"3"` with exactly the v3
+  constants. v1 and v2 keep their own exact constants.
+- `session_suggestion` gains `schedule_offset_seconds` and `schedule_offset_source`.
+  They are required for v3 and must be null for v1 and v2, enforced by CHECK.
+- A new, immutable `session_suggestion_run_block` table holds the per-block rows above.
+- New `stage_schedule_offset_setting` (versioned header) and
+  `stage_schedule_offset_entry` (ordered entries) tables, append-only with immutable
+  triggers, as in `0020`.
+- **Reverse:** refuses while any v3 run or any override setting exists, and otherwise
+  drops the additions exactly.
+- **Demo database:** back up with `pg_dump` before applying. It is at `0022` today;
+  `0023` is pending the owner's approval.
+
+### Test strategy
+
+- **Synthetic timelines:**
+  - a whole-day lateness of 25 min is recovered, and every talk aligns to its true
+    changeovers;
+  - two blocks around a lunch break with different lateness (+5 and +20 min);
+  - a producer override replaces the estimate for its blocks only, and an empty version
+    clears it;
+  - no changeover evidence gives offset 0 with source `none`;
+  - a gate case: an ambiguous small gain keeps offset 0;
+  - a lateness beyond ±60 min is not estimated, and falls back to v2 behaviour at offset
+    0;
+  - the grid, refinement and ties are deterministic;
+  - the printed-plan offsets and `schedule_offset_seconds` are reported correctly;
+  - v1 and v2 behaviour is unchanged for their own versions.
+- **Override:**
+  - idempotent by command ID;
+  - a digest mismatch is refused;
+  - history is immutable;
+  - entry bounds and ordering are validated;
+  - the input digest changes with the override version.
+- **PostgreSQL:** `0024` forward and reverse, the guarded reverse, and v1, v2 and v3 rows
+  each valid only with their own constants.
+- **Quality gate:** the full host backend suite, Ruff, Pyright, and `git diff --check`.
+
+### Acceptance criteria
+
+- [ ] New runs use v3, v1 and v2 records stay valid, and all checks pass on the host.
+- [ ] **Accuracy Run 003** (owner step): the same corpus and evaluator as Run 002, five
+  seeds, worst seed reported. These targets need owner approval:
+  | Scenario (simulated, as in the prototype) | Recall (min) | Median start and end error |
+  | --- | --- | --- |
+  | Zero drift (independent model) | ≥ 0.90 | ≤ 30 s |
+  | Whole-day lateness up to ±15 min | ≥ 0.90 | ≤ 45 s |
+  | Whole-day lateness of ±30 min | ≥ 0.85 | ≤ 45 s |
+  | Two-part lateness up to ±15 min | ≥ 0.90 | ≤ 45 s |
+  | Independent drift of ±5 min | ≥ 0.85 | ≤ 60 s |
+  | Independent drift of ±10 and ±15 min | reported, not targeted (known limitation) | — |
+- [ ] Setting the true offset as a producer override reproduces the zero-drift results
+  within 5 s of median error.
+
+### Rollback
+
+Revert the code. Reverse `0024` only while no v3 runs and no override settings exist.
+
+## Phase 2d: transcript cues as edges, with phrase presets (outline, not implementation-ready)
+
+### Status
+
+- **Draft outline**, recorded 2026-09-29 after the owner's decision to plan Option C
+  alongside Option B.
+- Not implementation-ready. It needs the owner decisions listed under Open decisions,
+  and a detailed section per sub-phase before work starts.
+- It follows Phase 2c (ED-0106): v3's measurements decide how much C must add.
+
+### Why
+
+- About 21% of true talk edges have no freeze or recording gap within 30 s (check 001).
+  Better selection among changeovers (v2, v3) cannot reach them.
+- In the cue analysis on the same corpus, changeover **or** transcript cue evidence lay
+  within 60 s of 54 of 56 true edges. Changeovers alone reached 44.
+- Today, cues only add a bonus to changeover edges (v2 and v3). They cannot create an edge
+  where no changeover exists.
+- Phrase lists are hand-typed per Event, 1–200 literal phrases each, through the ED-0092
+  API. There are no defaults. A producer has to know which phrases work.
+
+### Owner direction (2026-09-29)
+
+- A phrase list must be modifiable, but start from defaults.
+- Preferred: the producer **selects predefined phrase lists, or a combination of them**,
+  and can **augment the aggregate with custom phrases**.
+- Predefined groupings include:
+  - basic introduction and conclusion phrases, with common expected combinations;
+  - **studio use:** "action", "cut", "take 1" (or 2, 3 and so on);
+  - other use-specific groupings.
+
+### Proposed shape, in two sub-phases
+
+**2d-1: Cue phrase presets and composition (no policy change)**
+
+This is useful on its own: v2 and v3 already use cue lists for support and tie-breaks.
+
+- **Preset catalog:**
+  - built-in, versioned, and shipped in code like policy constants;
+  - read-only to producers;
+  - identified by key and version, so a composed list records exactly what it came
+    from.
+- **Each preset has:**
+  - a key, a version, and a display name;
+  - a **use**: general talks, Q&A, studio or production, interview or junket, panel;
+  - a **role**: `start` or `end`;
+  - its phrases.
+- **Numbered templates:** "take {n}" expands at catalog build time into literal phrases,
+  both as digits ("take 1") and as words ("take one"), for n = 1–20. The ED-0092 matcher
+  stays literal and unchanged, and transcripts can render numbers either way.
+- **Composition (the producer's workflow):**
+  1. On the Event page, the producer ticks presets, grouped by use.
+  2. They see the aggregated phrases grouped by role (start or end), each with a source
+     badge (which preset, or custom).
+  3. They can remove individual preset phrases, and add custom phrases per role.
+  4. Publishing creates new versions of two Event-scoped phrase lists, one for starts and
+     one for ends, using the existing ED-0092 phrase-list table.
+  5. It also records the composition as first-class provenance: preset keys and
+     versions, exclusions, custom phrases, who and when, and command idempotency (the
+     ED-0099 setting pattern).
+- **Default for suggestion runs:** a run uses the Event's current composed start and end
+  lists unless the producer names others. Today a producer must pass list IDs each time.
+- **Limits:** the existing 200-phrase cap per list holds. If a composition exceeds it,
+  the composition is refused with a clear reason; it is never silently truncated.
+
+**2d-2: cues as edges (policy v4)**
+
+- A new edge kind, `cue`:
+  - A start-phrase hit, or a cluster of them (for example an MC's introduction followed
+    by the speaker's greeting), becomes a candidate start edge.
+  - An end-phrase hit becomes a candidate end edge.
+  - This applies only where no changeover lies within a tolerance, so real changeovers
+    still win.
+- **Strength:** a cue edge is weaker than a real changeover, and a cue-only edge never
+  makes a suggestion `strong` on its own.
+- **False-hit control:** the cue analysis found 31 end-phrase hits deep inside talks
+  ("questions", "thank you"). The candidate rules must use position relative to the
+  (offset-corrected) plan and clustering, not single words.
+- **Evidence shown to the producer:** the matched phrase and its time, for example
+  "Start: cue 'please welcome…' at 14:02:08". This lets a reviewer check a row quickly.
+  The phrase text is already in the transcript; nothing new is stored beyond the match
+  reference.
+- **Degrades cleanly:** without transcripts (local transcription is optional under
+  ED-0075), v4 behaves as v3.
+
+### Proposed preset catalog v1 (English; contents for owner review)
+
+| Preset | Role | Example phrases |
+| --- | --- | --- |
+| General introduction (MC) | start | please welcome, welcome to the stage, give it up for, please join me in welcoming, our next speaker, without further ado |
+| Speaker opening | start | thank you for having me, my name is, hello everyone, good morning everyone, good afternoon everyone, today I'm going to talk about |
+| General conclusion | end | thank you very much, thank you so much, thanks everyone, thank you all, that's all I have, that's it for me |
+| Q&A close | end | any questions, time for one more question, last question, we're out of time |
+| Applause prompts | end | let's give it up for, a round of applause for, one more time for, please thank |
+| Studio: takes and slates | start | action, rolling, speed, take 1–20 (digits and words), scene, mark it |
+| Studio: stops | end | cut, that's a wrap, wrap it, reset, back to one, moving on |
+| Interview or junket | start | thanks for joining us, welcome to the show, we're here with, joining me today |
+| Interview or junket close | end | thanks for talking with us, thanks for coming in, that's all the time we have |
+| Panel | start | let me introduce our panelists, please welcome our panel |
+
+Phrases like "give it up for" and "please welcome" sit between two talks: they end one
+and start the next. The catalog marks them as changeover phrases, and 2d-2 treats them
+as support for **both** edges of a shared changeover.
+
+### Open decisions (owner)
+
+1. **Preset catalog contents and language:** approve or edit the v1 table above. English
+   only in v1?
+2. **Studio semantics:** in studio use, is a **take** its own Session, a segment inside
+   one Session, or ignored for boundaries so that only "action" and "cut" pairs count?
+   This touches Session and Segment meaning (Yellow, `AGENTS.md`), so it must be
+   answered before 2d-2 treats "take N" as an edge.
+3. **Relation to ADR-0035:** a spoken slate ("take 3… action") works like an audio
+   marker. Should the studio presets feed ADR-0035's `marked` strength when the Event
+   defines them as markers, or stay transcript cues? The default proposal: they stay
+   cues; ADR-0035 markers stay non-speech signals.
+4. **Scope of use:** should composed lists also be selectable for Editorial derivation
+   (ED-0092), or only for boundary cues? The default proposal: boundary cues only in v1.
+
+### Dependencies and validation
+
+- 2d-1 has no dependency beyond Phase 2 and can run before or after ED-0106.
+- 2d-2 depends on ED-0106 (v3), because cue edges should be positioned against the
+  offset-corrected plan.
+- **Validation:** an accuracy run of v4 against v3 on the transcribed corpus, with the
+  default presets and no tuning to the corpus. A studio-preset check needs a studio
+  corpus, which does not exist yet; synthetic tests only until then.
 
 ## Ground-truth corpus handling (all phases)
 
