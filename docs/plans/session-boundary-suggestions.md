@@ -410,12 +410,20 @@ through confirmation are ordinary human-realized Sessions and stay.
   - Only edges within ±20 min of the plan are candidates. With none, that edge falls back
     to the planned time, contributes 0, and has edge kind `schedule`.
   - Ties are broken deterministically: earliest edge, then lowest Program Expectation ID.
-  - Overlaps cannot occur by construction, so v2 always records `overlap` as false.
+  - **Clarification (2026-09-29, from the ED-0105 Yellow stop):** the monotone
+    constraint applies to changeover, gap and coverage edges.
+    - Schedule-fallback edges are exempt, because the plan's inputs can themselves
+      overlap: two planned talks whose schedule overlaps, with no candidate edges.
+    - When fallbacks leave suggestions overlapping, each keeps its planned times and is
+      marked `overlap` (and therefore `weak`), as in v1.
+    - No talk is dropped and no run is refused.
+    - Otherwise overlaps cannot occur.
 - **Strength (categorical):**
   - `strong`: both edges come from a changeover, gap or coverage, and at least one edge
     has silence support (silent share ≥ 0.3) or cue support;
   - `medium`: both edges come from a changeover, gap or coverage, with no support;
-  - `weak`: at least one edge is a schedule fallback, or the suggestion is unscheduled.
+  - `weak`: at least one edge is a schedule fallback, the suggestion is marked
+    `overlap`, or it is unscheduled.
 - **Unscheduled activity:** as in v1, using v2 changeovers.
 - **Evaluation tool:** a pure evaluator that takes suggestions plus anonymous
   ground-truth intervals and reports recall, median and 95th-percentile start and end
