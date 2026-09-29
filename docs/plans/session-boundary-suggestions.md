@@ -581,77 +581,39 @@ Revert the code. Reverse `0023` only while no v2 rows exist.
   - **Remaining work:** back up the demo database and migrate it to `0022` after merge.
     Phase 3 (boundary proposals), Phase 4 (surfaces) and Phase 5 (corpus validation) each
     need their detailed section.
-- **Phase 2b (ED-0105), implementation completed for owner review (2026-09-29):**
-  uncommitted on `codex/ed-0105-policy-v2`; host qualification and Accuracy Run 002 remain
-  outstanding. No acceptance box is checked on the strength of sandbox tests alone.
-  - **Changes:** `policy_v2.py`, version-specific contracts/serialization and new-run
-    service lineage; PostgreSQL run decoding and migration registry; additive `0023`
-    forward and guarded reverse SQL; anonymous evaluator and sanitized CLI; three new
-    test files; four pre-authorized existing assertion updates; context README, glossary,
-    capability layer and this plan. No Kernel/decision, dependency, frontend or runtime
-    configuration change.
-  - **Owner decisions:** observed edges stay monotone; schedule fallbacks retain planned
-    times and flag resulting overlap as weak. An invalid short fallback counts under
-    `no_coverage`, without constructing a candidate or writing an invalid SQL row.
-    v1 remains unchanged; the approved v2 minimum is inclusive at 60 seconds.
-  - **Policy evidence (`test_session_suggestion_policy_v2.py`):**
-    `test_consecutive_talks_share_merged_title_card_with_audio`,
-    `test_shared_changeover_strength_is_counted_once_in_joint_score`,
-    `test_freeze_threshold_is_inclusive`, `test_merge_gap_threshold`,
-    `test_long_silent_changeover_beats_nearer_slide_freeze`,
-    `test_drift_joint_alignment_is_monotone`,
-    `test_lunch_and_exact_coverage_gap_threshold`,
-    `test_hard_window_and_unclipped_fallback`,
-    `test_each_supporting_cue_adds_one_point_and_ties_choose_earlier_edge`,
-    `test_equal_plan_starts_are_ordered_by_lowest_expectation_id`,
-    `test_unscheduled_activity_clocks_lifecycle_and_input_order`,
-    `test_exact_sixty_second_v2_and_v1_replay`, and
-    `test_new_run_and_suggestion_lineage_and_exact_constants` cover the approved policy.
-    The overlap probe, cursor and predecessor fallback tests cover the first owner
-    clarification. `test_owner_thirty_second_fallback_is_skipped_and_counted_as_v1`
-    and `test_short_plan_can_still_yield_a_valid_evidence_interval` cover the second.
-  - **Evaluator evidence (`test_session_suggestion_evaluation.py`):** hand-computed
-    recall/median/p95/both-edges-within-60 metrics; one-to-one matching and empty inputs;
-    sanitized successful output, malformed/missing files and six invalid argument cases.
-    `test_cli_invalid_arguments_never_echo_caller_input` proves bounded generic errors.
-  - **SQL evidence (`test_session_suggestions_policy_v2_postgres.py`):**
-    `test_forward_reverse_preserves_v1_and_v2_roundtrip_refuses_reverse`,
-    `test_each_version_requires_its_exact_constants_and_suggestion_duration`, and
-    `test_registry_forward_reverse_order_and_sql_are_available`. The real database was
-    reachable. Both new database tests use the existing outer rollback fixture, including
-    DDL and all immutable rows; they leave no committed rows.
-  - **Existing assertions changed (only these four, pre-authorized):** the reverse list
-    in `test_migration_runner_orders_0012_before_0011`; the forward and reverse lists in
-    `test_migration_registration_order` (all add `0023` in dependency order); API
-    `test_authenticated_bounded_event_scoped_api_shapes_and_errors` changes the expected
-    new-run policy version from `1` to `2`.
-  - **Validation actually run from `backend`:**
-    - `uv run --no-sync pytest -p no:cacheprovider` with the seven session-suggestion
-      policy/service/API/evaluator/PostgreSQL files (including v2 PostgreSQL) and
-      `test_packaging_asset_foundation.py` / `test_session_assembly_foundation.py`,
-      with `-q --tb=short -r fEs`: **197 passed, 0 failed, 0 skipped**, one warning.
-      All **47 new parametrized test cases** passed. The full-suite XML independently
-      records the same 197 focused cases passing.
-    - `uv run --no-sync ruff check . --no-cache`: passed, twice.
-    - `uv run --no-sync pyright`: initially one incompatible override return annotation;
-      corrected the parser's annotation to `NoReturn`; rerun **0 errors, 0 warnings**.
-    - `uv run --no-sync pytest -o addopts='' -p no:cacheprovider -q --tb=short -r fEs
-      --junitxml=C:\Dev\StageFlow-codex\.codex-tmp\ed0105-full.xml`:
-      **2,493 passed, 0 failed, 1 skipped, 376 setup errors, 1 warning** (exit 1).
-      All 376 errors are the known sandbox temp-directory `PermissionError` category;
-      not investigated or treated as implementation failures. The skip is POSIX-only
-      descriptor-bound scanning. The known intermittent Devcon test passed; no rerun
-      was needed. No `0015` schema mismatch was observed in this run.
-    - `git diff --check`: passed. Complete tracked diff and every new file reviewed;
-      independent read-only Codex review found no blocking defect. No git metadata writes.
-  - **Environment and warnings:** cleared `STAGEFLOW_API_SHARED_SECRET` for each pytest
-    process; set `TMP`/`TEMP` and `UV_CACHE_DIR` under `.codex-tmp`; disabled pytest cache
-    and Python bytecode writes. The first run ignored an inherited mismatched virtual
-    environment; subsequent commands explicitly named this worktree's `.venv`.
-    Existing Starlette/httpx deprecation, Pyright update notice, and Git LF-to-CRLF
-    notices remain. No dependency installation or network access. Logs/XML remain only
-    under the owner-managed `.codex-tmp`; frontend checks were out of scope.
-  - **Remaining owner work:** host full-suite validation and Accuracy Run 002 at all
-    approved drift levels; review/commit and any subsequent backed-up database migration.
-    No production migration or deployment performed. Reverse `0023` refuses v2 rows;
-    it never deletes history to enable rollback.
+- **Phase 2b (ED-0105), implemented revision:** branch `codex/ed-0105-policy-v2`. Codex
+  implemented it and the owner committed it, with the review fixes below.
+  - **Changed files:**
+    - `policy_v2.py`, a joint dynamic program with O(T·C³) worst case, bounded in practice
+      by the ±20 min candidate window;
+    - `evaluation.py` and `evaluate_cli.py`, which produce sanitized metrics only;
+    - contracts, serialization, the service (new runs use v2) and the PostgreSQL
+      repository, with version-aware reads;
+    - migration `0023`, in which each version is valid only with its exact constants and
+      the reverse is guarded;
+    - three new test files;
+    - the README, the glossary and the capability layer.
+    - `policy.py` (v1) and its tests are unchanged.
+  - **Owner decisions during implementation:**
+    - overlapping schedule fallbacks keep their planned times and are marked
+      `overlap`/`weak` (PR #147);
+    - plans that cannot yield a suggestion of at least 60 s are skipped and counted under
+      `no_coverage`, as in v1.
+  - **Changed existing assertions:** four, all pre-authorized.
+    - `0023` added to three migration-order lists;
+    - the new-run policy version changed from "1" to "2" in the API test.
+  - **Review:** `directive-reviewer` returned FIX-FIRST twice, then APPROVE.
+    - F1: after a schedule fallback, a changeover could be reused as the start of two
+      talks, or as the end of two talks.
+    - Fix: a start/end-aware cursor, with regression tests.
+    - F3, introduced by the F1 fix: the cue bonus was deduplicated per changeover, which
+      dropped the next talk's start cues at a shared changeover. The owner fixed it:
+      strength is counted once per changeover, and cues are counted per observed edge.
+      A regression test covers it.
+  - **Tests (host), after the F1 and F3 fixes:** full backend suite **2,871 passed, 0 failed,
+    2 skipped**. Ruff and Pyright clean.
+  - **Remaining work:**
+    - Accuracy Run 002 (owner step): v1 and v2, with and without transcript cues. The
+      corpus is now transcribed, and a first cue analysis found that changeover or cue
+      evidence lies within 60 s of 54 of 56 true edges.
+    - Migrate the demo database to `0023` after merge, with a backup first.

@@ -51,9 +51,11 @@ v2 keeps placement, clock plausibility, <=15 s freeze merging, cue windows, the 
   `min(length, 600 s) / 60`; coverage bounds have strength 30.
 - A Stage's current planned expectations are ordered by planned start then ID and aligned
   jointly. A talk uses changeover end j and changeover start k > j, >=60 s apart;
-  the next observed start uses k' >= k. Each changeover contributes strength once,
-  including when shared. Each observed edge costs `abs(edge - plan) / 30 s` and adds
-  1 per supporting cue. Rational arithmetic makes exact score ties deterministic.
+  the next observed start uses k' >= k. No two talks share a start edge or an end edge,
+  even across fallbacks. Each changeover contributes its strength once, including when
+  shared; each observed edge adds 1 per supporting cue in its own window. Each observed
+  edge costs `abs(edge - plan) / 30 s`. Rational arithmetic makes exact score ties
+  deterministic.
 - A missing feasible edge falls back to its planned timestamp, without clipping, with
   score 0 and kind `schedule`. Fallbacks never advance the evidence cursor. If neither
   edge can form a valid pair for a predecessor, both planned edges are retained for that
@@ -61,7 +63,8 @@ v2 keeps placement, clock plausibility, <=15 s freeze merging, cue windows, the 
   minimum duration, the talk is skipped and counted under `no_coverage`, as in v1
   (owner decision after the second ED-0105 Yellow stop); it is never silently dropped.
 - Ties prefer the earliest edge sequence, then lowest Program Expectation ID. The dynamic
-  program keeps the best path per last evidence index, uses backpointers and ranks for
+  program keeps the best path per last evidence position (end of talk at changeover c =
+  2c, start of talk at c = 2c+1), uses backpointers and ranks for
   ties, and takes O(T*C^3) time and O(T*C) space for T talks and C changeovers (per Stage).
   About 50 changeovers/day is the expected practical workload. Inputs remain bounded at
   10,000 assets and 10,000 expectations; this is not a claim of constant cost at that cap.

@@ -112,6 +112,43 @@ def test_fallback_overlap_does_not_reset_evidence_cursor() -> None:
     assert all(c.strength == Strength.WEAK for c in result if c.overlap)
 
 
+def test_schedule_end_fallback_does_not_allow_reusing_observed_start() -> None:
+    media = replace(asset(0, 10000, freezes=((3400, 4000),)), start_cues=(at(4000),))
+    snapshot = InputSnapshot((expectation(4000, 4600), expectation(4720, 6400, 2)), (media,))
+    result = scheduled(snapshot)
+    assert [c.span for c in result] == [Span(at(4000), at(4600)), Span(at(4720), at(6400))]
+    assert result[0].start_edge_kind == EdgeKind.FREEZE and result[0].start_cue_support
+    assert result[0].end_edge_kind == EdgeKind.SCHEDULE
+    assert result[1].start_edge_kind == result[1].end_edge_kind == EdgeKind.SCHEDULE
+    assert not result[1].start_cue_support
+    assert all(not c.overlap for c in result)
+    assert evaluate(snapshot) == evaluate(replace(
+        snapshot, expectations=snapshot.expectations[::-1]))
+
+
+def test_schedule_start_fallback_does_not_allow_reusing_observed_end() -> None:
+    media = replace(asset(0, 10000, freezes=((4000, 4600),)), end_cues=(at(4000),))
+    snapshot = InputSnapshot((expectation(2000, 4000), expectation(3000, 5000, 2)), (media,))
+    result = scheduled(snapshot)
+    assert [c.span for c in result] == [Span(at(2000), at(4000)), Span(at(3000), at(5000))]
+    assert result[0].start_edge_kind == EdgeKind.SCHEDULE
+    assert result[0].end_edge_kind == EdgeKind.FREEZE and result[0].end_cue_support
+    assert result[1].start_edge_kind == result[1].end_edge_kind == EdgeKind.SCHEDULE
+    assert not result[1].end_cue_support
+    assert all(c.overlap and c.strength == Strength.WEAK for c in result)
+    assert evaluate(snapshot) == evaluate(replace(
+        snapshot, expectations=snapshot.expectations[::-1]))
+
+
+def test_shared_changeover_start_cues_still_count_for_the_next_talk() -> None:
+    media = replace(asset(0, 4000, freezes=((1700, 1800), (1900, 1960))),
+                    start_cues=tuple(at(1900) for _ in range(5)))
+    result = scheduled(InputSnapshot((expectation(0, 1700), expectation(1800, 3600, 2)),
+                                     (media,)))
+    assert result[0].span.end == at(1700) and result[1].span.start == at(1800)
+    assert result[1].start_edge_kind == EdgeKind.FREEZE and result[1].start_cue_support
+
+
 def test_each_predecessor_can_fall_back_without_losing_better_joint_path() -> None:
     result = scheduled(InputSnapshot((expectation(0, 500), expectation(400, 650, 2)),
                                     (asset(0, 2000, freezes=((300, 400), (500, 700))),)))

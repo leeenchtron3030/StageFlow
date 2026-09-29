@@ -56,6 +56,7 @@ def weight(changeover: Changeover, silences: tuple[Span, ...]) -> WeightedChange
 @dataclass
 class Alignment:
     score: Fraction
+    # Changeover c has end position 2*c, then start position 2*c+1; -1 is unused.
     cursor: int
     parent: "Alignment | None"
     edges: tuple[Edge, Edge] | None
@@ -91,13 +92,12 @@ def align(planned: tuple[ProgramExpectation, ...],
 
         for previous in states.values():
             viable = False
-            available_starts = tuple(j for j in starts if j >= previous.cursor)
+            available_starts = tuple(j for j in starts if 2 * j + 1 > previous.cursor)
             for j in available_starts or (None,):
                 a = (Edge(start, EdgeKind.SCHEDULE, False, False)
                      if j is None else start_edges[j])
-                cursor = previous.cursor if j is None else j
-                available_ends = tuple(k for k in ends if k >= cursor
-                                       and (j is None or k > j)
+                cursor = previous.cursor if j is None else 2 * j + 1
+                available_ends = tuple(k for k in ends if 2 * k > cursor
                                        and (end_edges[k].at - a.at).total_seconds()
                                        >= p.minimum_session_seconds)
                 for k in available_ends or (None,):
@@ -108,15 +108,20 @@ def align(planned: tuple[ProgramExpectation, ...],
                     viable = True
                     score = previous.score
                     last = previous.cursor
-                    for index, edge, plan, counts in ((j, a, start, start_counts),
-                                                      (k, b, end, end_counts)):
-                        if index is not None:
-                            if index != last:
+                    for pos, edge, plan, counts in (
+                        (None if j is None else 2 * j + 1, a, start, start_counts),
+                        (None if k is None else 2 * k, b, end, end_counts),
+                    ):
+                        if pos is not None:
+                            index = pos // 2
+                            if index != last // 2:
                                 score += changeovers[index].strength
+                            # Strength is counted once per changeover; cues belong to each
+                            # observed edge, so a shared changeover's start and end both count.
+                            score += p.cue_bonus * counts[index]
                             score -= Fraction(abs(microseconds(edge.at - plan)),
                                               p.plan_distance_seconds * 1_000_000)
-                            score += p.cue_bonus * counts[index]
-                            last = index
+                            last = pos
                     retain(following, Alignment(score, last, previous, (a, b)))
             if not viable:
                 # Both planned edges are exempt from the evidence order. Keep
