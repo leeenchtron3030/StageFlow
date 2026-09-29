@@ -617,3 +617,11 @@ Revert the code. Reverse `0023` only while no v2 rows exist.
       corpus is now transcribed, and a first cue analysis found that changeover or cue
       evidence lies within 60 s of 54 of 56 true edges.
     - Migrate the demo database to `0023` after merge, with a backup first.
+  - **Accuracy Run 002 (2026-09-29):** [result](../validation/results/session-suggestions-accuracy-002.md).
+    - The acceptance criteria are met at zero drift, and at ±5 min only with transcript
+      cues.
+    - They are not met at ±10 or ±15 min: recall is 0.68–0.86 and medians reach minutes.
+    - ED-0105 stays Approved pending an owner decision among options A, B and C in the
+      result.
+    - The demo database was backed up (`stageflow_demo-pre-ed0105-0023-*`). Migration
+      to `0023` awaits the owner's explicit approval.
