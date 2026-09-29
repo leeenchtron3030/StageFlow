@@ -2,13 +2,12 @@
 
 ## Status
 
-**Draft v0.1** (2026-09-29), for owner review.
+**Accepted v1.0** (owner, 2026-09-29), with the decisions recorded under *Owner decisions*.
 
 - This is the proposed content for the ADR-0034 Phase 2d-1 preset catalog
   ([plan](../plans/session-boundary-suggestions.md)).
-- It replaces the short example table in that plan section once the owner accepts it.
-- It does not implement anything. The catalog ships in code under ED-0107, after
-  approval.
+- It replaces the short example table in that plan section.
+- It does not implement anything. The catalog ships in code under ED-0107.
 
 ## Purpose
 
@@ -102,7 +101,6 @@
 | Tech conference and meetup | Conference profile, plus Tech: pitch and demo day handoffs |
 | Panel or moderated session | Panels; Conference: MC handoffs; Speaker closings |
 | Civic or government meeting | Civic: opening and adjournment; Civic: agenda items |
-| Ceremony or awards | Ceremonies and awards; Conference: MC handoffs |
 | Arena, sports or large public event | Arena and public address; Anthem and ceremonies |
 | Community and cultural event (Commonwealth/South Asian formal English) | Community: dignitaries and anchoring; Conference: MC handoffs; Speaker closings |
 | Press conference or media briefing | Press conference |
@@ -110,7 +108,6 @@
 | Broadcast or live stream | Broadcast and live stream |
 | Film or studio set | Studio: slate and takes (segment); Studio: wraps |
 | Webinar or virtual event | Webinar and virtual |
-| Worship or faith service | Worship services |
 
 **Regional add-on groups** (Australia and New Zealand; UK and Ireland; South Asian English)
 are never pre-ticked. Producers add them to any profile.
@@ -226,8 +223,8 @@ explicitly.
 | meeting stands adjourned | end | R [2] | yes |
 | motion to adjourn | end | R [2] | yes |
 
-**Civic: agenda items** (`civic.agenda`). Use this group when each agenda item should become
-its own Session, for example for per-item video.
+**Civic: agenda items** (`civic.agenda`). Each agenda item is its own Session (owner decision,
+2026-09-29). This group is pre-ticked in the civic profile.
 
 | Phrase | Role | Evidence | Default |
 | --- | --- | --- | --- |
@@ -238,7 +235,7 @@ its own Session, for example for per-item video.
 | all those in favor | segment | R [2] | yes |
 | the motion carries | segment | R [2] | yes |
 
-### Ceremonies and awards (`ceremonies.awards`)
+### Ceremonies and awards (`ceremonies.awards`), deferred from v1 by the owner
 
 | Phrase | Role | Evidence | Default |
 | --- | --- | --- | --- |
@@ -373,7 +370,7 @@ conference stage, "action" landed deep inside talks in 9 of 10 hits.
 | thank you for joining | end | R [12] | yes |
 | you're on mute | segment | R [12] ⚠ (said at any time) | opt-in |
 
-### Worship and faith services (`worship`)
+### Worship and faith services (`worship`), deferred from v1 by the owner
 
 | Phrase | Role | Evidence | Default |
 | --- | --- | --- | --- |
@@ -456,18 +453,19 @@ any of them as custom phrases.
   transcription model. Phrase precision differs by speaker population, MC style and
   transcriber. The catalog should be re-measured when other corpora exist.
 
-## Open decisions for the owner
+## Owner decisions (2026-09-29)
 
-1. **Accept the profiles and groups** above, or edit them.
-2. **Handling `segment` phrases in v1:**
-   - Store them in the composition and keep them out of the published cue lists
-     (proposed).
-   - Or omit segment groups until Segment work exists.
-3. **Civic "agenda items" profile:** confirm that an agenda item may be a Session. This
-   is a product-semantics choice for civic Events.
-4. **Worship and ceremonies groups:** include them in v1, or defer them.
-5. **Opt-in policy:** noisy phrases stay available but are never pre-ticked (proposed).
-   The alternative is to hide them entirely.
+1. **Profiles, groups and phrases:** accepted as proposed, with the changes below. v1
+   ships 11 profiles and 17 groups, plus 3 regional add-ons.
+2. **`segment` phrases:** stored in the composition and kept out of the published start
+   and end cue lists until Segment work exists.
+3. **Civic meetings:** each agenda item is its own Session. The `civic.agenda` changeover
+   phrases split them.
+4. **Worship and ceremonies:** deferred from v1. Their groups (`worship`,
+   `ceremonies.awards`) and profiles stay documented above as deferred, and do not ship in
+   the ED-0107 catalog.
+5. **Noisy phrases:** available as opt-in, never pre-ticked. The *Excluded from v1*
+   phrases can be added only as custom phrases.
 
 ## Sources
 
