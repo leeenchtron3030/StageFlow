@@ -37,7 +37,7 @@ policy v2) is detailed below (2026-09-29), after the early accuracy check. After
 | 3. Boundary proposals for realized Sessions | The same policy produces `session_boundary_proposal` rows (existing table) for confirmed Sessions | none expected |
 | 4. Producer surfaces | Work Queue item "confirm presentation" (additive), and suggestion review on Session Detail and Mission Control under the owner's scanning rule; UX checkpoint | none |
 | 2c. Policy v3, schedule offset (ED-0106, Completed) | Per-block schedule offset (estimated or producer override) before v2 alignment; Stage offset override setting | `0024` |
-| 2d-1. Cue phrase presets and composition (ED-0107 backend, ED-0108 Event page; Proposed) | Built-in catalog v1, human composition command publishing the Event's start and end cue lists, runs default to them, Event page section | `0025` |
+| 2d-1. Cue phrase presets and composition (ED-0107 backend, ED-0108 Event page; Approved) | Built-in catalog v1, human composition command publishing the Event's start and end cue lists, runs default to them, Event page section | `0025` |
 | 2d-2. Transcript cues as edges (outline) | Policy v4 with `cue` edges | to be detailed |
 | 5. Validation harness and Run 001 | Replay the ground-truth corpus (outside the repo) and measure recall, precision and start/end error against the ADR target; sanitized result | none |
 
@@ -877,9 +877,9 @@ as support for **both** edges of a shared changeover.
 
 ### Status
 
-- **Proposed** (2026-09-29).
-- It becomes Green and implementation-ready when the owner approves this section,
-  including decisions D1–D3 below.
+- **Approved** (owner, 2026-09-29), including decisions D1–D3 as proposed.
+- **Execution authority:** Green and implementation-ready. ED-0107 first; ED-0108 after
+  ED-0107 merges.
 - **Content authority:** the accepted
   [Cue phrase catalog v1](../ux/cue-phrase-catalog.md), and the owner decisions recorded
   there on 2026-09-29.
