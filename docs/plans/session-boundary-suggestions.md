@@ -2,8 +2,7 @@
 
 ## Status
 
-Approved (2026-09-28). Phase 1 (ED-0103) is complete. Phase 2 (ED-0104) is detailed below
-(2026-09-29). Phases 3–5 are outlined here; each gets a detailed section, reviewed by the owner, before it starts.
+Approved (2026-09-28). Phase 1 (ED-0103) and Phase 2 (ED-0104) are complete. Phases 3–5 are outlined here; each gets a detailed section, reviewed by the owner, before it starts.
 
 ## Execution authority
 
@@ -348,11 +347,11 @@ lineage)
 
 ### Acceptance criteria
 
-- [ ] A run produces deterministic, lineage-complete suggestions and skip counts from
+- [x] A run produces deterministic, lineage-complete suggestions and skip counts from
   schedule, timing, segmentation and optional cues, following policy v1.
-- [ ] Confirm realizes exactly one Session through the existing human commands,
+- [x] Confirm realizes exactly one Session through the existing human commands,
   idempotently and crash-safely. Reject records a decision. Nothing is automatic.
-- [ ] Migration `0022` forward and reverse pass; the demo database is backed up before it
+- [x] Migration `0022` forward and reverse pass; the demo database is backed up before it
   is applied. All checks pass on the host.
 
 ### Rollback
@@ -403,3 +402,39 @@ through confirmation are ordinary human-realized Sessions and stay.
     - `N/A` `out_time_us` handling;
     - only the first audio track is analysed;
     - results are tied to the current profile version.
+- **Phase 2 (ED-0104), implemented revision:** branch `codex/ed-0104-session-suggestions`.
+  Codex implemented it and the owner committed it.
+  - **Changed files:**
+    - migration `0022` (`session_suggestion_run`, `session_suggestion`,
+      `session_suggestion_decision`; immutable; guarded reverse; a non-unique
+      `(stage_id, input_digest)` index);
+    - the production-layer `session_suggestions` context (a pure policy
+      `boundary-suggestion` v1, the service, memory and PostgreSQL repositories, a README);
+    - the API routes and the router;
+    - four new test files;
+    - the glossary and the capability layer.
+    - The Kernel files are unchanged. No dependency, frontend or configuration change.
+  - **Approved deviation:** confirmation calls the existing Kernel `start_session` and
+    `correct_session_boundary` (UUIDv5 operation IDs) inside the suggestion transaction.
+    It borrows the connection through `_BoundKernelRepository`, so both Kernel writes and
+    the decision commit or roll back together. This is stricter than the plan's
+    "decision last" replay: a half-realized Session is never visible. A guard test fails
+    if the Kernel adapter ever commits itself or connects outside `_connect`.
+  - **Review:** `directive-reviewer` returned FIX-FIRST, then APPROVE.
+    - F1: returning to earlier inputs (A→B→A) replayed a superseded run. Now a prior run is
+      reused only while it is the Stage's latest.
+    - F2: suggestion reads and runs took Stage and Program Expectation row locks that
+      would block live Kernel commands. Now only confirm and reject take them, and a
+      lock-timeout test proves a Kernel start on another Stage is not blocked.
+    - Also: cue-version bounds, a non-vacuous import boundary, and refusal of an adjusted
+      end at or before the start.
+  - **Changed existing assertions:**
+    - three migration-order lists (pre-authorized);
+    - the run-replay assertion changed for F1 (owner-authorized).
+  - **Tests (host):** full backend suite **2,821 passed, 0 failed, 2 skipped**, on a reset
+    test database. The owner approved resetting only the test schema, after an earlier
+    version of the lock test left three immutable rows that blocked the reversal tests.
+    Ruff and Pyright clean.
+  - **Remaining work:** back up the demo database and migrate it to `0022` after merge.
+    Phase 3 (boundary proposals), Phase 4 (surfaces) and Phase 5 (corpus validation) each
+    need their detailed section.

@@ -47,6 +47,39 @@ not-event-ready disclaimer retain their meaning.
 
 ## Canonical and qualified terms
 
+### Session Suggestion
+
+- **Definition:** An immutable advisory proposed presentation interval for one Business
+  Event and Stage, optionally linked to a specific Program Expectation revision.
+- **Components:** Recorder-clock start/end, edge kinds, offsets from planned times,
+  silence and cue support per edge, overlap, timing qualifications, categorical strength,
+  evidence references and the `boundary-suggestion` policy identity/version.
+- **Authority:** A human may confirm with adjusted times, using the existing Kernel
+  Session start and end-boundary commands, or reject with a bounded reason. Suggestions
+  never realize Sessions, associate media, or complete packages automatically.
+- **Status:** Derived from Stage run order and decisions. A newer run supersedes an older
+  suggestion; otherwise its decision supplies confirmed/rejected, or it remains open.
+  Supersession never removes the retained decision or a realized Session.
+
+### Suggestion Run
+
+- **Definition:** The immutable result of a human invocation of `boundary-suggestion` v1
+  for one Event and Stage, with optional Event-scoped start/end phrase-list versions.
+- **Identity:** A digest of Event/Stage, policy lineage, Program Expectation revisions,
+  asset timing revisions, segmentation evidence IDs, complete transcript revisions and
+  cue-list versions. Identical inputs return the prior run only while it is the Stage's
+  latest run. Returning to earlier inputs creates a fresh latest run and supersedes the
+  intervening run's suggestions. Run order is commit-serialized and independent of clock ties.
+- **Evidence:** The policy unions recorder coverage, merges freezes separated by at most
+  15 seconds and recognizes freezes/gaps of at least 30 seconds as changeovers. Schedule,
+  silence and optional phrase cues remain advisory. Implausible recorder clocks are
+  excluded, never moved to another day.
+- **Bounds:** Five nonnegative integer skip counts; missing timing precedes implausible
+  clock, and missing segmentation counts usable assets. Missing planned times and no
+  coverage count eligible expectations. Input overflow refuses the run without truncation.
+- **Distinction:** Separate from Editorial derivation; reuse of phrase matching creates
+  no Editorial candidate and does not require transcripts.
+
 ### Editorial phrase list
 
 - **Definition:** An immutable, Event-scoped, operator-supplied list identified by key,
