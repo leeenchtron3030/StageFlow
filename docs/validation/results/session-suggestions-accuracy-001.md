@@ -83,6 +83,25 @@ These were run outside the repository and are not implemented.
   - ±10 min: 45 s / 42 s;
   - ±15 min: 176 s / 190 s.
 - No per-talk rule held 30 s or better beyond ±5 min of drift.
+- **Joint day alignment (prototype):** a deterministic dynamic program assigns each day's
+  talks to changeovers in order, so a talk's end and the next talk's start can share a
+  changeover. It scores changeover strength against distance from the plan. With a
+  changeover of at least 60 s and 30 s of distance per strength point:
+
+  | Drift | Median start / end error | Talks with both edges ≤ 60 s | 95th percentile of the worse edge |
+  | --- | --- | --- | --- |
+  | 0 | 19 s / 30 s | 13/28 | 927 s |
+  | ±5 min | 30 s / 45 s | 10/28 | 927 s |
+  | ±10 min | 45 s / 47 s | 9/28 | 927 s |
+  | ±15 min | 45 s / 47 s | 9/28 | 927 s |
+
+  Accuracy holds as drift grows: at ±15 min the median is about 45 s, where per-edge
+  rules reach 176–349 s. Accuracy with an exact schedule does not improve.
+- **Ceiling of the freeze and gap evidence:** of the 56 true talk edges, only 35 have any
+  freeze or gap edge within 30 s, and 44 within 60 s. The median distance is 15 s,
+  whatever the minimum changeover length (4–60 s). About 21% of real boundaries have no
+  nearby freeze or recording gap, so content changeovers alone cannot exceed about 79% of
+  edges within 60 s.
 
 ## Interpretation
 
@@ -91,13 +110,14 @@ These were run outside the repository and are not implemented.
   - Accuracy meets it only when the schedule is close to reality.
   - Policy v1's 30 s changeover minimum and "nearest edge" rule are too permissive,
     because in-talk freezes are frequent.
-- **Most promising next step** (inferred, not yet tested):
-  - a policy v2 that aligns the day's talks **jointly**, since consecutive talks share
-    one changeover;
-  - with strength-weighted changeovers (length, silence) and a tighter window.
+- **Next step (owner decision, 2026-09-29):** policy v2, with joint day alignment and
+  strength-weighted changeovers of at least 60 s. The prototype shows it is robust to
+  drift.
 - **Also needed:**
-  - **Transcript cues:** transcribing the corpus would add the introduction and
-    thank-you signals, which were not exercised here.
+  - **Transcript cues:** they are the only evidence that can lift the roughly 79%
+    ceiling, because the missing edges fall where no freeze or gap exists. Transcribing
+    the corpus would add introduction, thank-you and first-word signals, which were not
+    exercised here.
   - **Real schedule drift:** the event's published schedule would replace simulated
     drift with the actual gap between planned and actual times.
 - **Limits:** one event and one stage, simulated drift, no transcripts, and an
