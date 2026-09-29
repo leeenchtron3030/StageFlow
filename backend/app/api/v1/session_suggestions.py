@@ -17,6 +17,8 @@ from app.contexts.production.event_mode_kernel.repository import (
 )
 from app.contexts.production.session_suggestions.contracts import (
     Reference,
+    ScheduleOffsetEntry,
+    ScheduleOffsetSetting,
     SessionSuggestion,
     SuggestionConflictError,
     SuggestionDecision,
@@ -61,6 +63,17 @@ class ConfirmBody(HumanBody):
 class RejectBody(HumanBody):
     command_id: UUID
     reason: str = Field(min_length=1, max_length=500)
+
+
+class OffsetEntryBody(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    effective_from: AwareDatetime
+    offset_seconds: int = Field(strict=True, ge=-7200, le=7200)
+
+
+class OffsetBody(HumanBody):
+    command_id: UUID
+    entries: tuple[OffsetEntryBody, ...] = Field(max_length=20)
 
 
 def service(request: Request) -> SessionSuggestionService:
@@ -115,7 +128,42 @@ def run(event_id: UUID, stage_id: UUID, body: RunBody, svc: Service) -> dict[str
     return {"run_id": result.id.value, "event_id": result.event_id.value,
             "stage_id": result.stage_id.value, "input_digest": result.input_digest,
             "actor_id": result.actor_id.value, "created_at": result.created_at,
-            "policy": asdict(result.policy), "skips": asdict(result.skips)}
+            "policy": asdict(result.policy), "skips": asdict(result.skips),
+            "blocks": [asdict(b) for b in result.blocks],
+            "override_setting_version": result.override_setting_version}
+
+
+def _offset(value: ScheduleOffsetSetting) -> dict[str, object]:
+    return {"event_id": value.event_id.value, "stage_id": value.stage_id.value,
+            "version": value.version, "command_id": value.command_id.value,
+            "set_by": value.set_by.value, "set_at": value.set_at,
+            "entries": [asdict(e) for e in value.entries], "authorized_use": "advisory_only"}
+
+
+@router.post("/stages/{stage_id}/schedule-offset")
+def set_offset(event_id: UUID, stage_id: UUID, body: OffsetBody, svc: Service) -> dict[str, object]:
+    return _offset(_call(lambda: svc.set_offset(
+        event_id=EntityId(str(event_id)), stage_id=EntityId(str(stage_id)),
+        command_id=EntityId(str(body.command_id)), actor_id=EntityId(str(body.actor_id)),
+        authority_kind=body.authority_kind,
+        entries=tuple(ScheduleOffsetEntry(e.effective_from, e.offset_seconds)
+                      for e in body.entries),
+    )))
+
+
+@router.get("/stages/{stage_id}/schedule-offset")
+def current_offset(event_id: UUID, stage_id: UUID, svc: Service) -> dict[str, object]:
+    value = _call(lambda: svc.current_offset(EntityId(str(event_id)), EntityId(str(stage_id))))
+    return {"current": None if value is None else _offset(value)}
+
+
+@router.get("/stages/{stage_id}/schedule-offset/history")
+def offset_history(event_id: UUID, stage_id: UUID, svc: Service,
+                   after: Annotated[int, Query(ge=0, le=2_147_483_647)] = 0,
+                   limit: Annotated[int, Query(ge=1, le=100)] = 50) -> dict[str, object]:
+    values, cursor = _call(lambda: svc.offset_history(
+        EntityId(str(event_id)), EntityId(str(stage_id)), after=after, limit=limit))
+    return {"items": [_offset(v) for v in values], "limit": limit, "next_after": cursor}
 
 
 @router.get("/stages/{stage_id}/suggestions")

@@ -47,13 +47,32 @@ not-event-ready disclaimer retain their meaning.
 
 ## Canonical and qualified terms
 
+### Schedule offset
+
+- **Definition:** Advisory seconds added to printed Program Expectation times for
+  Session Suggestion alignment. Policy v3 uses a producer override, a gated estimate,
+  or zero, with source `producer`, `estimated`, or `none` respectively.
+- **Authority:** Never changes Program Expectations, Sessions, or Kernel facts.
+- **Lineage:** Event/Stage override versions are append-only; empty versions clear the
+  override. Entries take effect on the planned-time scale at a block's first start.
+
+### Schedule block
+
+- **Definition:** A consecutive group of current planned Program Expectations sorted
+  by planned start and identity. Policy v3 starts a new block at a planned gap of at
+  least 1,200 seconds from the preceding talk's end.
+- **Lineage:** Each run retains the block ordinal, first/last printed start, talk count,
+  offset, source, estimate margin, and applicable override version.
+- **Distinction:** A policy grouping, not a Session or Recording Block.
+
 ### Session Suggestion
 
 - **Definition:** An immutable advisory proposed presentation interval for one Business
   Event and Stage, optionally linked to a specific Program Expectation revision.
 - **Components:** Recorder-clock start/end, edge kinds, offsets from planned times,
   silence and cue support per edge, overlap, timing qualifications, categorical strength,
-  evidence references and the `boundary-suggestion` policy identity/version.
+  evidence references and the `boundary-suggestion` policy identity/version. v3 adds
+  schedule offset seconds/source; edge offsets remain relative to the printed plan.
 - **Authority:** A human may confirm with adjusted times, using the existing Kernel
   Session start and end-boundary commands, or reject with a bounded reason. Suggestions
   never realize Sessions, associate media, or complete packages automatically.
@@ -64,20 +83,25 @@ not-event-ready disclaimer retain their meaning.
 ### Suggestion Run
 
 - **Definition:** The immutable result of a human invocation of `boundary-suggestion`
-  (v2 for new runs; v1 retained) for one Event and Stage, with optional Event-scoped
+  (v3 for new runs; v1/v2 retained) for one Event and Stage, with optional Event-scoped
   start/end phrase-list versions.
 - **Identity:** A digest of Event/Stage, policy lineage, Program Expectation revisions,
   asset timing revisions, segmentation evidence IDs, complete transcript revisions and
-  cue-list versions. Identical inputs return the prior run only while it is the Stage's
+  cue-list versions, plus the Stage schedule offset setting version in v3. Identical
+  inputs return the prior run only while it is the Stage's
   latest run. Returning to earlier inputs creates a fresh latest run and supersedes the
   intervening run's suggestions. Run order is commit-serialized and independent of clock ties.
 - **Evidence:** The policy unions recorder coverage, merges freezes separated by at most
-  15 seconds. v2 recognizes freezes of at least 60 seconds and gaps of at least 30 seconds
+  15 seconds. v2/v3 recognize freezes of at least 60 seconds and gaps of at least 30 seconds
   as changeovers, jointly aligning planned talks in order. Schedule fallback edges are
   exempt from monotonicity; resulting overlaps retain their times and are marked weak.
   Recorded v1 uses its original 30-second freeze threshold. Schedule,
   silence and optional phrase cues remain advisory. Implausible recorder clocks are
   excluded, never moved to another day.
+- **Schedule alignment:** v3 groups the printed plan into schedule blocks, applies
+  a producer override or gated changeover-support estimate, and runs v2 alignment on
+  the shifted plan. The immutable block rows explain the offset without changing any
+  Program Expectation or Session fact.
 - **Bounds:** Five nonnegative integer skip counts; missing timing precedes implausible
   clock, and missing segmentation counts usable assets. Missing planned times and no
   coverage count eligible expectations. `no_coverage` also counts planned talks that

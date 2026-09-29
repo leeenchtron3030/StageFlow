@@ -9,16 +9,19 @@ from app.shared.ids import EntityId
 from app.shared.time import Clock, require_aware_datetime
 
 from .contracts import (
-    POLICY_V2,
+    POLICY_V3,
     Reference,
+    ScheduleOffsetEntry,
+    ScheduleOffsetSetting,
     SessionSuggestion,
     Span,
     SuggestionConflictError,
     SuggestionDecision,
     SuggestionRun,
     SuggestionStatus,
+    validate_offset_entries,
 )
-from .policy_v2 import evaluate
+from .policy_v3 import evaluate
 from .repository import SuggestionRepository
 
 
@@ -48,9 +51,11 @@ class SessionSuggestionService:
             tx.lock_event(event_id)
             tx.scope(event_id, stage_id)
             inputs = tx.snapshot(event_id, stage_id, start_cue_list, end_cue_list)
+            override = tx.current_offset(event_id, stage_id)
             digest = human_command_digest({
                 "event_id": event_id.value, "stage_id": stage_id.value,
-                "policy": asdict(POLICY_V2),
+                "policy": asdict(POLICY_V3),
+                "override_setting_version": None if override is None else override.version,
                 "expectations": [reference_document(Reference(x.id, x.revision))
                                  for x in sorted(inputs.expectations, key=lambda x: x.id.value)],
                 "assets": [{"id": x.asset_id.value, "timing": reference_document(x.timing),
@@ -63,16 +68,57 @@ class SessionSuggestionService:
             prior = tx.find_run(digest)
             if prior is not None:
                 return prior
-            result = evaluate(inputs)
+            result = evaluate(inputs, override)
             run = SuggestionRun(
                 EntityId.new(), event_id, stage_id, digest, actor_id, self.clock.now(),
                 tuple(Reference(x.id, x.revision) for x in inputs.expectations), inputs.assets,
-                start_cue_list, end_cue_list, result.skips, POLICY_V2,
+                start_cue_list, end_cue_list, result.skips, POLICY_V3, result.blocks,
+                None if override is None else override.version,
             )
             tx.save_run(run, tuple(SessionSuggestion(EntityId.new(), run.id, event_id, stage_id, x,
-                                                     POLICY_V2.id, POLICY_V2.version)
+                                                     POLICY_V3.id, POLICY_V3.version)
                                    for x in result.candidates))
             return run
+
+    def set_offset(self, *, event_id: EntityId, stage_id: EntityId, command_id: EntityId,
+                   actor_id: EntityId, entries: tuple[ScheduleOffsetEntry, ...],
+                   authority_kind: str = "human") -> ScheduleOffsetSetting:
+        self._human(authority_kind)
+        entries = tuple(entries)
+        validate_offset_entries(entries)
+        digest = human_command_digest({
+            "event_id": event_id.value, "stage_id": stage_id.value, "set_by": actor_id.value,
+            "entries": [{"effective_from": e.effective_from.isoformat(),
+                         "offset_seconds": e.offset_seconds} for e in entries],
+        })
+        with self.repository.transaction(self.clock) as tx:
+            tx.lock_event(event_id)
+            tx.scope(event_id, stage_id)
+            prior = tx.replay_offset(command_id, digest)
+            if prior is not None:
+                return prior
+            current = tx.current_offset(event_id, stage_id)
+            setting = ScheduleOffsetSetting(
+                event_id, stage_id, 1 if current is None else current.version + 1,
+                command_id, digest, actor_id, self.clock.now(), entries,
+            )
+            tx.save_offset(setting)
+            return setting
+
+    def current_offset(self, event_id: EntityId, stage_id: EntityId
+                       ) -> ScheduleOffsetSetting | None:
+        with self.repository.transaction(self.clock) as tx:
+            tx.scope(event_id, stage_id)
+            return tx.current_offset(event_id, stage_id)
+
+    def offset_history(self, event_id: EntityId, stage_id: EntityId, *, after: int = 0,
+                       limit: int = 50) -> tuple[tuple[ScheduleOffsetSetting, ...], int | None]:
+        if type(after) is not int or not 0 <= after <= 2_147_483_647 or not 1 <= limit <= 100:
+            raise ValueError("invalid schedule offset history page")
+        with self.repository.transaction(self.clock) as tx:
+            tx.scope(event_id, stage_id)
+            values = tx.offset_history(event_id, stage_id, after, limit + 1)
+            return values[:limit], values[limit - 1].version if len(values) > limit else None
 
     def read(self, event_id: EntityId, suggestion_id: EntityId
              ) -> tuple[SessionSuggestion, SuggestionStatus]:

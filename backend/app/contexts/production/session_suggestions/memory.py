@@ -18,6 +18,7 @@ from .contracts import (
     AssetInput,
     InputSnapshot,
     Reference,
+    ScheduleOffsetSetting,
     SessionSuggestion,
     SuggestionConflictError,
     SuggestionDecision,
@@ -37,6 +38,7 @@ class InMemorySuggestionRepository:
         self.runs: dict[EntityId, SuggestionRun] = {}
         self.suggestions: dict[EntityId, SessionSuggestion] = {}
         self.decisions: dict[EntityId, SuggestionDecision] = {}
+        self.offsets: dict[EntityId, ScheduleOffsetSetting] = {}
 
     @contextmanager
     def transaction(self, clock: Clock) -> Generator[SuggestionTransaction]:
@@ -45,13 +47,14 @@ class InMemorySuggestionRepository:
         with cast(RLock, vars(self.kernel_repository)["_lock"]):
             kernel_state = {k: copy(v) for k, v in vars(self.kernel_repository).items()
                             if k != "_lock"}
-            state = self.runs.copy(), self.suggestions.copy(), self.decisions.copy()
+            state = (self.runs.copy(), self.suggestions.copy(),
+                     self.decisions.copy(), self.offsets.copy())
             self.kernel = DurableEventModeKernel(repository=self.kernel_repository, clock=clock)
             try:
                 yield self
             except BaseException:
                 vars(self.kernel_repository).update(kernel_state)
-                self.runs, self.suggestions, self.decisions = state
+                self.runs, self.suggestions, self.decisions, self.offsets = state
                 raise
 
     def scope(self, event_id: EntityId, stage_id: EntityId) -> None:
@@ -64,6 +67,30 @@ class InMemorySuggestionRepository:
 
     def decision_scope(self, event_id: EntityId, stage_id: EntityId) -> None:
         self.scope(event_id, stage_id)
+
+    def current_offset(self, event_id: EntityId, stage_id: EntityId
+                       ) -> ScheduleOffsetSetting | None:
+        return next((s for s in reversed(tuple(self.offsets.values()))
+                     if s.event_id == event_id and s.stage_id == stage_id), None)
+
+    def replay_offset(self, command_id: EntityId, digest: str) -> ScheduleOffsetSetting | None:
+        prior = self.offsets.get(command_id)
+        if prior is not None and prior.request_digest != digest:
+            raise SuggestionConflictError("schedule_offset_command_id_conflict")
+        return prior
+
+    def save_offset(self, setting: ScheduleOffsetSetting) -> None:
+        if setting.command_id in self.offsets or any(
+                s.stage_id == setting.stage_id and s.version == setting.version
+                for s in self.offsets.values()):
+            raise SuggestionConflictError("schedule_offset_setting_exists")
+        self.offsets[setting.command_id] = setting
+
+    def offset_history(self, event_id: EntityId, stage_id: EntityId, after: int,
+                       limit: int) -> tuple[ScheduleOffsetSetting, ...]:
+        return tuple(sorted((s for s in self.offsets.values()
+                             if s.event_id == event_id and s.stage_id == stage_id
+                             and s.version > after), key=lambda s: s.version))[:limit]
 
     def snapshot(self, event_id: EntityId, stage_id: EntityId,
                  start_cues: Reference | None, end_cues: Reference | None) -> InputSnapshot:

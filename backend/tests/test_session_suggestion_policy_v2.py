@@ -8,6 +8,7 @@ from app.contexts.events import ProgramExpectationLifecycle
 from app.contexts.production.session_suggestions.contracts import (
     POLICY_V1,
     POLICY_V2,
+    POLICY_V3,
     AssetInput,
     EdgeKind,
     InputSnapshot,
@@ -243,9 +244,9 @@ def test_short_plan_can_still_yield_a_valid_evidence_interval() -> None:
 def test_new_run_and_suggestion_lineage_and_exact_constants() -> None:
     h = Harness()
     run = h.run()
-    assert run.policy == POLICY_V2
-    assert h.suggestion().policy_version == "2"
-    assert replace(run, policy=POLICY_V1).policy == POLICY_V1
+    assert run.policy == POLICY_V3
+    assert h.suggestion().policy_version == "3"
+    assert replace(run, policy=POLICY_V1, blocks=()).policy == POLICY_V1
     with pytest.raises(ValueError, match="unsupported"):
         replace(run, policy=replace(POLICY_V2, plan_distance_seconds=31))
     assert isinstance(run, SuggestionRun) and run.created_at == NOW

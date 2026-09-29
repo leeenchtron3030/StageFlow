@@ -23,7 +23,7 @@ def test_authenticated_bounded_event_scoped_api_shapes_and_errors() -> None:
     actor = {"actor_id": ACTOR_ID.value}
     assert client.post(f"{stage}/runs", json=actor).status_code == 401
     run = client.post(f"{stage}/runs", json=actor, headers=AUTH_HEADERS)
-    assert run.status_code == 200 and run.json()["policy"]["version"] == "2"
+    assert run.status_code == 200 and run.json()["policy"]["version"] == "3"
     assert run.json()["skips"]["no_timing_evidence"] == 0
     assert client.get(f"{stage}/suggestions?limit=101", headers=AUTH_HEADERS).status_code == 422
     invalid = client.get(f"{stage}/suggestions?status=invalid", headers=AUTH_HEADERS)
