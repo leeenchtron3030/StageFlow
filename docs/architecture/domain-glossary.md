@@ -525,3 +525,18 @@ not-event-ready disclaimer retain their meaning.
 
 Do not resolve these terms through incidental code naming. Record the decision first and
 then plan compatibility for documentation, contracts, storage, and APIs.
+
+## Media Segmentation Evidence
+
+Immutable advisory freeze and silence intervals for one Completed Media Asset and one
+`media_segmentation` Durable Operation (ADR-0034 Phase 1). Offsets are integer microseconds
+from asset start, with kind, profile ID/version and explicit FFmpeg version/SHA-256 lineage.
+The recorded `freeze-silence` v1 profile fixes CPU decode, the demuxer allowlist,
+`fps=5,scale=320:-2,freezedetect=n=0.003:d=4` and `silencedetect=n=-40dB:d=3`.
+An evidence result contains at most 10,000 intervals; exceeding the cap fails the operation.
+An empty result is valid. Open intervals close at the completed decode's output duration.
+An end reported up to 1 s past that duration (for example silence ending at the last audio
+frame) is clamped to it; a later end, or any start past the duration, is invalid.
+
+These observations do not identify a Session or grant association, boundary, editorial,
+completion or automation authority. Phase 1 produces no Session Suggestions or policy decisions.

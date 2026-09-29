@@ -159,4 +159,4 @@ or architecture document unless those documents are explicitly updated.
 | [Render quality UX follow-ups](render-quality-ux-follow-ups.md) | Completed - render quality UX follow-ups | StageFlow Frontend | ED-0099 UX checkpoint; Run 004; ED-0100 |
 | [Producer Work Queue: Assembly approval items](work-queue-assembly-approval-items.md) | Completed - Work Queue Assembly approval items | StageFlow Backend | Capability layer Work Queue; ED-0068 deferral; ED-0101 |
 | [Repository cleanup 2026-09-28](repository-cleanup-2026-09-28.md) | Completed - repository cleanup 2026-09-28 | StageFlow Docs / Frontend | Open follow-ups; ED-0100 review; ED-0102 |
-| [Session boundary suggestions](session-boundary-suggestions.md) | Approved - Phase 1 implementation-ready | StageFlow Backend / Production | ADR-0034; ED-0103 (Phase 1) |
+| [Session boundary suggestions](session-boundary-suggestions.md) | Approved - Phase 1 completed (ED-0103); Phase 2 to be detailed | StageFlow Backend / Production | ADR-0034; ED-0103 (Phase 1) |

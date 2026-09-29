@@ -19,6 +19,7 @@ from .contracts import (
     DurableOperation,
     EventNetworkPolicy,
     ExecutionLocality,
+    MediaSegmentationOperationInput,
     MediaTimingOperationInput,
     OperationAttempt,
     OperationClaim,
@@ -48,10 +49,12 @@ class InMemoryWorkExecutionRepository(WorkExecutionRepository[OperationInput]):
     def __init__(
         self, clock: Clock, *, input_types: tuple[type[OperationInput], ...] = (
             TranscriptionOperationInput, RenderOperationInput, MediaTimingOperationInput,
+            MediaSegmentationOperationInput,
         ),
     ) -> None:
         if not input_types or any(value not in (
             TranscriptionOperationInput, RenderOperationInput, MediaTimingOperationInput,
+            MediaSegmentationOperationInput,
         ) for value in input_types):
             raise ValueError("unsupported operation input type")
         self._input_types = input_types
@@ -81,7 +84,7 @@ class InMemoryWorkExecutionRepository(WorkExecutionRepository[OperationInput]):
                 if (old.id == request.operation_id or old.idempotency_key == request.idempotency_key
                         or old.work_key == pending.work_key):
                     if (old.kind == request.input.kind
-                            and old.kind in ("render", "media_timing")
+                            and old.kind in ("render", "media_timing", "media_segmentation")
                             and old.work_key == pending.work_key
                             and old.id != request.operation_id
                             and old.idempotency_key != request.idempotency_key

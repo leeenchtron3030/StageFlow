@@ -661,6 +661,31 @@ Authenticated reads expose operation pages and latest
 MTE summaries. Assembly ordering and Editorial placement do not consume these intervals
 in this slice. Owner host comparison and security review remain qualification work.
 
+## Media segmentation evidence
+
+ADR-0034 Phase 1 adds the `media_segmentation` Durable Operation and immutable advisory
+freeze/silence evidence under `production.media_segmentation_evidence`. Migration `0021`
+extends only operation-kind membership and the kind-aware success requirement, adds
+segmentation-specific input/capability/result checks and separate evidence/interval tables,
+and preserves existing kinds' constraints. Reversal refuses any segmentation rows.
+
+The default-off CPU worker uses an explicit operator-installed LGPL FFmpeg, reusing the
+render identity check and refusing GPL/nonfree builds. Fixed v1 filters run in one pass,
+with local-file protocols, a demuxer allowlist, renewable leases and presence. The adapter
+keeps bounded numeric intervals and tool/profile lineage; raw diagnostics, content and
+paths are never persisted. Missing audio/video streams are optional mappings; absent
+streams do not contribute intervals. An input with no decodable streams fails normally.
+Malformed detector output fails, and more than 10,000 intervals is a typed failure.
+
+Fence checking, evidence insertion, attempt success and terminal result commit together.
+Ambiguous commits retain the lease for durable reconciliation. Registered Event assets
+lacking an operation are enqueued idempotently, at most 100 per enabled Demo cycle;
+explicit human backfill remains available. Authenticated asset and Session evidence reads
+use keyset pagination (1-10 evidence results, each bounded to 10,000 intervals). Session
+reads select currently associated assets and never change association or boundaries.
+The memory repository is a test double only; PostgreSQL remains the runtime authority.
+The owner's real-FFmpeg qualification and demo-database migration remain separate steps.
+
 ## Progressive approval automation
 
 Automation is policy-scoped by decision type, Event/deployment, and version. It is never

@@ -145,6 +145,13 @@ class PostgresMigrationRunner:
             "0020_event_render_setting_forward.sql", version="0020_event_render_setting",
         )
 
+        self.apply_media_segmentation_v1()
+
+    def apply_media_segmentation_v1(self) -> None:
+        self._execute_if_missing(
+            "0021_media_segmentation_forward.sql", version="0021_media_segmentation",
+        )
+
     def reverse_event_mode_kernel_v1(self) -> None:
         self.reverse_demo_vertical_slice_v1()
         self.reverse_transcription_worker_v1()
@@ -259,8 +266,14 @@ class PostgresMigrationRunner:
         )
 
     def reverse_event_render_setting_v1(self) -> None:
+        self.reverse_media_segmentation_v1()
         self._execute_if_present(
             "0020_event_render_setting_reverse.sql", version="0020_event_render_setting",
+        )
+
+    def reverse_media_segmentation_v1(self) -> None:
+        self._execute_if_present(
+            "0021_media_segmentation_reverse.sql", version="0021_media_segmentation",
         )
 
     def _execute(self, filename: str) -> None:

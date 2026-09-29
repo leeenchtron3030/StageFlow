@@ -138,3 +138,45 @@ facts are terminal `input_missing`; unavailable media resources are retryable.
 Definite apply-time storage failures use retryable `media_timing_storage_unavailable`.
 An ambiguous result commit leaves the attempt for reconciliation rather than recording
 a terminal failure.
+
+### Optional local media segmentation
+
+`[local_media_segmentation]` accepts `enabled` (default `false`) and `ffmpeg_path`.
+Omitting the section leaves segmentation disabled. Enabling it requires an absolute,
+external, local path to the operator-installed LGPL FFmpeg executable. PATH lookup,
+batch wrappers, links and repository-local executables are refused; GPL/nonfree builds
+are refused by the same identity check as rendering. No package installation is added.
+
+```toml
+[local_media_segmentation]
+enabled = false
+# When enabling, set ffmpeg_path to the operator-installed executable's absolute path.
+```
+
+Run `python -m app.demo.media_segmentation_worker --once` for one bounded batch, or omit
+`--once` to poll. `--concurrency` defaults to 2 (1-8); `--poll-seconds` defaults to 1
+(0.1-30). This CPU worker renews leases and presence during decoding and uses no network
+provider. Inspection is capped at one hour per attempt with bounded retries.
+
+When enabled, each Demo reconciliation cycle enqueues at most 100 registered Event
+assets without a segmentation operation, including assets registered before enablement.
+The explicit human backfill command is
+`POST /api/v1/media-segmentation/events/{event_id}/requests`, with `actor_id`,
+`authority_kind: "human"`, `confirmed: "confirmed"`, `limit` (1-100) and optional `after`.
+It returns operation IDs and `next_after`; replay reuses the same asset/manifest/profile
+work key. Operation reads use `GET .../events/{event_id}/operations` (1-100).
+Evidence reads use `GET .../assets/{asset_id}/evidence` or
+`GET .../sessions/{session_id}/evidence`, with `limit` (1-10, default 5) and optional
+`after` evidence ID. Each result is capped at 10,000 intervals and includes immutable
+profile/filter/tool lineage and `authorized_use: "advisory_only"`.
+All routes use the existing API authentication boundary.
+
+Typed failures reuse `render_identity_refused`, `input_missing`, `render_exit_nonzero`
+and `render_output_invalid`. Segmentation adds `media_segmentation_interval_limit`,
+`media_segmentation_timeout`, `media_segmentation_internal` and
+`media_segmentation_storage_unavailable`; ambiguous transaction completion raises
+`media_segmentation_commit_ambiguous` and leaves reconciliation to the durable substrate.
+Only bounded codes are recorded, never stderr, media content or paths. Interval-limit
+and malformed-output failures are terminal. Missing durable asset/manifest identity is
+terminal; unavailable media resources, nonzero exit, timeout and storage unavailability
+are retryable. No Session or automatic authority is added.

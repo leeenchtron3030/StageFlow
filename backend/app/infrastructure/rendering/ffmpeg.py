@@ -54,6 +54,26 @@ class EncodingResult:
     duration_microseconds: int
 
 
+def identify_ffmpeg(binary: Path) -> FFmpegIdentity:
+    try:
+        with safe_path(binary).open("rb") as handle:
+            digest = hashlib.file_digest(handle, "sha256").hexdigest()
+        result = subprocess.run([str(binary), "-nostdin", "-version"],
+                                capture_output=True, check=False, timeout=10,
+                                encoding="utf-8", errors="replace", shell=False)
+        lines = result.stdout.splitlines()
+        match = re.match(r"^ffmpeg version ([A-Za-z0-9][A-Za-z0-9._+~-]*)(?:\s|$)",
+                         lines[0] if lines else "")
+        configurations = [line for line in lines if line.startswith("configuration:")]
+        if (result.returncode or match is None or len(configurations) != 1
+                or any(flag in configurations[0]
+                       for flag in ("--enable-gpl", "--enable-nonfree"))):
+            raise RenderError(RenderReason.IDENTITY_REFUSED)
+        return FFmpegIdentity(match.group(1), digest)
+    except (OSError, subprocess.SubprocessError):
+        raise RenderError(RenderReason.IDENTITY_REFUSED) from None
+
+
 class FFmpegAdapter:
     def __init__(self, ffmpeg_path: Path, ffprobe: FFprobeAdapter) -> None:
         self.ffprobe = ffprobe
@@ -67,23 +87,7 @@ class FFmpegAdapter:
             raise RenderError(RenderReason.IDENTITY_REFUSED) from None
 
     def _identify(self) -> FFmpegIdentity:
-        try:
-            with safe_path(self.binary).open("rb") as handle:
-                digest = hashlib.file_digest(handle, "sha256").hexdigest()
-            result = subprocess.run([str(self.binary), "-nostdin", "-version"],
-                                    capture_output=True, check=False, timeout=10,
-                                    encoding="utf-8", errors="replace", shell=False)
-            lines = result.stdout.splitlines()
-            match = re.match(r"^ffmpeg version ([A-Za-z0-9][A-Za-z0-9._+~-]*)(?:\s|$)",
-                             lines[0] if lines else "")
-            configurations = [line for line in lines if line.startswith("configuration:")]
-            if (result.returncode or match is None or len(configurations) != 1
-                    or any(flag in configurations[0]
-                           for flag in ("--enable-gpl", "--enable-nonfree"))):
-                raise RenderError(RenderReason.IDENTITY_REFUSED)
-            return FFmpegIdentity(match.group(1), digest)
-        except (OSError, subprocess.SubprocessError):
-            raise RenderError(RenderReason.IDENTITY_REFUSED) from None
+        return identify_ffmpeg(self.binary)
 
     def nvenc_available(self) -> bool:
         try:
