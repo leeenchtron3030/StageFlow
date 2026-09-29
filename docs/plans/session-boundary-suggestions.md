@@ -809,6 +809,12 @@ This is useful on its own: v2 and v3 already use cue lists for support and tie-b
 
 ### Proposed preset catalog v1 (English; contents for owner review)
 
+> **Superseded by a research-backed proposal (2026-09-29):**
+> [Cue phrase catalog v1](../ux/cue-phrase-catalog.md). It has event profiles, 20
+> groups and the roles `start`, `end`, `changeover` and `segment`. It includes measured
+> precision on the conference corpus and sources for every other phrase. The table below
+> is kept as the originally approved outline.
+
 | Preset | Role | Example phrases |
 | --- | --- | --- |
 | General introduction (MC) | start | please welcome, welcome to the stage, give it up for, please join me in welcoming, our next speaker, without further ado |

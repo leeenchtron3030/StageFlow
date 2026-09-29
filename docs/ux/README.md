@@ -51,6 +51,9 @@ surfaces need their own specifications before they are added to this index.
   exact Draft v0.1; Assembly, Packaging Asset, and automation decisions remain gated.
 - [Producer Sessions & Work Queue](producer-sessions-work-queue.md) — exact Draft v0.1;
   no Sessions/Work Queue frontend or supporting capability is implemented.
+- [Cue phrase catalog v1](cue-phrase-catalog.md) — Draft v0.1 (2026-09-29); proposed
+  preset phrase groups and event profiles for boundary cue lists (ADR-0034 Phase 2d-1),
+  with corpus-measured precision and sources; not implemented.
 
 ### Editorial
 
