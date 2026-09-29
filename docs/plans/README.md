@@ -157,5 +157,5 @@ or architecture document unless those documents are explicitly updated.
 | [Render profile v3: audio](render-profile-v3-audio.md) | Completed - Green render profile v3 (audio); Run 003 found and fixed an audio-length defect | StageFlow Rendering / Backend / Frontend | ADR-0032 amendment 4A; ED-0098 |
 | [Render quality chosen per Event](event-render-quality.md) | Completed - per-Event render quality; Run 004 passed (320 kbit/s audio undershoots, labelled "up to") | StageFlow Rendering / Backend / Frontend | ADR-0032 amendment 4B; ED-0099 |
 | [Render quality UX follow-ups](render-quality-ux-follow-ups.md) | Completed - render quality UX follow-ups | StageFlow Frontend | ED-0099 UX checkpoint; Run 004; ED-0100 |
-| [Producer Work Queue: Assembly approval items](work-queue-assembly-approval-items.md) | Approved | StageFlow Backend | Capability layer Work Queue; ED-0068 deferral; ED-0101 |
+| [Producer Work Queue: Assembly approval items](work-queue-assembly-approval-items.md) | Completed - Work Queue Assembly approval items | StageFlow Backend | Capability layer Work Queue; ED-0068 deferral; ED-0101 |
 | [Repository cleanup 2026-09-28](repository-cleanup-2026-09-28.md) | Approved | StageFlow Docs / Frontend | Open follow-ups; ED-0100 review; ED-0102 |

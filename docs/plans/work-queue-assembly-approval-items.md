@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved (2026-09-28).
+Completed (2026-09-28).
 
 ## Execution authority
 
@@ -154,13 +154,13 @@ stateless, and replaying the same cursor returns the same page while state is un
 
 ## Acceptance criteria
 
-- [ ] Assembly approval items appear exactly for current, valid, non-stale, undecided
+- [x] Assembly approval items appear exactly for current, valid, non-stale, undecided
   revisions, with the specified fields and priority.
-- [ ] Mixed-source ordering, pagination and truncation are correct and deterministic.
+- [x] Mixed-source ordering, pagination and truncation are correct and deterministic.
   Kernel-only behaviour is unchanged.
-- [ ] The Kernel does not depend on Assembly, and there is no migration or frontend
+- [x] The Kernel does not depend on Assembly, and there is no migration or frontend
   change.
-- [ ] All required checks pass on the host.
+- [x] All required checks pass on the host.
 
 ## Rollback or reversal
 
@@ -168,11 +168,33 @@ Revert the code. There is no data change.
 
 ## Completion record
 
-- Implemented revision:
-- Files and migrations actually changed:
-- Commands and tests actually run:
-- Results and warnings:
-- Execution authority used:
-- Approved deviations:
-- Rollback status:
-- Remaining work:
+- **Implemented revision:** branch `codex/ed-0101-work-queue-assembly`. Codex implemented
+  it and the owner committed it.
+- **Files changed:**
+  - `api/v1/work_queue.py`: Literal values; the service; 503 also for Assembly storage;
+  - the Assembly repository port, memory and PostgreSQL (the bounded pending-approval
+    read);
+  - new `contexts/assembly/work_queue.py` (the projection);
+  - new `contexts/production/work_queue.py` (the merge service);
+  - two additive enum values in the Kernel `contracts.py`;
+  - the capability-layer row;
+  - new `tests/test_work_queue_assembly.py` and `tests/test_work_queue_assembly_postgres.py`.
+  - No migration, frontend or dependency change.
+- **Tests (host):** full backend suite **2,703 passed, 0 failed, 2 skipped**. Ruff and
+  Pyright clean. The existing Kernel Work Queue tests are unchanged.
+  - One gate rerun, on a slow host, hit a PostgreSQL connection timeout in an existing
+    Kernel Work Queue test. That test passed alone, and the final full run on the
+    committed tree passed, with the same counts as above.
+- **Execution authority:** Green.
+- **Review:** `directive-reviewer` returned APPROVE, with no blocking findings.
+  - Its owner fix: the import-boundary test now asserts that it found the Kernel files,
+    so it cannot pass vacuously.
+  - Recorded for later, both optional:
+    - the Assembly repository port imports the Kernel Work Queue contract; returning
+      `SessionAssembly` plus the Stage would be cleaner;
+    - the PostgreSQL read runs a few queries per revision, which is bounded and fine at
+      demo scale.
+- **Deviations:** none.
+- **Rollback:** revert the code; there is no data change.
+- **Remaining work:** none. The Work Queue frontend stays out of scope until its UX
+  specification is accepted.

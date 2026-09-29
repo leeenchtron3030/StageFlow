@@ -1,8 +1,13 @@
 """Non-durable test repository. Inputs are supplied snapshots, never a runtime fallback."""
 from collections.abc import Callable
 from dataclasses import replace
+from heapq import nsmallest
 from threading import RLock
 
+from app.contexts.production.event_mode_kernel.contracts import (
+    ProducerWorkQueuePosition,
+    ProducerWorkQueueSubject,
+)
 from app.shared.ids import EntityId
 
 from .contracts import ApprovalState, CommandIdentity, nonnegative, validate_page
@@ -23,6 +28,7 @@ from .session_contracts import (
 )
 from .session_repository import AssemblyConflictError, AssemblyNotFoundError
 from .timing_reader import AssemblyTimingReader
+from .work_queue import assembly_work_queue_subject, validate_work_queue_limit
 
 
 class InMemorySessionAssemblyRepository:
@@ -212,3 +218,48 @@ class InMemorySessionAssemblyRepository:
             return AssemblyPage(tuple(items), len(history),
                                 items[-1].revision.revision_number
                                 if len(selected) > limit else None)
+
+    def list_pending_approvals(
+        self, event_id: EntityId, *, after: ProducerWorkQueuePosition | None = None,
+        limit: int = 50,
+    ) -> tuple[ProducerWorkQueueSubject, ...]:
+        validate_work_queue_limit(limit)
+        if after is not None and after.priority > 5:
+            return ()
+        with self._lock:
+            cursor = None if after is None else (
+                after.priority, after.updated_at, after.projection_id,
+            )
+            def key(revision: AssemblyRevision):
+                return (5, revision.created_at, f"assembly:{revision.session_id}")
+
+            approved = frozenset(c.revision.id for c in self._candidates()
+                                 if c.approval_state == ApprovalState.APPROVED)
+            items: list[ProducerWorkQueueSubject] = []
+            while len(items) < limit:
+                # Bound candidate hydration even when many earlier candidates are stale.
+                page = nsmallest(limit, (
+                    history[-1] for history in self._revisions.values() if history
+                    and history[-1].event_id == event_id
+                    and history[-1].validation.state == "valid"
+                    and not any(d.revision_id == history[-1].id
+                                for d in self._decisions.get(history[-1].session_id, ()))
+                    and (cursor is None or key(history[-1]) > cursor)
+                ), key=key)
+                if not page:
+                    break
+                for revision in page:
+                    inputs = self._resolved_inputs(revision.session_id)
+                    subject = assembly_work_queue_subject(SessionAssembly(
+                        revision, revision.revision_number, is_stale(
+                            revision, inputs.package_revision, approved, inputs.metadata,
+                        ), ApprovalState.UNREVIEWED, 0, None,
+                    ), stage_id=inputs.stage_id)
+                    if subject is not None:
+                        items.append(subject)
+                        if len(items) == limit:
+                            break
+                cursor = key(page[-1])
+                if len(page) < limit:
+                    break
+            return tuple(items)

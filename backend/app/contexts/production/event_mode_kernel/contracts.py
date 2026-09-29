@@ -69,11 +69,13 @@ class ProducerWorkDecisionType(StrEnum):
     PACKAGE_CORRECTION_REQUIRED = "package_correction_required"
     ASSOCIATION_UNRESOLVED = "association_unresolved"
     ASSOCIATION_CONFLICT = "association_conflict"
+    ASSEMBLY_APPROVAL_PENDING = "assembly_approval_pending"
 
 
 class ProducerWorkSubjectKind(StrEnum):
     SESSION_PACKAGE = "session_package"
     MEDIA_ASSOCIATION = "media_association"
+    SESSION_ASSEMBLY = "session_assembly"
 
 
 class HumanCommandKind(StrEnum):
