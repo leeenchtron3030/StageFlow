@@ -11,8 +11,10 @@ from .contracts import (
     AssetInput,
     Candidate,
     CandidateV2,
+    CandidateV3,
     EdgeKind,
     Reference,
+    ScheduleOffsetSource,
     Span,
     Strength,
 )
@@ -56,6 +58,9 @@ def asset(value: dict[str, Any]) -> AssetInput:
 
 def candidate_document(x: Candidate) -> dict[str, Any]:
     return {
+        **({"schedule_offset_seconds": x.schedule_offset_seconds,
+            "schedule_offset_source": x.schedule_offset_source.value}
+           if isinstance(x, CandidateV3) else {}),
         "expectation_id": None if x.expectation is None else x.expectation.id.value,
         "expectation_revision": None if x.expectation is None else x.expectation.revision,
         "suggested_start": x.span.start, "suggested_end": x.span.end,
@@ -74,7 +79,12 @@ def candidate_document(x: Candidate) -> dict[str, Any]:
 
 
 def candidate(x: dict[str, Any]) -> Candidate:
-    candidate_type = CandidateV2 if x.get("policy_version") == "2" else Candidate
+    candidate_type = (CandidateV3 if x.get("policy_version") == "3"
+                      else CandidateV2 if x.get("policy_version") == "2" else Candidate)
+    offset: dict[str, Any] = ({
+        "schedule_offset_seconds": x["schedule_offset_seconds"],
+        "schedule_offset_source": ScheduleOffsetSource(x["schedule_offset_source"]),
+    } if x.get("policy_version") == "3" else {})
     return candidate_type(
         None if x["expectation_id"] is None else Reference(
             EntityId(str(x["expectation_id"])), x["expectation_revision"]),
@@ -86,4 +96,5 @@ def candidate(x: dict[str, Any]) -> Candidate:
         tuple(TimingQualification(q) for q in x["timing_qualifications"]),
         references(x["timing_references"]), tuple(EntityId(str(i)) for i in x["segmentation_ids"]),
         references(x["transcript_references"]),
+        **offset,
     )

@@ -22,7 +22,12 @@ from app.contexts.production.session_suggestions.contracts import (
     InputSnapshot,
     Policy,
     PolicyV2,
+    PolicyV3,
     Reference,
+    ScheduleBlock,
+    ScheduleOffsetEntry,
+    ScheduleOffsetSetting,
+    ScheduleOffsetSource,
     SessionSuggestion,
     SkipCounts,
     Span,
@@ -101,6 +106,65 @@ class PostgresSuggestionTransaction:
 
     def lock_event(self, event_id: EntityId) -> None:
         self._lock("event:" + event_id.value)
+
+    def _offset(self, row: Row) -> ScheduleOffsetSetting:
+        entries = self.connection.execute(
+            """SELECT effective_from, offset_seconds FROM stageflow.stage_schedule_offset_entry
+               WHERE event_id=%s AND stage_id=%s AND version=%s ORDER BY ordinal""",
+            (row["event_id"], row["stage_id"], row["version"]),
+        ).fetchall()
+        return ScheduleOffsetSetting(
+            EntityId(str(row["event_id"])), EntityId(str(row["stage_id"])), row["version"],
+            EntityId(str(row["command_id"])), row["request_digest"], EntityId(str(row["set_by"])),
+            row["set_at"], tuple(ScheduleOffsetEntry(**e) for e in entries),
+        )
+
+    def current_offset(self, event_id: EntityId, stage_id: EntityId
+                       ) -> ScheduleOffsetSetting | None:
+        row = self.connection.execute(
+            """SELECT * FROM stageflow.stage_schedule_offset_setting
+               WHERE event_id=%s AND stage_id=%s ORDER BY version DESC LIMIT 1""",
+            (event_id.value, stage_id.value),
+        ).fetchone()
+        return None if row is None else self._offset(row)
+
+    def replay_offset(self, command_id: EntityId, digest: str) -> ScheduleOffsetSetting | None:
+        self._lock("offset_command:" + command_id.value)
+        row = self.connection.execute(
+            "SELECT * FROM stageflow.stage_schedule_offset_setting WHERE command_id=%s",
+            (command_id.value,),
+        ).fetchone()
+        if row is not None and row["request_digest"] != digest:
+            raise SuggestionConflictError("schedule_offset_command_id_conflict")
+        return None if row is None else self._offset(row)
+
+    def save_offset(self, setting: ScheduleOffsetSetting) -> None:
+        self.connection.execute(
+            """INSERT INTO stageflow.stage_schedule_offset_setting
+               (event_id, stage_id, version, command_id, request_digest,
+                set_by, set_at, entry_count)
+               VALUES (%s,%s,%s,%s,%s,%s,%s,%s)""",
+            (setting.event_id.value, setting.stage_id.value, setting.version,
+             setting.command_id.value, setting.request_digest, setting.set_by.value,
+             setting.set_at, len(setting.entries)),
+        )
+        for ordinal, entry in enumerate(setting.entries):
+            self.connection.execute(
+                """INSERT INTO stageflow.stage_schedule_offset_entry
+                   (event_id, stage_id, version, ordinal, effective_from, offset_seconds)
+                   VALUES (%s,%s,%s,%s,%s,%s)""",
+                (setting.event_id.value, setting.stage_id.value, setting.version, ordinal,
+                 entry.effective_from, entry.offset_seconds),
+            )
+
+    def offset_history(self, event_id: EntityId, stage_id: EntityId, after: int,
+                       limit: int) -> tuple[ScheduleOffsetSetting, ...]:
+        rows = self.connection.execute(
+            """SELECT * FROM stageflow.stage_schedule_offset_setting
+               WHERE event_id=%s AND stage_id=%s AND version>%s ORDER BY version LIMIT %s""",
+            (event_id.value, stage_id.value, after, limit),
+        ).fetchall()
+        return tuple(self._offset(r) for r in rows)
 
     def decision_scope(self, event_id: EntityId, stage_id: EntityId) -> None:
         self.lock_event(event_id)
@@ -190,7 +254,21 @@ class PostgresSuggestionTransaction:
                    FROM stageflow.session_suggestion_run WHERE stage_id=r.stage_id)""",
             (digest,),
         ).fetchone()
-        return None if row is None else _run(row)
+        if row is None:
+            return None
+        blocks: tuple[ScheduleBlock, ...] = ()
+        if row["policy_version"] == "3":
+            rows = self.connection.execute(
+                """SELECT * FROM stageflow.session_suggestion_run_block
+                   WHERE run_id=%s ORDER BY ordinal""",
+                (row["run_id"],),
+            ).fetchall()
+            blocks = tuple(ScheduleBlock(
+                r["ordinal"], r["first_planned_start"], r["last_planned_start"], r["talk_count"],
+                r["schedule_offset_seconds"], ScheduleOffsetSource(r["schedule_offset_source"]),
+                r["estimate_score_margin"], r["override_setting_version"],
+            ) for r in rows)
+        return _run(row, blocks)
 
     def save_run(self, run: SuggestionRun, suggestions: tuple[SessionSuggestion, ...]) -> None:
         self.connection.execute(
@@ -199,8 +277,8 @@ class PostgresSuggestionTransaction:
                 expectation_references, asset_inputs, start_cue_list_id, start_cue_list_version,
                 end_cue_list_id, end_cue_list_version, policy_id, policy_version, policy_constants,
                 no_timing_evidence, no_segmentation, clock_implausible,
-                no_coverage, no_planned_time)
-               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                no_coverage, no_planned_time, override_setting_version, block_count)
+               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
             (run.id.value, run.event_id.value, run.stage_id.value,
              run.input_digest, run.actor_id.value,
              run.created_at, Jsonb([reference_document(r) for r in run.expectations]),
@@ -210,8 +288,20 @@ class PostgresSuggestionTransaction:
              None if run.end_cue_list is None else run.end_cue_list.id.value,
              None if run.end_cue_list is None else run.end_cue_list.revision,
              run.policy.id, run.policy.version, Jsonb(asdict(run.policy)),
-             *asdict(run.skips).values()),
+             *asdict(run.skips).values(), run.override_setting_version, len(run.blocks)),
         )
+        for block in run.blocks:
+            self.connection.execute(
+                """INSERT INTO stageflow.session_suggestion_run_block
+                   (run_id, event_id, stage_id, ordinal, first_planned_start, last_planned_start,
+                    talk_count, schedule_offset_seconds, schedule_offset_source,
+                    estimate_score_margin, override_setting_version)
+                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                (run.id.value, run.event_id.value, run.stage_id.value, block.ordinal,
+                 block.first_planned_start, block.last_planned_start, block.talk_count,
+                 block.schedule_offset_seconds, block.schedule_offset_source.value,
+                 block.estimate_score_margin, block.override_setting_version),
+            )
         for suggestion in suggestions:
             doc = serde.candidate_document(suggestion.candidate)
             doc.update(suggestion_id=suggestion.id.value, run_id=run.id.value,
@@ -282,7 +372,7 @@ _STATUS_SQL = """SELECT s.*, CASE
     LEFT JOIN stageflow.session_suggestion_decision d USING(suggestion_id)"""
 
 
-def _run(row: Row) -> SuggestionRun:
+def _run(row: Row, blocks: tuple[ScheduleBlock, ...] = ()) -> SuggestionRun:
     return SuggestionRun(
         EntityId(str(row["run_id"])), EntityId(str(row["event_id"])),
         EntityId(str(row["stage_id"])),
@@ -294,7 +384,9 @@ def _run(row: Row) -> SuggestionRun:
         None if row["end_cue_list_id"] is None else Reference(
             EntityId(str(row["end_cue_list_id"])), row["end_cue_list_version"]),
         SkipCounts(**{k: row[k] for k in SkipCounts.__dataclass_fields__}),
-        (PolicyV2 if row["policy_version"] == "2" else Policy)(**row["policy_constants"]),
+        {"1": Policy, "2": PolicyV2, "3": PolicyV3}[row["policy_version"]](
+            **row["policy_constants"]),
+        blocks, row.get("override_setting_version"),
     )
 
 

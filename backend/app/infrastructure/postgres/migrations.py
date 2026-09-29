@@ -166,6 +166,14 @@ class PostgresMigrationRunner:
             version="0023_session_suggestions_policy_v2",
         )
 
+        self.apply_session_suggestions_policy_v3()
+
+    def apply_session_suggestions_policy_v3(self) -> None:
+        self._execute_if_missing(
+            "0024_session_suggestions_policy_v3_forward.sql",
+            version="0024_session_suggestions_policy_v3",
+        )
+
     def reverse_event_mode_kernel_v1(self) -> None:
         self.reverse_demo_vertical_slice_v1()
         self.reverse_transcription_worker_v1()
@@ -298,9 +306,16 @@ class PostgresMigrationRunner:
         )
 
     def reverse_session_suggestions_policy_v2(self) -> None:
+        self.reverse_session_suggestions_policy_v3()
         self._execute_if_present(
             "0023_session_suggestions_policy_v2_reverse.sql",
             version="0023_session_suggestions_policy_v2",
+        )
+
+    def reverse_session_suggestions_policy_v3(self) -> None:
+        self._execute_if_present(
+            "0024_session_suggestions_policy_v3_reverse.sql",
+            version="0024_session_suggestions_policy_v3",
         )
 
     def _execute(self, filename: str) -> None:

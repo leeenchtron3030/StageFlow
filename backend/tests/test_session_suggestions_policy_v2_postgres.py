@@ -107,7 +107,9 @@ def test_registry_forward_reverse_order_and_sql_are_available(
     monkeypatch.setattr(PostgresMigrationRunner, "_execute_if_present", record)
     runner = PostgresMigrationRunner("unused")
     runner.apply_session_suggestions_v1()
-    assert applied == ["0022_session_suggestions", "0023_session_suggestions_policy_v2"]
+    assert applied == ["0022_session_suggestions", "0023_session_suggestions_policy_v2",
+                       "0024_session_suggestions_policy_v3"]
     applied.clear()
     runner.reverse_session_suggestions_v1()
-    assert applied == ["0023_session_suggestions_policy_v2", "0022_session_suggestions"]
+    assert applied == ["0024_session_suggestions_policy_v3", "0023_session_suggestions_policy_v2",
+                        "0022_session_suggestions"]

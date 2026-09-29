@@ -2,6 +2,7 @@
 from dataclasses import dataclass, fields
 from datetime import UTC, datetime
 from enum import StrEnum
+from math import isfinite
 
 from app.contexts.editorial.derivation_contracts import TimingQualification
 from app.contexts.events import ProgramExpectation
@@ -80,6 +81,108 @@ class PolicyV2(Policy):
 
 
 POLICY_V2 = PolicyV2()
+
+
+@dataclass(frozen=True, slots=True)
+class PolicyV3(PolicyV2):
+    version: str = "3"
+    block_gap_seconds: int = 1200
+    offset_limit_seconds: int = 3600
+    offset_grid_seconds: int = 60
+    offset_refine_seconds: int = 10
+    offset_support_seconds: int = 180
+    offset_penalty_seconds: int = 600
+    offset_gate_per_talk: int = 6
+
+
+POLICY_V3 = PolicyV3()
+
+
+class ScheduleOffsetSource(StrEnum):
+    PRODUCER = "producer"
+    ESTIMATED = "estimated"
+    NONE = "none"
+
+
+@dataclass(frozen=True, slots=True)
+class ScheduleOffsetEntry:
+    effective_from: datetime
+    offset_seconds: int
+
+    def __post_init__(self) -> None:
+        require_aware_datetime(self.effective_from, "effective_from")
+        object.__setattr__(self, "effective_from", self.effective_from.astimezone(UTC))
+        if type(self.offset_seconds) is not int or not -7200 <= self.offset_seconds <= 7200:
+            raise ValueError("schedule offset must be an integer between -7200 and 7200")
+
+
+def validate_offset_entries(entries: tuple[ScheduleOffsetEntry, ...]) -> None:
+    if len(entries) > 20:
+        raise ValueError("at most 20 schedule offset entries")
+    if any(a.effective_from >= b.effective_from
+           for a, b in zip(entries, entries[1:], strict=False)):
+        raise ValueError("schedule offset entries must have strictly increasing effective_from")
+
+
+@dataclass(frozen=True, slots=True)
+class ScheduleOffsetSetting:
+    event_id: EntityId
+    stage_id: EntityId
+    version: int
+    command_id: EntityId
+    request_digest: str
+    set_by: EntityId
+    set_at: datetime
+    entries: tuple[ScheduleOffsetEntry, ...]
+
+    def __post_init__(self) -> None:
+        require_aware_datetime(self.set_at, "set_at")
+        object.__setattr__(self, "entries", tuple(self.entries))
+        validate_offset_entries(self.entries)
+        if type(self.version) is not int or not 1 <= self.version <= MAX_COUNT:
+            raise ValueError("schedule offset version out of bounds")
+        if len(self.request_digest) != 64 or any(c not in "0123456789abcdef"
+                                                for c in self.request_digest):
+            raise ValueError("invalid schedule offset request digest")
+
+
+@dataclass(frozen=True, slots=True)
+class ScheduleBlock:
+    ordinal: int
+    first_planned_start: datetime
+    last_planned_start: datetime
+    talk_count: int
+    schedule_offset_seconds: int
+    schedule_offset_source: ScheduleOffsetSource
+    estimate_score_margin: float
+    override_setting_version: int | None = None
+
+    def __post_init__(self) -> None:
+        for name in ("first_planned_start", "last_planned_start"):
+            require_aware_datetime(getattr(self, name), name)
+        if (type(self.ordinal) is not int or not 0 <= self.ordinal < MAX_INPUTS
+                or type(self.talk_count) is not int or not 1 <= self.talk_count <= MAX_INPUTS
+                or self.last_planned_start < self.first_planned_start):
+            raise ValueError("invalid schedule block")
+        validate_schedule_offset(self.schedule_offset_seconds, self.schedule_offset_source)
+        if (not isfinite(self.estimate_score_margin)
+                or not 0 <= self.estimate_score_margin <= 600000):
+            raise ValueError("estimate score margin out of bounds")
+        if ((self.schedule_offset_source == ScheduleOffsetSource.PRODUCER)
+                != (self.override_setting_version is not None)):
+            raise ValueError("producer block requires override setting version")
+        if self.override_setting_version is not None and (
+                type(self.override_setting_version) is not int
+                or not 1 <= self.override_setting_version <= MAX_COUNT):
+            raise ValueError("override setting version out of bounds")
+
+
+def validate_schedule_offset(seconds: int, source: ScheduleOffsetSource) -> None:
+    if (type(seconds) is not int or not -7200 <= seconds <= 7200
+            or source not in tuple(ScheduleOffsetSource)
+            or source == ScheduleOffsetSource.NONE and seconds != 0
+            or source == ScheduleOffsetSource.ESTIMATED and abs(seconds) > 3600):
+        raise ValueError("invalid schedule offset components")
 
 
 @dataclass(frozen=True, slots=True)
@@ -191,12 +294,35 @@ class CandidateV2(Candidate):
 
 
 @dataclass(frozen=True, slots=True)
+class CandidateV3(CandidateV2):
+    schedule_offset_seconds: int = 0
+    schedule_offset_source: ScheduleOffsetSource = ScheduleOffsetSource.NONE
+
+    def __post_init__(self) -> None:
+        CandidateV2.__post_init__(self)
+        validate_schedule_offset(self.schedule_offset_seconds, self.schedule_offset_source)
+        if self.expectation is None and (
+                self.schedule_offset_seconds != 0
+                or self.schedule_offset_source != ScheduleOffsetSource.NONE):
+            raise ValueError("unscheduled suggestions require zero offset and source none")
+
+
+@dataclass(frozen=True, slots=True)
 class PolicyResult:
     candidates: tuple[Candidate, ...]
     skips: SkipCounts
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "candidates", tuple(self.candidates))
+
+
+@dataclass(frozen=True, slots=True)
+class PolicyResultV3(PolicyResult):
+    blocks: tuple[ScheduleBlock, ...] = ()
+
+    def __post_init__(self) -> None:
+        PolicyResult.__post_init__(self)
+        object.__setattr__(self, "blocks", tuple(self.blocks))
 
 
 @dataclass(frozen=True, slots=True)
@@ -213,13 +339,24 @@ class SuggestionRun:
     end_cue_list: Reference | None
     skips: SkipCounts
     policy: Policy = POLICY_V1
+    blocks: tuple[ScheduleBlock, ...] = ()
+    override_setting_version: int | None = None
 
     def __post_init__(self) -> None:
         require_aware_datetime(self.created_at, "created_at")
         object.__setattr__(self, "expectations", tuple(self.expectations))
         object.__setattr__(self, "assets", tuple(self.assets))
-        if self.policy not in (POLICY_V1, POLICY_V2):
+        object.__setattr__(self, "blocks", tuple(self.blocks))
+        if self.policy not in (POLICY_V1, POLICY_V2, POLICY_V3):
             raise ValueError("unsupported suggestion policy")
+        if self.policy != POLICY_V3 and (self.blocks or self.override_setting_version is not None):
+            raise ValueError("schedule offset lineage requires v3")
+        if tuple(b.ordinal for b in self.blocks) != tuple(range(len(self.blocks))):
+            raise ValueError("schedule block ordinals must be contiguous")
+        if any(b.override_setting_version is not None
+               and b.override_setting_version != self.override_setting_version
+               for b in self.blocks):
+            raise ValueError("schedule block override version must match run")
 
 
 @dataclass(frozen=True, slots=True)

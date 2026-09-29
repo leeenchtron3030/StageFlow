@@ -895,20 +895,35 @@ claims.
 ## Session Suggestions core (ED-0104)
 
 The production-layer `session_suggestions` context implements the approved ADR-0034
-Phase 2/2b policy and human run/confirm/reject workflow. It reads Stage Program Expectations,
+Phase 2/2b/2c policy and human run/confirm/reject workflow. It reads Stage Program Expectations,
 latest active Media Timing Evidence, segmentation intervals and optional latest complete
 transcripts. ED-0092 phrase matching supplies optional boundary cues without Editorial
 candidate creation. Versioned constants and first-class components explain every result;
 unqualified recorder timing remains explicitly labelled.
 
-New runs use `boundary-suggestion` v2: freezes >=60 s, gaps >=30 s and coverage
+New runs use `boundary-suggestion` v3 with v2 alignment: freezes >=60 s, gaps >=30 s and coverage
 bounds are weighted by length and silence, then jointly aligned to planned talks by a
 monotone dynamic program. Shared changeovers count once; plan distance and cue support
-contribute to the score. Candidates stay within +/-20 min. Schedule fallbacks keep their
-planned times and are exempt from monotonicity; any resulting overlaps are explicit and
-weak. v1 remains intact for recorded runs and evaluation. Migration
+contribute to the score. Candidates stay within +/-20 min of the shifted plan. Schedule
+fallbacks keep shifted planned times and are exempt from monotonicity; resulting overlaps
+are explicit and weak. v1/v2 remain intact for recorded runs and evaluation. Migration
 `0023_session_suggestions_policy_v2` enforces exact constants per version and permits
 v2's inclusive 60-second minimum; its reverse refuses while v2 rows exist.
+
+v3 divides the printed plan at gaps >=20 min and applies one offset per block: producer
+override, else a gated changeover-support estimate over +/-60 min, else zero. The estimate
+uses a 60 s grid and 10 s refinement, 180 s linear support, an absolute-offset penalty
+of 1 point per 600 s, and a gain gate of 6 points per talk. Exact rational scoring and
+deterministic ties preserve replay. Start/end offsets remain relative to the printed plan;
+new components report the schedule offset and source without raising strength.
+
+The Event/Stage-scoped override is append-only and command-idempotent, with 0..20 entries,
+strictly increasing planned-time effective timestamps and integer offsets within +/-2 h.
+An empty version clears it. The latest entry effective at a block's first printed start
+wins; earlier blocks still estimate. Run digests include the setting version. Migration
+`0024_session_suggestions_policy_v3` enforces exact v3 constants, versioned components,
+immutable blocks and setting history, with reversal refused while a v3 run or setting
+exists. No Program Expectation, Session or Kernel fact is changed by an override.
 
 Migration `0022_session_suggestions` adds immutable runs, suggestions and decisions.
 Status derives from run order and decisions. The PostgreSQL adapter binds the unchanged
@@ -918,13 +933,16 @@ decision is inserted last. Failure rolls back all three writes. Event Stage lock
 confirmation against concurrent human starts; expectation locks pin the revision check.
 The memory repository is only a transactional test double.
 
-Authenticated Event-scoped API routes start runs, page/read suggestions and accept human
-confirm/reject commands. No UI, Work Queue item, boundary proposal producer, automatic
+Authenticated Event-scoped API routes start runs, page/read suggestions, set/read Stage
+schedule offsets and page their history, and accept human confirm/reject commands.
+Run responses include block provenance; v3 suggestions include offset seconds/source.
+No UI, Work Queue item, boundary proposal producer, automatic
 authority, new dependency or runtime setting is added. Phase 3 boundary proposals,
 Phase 4 producer surfaces and Phase 5 corpus accuracy qualification remain future work.
 A pure anonymous interval evaluator and local-file CLI have been pulled forward: recall,
 median/p95 start/end error and both-edges-within-60-second counts are numeric aggregates.
-Synthetic tests prove the metrics; the owner's Accuracy Run 002 remains separate.
+Synthetic tests prove the metrics; the evaluator is unchanged for the owner's Accuracy
+Run 003. Corpus drift models and real-event data remain outside the repository.
 See the [context README](../../backend/app/contexts/production/session_suggestions/README.md)
 for policy, bounds and transaction details. Synthetic tests establish contract behavior;
 they do not qualify recorder clocks or production-event readiness.
