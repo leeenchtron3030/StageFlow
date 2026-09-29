@@ -37,7 +37,8 @@ policy v2) is detailed below (2026-09-29), after the early accuracy check. After
 | 3. Boundary proposals for realized Sessions | The same policy produces `session_boundary_proposal` rows (existing table) for confirmed Sessions | none expected |
 | 4. Producer surfaces | Work Queue item "confirm presentation" (additive), and suggestion review on Session Detail and Mission Control under the owner's scanning rule; UX checkpoint | none |
 | 2c. Policy v3, schedule offset (ED-0106, Completed) | Per-block schedule offset (estimated or producer override) before v2 alignment; Stage offset override setting | `0024` |
-| 2d. Transcript cues as edges, phrase presets (outline) | 2d-1 preset catalog and composition of cue lists; 2d-2 policy v4 with `cue` edges | to be detailed |
+| 2d-1. Cue phrase presets and composition (ED-0107 backend, ED-0108 Event page; Approved) | Built-in catalog v1, human composition command publishing the Event's start and end cue lists, runs default to them, Event page section | `0025` |
+| 2d-2. Transcript cues as edges (outline) | Policy v4 with `cue` edges | to be detailed |
 | 5. Validation harness and Run 001 | Replay the ground-truth corpus (outside the repo) and measure recall, precision and start/end error against the ADR target; sanitized result | none |
 
 ## Phase 1: media segmentation evidence (ED-0103)
@@ -871,6 +872,272 @@ as support for **both** edges of a shared changeover.
 - **Validation:** an accuracy run of v4 against v3 on the transcribed corpus, with the
   default presets and no tuning to the corpus. A studio-preset check needs a studio
   corpus, which does not exist yet; synthetic tests only until then.
+
+## Phase 2d-1: cue phrase presets and composition (ED-0107 backend, ED-0108 Event page)
+
+### Status
+
+- **Approved** (owner, 2026-09-29), including decisions D1–D3 as proposed.
+- **Execution authority:** Green and implementation-ready. ED-0107 first; ED-0108 after
+  ED-0107 merges.
+- **Content authority:** the accepted
+  [Cue phrase catalog v1](../ux/cue-phrase-catalog.md), and the owner decisions recorded
+  there on 2026-09-29.
+
+### Why
+
+- Boundary cue lists feed Session suggestions. Today they give cue support and
+  tie-breaks in v3; later, cue edges in v4.
+- Producers currently have to hand-type literal phrase lists through the ED-0092 API,
+  with no defaults, and pass the list IDs on every run.
+- The accepted catalog gives research-backed defaults: 11 event profiles, 17 groups and
+  3 regional add-ons, with corpus-measured precision.
+- Composition turns that into two published cue lists, and records how they were made.
+
+### Verified current behavior
+
+- **Phrase lists (ED-0092):** `editorial_phrase_list` is Event-scoped. Each list has a
+  key and a version, and each published version gets a new `phrase_list_id` (`0019`).
+  - Contract: `EditorialPhraseList` in `contexts/editorial/derivation_contracts.py`,
+    which allows 1–200 phrases of 1–100 characters and rejects normalized duplicates.
+  - Publishing is a human, idempotent command (`derivation_service.py`,
+    `POST /editorial/events/{event_id}/phrase-lists`).
+- **Matching:** literal whole-token sequences within one transcript segment
+  (`contexts/editorial/derivation.py::match_phrases`).
+- **Suggestion runs** accept optional `start_cue_list` and `end_cue_list` references
+  (`api/v1/session_suggestions.py`, `RunBody`). With none given, no cues are used. The
+  lists are part of the run input digest and lineage (ED-0104).
+- **Event page:** it has one producer settings section, render quality
+  (`frontend/app/event/page.tsx`, `components/event-render-quality.tsx`, ED-0099/0100).
+  It follows the pattern of per-capability same-origin proxy routes with allowlists
+  (`capability-proxy.server.ts`, D1 in `producer-outputs-ui.md`).
+- **Session suggestions** have no frontend route or proxy capability yet (Phase 4).
+
+### Desired behavior
+
+**Catalog (in code, read-only)**
+
+- The **Boundary cue catalog** is `boundary-cue-catalog` version `1`. It is a pure,
+  immutable Python constant in `contexts/production/session_suggestions/`.
+- **Content:** exactly the non-deferred v1 content of the accepted catalog document:
+  - 11 profiles, 17 groups and 3 regional add-ons. Worship and ceremonies are **not**
+    shipped.
+  - Each group has a key, a version (`1`), a name, a category and phrases.
+  - Each phrase has its literal text, a role (`start`, `end`, `changeover` or
+    `segment`), a default flag (`true`, or `false` for opt-in ⚠ phrases) and its evidence
+    label from the document.
+  - Each profile has a key, a name and its pre-ticked group keys.
+- **Templates:** `take {n}` and `scene {n}` expand at build time for n = 1–20, both as
+  digits and as words ("take 3", "take three").
+- **Validation at import:**
+  - group and profile keys are unique;
+  - every phrase passes the `EditorialPhraseList` phrase rules;
+  - there are no normalized duplicates within a group;
+  - every profile refers only to existing groups.
+- **Catalog digest:** SHA-256 over a canonical serialization. It is recorded in every
+  composition as provenance.
+- The *Excluded from v1* phrases are not in the catalog. Producers can add them as custom
+  phrases.
+
+**Composition (human command, Event-scoped, versioned)**
+
+- **Inputs:**
+  - the catalog version;
+  - an optional profile key, for provenance only;
+  - the ticked group keys;
+  - `include` choices, which are opt-in phrases (group and phrase) to add;
+  - `exclude` choices, which are default phrases (group and phrase) to remove;
+  - custom phrases, each with a role;
+  - the actor, and a command ID.
+- **Deterministic result:**
+  1. Take each ticked group's default phrases, plus included opt-ins, minus exclusions,
+     plus custom phrases.
+  2. Merge phrases that normalize to the same tokens. A merged phrase takes the **union
+     of its roles**: a phrase that is `start` in one group and `end` in another behaves
+     as `changeover`.
+  3. **Start cue list** = `start` and `changeover` phrases. **End cue list** = `end` and
+     `changeover` phrases. Each list is ordered by first appearance in catalog order,
+     then custom order.
+  4. `segment` phrases are stored with the composition and are **not** published (owner
+     decision). A custom phrase may not use the `segment` role in v1.
+- **Validation:**
+  - Every referenced group, and every include or exclude choice, must exist in the
+    stated catalog version, and a choice must match that phrase's default flag.
+  - Custom phrases follow the phrase rules.
+  - Each published list must have 1–200 phrases. Otherwise the command is refused with
+    `cue_list_empty` or `cue_list_too_large` and a count. Nothing is ever truncated.
+- **Publishing:** in one transaction, all or nothing:
+  - a new version of each of two ED-0092 phrase lists, with the reserved keys
+    `boundary-cues-start` and `boundary-cues-end`;
+  - one composition record that references both, with first-class provenance: catalog
+    ID, version and digest; profile; groups and their versions; include and exclude
+    choices; custom phrases with roles; segment phrases with their sources; composed by;
+    composed at.
+- **Idempotency:** `command_id` plus `request_digest`, as for the ED-0099 settings. The
+  same command replays; a different body with the same command ID is refused.
+- **History:** append-only and immutable. The latest version is the Event's **current
+  composition**.
+
+**Suggestion runs use the current composition by default**
+
+- When a run names **neither** cue list and the Event has a current composition, the run
+  uses that composition's two published lists.
+- When the run names any list, the named lists are used exactly as today, with no
+  mixing.
+- The lists used are recorded in the run, and are already part of its input digest.
+
+**API** (authenticated, bounded, following ED-0104 conventions)
+
+- read the catalog;
+- create a composition;
+- read the current composition and its history;
+- run responses already carry the cue-list references they used.
+
+**Event page (ED-0108)**
+
+- A new **Boundary cue phrases** section, following the owner's scanning rule and the
+  render-quality pattern (ED-0099/0100).
+- **Summary first,** for example: "Conference stage · 4 groups · 38 start / 31 end
+  phrases · composed Tue 14:05". Or "Not set up: suggestions run without cues".
+- **Editing:**
+  - pick a profile, which pre-ticks its groups;
+  - groups are shown by category with their phrase counts;
+  - an aggregate view by role, where each phrase shows a source badge and an evidence
+    badge;
+  - remove a phrase, add an opt-in phrase (marked ⚠), or add a custom phrase with a
+    role;
+  - live counts against the 200 limit;
+  - publish with a confirmation.
+- **Details (collapsed):** version history, the composing actor and ID, and the catalog
+  version.
+- **Proxy:** a new `session-suggestions` proxy capability, with an allowlist of the
+  catalog and composition routes only.
+- **Owner UX checkpoint**, with screenshots, before merge.
+
+### Decisions (owner approval of this section approves the proposed defaults)
+
+- **D1. Reserved list keys:** the ED-0092 publish command refuses the keys
+  `boundary-cues-start` and `boundary-cues-end`, so manual publishes cannot mix into
+  composed lists.
+  - This is a small, additive restriction on an existing API. No existing data uses
+    these keys: the migration checks, and refuses if any rows exist.
+  - Alternative: allow manual publishes to those keys. Rejected, because it breaks
+    provenance.
+- **D2. Run default:** use the composition only when a run names no list (proposed).
+  - Alternative: fill in each missing list separately. Rejected as confusing.
+- **D3. Delivery:** two directives. ED-0107 is the backend: catalog, composition,
+  migration `0025`, API and run default. ED-0108 is the Event page, with the UX
+  checkpoint.
+
+### In scope
+
+- **ED-0107:**
+  1. The catalog constant, its validation and digest, plus the template expansion.
+  2. The composition domain, service and repository, with migration `0025`: composition
+     header and child tables, immutable triggers, the reserved-key check, and a guarded
+     reverse.
+  3. The composition API, and the catalog read API.
+  4. The reserved-key refusal in the ED-0092 publish command.
+  5. The run default.
+  6. Tests.
+  7. Docs: the context README, the capability layer, and glossary entries for **boundary
+     cue catalog**, **cue phrase group**, **event profile** and **boundary cue
+     composition**, including the roles.
+- **ED-0108:**
+  1. The Event page section.
+  2. The proxy capability and allowlist.
+  3. Frontend tests.
+  4. The UX checkpoint record in `docs/ux/operator-feedback.md`.
+
+### Out of scope
+
+- Cue edges (policy v4, Phase 2d-2).
+- Segment use of `segment` phrases.
+- Editorial derivation using composed lists (boundary use only, by owner decision).
+- Deferred groups: worship and ceremonies.
+- Languages other than English.
+- Automatic re-runs when a composition changes.
+
+### Constraints
+
+- No dependency. Pure, deterministic composition. Aware timestamps.
+- No real-event data in tests. The catalog phrases are generic language, not event
+  content.
+- Existing ED-0092 phrase lists, derivation runs and suggestion runs stay valid and
+  readable. Explicitly named cue lists behave exactly as today.
+- White-label.
+- The UI never exposes evidence counts as guarantees. The evidence badge says
+  "measured on one conference" or "from published scripts".
+
+### Data and migration (`0025`)
+
+- New tables:
+  - `boundary_cue_composition`: Event, version, command ID and digest, catalog ID,
+    version and digest, profile key, the start and end phrase-list ID and version,
+    composed by and at;
+  - child tables for groups, choices, custom phrases and segment phrases.
+- All of them are append-only, with immutable triggers (the `0020` pattern).
+- The forward migration **refuses** if any `editorial_phrase_list` row already uses a
+  reserved key (D1).
+- The reverse refuses while any composition exists, and otherwise drops exactly the
+  additions.
+- **Demo database:** back up with `pg_dump` before applying. The owner must authorize
+  explicitly.
+
+### Test strategy
+
+- **Catalog:**
+  - the exact group and profile keys, and the phrase counts per group, match the
+    accepted document;
+  - deferred groups are absent;
+  - template expansion gives 40 `take` and 40 `scene` phrases;
+  - the import validation rejects each malformed case;
+  - the digest is stable.
+- **Composition:**
+  - profile defaults;
+  - include and exclude;
+  - custom phrases;
+  - a role union that makes a phrase `changeover`;
+  - normalized dedupe across groups;
+  - segment phrases stored but not published;
+  - the 200 limit and the empty-list refusal;
+  - unknown group or phrase choices refused;
+  - deterministic ordering;
+  - idempotent replay, and a digest conflict;
+  - atomicity: a failure after the first list insert leaves nothing.
+- **Runs:**
+  - no named lists plus a current composition uses the composed lists;
+  - named lists are unchanged;
+  - no composition means no cues, as today;
+  - the input digest changes with the composition.
+- **ED-0092:** the reserved keys are refused, and other keys are unchanged.
+- **PostgreSQL:** `0025` forward and reverse, both guards, and rolled-back fixtures.
+- **Frontend (ED-0108):**
+  - rendering from fixtures;
+  - selection and aggregate logic;
+  - limit counters;
+  - the proxy allowlist;
+  - `npm run test`, `build`, `lint` and `typecheck`.
+- **Quality gate:** the full host backend suite, Ruff, Pyright, and `git diff --check`.
+
+### Acceptance criteria
+
+- [ ] ED-0107: the catalog matches the accepted document. Composition, API, run default,
+  reserved keys and `0025` are implemented, and all checks pass on the host.
+- [ ] ED-0108: the Event page section works end to end against a local backend. The
+  owner UX checkpoint passes.
+- [ ] **Owner step, Cue Run 001:**
+  - Compose the *Conference stage* profile. Run the Run 003 harness for v3 with the
+    composed lists, against v3 with the untuned Run 002 lists.
+  - Report recall and median errors for the whole-day and two-part models.
+  - The composed lists must be **no worse** than the untuned lists on any reported
+    target.
+
+### Rollback
+
+- Revert the code.
+- Reverse `0025` only while no composition exists.
+- Published phrase-list versions are ordinary ED-0092 rows and stay readable.
 
 ## Ground-truth corpus handling (all phases)
 
