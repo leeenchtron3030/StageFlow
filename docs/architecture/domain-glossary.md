@@ -589,6 +589,32 @@ not-event-ready disclaimer retain their meaning.
 Do not resolve these terms through incidental code naming. Record the decision first and
 then plan compatibility for documentation, contracts, storage, and APIs.
 
+## Boundary cue vocabulary
+
+- **Boundary cue catalog:** the immutable, code-defined `boundary-cue-catalog` v1,
+  containing the accepted English phrases, evidence labels and defaults. Its canonical
+  SHA-256 digest identifies the exact content used by a composition. It ships 18 groups,
+  three regional add-ons and 11 profiles; ceremonies and worship remain deferred.
+- **Cue phrase group:** a versioned bundle of literal phrases with a display name and
+  category. A selected group contributes its defaults, adjusted by explicit opt-in
+  inclusions and default exclusions. Regional add-ons are never pre-selected by profiles.
+- **Event profile:** a named starter selection of group keys. The composition command
+  records the optional profile as provenance; the submitted group selection controls
+  the result. Profiles do not constrain producers to one event type.
+- **Boundary cue composition:** an immutable Event-scoped version recording the human
+  actor/time, command/digest, catalog identity/digest, selected group versions, choices,
+  custom phrases, stored segment phrases and both published phrase-list references.
+  The latest version is current. Publication commits both lists and provenance together.
+- **Cue roles:** `start` supports the beginning of a Session; `end` supports its ending;
+  `changeover` supports both sides of a handoff between Sessions; `segment` marks content
+  inside a Session, including studio takes. Segment phrases retain their source groups
+  but are not published as Session-edge cues. Custom phrases cannot use `segment` in v1.
+  Matching equivalent start/end phrases merges their roles into changeover behavior.
+
+These terms describe advisory inputs only. They grant no Session or editorial authority.
+The reserved `boundary-cues-start` and `boundary-cues-end` lists retain ordinary
+ED-0092 list identity/version semantics, with manual publication to these keys refused.
+
 ## Media Segmentation Evidence
 
 Immutable advisory freeze and silence intervals for one Completed Media Asset and one

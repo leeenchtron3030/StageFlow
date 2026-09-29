@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from contextlib import ExitStack, nullcontext
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import LiteralString, cast
 
@@ -8,11 +9,24 @@ import psycopg
 from psycopg import sql
 
 
+@dataclass
+class _ReversalTransaction:
+    """Open lazily so migration registration remains independent of a database."""
+    stack: ExitStack
+    connection: psycopg.Connection | None = None
+
+    def borrow(self, dsn: str) -> nullcontext[psycopg.Connection]:
+        if self.connection is None:
+            self.connection = self.stack.enter_context(psycopg.connect(dsn))
+        return nullcontext(self.connection)
+
+
 @dataclass(frozen=True, slots=True)
 class PostgresMigrationRunner:
     """Explicit forward/reversal runner for the bounded StageFlow schema."""
 
     dsn: str
+    _reversal: _ReversalTransaction | None = field(default=None, repr=False, compare=False)
 
     def apply_ingress_v1(self) -> None:
         self._execute("0001_ingress_forward.sql")
@@ -174,6 +188,13 @@ class PostgresMigrationRunner:
             version="0024_session_suggestions_policy_v3",
         )
 
+        self.apply_boundary_cue_composition_v1()
+
+    def apply_boundary_cue_composition_v1(self) -> None:
+        self._execute_if_missing(
+            "0025_boundary_cue_composition_forward.sql", version="0025_boundary_cue_composition",
+        )
+
     def reverse_event_mode_kernel_v1(self) -> None:
         self.reverse_demo_vertical_slice_v1()
         self.reverse_transcription_worker_v1()
@@ -313,9 +334,19 @@ class PostgresMigrationRunner:
         )
 
     def reverse_session_suggestions_policy_v3(self) -> None:
+        # If 0024's existing guard refuses, retain 0025 too. The running v3
+        # application requires both, even when no composition has been published.
+        with ExitStack() as stack:
+            runner = replace(self, _reversal=_ReversalTransaction(stack))
+            runner.reverse_boundary_cue_composition_v1()
+            runner._execute_if_present(
+                "0024_session_suggestions_policy_v3_reverse.sql",
+                version="0024_session_suggestions_policy_v3",
+            )
+
+    def reverse_boundary_cue_composition_v1(self) -> None:
         self._execute_if_present(
-            "0024_session_suggestions_policy_v3_reverse.sql",
-            version="0024_session_suggestions_policy_v3",
+            "0025_boundary_cue_composition_reverse.sql", version="0025_boundary_cue_composition",
         )
 
     def _execute(self, filename: str) -> None:
@@ -342,7 +373,9 @@ class PostgresMigrationRunner:
         statement = (
             Path(__file__).with_name("sql").joinpath(filename).read_text(encoding="utf-8")
         )
-        with psycopg.connect(self.dsn) as connection:
+        scope = (psycopg.connect(self.dsn) if self._reversal is None
+                 else self._reversal.borrow(self.dsn))
+        with scope as connection:
             existing = connection.execute(
                 "SELECT 1 FROM stageflow.schema_migration WHERE version = %s",
                 (version,),

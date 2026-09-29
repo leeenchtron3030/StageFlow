@@ -946,3 +946,33 @@ Run 003. Corpus drift models and real-event data remain outside the repository.
 See the [context README](../../backend/app/contexts/production/session_suggestions/README.md)
 for policy, bounds and transaction details. Synthetic tests establish contract behavior;
 they do not qualify recorder clocks or production-event readiness.
+
+### Boundary cue presets and composition
+
+The Phase 2d-1 backend ships `boundary-cue-catalog` v1: 11 profiles, 18 phrase groups
+and three regional add-ons from the accepted content document. Immutable phrases retain
+literal text, start/end/changeover/segment roles, defaults and evidence labels; studio
+take/scene templates expand to digits and English words. Import validation and a
+canonical SHA-256 digest protect catalog identity. Evidence counts describe the source
+measurement, not a quality guarantee for another event.
+
+A human Event-scoped composition command selects groups and per-phrase choices, merges
+normalized token duplicates with role union, and appends custom start/end/changeover
+phrases. Catalog order then custom order determines first appearance. Segment phrases
+are stored with source groups for future work and excluded from published lists.
+Empty lists and lists over 200 phrases are refused with counts; nothing is truncated.
+
+The command atomically publishes new versions of the two reserved ED-0092 lists and
+their first-class provenance. Manual publishing refuses the reserved keys; ordinary
+lists and derivations keep their existing behavior. Migration `0025` provides immutable
+composition history and child membership, a pre-existing-reserved-key guard and a reverse
+that refuses recorded compositions. Command ID/request digest supports exact replay;
+the highest version is current. Authenticated catalog, publish, current and bounded
+history routes live under the existing session-suggestions Event router.
+
+Runs naming neither cue list default to both lists from the current composition. Any
+explicit list preserves the previous behavior without mixing in a default. The actual
+references are frozen in run lineage/digests and exposed in responses. No composition
+means no default cues; changing composition triggers no run. This adds no Kernel,
+confirmation, policy, automatic authority, dependency or runtime configuration change.
+The Event page remains a separate frontend directive.

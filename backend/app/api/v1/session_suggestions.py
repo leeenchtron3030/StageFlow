@@ -9,7 +9,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
 from app.bootstrap.event_mode_kernel import KernelComponents
-from app.contexts.editorial.repository import EditorialMomentNotFoundError
+from app.contexts.editorial.repository import (
+    EditorialMomentConflictError,
+    EditorialMomentNotFoundError,
+)
 from app.contexts.production.event_mode_kernel.repository import (
     KernelConflictError,
     KernelNotFoundError,
@@ -26,6 +29,15 @@ from app.contexts.production.session_suggestions.contracts import (
     SuggestionStatus,
     SuggestionStorageUnavailableError,
 )
+from app.contexts.production.session_suggestions.cue_catalog import BOUNDARY_CUE_CATALOG, CueRole
+from app.contexts.production.session_suggestions.cue_composition import (
+    CompositionRequest,
+    CueListSizeError,
+    CustomPhrase,
+    PhraseChoice,
+    composition_document,
+)
+from app.contexts.production.session_suggestions.cue_service import BoundaryCueService
 from app.contexts.production.session_suggestions.serialization import candidate_document
 from app.contexts.production.session_suggestions.service import SessionSuggestionService
 from app.infrastructure.postgres.session_suggestion_repository import PostgresSuggestionRepository
@@ -76,6 +88,29 @@ class OffsetBody(HumanBody):
     entries: tuple[OffsetEntryBody, ...] = Field(max_length=20)
 
 
+class PhraseChoiceBody(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    group_key: str = Field(min_length=1, max_length=100)
+    phrase: str = Field(min_length=1, max_length=100)
+
+
+class CustomPhraseBody(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    text: str = Field(min_length=1, max_length=100)
+    role: Literal["start", "end", "changeover"]
+
+
+class CompositionBody(HumanBody):
+    command_id: UUID
+    catalog_version: int = Field(strict=True, ge=1, le=2_147_483_647)
+    profile_key: str | None = Field(default=None, min_length=1, max_length=100)
+    group_keys: tuple[Annotated[str, Field(min_length=1, max_length=100)], ...] = Field(
+        max_length=20)
+    include: tuple[PhraseChoiceBody, ...] = Field(default=(), max_length=400)
+    exclude: tuple[PhraseChoiceBody, ...] = Field(default=(), max_length=400)
+    custom_phrases: tuple[CustomPhraseBody, ...] = Field(default=(), max_length=400)
+
+
 def service(request: Request) -> SessionSuggestionService:
     components = getattr(request.app.state, "kernel", None)
     if not isinstance(components, KernelComponents):
@@ -92,10 +127,12 @@ def _call[T](action: Callable[[], T]) -> T:
         return action()
     except (SuggestionNotFoundError, KernelNotFoundError, EditorialMomentNotFoundError) as exc:
         raise HTTPException(404, str(exc)) from None
-    except (SuggestionConflictError, KernelConflictError) as exc:
+    except (SuggestionConflictError, KernelConflictError, EditorialMomentConflictError) as exc:
         raise HTTPException(409, str(exc)) from None
     except (SuggestionStorageUnavailableError, KernelStorageUnavailableError):
         raise HTTPException(503, "postgresql_unavailable") from None
+    except CueListSizeError as exc:
+        raise HTTPException(422, {"code": exc.code, "role": exc.role, "count": exc.count}) from None
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from None
 
@@ -130,7 +167,46 @@ def run(event_id: UUID, stage_id: UUID, body: RunBody, svc: Service) -> dict[str
             "actor_id": result.actor_id.value, "created_at": result.created_at,
             "policy": asdict(result.policy), "skips": asdict(result.skips),
             "blocks": [asdict(b) for b in result.blocks],
+            "start_cue_list": None if result.start_cue_list is None else {
+                "id": result.start_cue_list.id.value, "version": result.start_cue_list.revision},
+            "end_cue_list": None if result.end_cue_list is None else {
+                "id": result.end_cue_list.id.value, "version": result.end_cue_list.revision},
             "override_setting_version": result.override_setting_version}
+
+
+@router.get("/boundary-cue-catalog")
+def cue_catalog(event_id: UUID) -> dict[str, object]:
+    return {**asdict(BOUNDARY_CUE_CATALOG), "digest": BOUNDARY_CUE_CATALOG.digest}
+
+
+@router.post("/boundary-cues")
+def compose_cues(event_id: UUID, body: CompositionBody, svc: Service) -> dict[str, object]:
+    return composition_document(_call(lambda: BoundaryCueService(svc.repository, svc.clock).publish(
+        event_id=EntityId(str(event_id)), actor_id=EntityId(str(body.actor_id)),
+        command_id=EntityId(str(body.command_id)), authority_kind=body.authority_kind,
+        request=CompositionRequest(
+            body.catalog_version, body.group_keys, body.profile_key,
+            tuple(PhraseChoice(c.group_key, c.phrase) for c in body.include),
+            tuple(PhraseChoice(c.group_key, c.phrase) for c in body.exclude),
+            tuple(CustomPhrase(c.text, CueRole(c.role)) for c in body.custom_phrases)),
+    )))
+
+
+@router.get("/boundary-cues")
+def current_cues(event_id: UUID, svc: Service) -> dict[str, object]:
+    value = _call(lambda: BoundaryCueService(svc.repository, svc.clock).current(
+        EntityId(str(event_id))))
+    return {"current": None if value is None else composition_document(value)}
+
+
+@router.get("/boundary-cues/history")
+def cue_history(event_id: UUID, svc: Service,
+                after: Annotated[int, Query(ge=0, le=2_147_483_647)] = 0,
+                limit: Annotated[int, Query(ge=1, le=100)] = 50) -> dict[str, object]:
+    values, cursor = _call(lambda: BoundaryCueService(svc.repository, svc.clock).history(
+        EntityId(str(event_id)), after=after, limit=limit))
+    return {"items": [composition_document(v) for v in values],
+            "limit": limit, "next_after": cursor}
 
 
 def _offset(value: ScheduleOffsetSetting) -> dict[str, object]:

@@ -811,7 +811,7 @@ This is useful on its own: v2 and v3 already use cue lists for support and tie-b
 ### Proposed preset catalog v1 (English; contents for owner review)
 
 > **Superseded by the accepted research-backed catalog (2026-09-29):**
-> [Cue phrase catalog v1](../ux/cue-phrase-catalog.md). Accepted by the owner (v1: 11 event profiles, 17
+> [Cue phrase catalog v1](../ux/cue-phrase-catalog.md). Accepted by the owner (v1: 11 event profiles, 18
 > groups plus 3 regional add-ons; worship and ceremonies deferred), and the roles `start`, `end`, `changeover` and `segment`. It includes measured
 > precision on the conference corpus and sources for every other phrase. The table below
 > is kept as the originally approved outline.
@@ -890,7 +890,7 @@ as support for **both** edges of a shared changeover.
   tie-breaks in v3; later, cue edges in v4.
 - Producers currently have to hand-type literal phrase lists through the ED-0092 API,
   with no defaults, and pass the list IDs on every run.
-- The accepted catalog gives research-backed defaults: 11 event profiles, 17 groups and
+- The accepted catalog gives research-backed defaults: 11 event profiles, 18 groups and
   3 regional add-ons, with corpus-measured precision.
 - Composition turns that into two published cue lists, and records how they were made.
 
@@ -920,7 +920,8 @@ as support for **both** edges of a shared changeover.
 - The **Boundary cue catalog** is `boundary-cue-catalog` version `1`. It is a pure,
   immutable Python constant in `contexts/production/session_suggestions/`.
 - **Content:** exactly the non-deferred v1 content of the accepted catalog document:
-  - 11 profiles, 17 groups and 3 regional add-ons. Worship and ceremonies are **not**
+  - 11 profiles, 18 groups (incl. `studio.setups`, added from the ED-0107 review) and
+    3 regional add-ons. Worship and ceremonies are **not**
     shipped.
   - Each group has a key, a version (`1`), a name, a category and phrases.
   - Each phrase has its literal text, a role (`start`, `end`, `changeover` or

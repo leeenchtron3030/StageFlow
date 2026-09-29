@@ -8,6 +8,7 @@ from threading import RLock
 from typing import cast
 
 from app.contexts.editorial.derivation import match_phrases
+from app.contexts.editorial.derivation_contracts import EditorialPhraseList
 from app.contexts.editorial.derivation_memory import InMemoryEditorialDerivationRepository
 from app.contexts.production.event_mode_kernel.repository import InMemoryEventModeKernelRepository
 from app.contexts.production.event_mode_kernel.service import DurableEventModeKernel
@@ -26,6 +27,7 @@ from .contracts import (
     SuggestionRun,
     SuggestionStatus,
 )
+from .cue_composition import BoundaryCueComposition
 from .repository import SuggestionTransaction
 
 
@@ -39,23 +41,65 @@ class InMemorySuggestionRepository:
         self.suggestions: dict[EntityId, SessionSuggestion] = {}
         self.decisions: dict[EntityId, SuggestionDecision] = {}
         self.offsets: dict[EntityId, ScheduleOffsetSetting] = {}
+        self.compositions: dict[EntityId, BoundaryCueComposition] = {}
 
     @contextmanager
     def transaction(self, clock: Clock) -> Generator[SuggestionTransaction]:
         # The existing memory Kernel is a test double with immutable values. Retain
         # its collections under its own lock to simulate the SQL unit of work.
-        with cast(RLock, vars(self.kernel_repository)["_lock"]):
+        with (cast(RLock, vars(self.kernel_repository)["_lock"]),
+              self.editorial.transaction()):
             kernel_state = {k: copy(v) for k, v in vars(self.kernel_repository).items()
                             if k != "_lock"}
             state = (self.runs.copy(), self.suggestions.copy(),
-                     self.decisions.copy(), self.offsets.copy())
+                     self.decisions.copy(), self.offsets.copy(), self.compositions.copy())
             self.kernel = DurableEventModeKernel(repository=self.kernel_repository, clock=clock)
             try:
                 yield self
             except BaseException:
                 vars(self.kernel_repository).update(kernel_state)
-                self.runs, self.suggestions, self.decisions, self.offsets = state
+                (self.runs, self.suggestions, self.decisions, self.offsets,
+                 self.compositions) = state
                 raise
+
+    def cue_event_scope(self, event_id: EntityId) -> None:
+        if event_id not in cast(dict[EntityId, object], vars(self.kernel_repository)["_events"]):
+            raise SuggestionNotFoundError("event_not_found")
+
+    def current_composition(self, event_id: EntityId) -> BoundaryCueComposition | None:
+        values = [v for v in self.compositions.values() if v.event_id == event_id]
+        return max(values, key=lambda v: v.version, default=None)
+
+    def replay_composition(self, command_id: EntityId, digest: str
+                           ) -> BoundaryCueComposition | None:
+        value = self.compositions.get(command_id)
+        if value is not None and value.request_digest != digest:
+            raise SuggestionConflictError("cue_composition_command_id_conflict")
+        return value
+
+    def publish_cue_list(self, value: EditorialPhraseList) -> EditorialPhraseList:
+        self.cue_event_scope(value.event_id)
+        prior = next((p for p in self.editorial.phrases.values()
+                      if p.event_id == value.event_id and p.key == value.key), None)
+        if prior is not None:
+            value = replace(value, id=prior.id)
+        if (value.id, value.version) in self.editorial.phrases:
+            raise SuggestionConflictError("phrase_list_version_exists")
+        self.editorial.phrases[value.id, value.version] = value
+        return value
+
+    def save_composition(self, value: BoundaryCueComposition) -> None:
+        if value.command_id in self.compositions or any(
+                v.event_id == value.event_id and v.version == value.version
+                for v in self.compositions.values()):
+            raise SuggestionConflictError("cue_composition_exists")
+        self.compositions[value.command_id] = value
+
+    def composition_history(self, event_id: EntityId, after: int, limit: int
+                            ) -> tuple[BoundaryCueComposition, ...]:
+        return tuple(sorted((v for v in self.compositions.values()
+                             if v.event_id == event_id and v.version > after),
+                            key=lambda v: v.version))[:limit]
 
     def scope(self, event_id: EntityId, stage_id: EntityId) -> None:
         if all(s.id != stage_id for s in self.kernel_repository.list_stages(event_id)):

@@ -491,10 +491,11 @@ def test_migration_registration_order(monkeypatch: pytest.MonkeyPatch) -> None:
                        "0018_assembly_timing_evidence", "0019_derived_editorial_candidates",
                        "0020_event_render_setting", "0021_media_segmentation",
                        "0022_session_suggestions", "0023_session_suggestions_policy_v2",
-                       "0024_session_suggestions_policy_v3"]
+                       "0024_session_suggestions_policy_v3", "0025_boundary_cue_composition"]
     applied.clear()
     runner.reverse_packaging_asset_foundation_v1()
-    assert applied == ["0024_session_suggestions_policy_v3", "0023_session_suggestions_policy_v2",
+    assert applied == ["0025_boundary_cue_composition", "0024_session_suggestions_policy_v3",
+                       "0023_session_suggestions_policy_v2",
                         "0022_session_suggestions",
                         "0021_media_segmentation",
                         "0020_event_render_setting",

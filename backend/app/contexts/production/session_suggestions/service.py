@@ -50,6 +50,11 @@ class SessionSuggestionService:
         with self.repository.transaction(self.clock) as tx:
             tx.lock_event(event_id)
             tx.scope(event_id, stage_id)
+            if start_cue_list is None and end_cue_list is None:
+                composition = tx.current_composition(event_id)
+                if composition is not None:
+                    start_cue_list = composition.start_cue_list
+                    end_cue_list = composition.end_cue_list
             inputs = tx.snapshot(event_id, stage_id, start_cue_list, end_cue_list)
             override = tx.current_offset(event_id, stage_id)
             digest = human_command_digest({
