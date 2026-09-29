@@ -2,8 +2,8 @@
 
 ## Status
 
-Approved (2026-09-28). Phase 1 (ED-0103) is implementation-ready. Phases 2–5 are outlined
-here; each gets a detailed section, reviewed by the owner, before it starts.
+Approved (2026-09-28). Phase 1 (ED-0103) is complete. Phase 2 (ED-0104) is detailed below
+(2026-09-29). Phases 3–5 are outlined here; each gets a detailed section, reviewed by the owner, before it starts.
 
 ## Execution authority
 
@@ -136,6 +136,229 @@ and any change to media timing, rendering or transcription.
 ### Rollback
 
 Revert the code. Reverse `0021` only while no segmentation rows exist.
+
+## Phase 2: Session Suggestions core (ED-0104)
+
+### Verified current behavior
+
+- **Human Session realization:** the Kernel command `start_session(StartSessionRequest)`
+  takes the Event, Stage, actor, aware `authoritative_start`, an optional
+  `program_expectation_id` and an optional title. The end is set by
+  `correct_session_boundary(boundary_kind="end", …)`. Both are idempotent by operation ID
+  (`event_mode_kernel/service.py:187-215`).
+- **Program Expectations:** `list_program_expectations(event_id)` returns revisioned
+  records with an optional `stage_id`, `planned_start` and `planned_end` (aware), title,
+  speakers and lifecycle state (`events/kernel_contracts.py:172`). Withdrawn
+  expectations must not be selected for new realization (glossary).
+- **Timing:** each asset's Media Timing Evidence gives a derived
+  `creation_time_plus_duration` interval on the recorder clock, with a qualification. It
+  is advisory and currently unqualified (ADR-0027, ADR-0033). ED-0091 and ED-0092 already
+  place asset-relative offsets on that clock this way (`editorial/derivation_service.py`,
+  `place_match`).
+- **Segmentation:** ED-0103 stores per-asset freeze and silence intervals in integer
+  microseconds from the asset start, with profile lineage (`media_segmentation_evidence`).
+  [Segmentation Run 001](../validation/results/media-segmentation-001.md) observed that
+  changeovers can carry audio.
+- **Transcript cues:** ED-0092's `match_phrases` over the latest complete Transcription
+  Evidence and Event-scoped, versioned phrase lists (`editorial_phrase_list`).
+- **Real-corpus shape** (sanitized, from the decoded ground truth):
+  - title-card holds of about 1–2 minutes between talks, with brief freeze breaks;
+  - changeovers of 1–10 minutes;
+  - recorder stops around lunch;
+  - freezes of 4–7 s inside talks (static slides) with no matching silence.
+
+### Desired behavior
+
+**Suggestion run (human-invoked)**
+
+- A human starts a run for one Event and Stage, optionally naming a start-cue list and an
+  end-cue list (phrase list ID and version).
+- The run is idempotent by an input digest covering:
+  - the policy ID and version;
+  - the Stage's current Program Expectation IDs and revisions;
+  - the assets' timing-evidence IDs and revisions;
+  - the segmentation evidence IDs;
+  - the transcript revisions;
+  - the cue-list versions.
+- The run records bounded skip counts: `no_timing_evidence`, `no_segmentation`,
+  `clock_implausible`, `no_coverage` and `no_planned_time`.
+
+**Policy `boundary-suggestion` v1** (deterministic, pure, no model; constants are
+lineage)
+
+1. **Stage timeline:**
+   - each asset is placed on the recorder clock by its latest active timing evidence;
+   - recorder coverage is the union of placed assets;
+   - segmentation and cue offsets are mapped to absolute time the same way.
+2. **Clock plausibility:**
+   - an asset is used only if its placed interval overlaps the Stage's planned span (the
+     earliest planned start minus 12 h to the latest planned end plus 12 h);
+   - otherwise it is excluded and counted as `clock_implausible`, and never placed on
+     another day;
+   - if no Program Expectation has planned times, every asset with timing evidence is
+     used, and only unscheduled suggestions (step 7) can result.
+3. **Changeovers:**
+   - freeze intervals separated by 15 s or less are merged;
+   - a merged freeze of at least 30 s is a changeover, and so is a coverage gap of at
+     least 30 s;
+   - the start and end of coverage are also changeover edges;
+   - silence overlap and nearby cue matches are recorded as supporting components, not
+     required.
+4. **Match each current, non-withdrawn Program Expectation with planned times,** in
+   planned order:
+   - suggested start = the changeover end nearest `planned_start` within ±20 min;
+   - suggested end = the changeover start nearest `planned_end` within ±20 min, and more
+     than 60 s after the start;
+   - when two edges fall within 60 s of each other, prefer the one with a supporting cue
+     (a start cue within −120/+180 s, an end cue within −180/+60 s), then the one nearest
+     the plan;
+   - with no edge in the window, fall back to the planned time clipped to coverage, with
+     edge kind `schedule`;
+   - with no coverage in the window, make no suggestion and count it as `no_coverage`.
+5. **Adjacent Program Expectations:**
+   - suggestions must not overlap;
+   - if two overlap and a changeover lies between them, the earlier ends at the
+     changeover start and the later begins at its end;
+   - otherwise both keep their times and are marked `overlap`.
+6. **Strength**, a categorical result derived from the components, with no numeric score:
+   - `strong`: both edges come from changeovers or coverage, and at least one edge has
+     silence or cue support;
+   - `medium`: both edges come from changeovers or coverage, with no support;
+   - `weak`: at least one edge comes from the schedule, or the suggestion is marked
+     `overlap`.
+7. **Unscheduled activity:** covered, non-changeover spans of at least 120 s that no
+   suggestion covers become suggestions with no Program Expectation and strength `weak`,
+   for example opening remarks.
+
+**Session Suggestion (advisory, immutable)**
+
+- Fields:
+  - run, Event and Stage;
+  - Program Expectation ID and revision, or none;
+  - suggested start and end (aware, on the recorder clock);
+  - components as first-class columns: start and end edge kind; offsets from the plan in
+    seconds; silence and cue support per edge; `overlap`; the timing qualification carried
+    from the evidence; strength;
+  - evidence references: segmentation evidence IDs, timing evidence IDs and revisions,
+    transcript revision IDs;
+  - policy ID and version.
+- Status is **derived**, not stored:
+  - `open` while it belongs to the latest run for its Stage and has no decision;
+  - `superseded` when a later run exists;
+  - otherwise `confirmed` or `rejected`, from its decision.
+
+**Decisions (human, idempotent by command ID with a request digest)**
+
+- **Confirm**, with optional human-adjusted start and end, where start must be before
+  end:
+  - calls the existing `start_session` with the Program Expectation link, the start, and
+    the expectation's title when there is one;
+  - then calls `correct_session_boundary` for the end;
+  - the Kernel operation IDs are derived deterministically from the confirm command ID
+    (UUIDv5), so a retry after a partial failure completes without duplicates;
+  - the decision row, which records the resulting Session ID and the times actually used,
+    is written last;
+  - only an `open` suggestion can be confirmed;
+  - a stale expectation revision, or a Session already linked to the same expectation, is
+    refused with a typed reason.
+- **Reject**, with a bounded reason: records the decision only.
+- Nothing is realized automatically. ADR-0026 stays inactive.
+
+**API** (authenticated, bounded, Event-scoped):
+
+- start a run;
+- list suggestions for a Stage by status (cursor, limit at most 100);
+- read one suggestion with its components;
+- confirm;
+- reject.
+
+### In scope
+
+1. Migration `0022`:
+   - `session_suggestion_run`, `session_suggestion` and `session_suggestion_decision`;
+   - immutable by trigger;
+   - a guarded reverse that refuses while rows exist.
+2. A new `session_suggestions` context in the production layer (not the Kernel):
+   - the pure policy and its contracts;
+   - the run, confirm and reject services;
+   - memory and PostgreSQL repositories.
+3. Reads of Program Expectations, assets, timing, segmentation and transcripts through
+   existing repositories and ports. Cue matching reuses ED-0092's `match_phrases`.
+4. The API routes.
+5. Tests: see Test strategy.
+6. Documentation:
+   - glossary terms Session Suggestion and Suggestion Run;
+   - the capability layer;
+   - a README for the context.
+
+### Out of scope
+
+- Boundary proposals for realized Sessions (Phase 3).
+- The Work Queue item and all UI (Phase 4).
+- The corpus harness and accuracy measurement (Phase 5).
+- Automatic realization, split or merge.
+- Title-card detection; changes to segmentation, timing, transcription or Kernel
+  semantics.
+
+### Constraints
+
+- The Kernel is unchanged and must not import the new context. Confirmation goes only
+  through the existing human commands.
+- The policy is pure and deterministic. Its constants are versioned lineage, and a
+  change needs a new policy version.
+- No dependency. Offline. Aware timestamps from the injected clock.
+- No real-event data in tests.
+- Suggestions from unqualified clocks are labelled as such.
+
+### Test strategy
+
+- **Policy, pure, with synthetic timelines:**
+  - a clean title-card changeover between two talks;
+  - brief freeze breaks merged;
+  - short in-talk freezes ignored;
+  - a changeover with audio (freeze only);
+  - a recording gap as the changeover;
+  - schedule drift of up to ±20 min;
+  - no edge in the window (schedule fallback, `weak`);
+  - no coverage (none, counted);
+  - overlap resolution at a shared changeover;
+  - unscheduled opening remarks;
+  - a cue tie-break;
+  - a clock years off (excluded, never placed);
+  - an expectation without planned times;
+  - withdrawn expectations ignored;
+  - determinism (same inputs, identical output).
+- **Service and repository:**
+  - run idempotency by input digest;
+  - skip counts;
+  - derived status transitions;
+  - confirm calls the Kernel commands with the expected arguments, creates exactly one
+    Session, and replays safely after a simulated crash between the Kernel commands and
+    the decision write;
+  - adjusted times;
+  - refusals: not open, stale expectation revision, expectation already realized;
+  - reject;
+  - immutability.
+- **PostgreSQL:** migration forward and reverse, including refusing while rows exist;
+  the repository; a transactional replay.
+- **API:** shapes, bounds, authentication, typed errors.
+- **Import boundary:** the Kernel does not import `session_suggestions`.
+- **Quality gate:** the full host backend suite, Ruff, Pyright, and `git diff --check`.
+  The real-corpus accuracy check is Phase 5.
+
+### Acceptance criteria
+
+- [ ] A run produces deterministic, lineage-complete suggestions and skip counts from
+  schedule, timing, segmentation and optional cues, following policy v1.
+- [ ] Confirm realizes exactly one Session through the existing human commands,
+  idempotently and crash-safely. Reject records a decision. Nothing is automatic.
+- [ ] Migration `0022` forward and reverse pass; the demo database is backed up before it
+  is applied. All checks pass on the host.
+
+### Rollback
+
+Revert the code. Reverse `0022` only while no suggestion rows exist. Sessions realized
+through confirmation are ordinary human-realized Sessions and stay.
 
 ## Ground-truth corpus handling (all phases)
 
