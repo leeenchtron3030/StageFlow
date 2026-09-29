@@ -2,7 +2,8 @@
 
 ## Status
 
-Approved (2026-09-28). Phase 1 (ED-0103) and Phase 2 (ED-0104) are complete. Phases 3–5 are outlined here; each gets a detailed section, reviewed by the owner, before it starts.
+Approved (2026-09-28). Phase 1 (ED-0103) and Phase 2 (ED-0104) are complete. Phase 2b (ED-0105,
+policy v2) is detailed below (2026-09-29), after the early accuracy check. Phases 3–5 are outlined here; each gets a detailed section, reviewed by the owner, before it starts.
 
 ## Execution authority
 
@@ -358,6 +359,131 @@ lineage)
 
 Revert the code. Reverse `0022` only while no suggestion rows exist. Sessions realized
 through confirmation are ordinary human-realized Sessions and stay.
+
+## Phase 2b: policy v2, joint day alignment (ED-0105)
+
+### Why
+
+- The owner requested an early check before Phase 3:
+  [early accuracy check 001](../validation/results/session-suggestions-accuracy-001.md).
+  It ran policy v1 on 28 real main-stage talks.
+- **v1 meets the target only with an exact schedule.** Median start and end errors are
+  15 s and 24 s at zero drift, 47 s and 66 s at ±5 min, and minutes beyond that.
+- The cause: long freezes inside talks outnumber real changeovers.
+  - in-talk freezes: median 56 s, silent share 0.00;
+  - boundary freezes: median 284 s, silent share 0.18.
+- A prototype of **joint day alignment** held median errors near 45 s up to ±15 min of
+  drift.
+- The freeze and gap evidence has a ceiling: only 44 of 56 true edges have any changeover
+  within 60 s. Transcript cues are the remaining lever.
+- **Owner decision (2026-09-29):** build policy v2 before Phase 3.
+
+### Desired behavior
+
+- **Policy `boundary-suggestion` v2** is deterministic, and its constants are versioned
+  lineage. **v1 stays readable** for recorded runs, and new runs use v2. The following are
+  unchanged from v1:
+  - the timeline placement and clock-plausibility rules (±12 h);
+  - the merge gap of 15 s or less;
+  - the minimum Session of 60 s;
+  - the unscheduled span of at least 120 s;
+  - the cue windows;
+  - the ±20 min hard edge window.
+- **Changeovers:**
+  - merged freezes of **at least 60 s**;
+  - recording coverage gaps of at least 30 s;
+  - the coverage start and end.
+- **Changeover strength** is `min(length, 600 s) / 60 × (1 + 2 × silent share)`, where
+  the silent share is the fraction of the changeover overlapped by silence intervals.
+  - Coverage bounds have strength 30.
+  - Coverage gaps have strength `min(length, 600 s) / 60`.
+- **Joint alignment:**
+  - Each Stage's current, planned Program Expectations are aligned **in planned order**,
+    with a monotone dynamic program:
+    - talk *i* starts at the end of changeover *j* and ends at the start of changeover
+      *k*, which comes after *j* and leaves at least 60 s between them;
+    - the next talk starts at the end of changeover *k′* ≥ *k*, so consecutive talks may
+      share one changeover.
+  - Score: the sum of the strengths of the changeovers used, each counted once, minus the
+    sum of |edge − planned time| / **30 s**, plus **1 point per supporting cue** in the
+    v1 cue windows.
+  - Only edges within ±20 min of the plan are candidates. With none, that edge falls back
+    to the planned time, contributes 0, and has edge kind `schedule`.
+  - Ties are broken deterministically: earliest edge, then lowest Program Expectation ID.
+  - Overlaps cannot occur by construction, so v2 always records `overlap` as false.
+- **Strength (categorical):**
+  - `strong`: both edges come from a changeover, gap or coverage, and at least one edge
+    has silence support (silent share ≥ 0.3) or cue support;
+  - `medium`: both edges come from a changeover, gap or coverage, with no support;
+  - `weak`: at least one edge is a schedule fallback, or the suggestion is unscheduled.
+- **Unscheduled activity:** as in v1, using v2 changeovers.
+- **Evaluation tool:** a pure evaluator that takes suggestions plus anonymous
+  ground-truth intervals and reports recall, median and 95th-percentile start and end
+  error, and the count within 60 s. It has a CLI that reads a local ground-truth file,
+  kept outside the repository, and prints sanitized numbers only. This is pulled forward
+  from Phase 5 so v2 can be measured.
+- **Migration `0023`** widens the run and suggestion CHECK constraints so version `"1"`
+  (exact v1 constants) and version `"2"` (exact v2 constants) are both valid, each exactly
+  for its own version. The reverse refuses while v2 rows exist.
+
+### In scope
+
+1. The v2 policy, keeping v1 intact for recorded runs. The service uses v2 for new runs.
+2. Migration `0023`, forward and guarded reverse.
+3. The evaluator and its CLI, tested only on synthetic fixtures.
+4. Tests: see Test strategy.
+5. Documentation: the context README, the capability layer, and the glossary if it names
+   the policy version.
+6. **Owner step:** Accuracy Run 002 on the same corpus with the evaluator, comparing v1
+   and v2 at drift 0 and at ±5, ±10 and ±15 min, recorded as a sanitized result.
+
+### Out of scope
+
+- A transcription run over the corpus and cue tuning. These are a follow-up once
+  transcripts exist; the v2 cue bonus is present but unmeasured.
+- Phases 3–5.
+- Any change to Kernel, confirmation or decision semantics.
+- UI.
+
+### Constraints
+
+- Pure and deterministic. No dependency. Aware timestamps. No real-event data in tests.
+- v1 runs and suggestions stay exact and readable.
+- The alignment is bounded: at most 10,000 inputs as in v1. The dynamic program runs per
+  Stage and must stay practical, around 50 changeovers per day; document its complexity.
+
+### Test strategy
+
+- **Synthetic timelines:**
+  - consecutive talks sharing a title-card changeover;
+  - an in-talk 45–60 s slide freeze being ignored;
+  - a long silent changeover beating a nearer non-silent freeze;
+  - schedule drift of ±15 min still aligning in order;
+  - a lunch gap;
+  - a missing changeover falling back to the schedule;
+  - monotonicity (no overlap);
+  - cue bonus effect;
+  - determinism and tie-breaking;
+  - v1 behaviour unchanged for v1 evaluation.
+- **Evaluator:** metrics on hand-computed fixtures.
+- **PostgreSQL:** `0023` forward and reverse; v1 and v2 rows each valid only with their own
+  constants.
+- **Quality gate:** the full host backend suite, Ruff, Pyright, and `git diff --check`.
+
+### Acceptance criteria
+
+- [ ] New runs use v2, v1 records stay valid, and all checks pass on the host.
+- [ ] Accuracy Run 002 shows v2, compared with v1:
+  - median start and end errors of **35 s or less at zero drift**;
+  - **60 s or less at ±5, ±10 and ±15 min**;
+  - recall of at least 90%.
+
+  These are the prototype-derived targets. The ADR's 30 s target at every drift remains
+  open until transcript cues are measured.
+
+### Rollback
+
+Revert the code. Reverse `0023` only while no v2 rows exist.
 
 ## Ground-truth corpus handling (all phases)
 
