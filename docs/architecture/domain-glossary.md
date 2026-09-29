@@ -63,20 +63,26 @@ not-event-ready disclaimer retain their meaning.
 
 ### Suggestion Run
 
-- **Definition:** The immutable result of a human invocation of `boundary-suggestion` v1
-  for one Event and Stage, with optional Event-scoped start/end phrase-list versions.
+- **Definition:** The immutable result of a human invocation of `boundary-suggestion`
+  (v2 for new runs; v1 retained) for one Event and Stage, with optional Event-scoped
+  start/end phrase-list versions.
 - **Identity:** A digest of Event/Stage, policy lineage, Program Expectation revisions,
   asset timing revisions, segmentation evidence IDs, complete transcript revisions and
   cue-list versions. Identical inputs return the prior run only while it is the Stage's
   latest run. Returning to earlier inputs creates a fresh latest run and supersedes the
   intervening run's suggestions. Run order is commit-serialized and independent of clock ties.
 - **Evidence:** The policy unions recorder coverage, merges freezes separated by at most
-  15 seconds and recognizes freezes/gaps of at least 30 seconds as changeovers. Schedule,
+  15 seconds. v2 recognizes freezes of at least 60 seconds and gaps of at least 30 seconds
+  as changeovers, jointly aligning planned talks in order. Schedule fallback edges are
+  exempt from monotonicity; resulting overlaps retain their times and are marked weak.
+  Recorded v1 uses its original 30-second freeze threshold. Schedule,
   silence and optional phrase cues remain advisory. Implausible recorder clocks are
   excluded, never moved to another day.
 - **Bounds:** Five nonnegative integer skip counts; missing timing precedes implausible
   clock, and missing segmentation counts usable assets. Missing planned times and no
-  coverage count eligible expectations. Input overflow refuses the run without truncation.
+  coverage count eligible expectations. `no_coverage` also counts planned talks that
+  cannot yield a valid minimum-duration suggestion, including short schedule fallbacks.
+  Input overflow refuses the run without truncation.
 - **Distinction:** Separate from Editorial derivation; reuse of phrase matching creates
   no Editorial candidate and does not require transcripts.
 

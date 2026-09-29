@@ -66,6 +66,23 @@ POLICY_V1 = Policy()
 
 
 @dataclass(frozen=True, slots=True)
+class PolicyV2(Policy):
+    version: str = "2"
+    changeover_seconds: int = 60
+    coverage_gap_seconds: int = 30
+    strength_cap_seconds: int = 600
+    strength_unit_seconds: int = 60
+    silence_multiplier: int = 2
+    coverage_strength: int = 30
+    plan_distance_seconds: int = 30
+    cue_bonus: int = 1
+    silence_support_share: float = 0.3
+
+
+POLICY_V2 = PolicyV2()
+
+
+@dataclass(frozen=True, slots=True)
 class Reference:
     id: EntityId
     revision: int
@@ -147,8 +164,7 @@ class Candidate:
         for name in ("timing_qualifications", "timing_references", "segmentation_ids",
                      "transcript_references"):
             object.__setattr__(self, name, tuple(getattr(self, name)))
-        if (self.span.end - self.span.start).total_seconds() <= POLICY_V1.minimum_session_seconds:
-            raise ValueError("suggestion must exceed 60 seconds")
+        self._validate_duration()
         if not self.timing_qualifications or not self.timing_references:
             raise ValueError("suggestion requires timing lineage")
         if ((self.expectation is None) != (self.start_plan_offset_seconds is None)
@@ -161,6 +177,17 @@ class Candidate:
         strength = Strength.WEAK if weak else Strength.STRONG if supported else Strength.MEDIUM
         if self.strength != strength:
             raise ValueError("strength must follow policy components")
+
+    def _validate_duration(self) -> None:
+        if (self.span.end - self.span.start).total_seconds() <= POLICY_V1.minimum_session_seconds:
+            raise ValueError("suggestion must exceed 60 seconds")
+
+
+@dataclass(frozen=True, slots=True)
+class CandidateV2(Candidate):
+    def _validate_duration(self) -> None:
+        if (self.span.end - self.span.start).total_seconds() < POLICY_V2.minimum_session_seconds:
+            raise ValueError("suggestion must span at least 60 seconds")
 
 
 @dataclass(frozen=True, slots=True)
@@ -191,7 +218,7 @@ class SuggestionRun:
         require_aware_datetime(self.created_at, "created_at")
         object.__setattr__(self, "expectations", tuple(self.expectations))
         object.__setattr__(self, "assets", tuple(self.assets))
-        if self.policy != POLICY_V1:
+        if self.policy not in (POLICY_V1, POLICY_V2):
             raise ValueError("unsupported suggestion policy")
 
 

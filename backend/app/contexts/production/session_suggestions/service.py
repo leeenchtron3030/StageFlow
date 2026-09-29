@@ -9,7 +9,7 @@ from app.shared.ids import EntityId
 from app.shared.time import Clock, require_aware_datetime
 
 from .contracts import (
-    POLICY_V1,
+    POLICY_V2,
     Reference,
     SessionSuggestion,
     Span,
@@ -18,7 +18,7 @@ from .contracts import (
     SuggestionRun,
     SuggestionStatus,
 )
-from .policy import evaluate
+from .policy_v2 import evaluate
 from .repository import SuggestionRepository
 
 
@@ -50,7 +50,7 @@ class SessionSuggestionService:
             inputs = tx.snapshot(event_id, stage_id, start_cue_list, end_cue_list)
             digest = human_command_digest({
                 "event_id": event_id.value, "stage_id": stage_id.value,
-                "policy": asdict(POLICY_V1),
+                "policy": asdict(POLICY_V2),
                 "expectations": [reference_document(Reference(x.id, x.revision))
                                  for x in sorted(inputs.expectations, key=lambda x: x.id.value)],
                 "assets": [{"id": x.asset_id.value, "timing": reference_document(x.timing),
@@ -67,9 +67,10 @@ class SessionSuggestionService:
             run = SuggestionRun(
                 EntityId.new(), event_id, stage_id, digest, actor_id, self.clock.now(),
                 tuple(Reference(x.id, x.revision) for x in inputs.expectations), inputs.assets,
-                start_cue_list, end_cue_list, result.skips,
+                start_cue_list, end_cue_list, result.skips, POLICY_V2,
             )
-            tx.save_run(run, tuple(SessionSuggestion(EntityId.new(), run.id, event_id, stage_id, x)
+            tx.save_run(run, tuple(SessionSuggestion(EntityId.new(), run.id, event_id, stage_id, x,
+                                                     POLICY_V2.id, POLICY_V2.version)
                                    for x in result.candidates))
             return run
 

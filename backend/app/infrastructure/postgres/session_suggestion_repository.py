@@ -21,6 +21,7 @@ from app.contexts.production.session_suggestions.contracts import (
     AssetInput,
     InputSnapshot,
     Policy,
+    PolicyV2,
     Reference,
     SessionSuggestion,
     SkipCounts,
@@ -293,7 +294,7 @@ def _run(row: Row) -> SuggestionRun:
         None if row["end_cue_list_id"] is None else Reference(
             EntityId(str(row["end_cue_list_id"])), row["end_cue_list_version"]),
         SkipCounts(**{k: row[k] for k in SkipCounts.__dataclass_fields__}),
-        Policy(**row["policy_constants"]),
+        (PolicyV2 if row["policy_version"] == "2" else Policy)(**row["policy_constants"]),
     )
 
 

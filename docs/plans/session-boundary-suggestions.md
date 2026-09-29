@@ -9,6 +9,10 @@ policy v2) is detailed below (2026-09-29), after the early accuracy check. Phase
 
 - Classification: Green for Phase 1 under the accepted ADR. Later phases are Green once
   their detailed sections are approved.
+- Phase 2b continuation: Green and implementation-ready under the approved ED-0105
+  section, the overlap clarification merged in `b4a9e1a` / `d6e05f4`, and the owner's
+  second-stop decision below. The bounded implementation and synthetic validation are
+  authorized; Accuracy Run 002 remains an owner acceptance step.
 - Authority evidence:
   - [ADR-0034](../adr/ADR-0034-session-boundary-suggestions.md), accepted by the owner on
     2026-09-28: scope B, transcript cues in v1, and the v1 quality target;
@@ -418,6 +422,11 @@ through confirmation are ordinary human-realized Sessions and stay.
       marked `overlap` (and therefore `weak`), as in v1.
     - No talk is dropped and no run is refused.
     - Otherwise overlaps cannot occur.
+  - **Owner continuation decision (2026-09-29, second Yellow stop):** a planned talk
+    that cannot yield a valid minimum-duration suggestion is skipped and counted under
+    `no_coverage`, exactly as v1 does. A 30-second schedule-only fallback must not raise
+    a contract/SQL exception or disappear without a count. Short plans may still use
+    evidence to produce a valid interval.
 - **Strength (categorical):**
   - `strong`: both edges come from a changeover, gap or coverage, and at least one edge
     has silence support (silent share ≥ 0.3) or cue support;
@@ -572,3 +581,39 @@ Revert the code. Reverse `0023` only while no v2 rows exist.
   - **Remaining work:** back up the demo database and migrate it to `0022` after merge.
     Phase 3 (boundary proposals), Phase 4 (surfaces) and Phase 5 (corpus validation) each
     need their detailed section.
+- **Phase 2b (ED-0105), implemented revision:** branch `codex/ed-0105-policy-v2`. Codex
+  implemented it and the owner committed it, with the review fixes below.
+  - **Changed files:**
+    - `policy_v2.py`, a joint dynamic program with O(T·C³) worst case, bounded in practice
+      by the ±20 min candidate window;
+    - `evaluation.py` and `evaluate_cli.py`, which produce sanitized metrics only;
+    - contracts, serialization, the service (new runs use v2) and the PostgreSQL
+      repository, with version-aware reads;
+    - migration `0023`, in which each version is valid only with its exact constants and
+      the reverse is guarded;
+    - three new test files;
+    - the README, the glossary and the capability layer.
+    - `policy.py` (v1) and its tests are unchanged.
+  - **Owner decisions during implementation:**
+    - overlapping schedule fallbacks keep their planned times and are marked
+      `overlap`/`weak` (PR #147);
+    - plans that cannot yield a suggestion of at least 60 s are skipped and counted under
+      `no_coverage`, as in v1.
+  - **Changed existing assertions:** four, all pre-authorized.
+    - `0023` added to three migration-order lists;
+    - the new-run policy version changed from "1" to "2" in the API test.
+  - **Review:** `directive-reviewer` returned FIX-FIRST twice, then APPROVE.
+    - F1: after a schedule fallback, a changeover could be reused as the start of two
+      talks, or as the end of two talks.
+    - Fix: a start/end-aware cursor, with regression tests.
+    - F3, introduced by the F1 fix: the cue bonus was deduplicated per changeover, which
+      dropped the next talk's start cues at a shared changeover. The owner fixed it:
+      strength is counted once per changeover, and cues are counted per observed edge.
+      A regression test covers it.
+  - **Tests (host), after the F1 and F3 fixes:** full backend suite **2,871 passed, 0 failed,
+    2 skipped**. Ruff and Pyright clean.
+  - **Remaining work:**
+    - Accuracy Run 002 (owner step): v1 and v2, with and without transcript cues. The
+      corpus is now transcribed, and a first cue analysis found that changeover or cue
+      evidence lies within 60 s of 54 of 56 true edges.
+    - Migrate the demo database to `0023` after merge, with a backup first.

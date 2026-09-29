@@ -895,11 +895,20 @@ claims.
 ## Session Suggestions core (ED-0104)
 
 The production-layer `session_suggestions` context implements the approved ADR-0034
-Phase 2 policy and human run/confirm/reject workflow. It reads Stage Program Expectations,
+Phase 2/2b policy and human run/confirm/reject workflow. It reads Stage Program Expectations,
 latest active Media Timing Evidence, segmentation intervals and optional latest complete
 transcripts. ED-0092 phrase matching supplies optional boundary cues without Editorial
 candidate creation. Versioned constants and first-class components explain every result;
 unqualified recorder timing remains explicitly labelled.
+
+New runs use `boundary-suggestion` v2: freezes >=60 s, gaps >=30 s and coverage
+bounds are weighted by length and silence, then jointly aligned to planned talks by a
+monotone dynamic program. Shared changeovers count once; plan distance and cue support
+contribute to the score. Candidates stay within +/-20 min. Schedule fallbacks keep their
+planned times and are exempt from monotonicity; any resulting overlaps are explicit and
+weak. v1 remains intact for recorded runs and evaluation. Migration
+`0023_session_suggestions_policy_v2` enforces exact constants per version and permits
+v2's inclusive 60-second minimum; its reverse refuses while v2 rows exist.
 
 Migration `0022_session_suggestions` adds immutable runs, suggestions and decisions.
 Status derives from run order and decisions. The PostgreSQL adapter binds the unchanged
@@ -913,6 +922,9 @@ Authenticated Event-scoped API routes start runs, page/read suggestions and acce
 confirm/reject commands. No UI, Work Queue item, boundary proposal producer, automatic
 authority, new dependency or runtime setting is added. Phase 3 boundary proposals,
 Phase 4 producer surfaces and Phase 5 corpus accuracy qualification remain future work.
+A pure anonymous interval evaluator and local-file CLI have been pulled forward: recall,
+median/p95 start/end error and both-edges-within-60-second counts are numeric aggregates.
+Synthetic tests prove the metrics; the owner's Accuracy Run 002 remains separate.
 See the [context README](../../backend/app/contexts/production/session_suggestions/README.md)
 for policy, bounds and transaction details. Synthetic tests establish contract behavior;
 they do not qualify recorder clocks or production-event readiness.
