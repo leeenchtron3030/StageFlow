@@ -12,11 +12,13 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, ConfigDict
 
 from app.bootstrap.event_mode_kernel import KernelComponents
+from app.contexts.assembly.session_repository import AssemblyStorageUnavailableError
 from app.contexts.production.event_mode_kernel import (
     KernelStorageUnavailableError,
     ProducerWorkQueuePosition,
     ProducerWorkQueueSubject,
 )
+from app.contexts.production.work_queue import ProducerWorkQueueService
 from app.shared.ids import EntityId
 
 router = APIRouter(prefix="/producer", tags=["producer"])
@@ -31,8 +33,9 @@ class ProducerWorkQueueItemResponse(BaseModel):
         "package_correction_required",
         "association_unresolved",
         "association_conflict",
+        "assembly_approval_pending",
     ]
-    subject_kind: Literal["session_package", "media_association"]
+    subject_kind: Literal["session_package", "media_association", "session_assembly"]
     subject_id: str
     subject_revision: int
     event_id: str
@@ -153,12 +156,17 @@ def producer_work_queue(
         else _decode_cursor(cursor, event_id=parsed_event_id)
     )
     try:
-        subjects = components.repository.list_producer_work_queue(
+        service = ProducerWorkQueueService(
+            components.repository,
+            None if components.session_assemblies is None
+            else components.session_assemblies.repository,
+        )
+        subjects = service.list_items(
             parsed_event_id,
             after=after,
-            limit=limit + 1,
+            limit=limit,
         )
-    except KernelStorageUnavailableError as exc:
+    except (KernelStorageUnavailableError, AssemblyStorageUnavailableError) as exc:
         raise HTTPException(
             status_code=503,
             detail="postgresql_unavailable",

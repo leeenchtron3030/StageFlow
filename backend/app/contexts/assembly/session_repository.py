@@ -1,5 +1,9 @@
 from typing import Protocol
 
+from app.contexts.production.event_mode_kernel.contracts import (
+    ProducerWorkQueuePosition,
+    ProducerWorkQueueSubject,
+)
 from app.shared.ids import EntityId
 
 from .contracts import CommandIdentity
@@ -29,6 +33,11 @@ class AssemblyStorageUnavailableError(RuntimeError):
 
 
 class SessionAssemblyRepository(Protocol):
+    def list_pending_approvals(
+        self, event_id: EntityId, *, after: ProducerWorkQueuePosition | None = None,
+        limit: int = 50,
+    ) -> tuple[ProducerWorkQueueSubject, ...]: ...
+
     def record_metadata_override(
         self, command: CommandIdentity, entry: AssemblyMetadataOverride, expected_sequence: int,
     ) -> AssemblyMetadataOverride: ...

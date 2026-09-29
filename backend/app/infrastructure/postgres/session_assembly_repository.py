@@ -50,6 +50,15 @@ from app.contexts.assembly.session_repository import (
     AssemblyNotFoundError,
     AssemblyStorageUnavailableError,
 )
+from app.contexts.assembly.work_queue import (
+    assembly_work_queue_position,
+    assembly_work_queue_subject,
+    validate_work_queue_limit,
+)
+from app.contexts.production.event_mode_kernel.contracts import (
+    ProducerWorkQueuePosition,
+    ProducerWorkQueueSubject,
+)
 from app.shared.ids import EntityId
 
 from .assembly_timing_reader import PostgresAssemblyTimingReader
@@ -521,6 +530,69 @@ class PostgresSessionAssemblyRepository:
             ).fetchall()
             items = tuple(_template(r) for r in rows[:limit])
             return TemplatePage(items, count["total"], items[-1].id if len(rows) > limit else None)
+
+    def list_pending_approvals(
+        self, event_id: EntityId, *, after: ProducerWorkQueuePosition | None = None,
+        limit: int = 50,
+    ) -> tuple[ProducerWorkQueueSubject, ...]:
+        validate_work_queue_limit(limit)
+        if after is not None and after.priority > 5:
+            return ()
+        with self._transaction(read=True) as conn:
+            items: list[ProducerWorkQueueSubject] = []
+            cursor = after
+            while len(items) < limit:
+                # Existing Event/Session revision and decision indexes bound the scope;
+                # only the current revision can qualify, even if a newer one is invalid.
+                rows = conn.execute(
+                    """SELECT r.* FROM stageflow.assembly_revision r
+                       JOIN stageflow.session s ON s.session_id=r.session_id
+                       WHERE s.event_id=%s AND r.event_id=%s
+                         AND r.validation_state='valid'
+                         AND NOT EXISTS (SELECT 1 FROM stageflow.assembly_revision newer
+                             WHERE newer.session_id=r.session_id
+                               AND newer.revision_number>r.revision_number)
+                         AND NOT EXISTS (SELECT 1 FROM stageflow.assembly_approval_decision d
+                             WHERE d.revision_id=r.revision_id)
+                         AND (%s::integer IS NULL OR
+                              (5,r.created_at,'assembly:' || r.session_id::text) >
+                              (%s::integer,%s::timestamptz,%s::text))
+                       ORDER BY r.created_at, 'assembly:' || r.session_id::text LIMIT %s""",
+                    (event_id.value, event_id.value,
+                     None if cursor is None else cursor.priority,
+                     None if cursor is None else cursor.priority,
+                     None if cursor is None else cursor.updated_at,
+                     None if cursor is None else cursor.projection_id, limit),
+                ).fetchall()
+                if not rows:
+                    break
+                revisions = self._hydrate(conn, rows)
+                ids = [b.packaging_revision_id.value for r in revisions for b in r.bindings
+                       if b.packaging_revision_id is not None]
+                approved = frozenset(_id(r["revision_id"]) for r in conn.execute(
+                    """SELECT r.revision_id FROM stageflow.packaging_asset_revision r
+                       JOIN LATERAL (SELECT action
+                         FROM stageflow.packaging_asset_approval_decision
+                         WHERE packaging_asset_id=r.packaging_asset_id
+                           AND revision_number=r.revision_number
+                         ORDER BY decision_sequence DESC LIMIT 1) d ON d.action='approve'
+                       WHERE r.revision_id=ANY(%s::uuid[])""", (ids,),
+                ))
+                for revision in revisions:
+                    inputs = self._inputs(conn, self._session(conn, revision.session_id))
+                    subject = assembly_work_queue_subject(SessionAssembly(
+                        revision, revision.revision_number, is_stale(
+                            revision, inputs.package_revision, approved, inputs.metadata,
+                        ), ApprovalState.UNREVIEWED, 0, None,
+                    ), stage_id=inputs.stage_id)
+                    if subject is not None:
+                        items.append(subject)
+                        if len(items) == limit:
+                            break
+                cursor = assembly_work_queue_position(revisions[-1])
+                if len(rows) < limit:
+                    break
+            return tuple(items)
 
     def list_revisions(
         self, event_id: EntityId, session_id: EntityId, *, after: int = 0, limit: int = 50,
