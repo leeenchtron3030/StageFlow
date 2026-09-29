@@ -897,7 +897,8 @@ as support for **both** edges of a shared changeover.
 ### Verified current behavior
 
 - **Phrase lists (ED-0092):** `editorial_phrase_list` is Event-scoped. Each list has a
-  key and a version, and each published version gets a new `phrase_list_id` (`0019`).
+  key and a version (`0019`). *(Corrected at completion: the `phrase_list_id` stays stable
+  across versions of one key; the draft said a new ID per version.)*
   - Contract: `EditorialPhraseList` in `contexts/editorial/derivation_contracts.py`,
     which allows 1–200 phrases of 1–100 characters and rejects normalized duplicates.
   - Publishing is a human, idempotent command (`derivation_service.py`,
@@ -1139,6 +1140,46 @@ as support for **both** edges of a shared changeover.
 - Revert the code.
 - Reverse `0025` only while no composition exists.
 - Published phrase-list versions are ordinary ED-0092 rows and stay readable.
+
+
+### Completion record (ED-0107)
+
+- **Implemented revision:** `ab2f5a1`, merged in PR #155 (`main` `2788e6c`). Codex
+  implemented it and the owner committed it.
+- **Changed files:**
+  - `cue_catalog.py`, `cue_composition.py` and `cue_service.py` (new);
+  - the session-suggestion API, service, repositories and in-memory store;
+  - the ED-0092 publish (reserved keys);
+  - `boundary_cue_repository.py` (new) and migration `0025` (forward and reverse);
+  - the context README, capability layer and glossary;
+  - the catalog document, amended by the owner;
+  - new tests `test_boundary_cue_{catalog,composition,api,postgres}.py`.
+- **Changed existing assertions:** five, all pre-authorized: `0025` added to the migration
+  lists in three test files.
+- **Review:** `directive-reviewer` returned ESCALATE, then APPROVE.
+  - The escalation: the *Film or studio set* profile had no `start` phrase, so it could
+    never publish.
+  - Owner decision: add `studio.setups` ("picture's up"). The catalog is now 18 groups.
+  - Codex also added a test and a README note that an exclusion applies per source group,
+    and mapped editorial publish conflicts to 409.
+  - A mechanical comparison of the catalog against the document found zero mismatches.
+- **Tests (host):** full backend suite **2,966 passed, 0 failed, 2 skipped**. Ruff and
+  Pyright clean. CI green.
+- **Demo database:** backed up (`stageflow_demo-pre-ed0107-0025-*`) and migrated to
+  `0025` with the owner's approval.
+- **Cue Run 001 (2026-09-29):**
+  [result](../validation/results/boundary-cue-run-001.md).
+  - Every Run 003 target is met.
+  - Cell by cell against the untuned lists: better or equal in 12 of 15 cells. It is
+    worse in 3, by at most 3.3 s, or one talk of recall in a cell that is not a target.
+- **Status:** Completed.
+- **Follow-ups:**
+  - ED-0108 (the Event page section). Its "remove phrase" must exclude the phrase from
+    every source group.
+  - Optional non-blocking review notes:
+    - the catalog GET does not check that the Event exists;
+    - the reserved-key check is case-sensitive, which is harmless because keys are
+      stored case-sensitively.
 
 ## Ground-truth corpus handling (all phases)
 
