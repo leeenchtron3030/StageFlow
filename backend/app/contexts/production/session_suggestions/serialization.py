@@ -10,6 +10,7 @@ from app.shared.ids import EntityId
 from .contracts import (
     AssetInput,
     Candidate,
+    CandidateV2,
     EdgeKind,
     Reference,
     Span,
@@ -73,7 +74,8 @@ def candidate_document(x: Candidate) -> dict[str, Any]:
 
 
 def candidate(x: dict[str, Any]) -> Candidate:
-    return Candidate(
+    candidate_type = CandidateV2 if x.get("policy_version") == "2" else Candidate
+    return candidate_type(
         None if x["expectation_id"] is None else Reference(
             EntityId(str(x["expectation_id"])), x["expectation_revision"]),
         Span(x["suggested_start"], x["suggested_end"]),

@@ -1,10 +1,12 @@
 # Session Suggestions
 
-Execution classification: Green under the approved Phase 2 plan and ED-0104. This context
+Execution classification: Green under the approved Phase 2/2b plan, ED-0104 and ED-0105,
+including the owner decision exempting schedule fallback edges from monotonicity. This context
 implements advisory suggestions only. Kernel code and its Session, association and package
 semantics remain unchanged. There is no automated realization or ADR-0026 activation.
 
-`policy.evaluate` is pure. Policy `boundary-suggestion` v1 freezes these lineage constants:
+`policy.evaluate` remains the unchanged pure v1 evaluator for recorded runs. Policy
+`boundary-suggestion` v1 freezes these lineage constants:
 
 | Rule | v1 value |
 | --- | --- |
@@ -32,6 +34,45 @@ unscheduled activity are weak. Unscheduled suggestions cover the remaining activ
 subtracting changeovers and scheduled suggestions. All consulted usable timing,
 segmentation and transcript references are retained (including evidence outside an
 individual result's interval); qualifications are retained without upgrading clocks.
+
+New runs use pure `policy_v2.evaluate` and `boundary-suggestion` v2. v1 constants and
+records stay exact and readable; migration `0023_session_suggestions_policy_v2` admits
+each version only with its own full constants, retaining the composite suggestion/run
+policy FK. v1 durations remain >60 s; v2 permits exactly 60 s. Reverse 0023 refuses while
+any v2 run or suggestion exists, and otherwise restores the original v1 constraints
+without rewriting history. Reverse before reverting code; v2 rows prevent that rollback.
+
+v2 keeps placement, clock plausibility, <=15 s freeze merging, cue windows, the inclusive
++/-20 min candidate window and >=120 s unscheduled activity. Its changes are:
+
+- Merged freezes must be >=60 s; coverage gaps remain >=30 s. Coverage bounds are edges.
+- Freeze strength is `min(length, 600 s) / 60 * (1 + 2 * silent_share)`;
+  silence is unioned before calculating the overlap fraction. Gap strength is
+  `min(length, 600 s) / 60`; coverage bounds have strength 30.
+- A Stage's current planned expectations are ordered by planned start then ID and aligned
+  jointly. A talk uses changeover end j and changeover start k > j, >=60 s apart;
+  the next observed start uses k' >= k. Each changeover contributes strength once,
+  including when shared. Each observed edge costs `abs(edge - plan) / 30 s` and adds
+  1 per supporting cue. Rational arithmetic makes exact score ties deterministic.
+- A missing feasible edge falls back to its planned timestamp, without clipping, with
+  score 0 and kind `schedule`. Fallbacks never advance the evidence cursor. If neither
+  edge can form a valid pair for a predecessor, both planned edges are retained for that
+  predecessor. Existing no-coverage skips remain. If no viable interval meets the
+  minimum duration, the talk is skipped and counted under `no_coverage`, as in v1
+  (owner decision after the second ED-0105 Yellow stop); it is never silently dropped.
+- Ties prefer the earliest edge sequence, then lowest Program Expectation ID. The dynamic
+  program keeps the best path per last evidence index, uses backpointers and ranks for
+  ties, and takes O(T*C^3) time and O(T*C) space for T talks and C changeovers (per Stage).
+  About 50 changeovers/day is the expected practical workload. Inputs remain bounded at
+  10,000 assets and 10,000 expectations; this is not a claim of constant cost at that cap.
+- Monotonicity applies to freeze, gap and coverage edges only. Fallback times stay planned;
+  any resulting overlapping suggestions are both marked `overlap` and `weak`. Observed
+  intervals otherwise do not overlap. There is no post-alignment boundary repair.
+- Silence supports an edge only at silent share >=0.3; cue support uses the v1 windows.
+  Both observed edges with support are `strong`, both without support `medium`;
+  schedule edges, overlapping suggestions and unscheduled activity are `weak`.
+
+The policy still consumes a single Stage snapshot; repositories supply that scope.
 
 `SessionSuggestionService` owns human run/confirm/reject commands. Runs are idempotent by
 the input digest while that run is still the Stage's latest, independent of actor and
@@ -70,9 +111,40 @@ API base: `/api/v1/session-suggestions/events/{event_id}`. Routes:
 All routes use existing API authentication. Cue lists must belong to the same Event.
 Missing resources return 404, stale/realized/not-open or command conflicts 409, invalid
 bounds/authority 422, unavailable persistence 503. No media paths or transcript text are
-returned. No UI, Work Queue item, boundary proposal, corpus harness or dependency is added.
+returned. No UI, Work Queue item, boundary proposal or dependency is added.
 
 Tests: `test_session_suggestion_policy.py`, `test_session_suggestions.py`,
 `test_session_suggestions_api.py`, and `test_session_suggestions_postgres.py` cover the
 policy, immutable lineage, decisions/replay, import boundary, API and real SQL rollback.
 Corpus accuracy and event readiness remain separate owner qualification work.
+
+## Anonymous accuracy evaluation
+
+`evaluation.evaluate_accuracy` accepts suggestions (Candidate/SessionSuggestion or Span)
+and anonymous ground-truth Spans for one Stage. It matches chronologically, one-to-one,
+with interval IoU >=0.5, maximizing matched count and then minimizing total absolute edge
+error; ties retain earlier intervals. Recall is matched/truth, or 0 with no truth.
+Median and nearest-rank p95 (`ceil(0.95*n)`) start/end errors cover matched pairs only;
+no matches yields null errors. `count_within_60_seconds` requires both edges <=60 s.
+Extra suggestions cannot increase recall through duplicate matches. Matching takes
+O(G*S) time and space for G truth intervals and S suggestions.
+
+Run from `backend` with both local files outside the repository:
+
+```text
+uv run --no-sync python -m app.contexts.production.session_suggestions.evaluate_cli <ground-truth.json> <suggestions.json>
+```
+
+Each file is a JSON array of objects with `start` and `end` ISO-8601 timestamps, including
+a timezone; additional fields are ignored. The CLI reads files only and prints aggregate
+numbers/nulls, never timestamps, paths, names, IDs or source data. Argument/input/read errors
+return exit 1 with `{"error_count": 1}`. This evaluator is pulled forward from Phase 5; it does
+not generate corpus suggestions or perform a transcription run. Owner Accuracy Run 002
+and its drift comparisons remain external qualification work. Real-event data and scripts
+stay outside the repository as required by the plan's corpus-handling rules.
+
+Additional synthetic tests: `test_session_suggestion_policy_v2.py` covers joint alignment,
+shared changeovers, drift, thresholds, cues, fallback overlap and version lineage;
+`test_session_suggestion_evaluation.py` covers hand-computed metrics and sanitized CLI IO;
+`test_session_suggestions_policy_v2_postgres.py` proves exact per-version SQL constraints,
+round trips, registry ordering and guarded reversal in a rolled-back transaction.
