@@ -1,6 +1,7 @@
 from contextlib import AbstractContextManager
 from typing import Protocol
 
+from app.contexts.editorial.derivation_contracts import EditorialPhraseList
 from app.contexts.production.event_mode_kernel.service import DurableEventModeKernel
 from app.shared.ids import EntityId
 from app.shared.time import Clock
@@ -14,11 +15,20 @@ from .contracts import (
     SuggestionRun,
     SuggestionStatus,
 )
+from .cue_composition import BoundaryCueComposition
 
 
 class SuggestionTransaction(Protocol):
     kernel: DurableEventModeKernel
 
+    def cue_event_scope(self, event_id: EntityId) -> None: ...
+    def current_composition(self, event_id: EntityId) -> BoundaryCueComposition | None: ...
+    def replay_composition(self, command_id: EntityId, digest: str
+                           ) -> BoundaryCueComposition | None: ...
+    def publish_cue_list(self, value: EditorialPhraseList) -> EditorialPhraseList: ...
+    def save_composition(self, value: BoundaryCueComposition) -> None: ...
+    def composition_history(self, event_id: EntityId, after: int, limit: int
+                            ) -> tuple[BoundaryCueComposition, ...]: ...
     def scope(self, event_id: EntityId, stage_id: EntityId) -> None: ...
     def lock_event(self, event_id: EntityId) -> None: ...
     def current_offset(self, event_id: EntityId, stage_id: EntityId

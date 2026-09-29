@@ -43,6 +43,8 @@ class EditorialDerivationService:
         authority_kind: str = "human",
     ) -> EditorialPhraseList:
         self._human(authority_kind)
+        if key.strip() in {"boundary-cues-start", "boundary-cues-end"}:
+            raise ValueError("reserved_boundary_cue_list_key")
         phrase_list = EditorialPhraseList(
             EntityId.new(), event_id, key, version, name, phrases, actor_id,
             self.clock.now().astimezone(UTC),

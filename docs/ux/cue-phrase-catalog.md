@@ -106,7 +106,7 @@
 | Press conference or media briefing | Press conference |
 | Interview, junket or podcast | Interviews and junkets |
 | Broadcast or live stream | Broadcast and live stream |
-| Film or studio set | Studio: slate and takes (segment); Studio: wraps |
+| Film or studio set | Studio: setups; Studio: slate and takes (segment); Studio: wraps |
 | Webinar or virtual event | Webinar and virtual |
 
 **Regional add-on groups** (Australia and New Zealand; UK and Ireland; South Asian English)
@@ -328,6 +328,13 @@ Commonwealth and South Asian English
 
 ### Film and studio set
 
+**Studio: setups** (`studio.setups`). Added by the owner on 2026-09-29, so that the studio profile has
+a Session-start phrase. A Session is a setup; takes are segments inside it.
+
+| Phrase | Role | Evidence | Default |
+| --- | --- | --- | --- |
+| picture's up | start | R [16] | yes |
+
 **Studio: slate and takes** (`studio.takes`). All `segment`: takes are passes within a
 Session (owner decision). Opt-in outside the *Film or studio set* profile: on a
 conference stage, "action" landed deep inside talks in 9 of 10 hits.
@@ -456,7 +463,7 @@ any of them as custom phrases.
 ## Owner decisions (2026-09-29)
 
 1. **Profiles, groups and phrases:** accepted as proposed, with the changes below. v1
-   ships 11 profiles and 17 groups, plus 3 regional add-ons.
+   ships 11 profiles and 18 groups, plus 3 regional add-ons.
 2. **`segment` phrases:** stored in the composition and kept out of the published start
    and end cue lists until Segment work exists.
 3. **Civic meetings:** each agenda item is its own Session. The `civic.agenda` changeover
@@ -466,6 +473,12 @@ any of them as custom phrases.
    the ED-0107 catalog.
 5. **Noisy phrases:** available as opt-in, never pre-ticked. The *Excluded from v1*
    phrases can be added only as custom phrases.
+6. **Studio Session start (2026-09-29, from the ED-0107 review):**
+   - The *Film or studio set* profile had no `start` phrase, so it could never publish a
+     start list.
+   - The owner added the `studio.setups` group with "picture's up", which marks the first
+     real take of a setup, and pre-ticks it in that profile.
+   - The rule that both published lists need 1–200 phrases is unchanged.
 
 ## Sources
 
@@ -524,3 +537,6 @@ any of them as custom phrases.
     (<https://www.powerfulpanels.com/sample-script-for-a-panel-discussion/>);
     Toastmasters, "A Panel Moderator's Guide to Success"
     (<https://www.toastmasters.org/magazine/magazine-issues/2023/june/panel-moderators>).
+16. SetHero, "What does 'Picture's up' mean on a film set?"
+    (<https://sethero.com/blog/article/pictures-up-film-set-terminology/>);
+    HowToFilmSchool, "Picture's Up" (<https://howtofilmschool.com/dictionary/pictures-up/>).

@@ -1,9 +1,77 @@
 # Session Suggestions
 
-Execution classification: Green under the approved Phase 2/2b/2c plan, ED-0104 through ED-0106,
+Execution classification: Green under the approved Phase 2/2b/2c/2d-1 plan,
+ED-0104 through ED-0107,
 including the owner decision exempting schedule fallback edges from monotonicity. This context
 implements advisory suggestions only. Kernel code and its Session, association and package
 semantics remain unchanged. There is no automated realization or ADR-0026 activation.
+
+## Boundary cue presets and composition
+
+The approved Phase 2d-1 plan and accepted cue phrase catalog v1.0 authorize the backend
+composition boundary. `cue_catalog.BOUNDARY_CUE_CATALOG` is pure and recursively immutable:
+11 profiles, 18 groups and three regional add-ons, with exact literal text, roles,
+default flags and evidence labels. `take {n}` and `scene {n}` each expand to 40 phrases
+(1–20 as digits and English words). Deferred ceremonies/worship groups are absent.
+Import validation reuses the Editorial phrase rules, rejects duplicate keys and normalized
+phrases within groups, and checks profile references. The digest hashes canonical JSON
+with sorted object keys and compact separators, retaining catalog array order.
+
+`cue_composition.compose` selects submitted groups in catalog order, adjusts defaults
+with explicit group/literal-phrase choices, then adds custom phrases in submitted order.
+Exclusion removes a phrase only from its selected source group, so the future UI's
+"remove phrase" action must exclude it from every source group to remove it entirely.
+The optional profile key records provenance only. `word_tokens` defines deduplication;
+role union puts changeover phrases in both lists. Segment phrases retain their source
+groups and are stored without publication. Custom roles are start/end/changeover only.
+Every published list must contain 1–200 phrases; `cue_list_empty` and
+`cue_list_too_large` report the affected role and count, with no truncation.
+
+`BoundaryCueService.publish` is a human command, serialized per Event in the existing
+suggestion transaction. Both reserved lists (`boundary-cues-start`, `boundary-cues-end`)
+and the composition commit together. List IDs remain stable across versions, as in
+ED-0092; each composition freezes both ID/version pairs. Manual ED-0092 publication
+refuses these keys. Command ID plus request digest provides original-result replay and
+body-conflict refusal. The injected clock supplies the aware composition timestamp.
+Catalog identity/digest, profile, group versions, choices, customs and segment sources
+are first-class provenance. Highest version is current; history is immutable.
+
+Migration `0025_boundary_cue_composition` adds only the composition header and four
+child tables. Immutable triggers reject update/delete; deferred membership checks also
+refuse incomplete publication or later child inserts. Forward refuses any pre-existing
+reserved list key. Reverse refuses any composition and otherwise drops exactly its
+tables/functions/registry entry; existing Editorial lists are untouched. Applying the
+migration to the Demo database remains an owner-authorized operation with a backup.
+
+Runs naming neither cue list use both current-composition references. Naming either
+list preserves the explicit request without filling the other. Without a composition,
+neither default is supplied. Run lineage and input digests freeze the actual references;
+changing composition never automatically reruns suggestions.
+
+Authenticated routes under `/session-suggestions/events/{event_id}`:
+
+- `GET /boundary-cue-catalog`: versioned catalog and digest (no persistence required).
+- `POST /boundary-cues`: catalog version, optional profile key, group keys, include and
+  exclude choices (`group_key`, `phrase`), custom phrases (`text`, `role`), actor and
+  command ID. Requests allow at most 20 groups, 400 choices of each kind and 400 customs;
+  published lists retain the stricter 200 limit. Unknown or mismatched choices fail.
+- `GET /boundary-cues`: current composition, or `null`.
+- `GET /boundary-cues/history`: ascending version pages; `after` 0–2,147,483,647,
+  `limit` 1–100 (default 50), with `next_after`.
+
+Composition reads/publication require an existing Event. The existing run response adds
+`start_cue_list` and `end_cue_list` with `id`/`version`. Errors follow the existing
+404/409/422/503 conventions; list-size errors have structured `code`, `role`, `count`.
+No UI, dependency, policy, Kernel command or authority change is included.
+
+Tests: `test_boundary_cue_catalog.py` compares every accepted literal/role/default/evidence
+row and template expansion; `test_boundary_cue_composition.py` covers merge, bounds,
+provenance, atomic rollback, replay/concurrency, D1 and D2; `test_boundary_cue_api.py`
+covers authentication, bounded input/history and run-reference disclosure;
+`test_boundary_cue_postgres.py` covers persistence/restart, transactional rollback,
+immutable membership and both migration guards in a rolled-back schema.
+
+## Suggestion policies
 
 `policy.evaluate` remains the unchanged pure v1 evaluator for recorded runs. Policy
 `boundary-suggestion` v1 freezes these lineage constants:

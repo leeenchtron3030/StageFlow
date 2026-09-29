@@ -40,6 +40,7 @@ from app.contexts.production.session_suggestions.contracts import (
 )
 from app.contexts.production.session_suggestions.repository import SuggestionTransaction
 from app.contexts.production.session_suggestions.service import reference_document
+from app.infrastructure.postgres.boundary_cue_repository import PostgresBoundaryCueTransaction
 from app.infrastructure.postgres.editorial_derivation_repository import (
     PostgresEditorialDerivationTransaction,
 )
@@ -86,7 +87,7 @@ class PostgresSuggestionRepository:
             raise SuggestionStorageUnavailableError("postgresql_unavailable") from exc
 
 
-class PostgresSuggestionTransaction:
+class PostgresSuggestionTransaction(PostgresBoundaryCueTransaction):
     def __init__(self, connection: psycopg.Connection[Row], clock: Clock) -> None:
         self.connection = connection
         self.kernel = DurableEventModeKernel(
