@@ -64,8 +64,25 @@ test("quality reason appears once next to the mismatch action and only while tha
       const current = scenario === "preset" ? "720p Compact · video 4 Mbit/s · audio 128 kbit/s"
         : scenario === "video" ? "1080p Standard · video 6.5 Mbit/s · audio 192 kbit/s"
         : "1080p Standard · video 8 Mbit/s · audio 256 kbit/s";
-      assert.ok(html.includes(`Render again at current quality</button><span>Latest output: 1080p Standard · video 8 Mbit/s · audio 192 kbit/s · Current setting: ${current}</span>`));
+      assert.ok(html.includes(`Render again at current quality</button><span id="render-quality-reason">Latest output: 1080p Standard · video 8 Mbit/s · audio 192 kbit/s · Current setting: ${current}</span>`));
     }
+  }
+});
+
+test("re-render button describes the quality reason only when present and retains action status", () => {
+  const ctx = context();
+  const item = fixtureAssembly(); item.approval_state = "approved";
+  ctx.assembly = { state: "available", value: item };
+  ctx.outputs = { state: "available", value: { items: [presentation.outputSummary({ ...fixtureRenderedOutput(), profile_version: "3" })], truncated: false } };
+  ctx.renderSetting = { state: "available", value: { event_id: id(3), version: 4, profile_id: "h264-nvenc-1080p-video", profile_version: "3", video_bit_rate: 6500000, audio_bit_rate: null, effective_video_bit_rate: 6500000, effective_audio_bit_rate: 192000, selected_by: id(9), selected_at: "2026-09-27T00:00:00Z", command_id: id(8) } };
+  const ui = harness(ctx, async () => { assert.fail("presentation must not submit"); });
+  assert.equal(ui.find("button", "Render again at current quality")["aria-describedby"], "output-action-state render-quality-reason");
+  assert.equal(ui.find("span", "render-quality-reason").children, "Latest output: 1080p Standard · video 8 Mbit/s · audio 192 kbit/s · Current setting: 1080p Standard · video 6.5 Mbit/s · audio 192 kbit/s");
+  assert.equal((ui.html().match(/id="render-quality-reason"/g) ?? []).length, 1);
+  for (const patch of [{ outputs: { state: "available" as const, value: { items: [], truncated: false } } }, { assembly: { state: "available" as const, value: fixtureAssembly() } }]) {
+    ui.context = { ...ctx, ...patch }; ui.render();
+    assert.equal(ui.find("button")["aria-describedby"], "output-action-state");
+    assert.doesNotMatch(ui.html(), /render-quality-reason/);
   }
 });
 

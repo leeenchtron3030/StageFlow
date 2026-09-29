@@ -55,10 +55,12 @@ surfaces need their own specifications before they are added to this index.
 ### Editorial
 
 - [Editorial Temporal Workspace](editorial-temporal-workspace.md) — exact Draft v0.1;
-  no playback, transcript, or candidate-review workspace is implemented.
+  playback and transcript workspaces remain unimplemented; ED-0095 implements the
+  [bounded Editorial review surface](../plans/producer-outputs-ui.md) at `/editorial`.
 - [Editorial Event Queue & Live Triage](editorial-event-queue-live-triage.md) — exact
-  Draft v0.1; no Editorial queue, Temporal Workspace, or candidate-review workflow is
-  implemented.
+  Draft v0.1; ED-0095 implements the Event review queue and four human review actions
+  in the [Editorial review surface](../plans/producer-outputs-ui.md); the full Temporal
+  Workspace and Live Triage specification remain unimplemented.
 - [Editorial Live vs Post-Session Operating Model](editorial-live-post-session-operating-model.md)
   — exact Draft v0.1; records the small-team multi-Stage operating assumption.
 

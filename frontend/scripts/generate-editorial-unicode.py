@@ -20,12 +20,15 @@ def ranges(points: list[int]) -> list[tuple[int, int]]:
 
 def generate() -> bytes:
     lines = [
-        f"// Generated from the installed backend Python Unicode {unicodedata.unidata_version}; no runtime dependency.",
+        f"// Generated from the installed backend Python Unicode {unicodedata.unidata_version}; "
+        "no runtime dependency.",
         "// Regeneration over range(0x110000):",
-        "// casefoldMappings = {chr(i): chr(i).casefold() for i in ... if chr(i).casefold() != chr(i)}",
+        "// casefoldMappings = {chr(i): chr(i).casefold() for i in ... "
+        "if chr(i).casefold() != chr(i)}",
         "// assignedRanges = consecutive ranges where unicodedata.category(chr(i)) != 'Cn'",
         "// alphanumericRanges = consecutive ranges where chr(i).isalnum()",
-        "// Update alongside a backend Unicode-version change and rerun normalization parity tests.",
+        "// Update alongside a backend Unicode-version change "
+        "and rerun normalization parity tests.",
         f'export const backendUnicodeVersion = "{unicodedata.unidata_version}";',
         "export const casefoldMappings: Readonly<Record<string, string>> = {",
     ]
@@ -56,8 +59,17 @@ if __name__ == "__main__":
     generated = generate()
     if args.check:
         if TARGET.read_bytes() != generated:
-            raise SystemExit("Unicode table drift: run this script with backend/.venv's Python, then rerun normalization parity tests.")
-        print(f"Unicode {unicodedata.unidata_version}: byte-for-byte match ({len(generated)} bytes)")
+            raise SystemExit(
+                "Unicode table drift: run this script with backend/.venv's Python, "
+                "then rerun normalization parity tests."
+            )
+        print(
+            f"Unicode {unicodedata.unidata_version}: "
+            f"byte-for-byte match ({len(generated)} bytes)"
+        )
     else:
         TARGET.write_bytes(generated)
-        print(f"Generated {TARGET.name} with Unicode {unicodedata.unidata_version}; rerun normalization parity tests.")
+        print(
+            f"Generated {TARGET.name} with Unicode {unicodedata.unidata_version}; "
+            "rerun normalization parity tests."
+        )

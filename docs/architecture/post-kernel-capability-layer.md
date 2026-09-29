@@ -597,7 +597,10 @@ Existing v1/v2 outputs retain their recorded identities and remain readable. The
 revision/profile/version work key makes v3 on a v2-rendered revision a new operation.
 Workers declare every catalog preset; earlier Standard v1/v2 operations remain visible and unclaimed
 (ADR-0025 eligibility promotion still applies). GPU audio sync, determinism and
-throughput qualification remain the owner's Run 003 step. FFmpeg identity checks are
+throughput evidence is recorded in [Run 003](../validation/results/render-durable-operation-003.md)
+(passed after the audio-length fix) and [Run 004](../validation/results/render-durable-operation-004.md)
+(preset qualification with the documented 320 kbit/s AAC undershoot); these single-host
+runs do not establish Event readiness or a throughput guarantee. FFmpeg identity checks are
 unchanged. ffprobe is operator-installed and identity-checked under ADR-0033 rules.
 The optional, default-off [local_render] section adds optional ffprobe_path; the render
 worker requires it, while existing configuration files and the API remain valid.

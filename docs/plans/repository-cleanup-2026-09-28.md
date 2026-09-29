@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved (2026-09-28).
+Completed (2026-09-28).
 
 ## Execution authority
 
@@ -84,7 +84,7 @@ Approved (2026-09-28).
 
 ## Acceptance criteria
 
-- [ ] Findings 1–7 are resolved as described, and all checks pass on the host.
+- [x] Findings 1–7 are resolved as described, and all checks pass on the host.
 
 ## Rollback
 
@@ -92,7 +92,32 @@ Revert the commit.
 
 ## Completion record
 
-- Implemented revision:
-- Commands and tests actually run:
-- Results:
-- Remaining work:
+- **Implemented revision:** branch `codex/ed-0102-repository-cleanup`. Codex implemented it
+  and the owner committed it.
+- **Changes:**
+  - findings 1–3 corrected in the capability layer, the UX README and durable-kernel
+    operations;
+  - CHANGELOG entries from 2026-08-22 to 2026-09-28, covering 66 PR merges checked against
+    merge history;
+  - `frontend/middleware.ts` renamed to `frontend/proxy.ts` with the `proxy` export,
+    following the installed Next 16.3.2 documentation. The unsupported `runtime` setting
+    was dropped; Proxy runs on Node.js by default. The matcher and the Host-header
+    allowlist are unchanged;
+  - the 6 E501 lines wrapped, AST-identical to before;
+  - the re-render reason line linked through `aria-describedby`.
+- **Changed existing assertions:** the two the owner approved:
+  - `ui-host-policy.test.ts` no longer expects `runtime: "nodejs"` and now asserts that
+    there is no `runtime` export;
+  - `output-actions-ui.test.ts` expects the reason `<span>` to carry its ID.
+- **Tests (host):**
+  - frontend `npm run test` 267/267; lint and typecheck pass;
+  - the build compiles and no longer prints the middleware deprecation warning. The route
+    is listed as "Proxy (Middleware)";
+  - backend full suite 2,703 passed, 0 failed, 2 skipped;
+  - Ruff clean, including the Unicode script.
+- **Review:** `directive-reviewer` returned FIX-FIRST because the CHANGELOG "Unreleased"
+  line was stale ("partial", missing items 3 and 5). The owner fixed it and also updated
+  the README proxy wording.
+- **Remaining work:** none. Recorded pre-existing items, out of scope:
+  - absolute local checkout paths in `frontend/README.md`;
+  - a Devcon mention in the 2026-08-19 CHANGELOG entry.
