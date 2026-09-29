@@ -3,7 +3,7 @@
 ## Status
 
 Approved (2026-09-28). Phase 1 (ED-0103) and Phase 2 (ED-0104) are complete. Phase 2b (ED-0105,
-policy v2) is detailed below (2026-09-29), after the early accuracy check. After Accuracy Run 002, the owner chose Option B (Phase 2c, ED-0106, Proposed) and asked for Option C to be planned (Phase 2d, outline). Phases 3–5 are outlined here; each gets a detailed section, reviewed by the owner, before it starts.
+policy v2) is detailed below (2026-09-29), after the early accuracy check. After Accuracy Run 002, the owner chose Option B (Phase 2c, ED-0106, Approved 2026-09-29) and asked for Option C to be planned (Phase 2d, outline). Phases 3–5 are outlined here; each gets a detailed section, reviewed by the owner, before it starts.
 
 ## Execution authority
 
@@ -36,7 +36,7 @@ policy v2) is detailed below (2026-09-29), after the early accuracy check. After
 | 2. Session Suggestions core | Suggestion aggregate, deterministic `boundary-suggestion` policy v1 (schedule, timing, segmentation, transcript cues), human-invoked suggestion run, confirm and reject commands (confirm reuses the existing human Session realization and boundary commands) | `0022` |
 | 3. Boundary proposals for realized Sessions | The same policy produces `session_boundary_proposal` rows (existing table) for confirmed Sessions | none expected |
 | 4. Producer surfaces | Work Queue item "confirm presentation" (additive), and suggestion review on Session Detail and Mission Control under the owner's scanning rule; UX checkpoint | none |
-| 2c. Policy v3, schedule offset (ED-0106, Proposed) | Per-block schedule offset (estimated or producer override) before v2 alignment; Stage offset override setting | `0024` |
+| 2c. Policy v3, schedule offset (ED-0106, Approved) | Per-block schedule offset (estimated or producer override) before v2 alignment; Stage offset override setting | `0024` |
 | 2d. Transcript cues as edges, phrase presets (outline) | 2d-1 preset catalog and composition of cue lists; 2d-2 policy v4 with `cue` edges | to be detailed |
 | 5. Validation harness and Run 001 | Replay the ground-truth corpus (outside the repo) and measure recall, precision and start/end error against the ADR target; sanitized result | none |
 
@@ -508,8 +508,14 @@ Revert the code. Reverse `0023` only while no v2 rows exist.
 
 ### Status
 
-- **Proposed** (2026-09-29). It becomes Green and implementation-ready when the owner
-  approves this section, including the constants and targets marked for owner approval.
+- **Approved** (owner, 2026-09-29), including the constants (20 min block break,
+  ±60 min grid, 180 s support tolerance, gate of 6 points per talk) and the Accuracy
+  Run 003 targets.
+- **Execution authority:** Green and implementation-ready.
+  - It is authorized by ADR-0034 (a deterministic, versioned policy) and this approved
+    section.
+  - No Kernel, confirmation or authority semantics change. The migration is additive
+    with a guarded reverse, and no dependency is added.
 - **Owner decision (2026-09-29, after Accuracy Run 002):** Option B now. Option C is
   planned in Phase 2d.
 
@@ -834,6 +840,15 @@ as support for **both** edges of a shared changeover.
    cues; ADR-0035 markers stay non-speech signals.
 4. **Scope of use:** should composed lists also be selectable for Editorial derivation
    (ED-0092), or only for boundary cues? The default proposal: boundary cues only in v1.
+
+**Owner decisions (2026-09-29):**
+
+- **Decision 1:** the v1 catalog table above is approved, English only.
+- **Decision 3:** studio presets stay transcript cues. ADR-0035 markers stay non-speech
+  signals.
+- **Decision 4:** composed lists are for boundary cues only in v1.
+- **Decision 2 (studio take semantics) remains open.** It blocks only 2d-2's treatment of
+  "take N" as an edge. 2d-1 may ship the studio presets as cue phrases.
 
 ### Dependencies and validation
 
