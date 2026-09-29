@@ -847,8 +847,15 @@ as support for **both** edges of a shared changeover.
 - **Decision 3:** studio presets stay transcript cues. ADR-0035 markers stay non-speech
   signals.
 - **Decision 4:** composed lists are for boundary cues only in v1.
-- **Decision 2 (studio take semantics) remains open.** It blocks only 2d-2's treatment of
-  "take N" as an edge. 2d-1 may ship the studio presets as cue phrases.
+- **Decision 2 (studio take semantics), decided the same day:** a take signals a
+  **segment inside a Session**, not a Session boundary. A series of takes is repeated
+  passes at the same content.
+  - For 2d-2, "take N", "action" and "cut" must **not** start or end a Session
+    suggestion on their own. Session edges still come from changeovers, other cues,
+    markers and the schedule.
+  - Using takes as Segment evidence (grouping passes within a Session) is a separate,
+    later capability, planned with the domain glossary first.
+  - 2d-1 may ship the studio presets as cue phrases.
 
 ### Dependencies and validation
 
