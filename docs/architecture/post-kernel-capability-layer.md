@@ -891,3 +891,28 @@ claims.
     `backend/app/contexts/work_execution/service.py:42`). The optional operator-installed
     `transcription` group is excluded from distributable artifacts under ED-0075
     (`backend/pyproject.toml:14`); this is not legal clearance.
+
+## Session Suggestions core (ED-0104)
+
+The production-layer `session_suggestions` context implements the approved ADR-0034
+Phase 2 policy and human run/confirm/reject workflow. It reads Stage Program Expectations,
+latest active Media Timing Evidence, segmentation intervals and optional latest complete
+transcripts. ED-0092 phrase matching supplies optional boundary cues without Editorial
+candidate creation. Versioned constants and first-class components explain every result;
+unqualified recorder timing remains explicitly labelled.
+
+Migration `0022_session_suggestions` adds immutable runs, suggestions and decisions.
+Status derives from run order and decisions. The PostgreSQL adapter binds the unchanged
+Kernel repository to the surrounding confirmation transaction: existing `start_session`
+then `correct_session_boundary(end)` run with deterministic UUIDv5 operation IDs, and the
+decision is inserted last. Failure rolls back all three writes. Event Stage locks serialize
+confirmation against concurrent human starts; expectation locks pin the revision check.
+The memory repository is only a transactional test double.
+
+Authenticated Event-scoped API routes start runs, page/read suggestions and accept human
+confirm/reject commands. No UI, Work Queue item, boundary proposal producer, automatic
+authority, new dependency or runtime setting is added. Phase 3 boundary proposals,
+Phase 4 producer surfaces and Phase 5 corpus accuracy qualification remain future work.
+See the [context README](../../backend/app/contexts/production/session_suggestions/README.md)
+for policy, bounds and transaction details. Synthetic tests establish contract behavior;
+they do not qualify recorder clocks or production-event readiness.

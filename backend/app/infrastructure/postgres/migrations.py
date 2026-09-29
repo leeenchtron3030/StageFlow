@@ -151,6 +151,12 @@ class PostgresMigrationRunner:
         self._execute_if_missing(
             "0021_media_segmentation_forward.sql", version="0021_media_segmentation",
         )
+        self.apply_session_suggestions_v1()
+
+    def apply_session_suggestions_v1(self) -> None:
+        self._execute_if_missing(
+            "0022_session_suggestions_forward.sql", version="0022_session_suggestions",
+        )
 
     def reverse_event_mode_kernel_v1(self) -> None:
         self.reverse_demo_vertical_slice_v1()
@@ -272,8 +278,14 @@ class PostgresMigrationRunner:
         )
 
     def reverse_media_segmentation_v1(self) -> None:
+        self.reverse_session_suggestions_v1()
         self._execute_if_present(
             "0021_media_segmentation_reverse.sql", version="0021_media_segmentation",
+        )
+
+    def reverse_session_suggestions_v1(self) -> None:
+        self._execute_if_present(
+            "0022_session_suggestions_reverse.sql", version="0022_session_suggestions",
         )
 
     def _execute(self, filename: str) -> None:
