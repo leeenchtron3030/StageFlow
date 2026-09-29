@@ -89,7 +89,7 @@ uncontrolled scan loop.
 For source loss, preserve the durable records, restore the same configured binding, and
 run reconciliation again. Absence never implies deletion, Session end, package
 completion, or reassociation. For database loss in a live process, stop authoritative
-writes, restore connectivity, verify all five migrations, and call
+writes, restore connectivity, verify all registered migrations, and call
 `KernelComponents.reconcile_postgresql_recovery()`. Status remains recovering and not
 ready until that fresh bounded reconciliation succeeds; failure remains not ready. A
 restart reconstructs the same durable authority and must satisfy the same source gate.

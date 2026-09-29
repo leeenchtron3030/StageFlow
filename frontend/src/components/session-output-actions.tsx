@@ -84,10 +84,10 @@ export function SessionOutputActions({ context }: { context: OutputActionContext
   }
   return <div className="output-actions">
     {renderSummary ? <strong role="status">{renderSummary}</strong> : null}
-    <button ref={trigger} className={renderSummary || qualityMismatch ? "output-secondary-action" : undefined} type="button" onClick={begin} disabled={Boolean(disabled) || busy || refreshing || Boolean(retry)} aria-describedby="output-action-state">
+    <button ref={trigger} className={renderSummary || qualityMismatch ? "output-secondary-action" : undefined} type="button" onClick={begin} disabled={Boolean(disabled) || busy || refreshing || Boolean(retry)} aria-describedby={primary === "render" && qualityMismatch ? "output-action-state render-quality-reason" : "output-action-state"}>
       {primary === "propose" ? "Propose Assembly" : primary === "approve" ? "Approve / Reject" : qualityMismatch ? renderQualityLabels.again : renderSummary ? "Request another render" : "Request render"}
     </button>
-    {primary === "render" && qualityMismatch && quality && latest ? <span>{renderQualityComparison(renderQualityLabel(latest), renderQualityLabel(quality))}</span> : null}
+    {primary === "render" && qualityMismatch && quality && latest ? <span id="render-quality-reason">{renderQualityComparison(renderQualityLabel(latest), renderQualityLabel(quality))}</span> : null}
     <span ref={actionState} tabIndex={-1} id="output-action-state">{busy ? "Working…" : refreshing ? "Refreshing current state…" : disabled ?? (retry ? "Resolve the pending command before another action." : "")}</span>
     {result ? <div className="output-command-result">
       <p role="status">{result.message}</p>

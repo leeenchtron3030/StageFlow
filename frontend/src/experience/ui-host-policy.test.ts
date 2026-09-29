@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 import { NextRequest } from "next/server.js";
-import { middleware, config } from "../../middleware.ts";
+import { proxy as middleware, config } from "../../proxy.ts";
+import * as proxyModule from "../../proxy.ts";
 import { isAllowedUiHost } from "./ui-host-policy.server.ts";
 
 const originalPort = process.env.PORT;
@@ -47,7 +48,8 @@ test("malformed configured entries grant no access and cannot widen valid entrie
 test("middleware guards pages, all capability routes and static assets with empty 421 responses", async () => {
   process.env.PORT = "4173";
   process.env.STAGEFLOW_UI_ALLOWED_HOSTS = "producer.lan:4173";
-  assert.deepEqual(config, { matcher: "/:path*", runtime: "nodejs" });
+  assert.deepEqual(config, { matcher: "/:path*" });
+  assert.equal(Object.hasOwn(proxyModule, "runtime"), false);
   for (const path of ["/", "/sessions/example", "/api/stageflow/demo/sessions/start", "/api/stageflow/assembly/templates", "/api/stageflow/rendering/requests", "/api/stageflow/editorial/events/example/phrase-lists", "/api/stageflow/media-timing/assets/example/latest", "/_next/static/chunks/app.js", "/favicon.ico"]) {
     for (const method of ["GET", "POST", "HEAD", "OPTIONS"]) {
       for (const host of ["localhost:4173", "127.0.0.1:4173", "[::1]:4173", "producer.lan:4173", "evil.example:4173", "localhost:3000", null]) {

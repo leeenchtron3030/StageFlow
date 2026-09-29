@@ -41,12 +41,12 @@ npm ci
 
 ## UI Host allowlist
 
-Every page, API route and static asset passes through `middleware.ts`. It checks the
+Every page, API route and static asset passes through `proxy.ts`. It checks the
 original `Host` header and returns an empty **421** response for unapproved or missing
 hosts. The default authorities are `localhost:<port>`, `127.0.0.1:<port>` and
 `[::1]:<port>`, where `<port>` is the actual Next.js listening port.
 
-The Node-runtime middleware reads `process.env.PORT` on each request. The installed
+The Node-runtime proxy (`proxy.ts`) reads `process.env.PORT` on each request. The installed
 Next.js `next dev` / `next start` server sets this from `server.address().port` before
 handling requests (`next/dist/server/lib/start-server.js`), covering the default port,
 `PORT`, CLI `--port`, and automatic development fallback when a port is occupied.
