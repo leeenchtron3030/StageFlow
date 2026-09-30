@@ -15,6 +15,12 @@ collapsed Details for diagnosis; shared facts appear once and exceptions remain 
 
 | Internal term | UI label |
 | --- | --- |
+| Session Suggestion / no expectation | Suggested presentations / Unscheduled activity; Mission Control counts are suggestions to review (including unscheduled activity) |
+| Suggestion strength `weak` / schedule edge / overlap | Needs a closer look / From the schedule only / Overlap; other strength and boundary evidence are in Details |
+| Schedule offset source `estimated` / `producer` / `none` | Running about N min behind (or ahead of) the printed schedule (estimated / set by producer) / No schedule offset applied; different blocks have separate local-time summaries |
+| Producer schedule offset override | Schedule offset; from [local printed time], ±N min; publish or clear with confirmation, then explicitly Suggest again |
+| Confirmed and rejected / superseded suggestions | Decided · N (collapsed) / N superseded suggestions hidden |
+| Suggestion confirmation / rejection | Confirm one suggestion, optionally Adjust times in local time; Reject with a fixed picker of reasons within the backend’s bounded text contract |
 | Editorial origin `declared` / `derived` | Marked / Suggested (with matched phrase) |
 | Candidate Moment / point mark | Moment / Single point: set start and end |
 | Session-relative range | time into Session (mm:ss) |

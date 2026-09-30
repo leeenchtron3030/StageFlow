@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { SuggestionQueueLines } from "./suggestion-queue-lines";
+import type { SuggestionQueueItem } from "../experience/session-suggestions-api.ts";
 
 import type {
   AttentionItemView,
@@ -224,7 +226,7 @@ export function InfrastructureStrip({ items }: { items: InfrastructureItemView[]
   );
 }
 
-export function MissionControl({ workspace }: { workspace: OperationalWorkspace }) {
+export function MissionControl({ workspace, suggestions }: { workspace: OperationalWorkspace; suggestions?: SuggestionQueueItem[] }) {
   const interventions = workspace.attention.filter((item) => item.level === "intervention").length;
   const reviews = workspace.attention.filter((item) => item.level === "review").length;
   const summary = interventions
@@ -237,6 +239,7 @@ export function MissionControl({ workspace }: { workspace: OperationalWorkspace 
       <WorkspaceTitle eyebrow="Producer" title="Mission Control" summary={summary} />
       <EventPulse workspace={workspace} />
       <StageMatrix workspace={workspace} />
+      <SuggestionQueueLines items={suggestions} stages={workspace.stages} />
       <div className="mission-lower-grid">
         <AttentionPanel attention={workspace.attention} />
         <InfrastructureStrip items={workspace.infrastructure} />

@@ -236,6 +236,12 @@ are `http://127.0.0.1:8000/api/v1/<capability>`:
 | `STAGEFLOW_RENDERING_API_BASE_URL` | `rendering` |
 | `STAGEFLOW_EDITORIAL_API_BASE_URL` | `editorial` |
 | `STAGEFLOW_MEDIA_TIMING_API_BASE_URL` | `media-timing` |
+| `STAGEFLOW_SESSION_SUGGESTIONS_API_BASE_URL` | `session-suggestions` |
+| `STAGEFLOW_PRODUCER_API_BASE_URL` | `producer` |
+
+The `producer` capability defaults to `http://127.0.0.1:8000/api/v1/producer`.
+Its optional override names the backend Producer API base. The browser route is
+`/api/stageflow/producer/events/U/work-queue`.
 
 All use the existing `STAGEFLOW_API_SHARED_SECRET`. New browser commands additionally
 require the current `STAGEFLOW_DEMO_LAUNCH_CONTEXT` header and a valid server-held
@@ -278,6 +284,27 @@ Literal path segments are case-sensitive. All other method/path pairs return 404
 | editorial | POST | `sessions/U/derivations` |
 | media-timing | GET | `events/U/operations` |
 | media-timing | GET | `assets/U/latest` |
+| producer | GET | `events/U/work-queue` |
+| session-suggestions | GET | `events/U/boundary-cue-catalog` |
+| session-suggestions | GET | `events/U/boundary-cues` |
+| session-suggestions | GET | `events/U/boundary-cues/history` |
+| session-suggestions | POST | `events/U/boundary-cues` |
+| session-suggestions | POST | `events/U/stages/U/runs` |
+| session-suggestions | GET | `events/U/stages/U/runs/latest` |
+| session-suggestions | GET | `events/U/stages/U/suggestions` |
+| session-suggestions | GET | `events/U/suggestions/U` |
+| session-suggestions | POST | `events/U/suggestions/U/confirm` |
+| session-suggestions | POST | `events/U/suggestions/U/reject` |
+| session-suggestions | POST | `events/U/stages/U/schedule-offset` |
+| session-suggestions | GET | `events/U/stages/U/schedule-offset` |
+| session-suggestions | GET | `events/U/stages/U/schedule-offset/history` |
+
+The ED-0108 catalog and composition routes support the Event's Boundary cue phrases
+section. ED-0110 adds the Stage's Suggested presentations panel and the per-Stage
+Mission Control review strip. Confirm and reject remain explicit human actions;
+publishing a schedule offset does not start a suggestion run. Only
+`suggestion_run_not_found` means there is no latest run; other read failures show
+the unavailable state.
 
 The command paths are access foundations for later explicitly confirmed UI actions.
 Editorial marking remains on the existing Demo route. Media-timing enqueue is not in
