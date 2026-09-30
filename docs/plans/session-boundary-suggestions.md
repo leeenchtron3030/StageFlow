@@ -1982,7 +1982,7 @@ Kernel Sessions, and are corrected through the existing commands.
   - the scenario suite passes in CI.
 - [x] **Qualification Run 001** is recorded. It states pass or fail against the ADR target
   for each scenario, with no tuning.
-- [ ] ED-0115: one replay report (time-to-suggestion, stability) on a synthetic day is
+- [x] ED-0115: one replay report (time-to-suggestion, stability) on a synthetic day is
   recorded.
 
 ### Rollback
@@ -2042,9 +2042,41 @@ Revert the code. There is no schema change.
   suggestions are 0 in every cell.
 - **Cause:** per-talk duration and lateness error, which v3's one-offset-per-block model
   cannot represent. No tuning was done.
-- **Open owner decisions:**
-  - whether the target is judged per event day or per event;
-  - the priority of a per-talk-lateness policy version relative to ED-0115.
+- **Owner decisions (2026-09-30):**
+  - The ADR-0034 v1 accuracy target is judged **per event day**, the stricter reading.
+    With 8–11 talks a day, 0.90 recall allows at most one miss, and none on a day of
+    9 talks or fewer.
+  - **Sequence:** ED-0115 comes first. A policy version for per-talk lateness follows. It
+    needs its own plan and owner approval, and must re-qualify with the harness (a
+    Qualification Run 002) and the live replay.
+
+### Completion record (ED-0115)
+
+- **Implemented revision:** merged in PR #172 (`main` `94513ef`).
+- **What changed:**
+  - `scripts/validation/replay_blocks.py`: the stdlib-only live replay tool, with paced
+    atomic copies and bounded pipeline phases. It uses the normal APIs and workers only,
+    and outputs a sanitized JSON report.
+  - Its tests, which use fake effects only.
+  - Docs: the `scripts/validation` README, a method paragraph in the validation README,
+    and a pointer in the context README.
+- **Owner-approved additive evaluator change:** Codex stopped at a Yellow condition,
+  because the directive froze application code but per-talk metrics need matched pairs.
+  The owner approved `evaluation.match_intervals`, which `evaluate_accuracy` now uses
+  internally. Results are unchanged, and no existing assertion changed.
+- **Review:** `directive-reviewer` returned FIX-FIRST (the safety refusals at the entry
+  point were untested), then APPROVE after a tests-only fix. The reviewer confirmed the
+  evaluator refactor matches exactly.
+- **Tests (host):** backend **3,194 passed, 0 failed, 2 skipped**, before and after the
+  rebase. CI green.
+- **Owner replay check:**
+  [session-suggestions-replay-001.md](../validation/results/session-suggestions-replay-001.md).
+  On the synthetic day (24 blocks, 5 talks, ×10 pace, a run every 4 blocks):
+  - final recall 1.00, with 0 s median start and end error;
+  - time to first suggestion from 0 to 1,671 media s, mostly driven by the cadence;
+  - four talks corrected once, by up to 360 s, and nothing moved after that.
+- **Status:** Completed. **Phase 5's tooling is complete.** The policy follow-up is next,
+  as sequenced above.
 
 
 ## Ground-truth corpus handling (all phases)
