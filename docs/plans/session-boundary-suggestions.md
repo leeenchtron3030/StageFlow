@@ -1989,6 +1989,49 @@ Kernel Sessions, and are corrected through the existing commands.
 
 Revert the code. There is no schema change.
 
+### Completion record (ED-0114)
+
+- **Implemented revision:** merged in PR #169 (`main` `a72de19`).
+- **What changed:**
+  - `harness.py` and `harness_cli.py`: the pure harness and its CLI. They take the
+    corpus manifest (schema in `corpus-manifest.schema.json`) and run a policy (v1, v2
+    or v3) against one of two schedule sources:
+    - the manifest schedule, used as is;
+    - drift models (whole-day, two-part, independent). Event days split at gaps of at
+      least 6 h, plans are at least 120 s, and the seeded RNG is documented.
+  - The harness also takes an optional cue profile and producer offsets. Output is
+    sanitized JSON and Markdown. The CLI's catch-all prints codes only, and manifests
+    are capped at 64 MiB.
+  - Evaluator additions: scheduled precision, inclusive precision, an unscheduled count,
+    and the wrong-day check. Existing fields are unchanged.
+  - `scenarios.py`: the deterministic synthetic generator. Its scenarios are:
+    - a clean day;
+    - recording gaps;
+    - a multi-part talk;
+    - a wrong camera clock (never placed, 0 wrong-day);
+    - short evenly spaced talks, pinned as the known aliasing weakness (recall 0.75,
+      which is not an ADR pass);
+    - a late recording start.
+  - Docs: the context README, the capability layer, and the validation README.
+- **Review:** `directive-reviewer` returned FIX-FIRST, then APPROVE after these fixes:
+  - drift plans use a 120 s minimum, as in Runs 002 and 003;
+  - event days are split by gaps, not by UTC dates;
+  - the CLI has a catch-all.
+- **Non-blocking review notes, kept for later:**
+  - measure the day split from a running maximum, not from the previous sorted interval;
+  - apply the byte cap before reading the file (call `stat()` first);
+  - remove the duplicate `except` blocks in `harness_cli.py`.
+- **Tests (host):** backend **3,119 passed, 0 failed, 2 skipped**; Ruff and Pyright
+  clean. CI green.
+- **Acceptance:** precision, the wrong-day check and the scenario suite are done. The
+  check that the harness reproduces Run 003 needs the local corpus manifest, so it runs
+  as the first step of qualification Run 001.
+- **Owner decision (2026-09-30), wrong-day check with several event days:** the Run 001
+  manifest has **one Stage entry per event day**, so the ±12 h window applies to each
+  day. No code change. A per-suggestion day check was the alternative; it was not
+  chosen.
+- **Status:** Completed. Next: qualification Run 001 (owner step), then ED-0115.
+
 ## Ground-truth corpus handling (all phases)
 
 - Real-event media, the decoded ground truth and scripts stay outside the repository:
