@@ -3,7 +3,7 @@ import { runSchema, suggestionSchema, offsetSchema, type SuggestionData, type Su
 export const suggestionId = (n: number) => `10000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 export const eventId = suggestionId(1), stageId = suggestionId(2);
 export const runFixture = runSchema.parse({ run_id: suggestionId(3), event_id: eventId, stage_id: stageId, actor_id: suggestionId(4), created_at: "2026-09-29T14:00:00Z", input_digest: "a".repeat(64),
-  policy: { id: "boundary-suggestion", version: "3" }, skips: { no_timing_evidence: 0, no_segmentation: 0, clock_implausible: 0, no_coverage: 0, no_planned_time: 0 },
+  policy: { id: "boundary-suggestion", version: "3" }, skips: { no_timing_evidence: 0, no_segmentation: 0, clock_implausible: 0, no_coverage: 0, no_planned_time: 0, already_realized: 0 },
   blocks: [{ ordinal: 0, first_planned_start: "2026-09-29T10:00:00Z", last_planned_start: "2026-09-29T12:00:00Z", talk_count: 3, schedule_offset_seconds: 720, schedule_offset_source: "estimated", estimate_score_margin: 20, override_setting_version: null }],
   override_setting_version: null, start_cue_list: null, end_cue_list: null });
 export const suggestionFixture = suggestionSchema.parse({ suggestion_id: suggestionId(5), run_id: runFixture.run_id, event_id: eventId, stage_id: stageId, policy_id: "boundary-suggestion", policy_version: "3", authorized_use: "advisory_only", status: "open",

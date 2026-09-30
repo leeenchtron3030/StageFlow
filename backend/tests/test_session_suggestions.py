@@ -7,10 +7,12 @@ from unittest.mock import patch
 
 import pytest
 
+from app.contexts.production.event_mode_kernel.contracts import StartSessionRequest
 from app.contexts.production.event_mode_kernel.service import DurableEventModeKernel
 from app.contexts.production.session_suggestions.contracts import (
     Reference,
     SessionSuggestion,
+    SkipCounts,
     SuggestionConflictError,
     SuggestionRun,
     SuggestionStatus,
@@ -113,12 +115,14 @@ def test_stale_and_already_realized_typed_refusals() -> None:
         h.service.confirm(event_id=h.event, suggestion_id=old.id,
                           command_id=EntityId.new(), actor_id=ACTOR_ID)
     new = h.suggestion()
-    h.service.confirm(event_id=h.event, suggestion_id=new.id,
-                      command_id=EntityId.new(), actor_id=ACTOR_ID)
-    h.repository.assets[h.stage] = (replace(asset(0, 1800), segmentation_ids=()),)
-    newer = h.suggestion()
+    # A direct Kernel start can realize the talk after evaluation, before confirm.
+    h.kernel.start_session(StartSessionRequest(
+        operation_id=EntityId.new(), event_id=h.event, stage_id=h.stage,
+        actor_id=ACTOR_ID, authoritative_start=at(0), requested_at=NOW,
+        program_expectation_id=h.expectation.id,
+    ))
     with pytest.raises(SuggestionConflictError, match="expectation_already_realized"):
-        h.service.confirm(event_id=h.event, suggestion_id=newer.id,
+        h.service.confirm(event_id=h.event, suggestion_id=new.id,
                           command_id=EntityId.new(), actor_id=ACTOR_ID)
 
 
@@ -310,3 +314,94 @@ def test_bound_kernel_repository_borrowed_connection_assumptions() -> None:
     assert all(call in contexts and isinstance(call.func, ast.Attribute)
                and isinstance(call.func.value, ast.Name) and call.func.value.id == "self"
                for call in borrowed_calls)
+
+
+def test_confirm_then_run_filters_realized_preserving_alignment_coverage_and_queue() -> None:
+    h = Harness()
+    talk2 = h.kernel.record_program_expectation(
+        event_id=h.event, stage_id=h.stage, key="talk-2", title="Talk 2",
+        planned_start=at(1920), planned_end=at(3600))
+    h.repository.assets[h.stage] = (asset(300, 3900, freezes=((1800, 1920),),
+                                         silences=((1800, 1920),)),)
+    first = h.run()
+    before = {s.candidate.expectation.id: s for s in h.service.page(h.event, h.stage)[0]
+              if s.candidate.expectation is not None}
+    assert set(before) == {h.expectation.id, talk2.id}
+    talk1_span = before[h.expectation.id].candidate.span
+    h.service.confirm(event_id=h.event, suggestion_id=before[h.expectation.id].id,
+                      command_id=EntityId.new(), actor_id=ACTOR_ID)
+    second = h.run()
+    assert second.id != first.id and second.input_digest != first.input_digest
+    assert second.skips == replace(first.skips, already_realized=1)
+    assert second.expectations == first.expectations and second.blocks == first.blocks
+    after, _ = h.service.page(h.event, h.stage)
+    assert len(after) == 1 and after[0].candidate == before[talk2.id].candidate
+    assert all(s.candidate.expectation is not None or
+               s.candidate.span.end <= talk1_span.start or
+               s.candidate.span.start >= talk1_span.end for s in after)
+    assert all(s.candidate.expectation is None or
+               s.candidate.expectation.id != h.expectation.id
+               for s in h.repository.suggestions.values() if s.run_id == second.id)
+    assert h.run() == h.service.latest_run(h.event, h.stage) == second
+    queue, = h.service.list_pending_confirmations(h.event)
+    assert "open_count:1" in queue.reason_codes
+    h.service.confirm(event_id=h.event, suggestion_id=after[0].id,
+                      command_id=EntityId.new(), actor_id=ACTOR_ID)
+    assert h.run().skips.already_realized == 2
+    assert h.service.page(h.event, h.stage)[0] == ()
+    assert h.service.list_pending_confirmations(h.event) == ()
+
+
+def test_run_and_confirm_share_cross_stage_realization_rule() -> None:
+    h = Harness()
+    suggestion = h.suggestion()
+    other_stage = next(s.id for s in h.kernel_repo.list_stages(h.event) if s.id != h.stage)
+    h.kernel.start_session(StartSessionRequest(
+        operation_id=EntityId.new(), event_id=h.event, stage_id=other_stage,
+        actor_id=ACTOR_ID, authoritative_start=at(0), requested_at=NOW,
+        program_expectation_id=h.expectation.id,
+    ))
+    with pytest.raises(SuggestionConflictError, match="expectation_already_realized"):
+        h.service.confirm(event_id=h.event, suggestion_id=suggestion.id,
+                          command_id=EntityId.new(), actor_id=ACTOR_ID)
+    assert h.run().skips.already_realized == 1
+    assert h.service.page(h.event, h.stage)[0] == ()
+
+
+def test_rejected_talk_is_eligible_on_new_run() -> None:
+    h = Harness()
+    suggestion = h.suggestion()
+    h.service.reject(event_id=h.event, suggestion_id=suggestion.id,
+                     command_id=EntityId.new(), actor_id=ACTOR_ID, reason="Synthetic reason")
+    # Rejection alone retains digest replay; new evidence creates a new run.
+    h.repository.assets[h.stage] = (replace(asset(0, 1800), segmentation_ids=()),)
+    run = h.run()
+    fresh, = h.service.page(h.event, h.stage)[0]
+    assert fresh.id != suggestion.id
+    assert fresh.candidate.expectation == suggestion.candidate.expectation
+    assert run.skips.already_realized == 0
+
+
+def test_realized_filter_preserves_unrelated_unscheduled_candidate() -> None:
+    h = Harness()
+    h.repository.assets[h.stage] = (asset(0, 3600, freezes=((1800, 1920),)),)
+    h.run()
+    before = h.service.page(h.event, h.stage)[0]
+    scheduled, = (s for s in before if s.candidate.expectation is not None)
+    unscheduled, = (s for s in before if s.candidate.expectation is None)
+    h.service.confirm(event_id=h.event, suggestion_id=scheduled.id,
+                      command_id=EntityId.new(), actor_id=ACTOR_ID)
+    assert h.run().skips.already_realized == 1
+    remaining, = h.service.page(h.event, h.stage)[0]
+    assert remaining.candidate == unscheduled.candidate
+
+
+@pytest.mark.parametrize("value", [-1, 2_147_483_648, True, 1.5])
+def test_already_realized_skip_rejects_invalid_counts(value: int) -> None:
+    with pytest.raises(ValueError, match="skip count out of bounds"):
+        SkipCounts(already_realized=value)
+
+
+def test_already_realized_skip_default_and_upper_bound() -> None:
+    assert SkipCounts().already_realized == 0
+    assert SkipCounts(already_realized=2_147_483_647).already_realized == 2_147_483_647

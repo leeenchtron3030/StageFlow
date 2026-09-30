@@ -1,4 +1,4 @@
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from datetime import UTC, datetime
 from uuid import NAMESPACE_URL, uuid5
 
@@ -27,7 +27,7 @@ from .contracts import (
     validate_offset_entries,
 )
 from .policy_v3 import evaluate
-from .repository import SuggestionRepository
+from .repository import SuggestionRepository, SuggestionTransaction
 from .work_queue import validate_work_queue_limit
 
 
@@ -38,6 +38,13 @@ def kernel_operation_id(command_id: EntityId, command: str) -> EntityId:
 
 def reference_document(reference: Reference | None) -> dict[str, object] | None:
     return None if reference is None else {"id": reference.id.value, "revision": reference.revision}
+
+
+def realized_expectation_ids(tx: SuggestionTransaction, event_id: EntityId) -> set[EntityId]:
+    return {s.program_expectation_id
+            for stage in tx.kernel.repository.list_stages(event_id)
+            for s in tx.kernel.repository.list_sessions_for_stage(stage.id)
+            if s.program_expectation_id is not None}
 
 
 class SessionSuggestionService:
@@ -63,9 +70,14 @@ class SessionSuggestionService:
                     end_cue_list = composition.end_cue_list
             inputs = tx.snapshot(event_id, stage_id, start_cue_list, end_cue_list)
             override = tx.current_offset(event_id, stage_id)
+            realized = realized_expectation_ids(tx, event_id)
             digest = human_command_digest({
                 "event_id": event_id.value, "stage_id": stage_id.value,
                 "policy": asdict(POLICY_V3),
+                # Only this Stage's expectations: a confirm on another Stage must not
+                # force a new run here.
+                "realized_expectation_ids": sorted(
+                    x.id.value for x in inputs.expectations if x.id in realized),
                 "override_setting_version": None if override is None else override.version,
                 "expectations": [reference_document(Reference(x.id, x.revision))
                                  for x in sorted(inputs.expectations, key=lambda x: x.id.value)],
@@ -80,15 +92,20 @@ class SessionSuggestionService:
             if prior is not None:
                 return prior
             result = evaluate(inputs, override)
+            # Keep realized talks in evaluation to preserve alignment and coverage.
+            candidates = tuple(x for x in result.candidates
+                               if x.expectation is None or x.expectation.id not in realized)
+            skips = replace(result.skips,
+                            already_realized=len(result.candidates) - len(candidates))
             run = SuggestionRun(
                 EntityId.new(), event_id, stage_id, digest, actor_id, self.clock.now(),
                 tuple(Reference(x.id, x.revision) for x in inputs.expectations), inputs.assets,
-                start_cue_list, end_cue_list, result.skips, POLICY_V3, result.blocks,
+                start_cue_list, end_cue_list, skips, POLICY_V3, result.blocks,
                 None if override is None else override.version,
             )
             tx.save_run(run, tuple(SessionSuggestion(EntityId.new(), run.id, event_id, stage_id, x,
                                                      POLICY_V3.id, POLICY_V3.version)
-                                   for x in result.candidates))
+                                   for x in candidates))
             return run
 
     def latest_run(self, event_id: EntityId, stage_id: EntityId) -> SuggestionRun:
@@ -213,9 +230,7 @@ class SessionSuggestionService:
                             or expectation.lifecycle_state != ProgramExpectationLifecycle.CURRENT
                             or expectation.stage_id != suggestion.stage_id):
                         raise SuggestionConflictError("stale_expectation_revision")
-                    if any(s.program_expectation_id == expected.id
-                           for stage in tx.kernel.repository.list_stages(event_id)
-                           for s in tx.kernel.repository.list_sessions_for_stage(stage.id)):
+                    if expected.id in realized_expectation_ids(tx, event_id):
                         raise SuggestionConflictError("expectation_already_realized")
                 session = tx.kernel.start_session(StartSessionRequest(
                     operation_id=kernel_operation_id(command_id, "start"), event_id=event_id,

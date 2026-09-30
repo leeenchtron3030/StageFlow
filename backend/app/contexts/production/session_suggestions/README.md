@@ -195,6 +195,21 @@ counts fit a nonnegative signed 32-bit integer. Pagination is UUID keyset order 
 limit of 1-100. Rejection reasons contain 1-500 trimmed characters. All domain timestamps
 are aware; infrastructure timestamps come from the injected clock.
 
+New runs retain realized Program Expectations in the unchanged v3 policy input, then
+omit candidates whose expectation has a Kernel Session on any Stage of the Event.
+This is the same realization rule used by confirm. Their evaluated spans still cover
+scheduled activity, so filtering does not create unscheduled replacements or shift other
+talks' alignment. Rejected talks remain eligible on a new run. The sorted set of realized
+expectation IDs joins the input digest, so confirm followed by run creates a new run.
+
+The informational skip `already_realized` counts omitted candidates. Migration
+`0026_session_suggestions_already_realized` adds a nonnegative integer column with default
+0; old rows read 0, and reversal drops only that column and its migration record.
+Run and latest-run responses include the skip. The Stage summary shows "1 already a
+Session" or "N already Sessions" when nonzero, outside the exception-style skips list.
+Work Queue counts reflect only stored open suggestions. No policy constants or version,
+Kernel semantics, dependency or runtime configuration change accompanies this filter.
+
 Only open suggestions can receive a new decision. Confirm checks current expectation
 revision/lifecycle/Stage and any Session already linked to that expectation. It invokes
 the existing Kernel start and end commands with UUIDv5 IDs derived from the confirm

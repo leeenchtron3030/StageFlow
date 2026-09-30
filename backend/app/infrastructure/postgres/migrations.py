@@ -194,6 +194,13 @@ class PostgresMigrationRunner:
         self._execute_if_missing(
             "0025_boundary_cue_composition_forward.sql", version="0025_boundary_cue_composition",
         )
+        self.apply_session_suggestions_already_realized()
+
+    def apply_session_suggestions_already_realized(self) -> None:
+        self._execute_if_missing(
+            "0026_session_suggestions_already_realized_forward.sql",
+            version="0026_session_suggestions_already_realized",
+        )
 
     def reverse_event_mode_kernel_v1(self) -> None:
         self.reverse_demo_vertical_slice_v1()
@@ -334,8 +341,7 @@ class PostgresMigrationRunner:
         )
 
     def reverse_session_suggestions_policy_v3(self) -> None:
-        # If 0024's existing guard refuses, retain 0025 too. The running v3
-        # application requires both, even when no composition has been published.
+        # If 0024's existing guard refuses, retain later migrations too.
         with ExitStack() as stack:
             runner = replace(self, _reversal=_ReversalTransaction(stack))
             runner.reverse_boundary_cue_composition_v1()
@@ -345,8 +351,20 @@ class PostgresMigrationRunner:
             )
 
     def reverse_boundary_cue_composition_v1(self) -> None:
+        # Retain 0026 if the composition guard refuses reversal.
+        with ExitStack() as stack:
+            runner = (self if self._reversal is not None
+                      else replace(self, _reversal=_ReversalTransaction(stack)))
+            runner.reverse_session_suggestions_already_realized()
+            runner._execute_if_present(
+                "0025_boundary_cue_composition_reverse.sql",
+                version="0025_boundary_cue_composition",
+            )
+
+    def reverse_session_suggestions_already_realized(self) -> None:
         self._execute_if_present(
-            "0025_boundary_cue_composition_reverse.sql", version="0025_boundary_cue_composition",
+            "0026_session_suggestions_already_realized_reverse.sql",
+            version="0026_session_suggestions_already_realized",
         )
 
     def _execute(self, filename: str) -> None:

@@ -106,7 +106,7 @@ export function StageSuggestions({ eventId, stageId, data, titles, hasPlannedTal
       <button type="button" disabled={locked || Boolean(selection) || editing} onClick={() => void submit(prepareRun(stageId))}>{data?.run ? labels.again : labels.suggest}</button>
       <button type="button" disabled={busy || uncertain} onClick={() => router.refresh()}>{labels.refresh}</button>
     </div>
-    {data?.run ? <ul className="suggestion-skips">{Object.entries(data.run.skips).filter(([, count]) => count > 0).map(([key, count]) => <li key={key}>{count} {labels.skips[key as keyof typeof labels.skips][count === 1 ? 0 : 1]}</li>)}</ul> : null}
+    {data?.run ? <ul className="suggestion-skips">{Object.entries(data.run.skips).filter(([key, count]) => key !== "already_realized" && count > 0).map(([key, count]) => <li key={key}>{count} {labels.skips[key as keyof typeof labels.skips][count === 1 ? 0 : 1]}</li>)}</ul> : null}
     <ul className="suggestion-rows" aria-label="Open suggestions">{open.map((item) => <SuggestionRow key={item.suggestion_id} item={item} titles={titles} timeZone={timeZone} offsetInSummary={uniformOffset(open)} decisionForm={selection?.item.suggestion_id === item.suggestion_id ? decisionForm : null}>
       <button type="button" disabled={locked || Boolean(selection) || editing} onClick={() => choose(item, "confirm")}>{labels.confirm}</button>
       <button type="button" disabled={locked || Boolean(selection) || editing} onClick={() => choose(item, "reject")}>{labels.reject}</button>

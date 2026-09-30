@@ -251,3 +251,22 @@ def test_new_reads_return_bounded_storage_errors(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setattr(queue.suggestions, "list_pending_confirmations", unavailable)
     response = client.get(f"/api/v1/producer/events/{event}/work-queue", headers=AUTH_HEADERS)
     assert response.status_code == 503 and response.json() == {"detail": "postgresql_unavailable"}
+
+
+def test_run_and_latest_api_expose_realized_skip_after_confirm() -> None:
+    h = Harness()
+    client = client_for(h)
+    root = f"/api/v1/session-suggestions/events/{h.event}"
+    url = f"{root}/stages/{h.stage}/runs"
+    first = client.post(url, headers=AUTH_HEADERS, json={"actor_id": ACTOR_ID.value})
+    assert first.status_code == 200 and first.json()["skips"]["already_realized"] == 0
+    suggestion, = h.service.page(h.event, h.stage)[0]
+    confirmed = client.post(f"{root}/suggestions/{suggestion.id}/confirm", headers=AUTH_HEADERS,
+                            json={"actor_id": ACTOR_ID.value, "command_id": EntityId.new().value})
+    assert confirmed.status_code == 200
+    second = client.post(url, headers=AUTH_HEADERS, json={"actor_id": ACTOR_ID.value})
+    assert second.status_code == 200 and second.json()["skips"]["already_realized"] == 1
+    assert second.json()["input_digest"] != first.json()["input_digest"]
+    latest = client.get(url + "/latest", headers=AUTH_HEADERS)
+    assert latest.status_code == 200 and latest.json() == second.json()
+    assert h.service.page(h.event, h.stage)[0] == ()
