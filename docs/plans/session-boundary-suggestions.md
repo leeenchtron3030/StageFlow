@@ -40,7 +40,7 @@ policy v2) is detailed below (2026-09-29), after the early accuracy check. After
 | 2d-1. Cue phrase presets and composition (ED-0107 backend, ED-0108 Event page; Completed) | Built-in catalog v1, human composition command publishing the Event's start and end cue lists, runs default to them, Event page section | `0025` |
 | 2d-2. Transcript cues as edges (outline) | Policy v4 with `cue` edges | to be detailed |
 | 5. Validation harness and Run 001 (ED-0114 harness, ED-0115 live replay; Approved) | Committed pure harness + CLI over a local corpus manifest, precision and wrong-day checks, deterministic synthetic scenario suite in CI (gaps, multi-part, wrong clocks, short talks, late recording start), owner qualification Run 001 against the ADR target, local live-replay tool with time-to-suggestion | none |
-| 6. Policy v4, per-talk lateness (ED-0116; Approved) | Lateness-chain joint alignment replacing v3's per-block offset (fixes slot aliasing and per-talk duration error), override entries as mid-day anchors, realistic-schedule-error scenario generator; re-qualify with Qualification Run 002 (dev and held-out, per event day) and Live Replay Run 002 | `0028` |
+| 6. Policy v4, per-talk lateness (ED-0116; Parked 2026-09-30 after dev evaluation; v3 remains) | Lateness-chain joint alignment replacing v3's per-block offset (fixes slot aliasing and per-talk duration error), override entries as mid-day anchors, realistic-schedule-error scenario generator; re-qualify with Qualification Run 002 (dev and held-out, per event day) and Live Replay Run 002 | `0028` |
 
 ## Phase 1: media segmentation evidence (ED-0103)
 
@@ -2084,6 +2084,9 @@ Revert the code. There is no schema change.
 
 ### Status
 
+- **PARKED** (owner, 2026-09-30) after the host dev evaluation. See "Dev evaluation and
+  parking record (ED-0116)" at the end of this phase. v3 remains the policy. The
+  sections below are kept as approved at the time.
 - **Approved** (owner, 2026-09-30), with D1–D6 as recommended:
   - lateness-chain alignment;
   - the name v4, with Phase 2d-2 cue edges moving to v5;
@@ -2359,6 +2362,62 @@ In short:
   v4 rows block rollback, as with `0024`.
 - The default stays v3 until the owner switches it, so reverting before the switch
   affects no producer.
+
+### Dev evaluation and parking record (ED-0116)
+
+- **Implementation:** Codex implemented this section on branch `codex/ed-0116-policy-v4`
+  (`a845230`). It covers `policy_v4.py`, migration `0028`, the harness option, the
+  generator and tests; Codex's sandbox checks were clean. The branch is pushed for
+  reference only. It has **no PR and is not merged**, so `0028` does not exist on `main`.
+- **Owner decisions during implementation:**
+  - **Slot-alias test (Codex Yellow stop 1).** `short-evenly-spaced` is ambiguous by
+    construction: 8 identical talks, with the schedule shifted by exactly one slot.
+    Constants were not tuned to force it.
+  - **Override test (Yellow stop 2).** Even with the correct −420 s override, skipping a
+    talk and jumping a slot scored 95 against 94. v4 was built as specified and then
+    measured.
+- **Dev evaluation on the host.** It used only the three W3S25 days (real published
+  schedule, with cues, one Stage per day) and generator seeds 1–20. The held-out seeds
+  1000–1099 were never used.
+
+  **As specified**, per-day recall on the real schedule:
+
+  | Policy | Day 1 | Day 2 | Day 3 |
+  | --- | --- | --- | --- |
+  | v4 | 0.44 | 0.64 | 0.75 |
+  | v3 | 1.00 | 0.91 | 0.50 |
+
+  - v4 drifts lateness, merges or skips talks mid-day, and pushes the remaining talks
+    into the recording tail after the program.
+
+  **About 70 variants were tested:** τ_step, τ_anchor and window; a weak absolute-lateness
+  term; a cost for skipping a scheduled talk; and a larger cost for early moves.
+  - No variant passes any day.
+  - The best-balanced variant, with a skip cost of 10, gives 0.89 / 0.91 / 0.75. That is
+    a mean of 0.85 against v3's 0.80, with a worst start median of 39 s against 215 s.
+  - That same variant fails the D5 no-regression check against v3 on the drift matrix:
+
+  | Condition | v3 recall (day 1 / 2 / 3) | Variant recall |
+  | --- | --- | --- |
+  | Zero drift | 1.00 / 0.91 / 0.88 | 1.00 / 0.91 / 0.75 |
+  | Two-part ±30 min | 1.00 / 0.82 / 0.75 | 0.67 / 0.73 / 0.50 |
+  | Independent ±5 min | 0.89 / 0.64 / 0.38 | 0.78 / 0.73 / 0.62 |
+
+  - It gains on per-talk error and loses on the whole-day and two-part lateness that v3
+    handles well.
+- **Evidence ceiling (from Qualification Run 001):** with a perfect schedule (independent
+  model, zero drift), v3 already fails the per-day target on days 2 and 3. Day 2's end
+  median is 37 s, and day 3's recall is 0.88. No schedule-handling policy can pass per day
+  on this corpus. The limit is the boundary evidence.
+- **Owner decision (2026-09-30):** park v4 and improve the evidence next:
+  - transcript cues as boundary edges (Phase 2d-2; its version number is now the next
+    free version);
+  - the recording-start boundary;
+  - the content after the program.
+  - Lateness modelling will be revisited once the evidence ceiling is higher. A hybrid,
+    with v3's block offset plus a local chain correction, is a recorded option.
+- **Acceptance:** the ED-0116 items above are **not met** and stay unchecked. No
+  Qualification Run 002 or Live Replay Run 002 was run.
 
 ## Ground-truth corpus handling (all phases)
 
