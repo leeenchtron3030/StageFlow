@@ -354,5 +354,6 @@ def boundary_history(event_id: UUID, session_id: UUID, svc: Service,
     values, cursor = _call(lambda: BoundaryProposalService(svc.repository, svc.clock).history(
         EntityId(str(event_id)), EntityId(str(session_id)),
         after=None if after is None else EntityId(str(after)), limit=limit))
-    return {"items": [_boundary_decision(v) for v in values], "limit": limit,
+    return {"items": [{**_boundary_decision(v), "boundary_kind": v.boundary_kind} for v in values],
+            "limit": limit,
             "next_after": None if cursor is None else cursor.value}

@@ -341,7 +341,7 @@ function capabilityAudit(request: NextRequest, segments: string[], method: strin
     }));
   };
   const resourceFields = ["event_id", "stage_id", "session_id", "asset_id", "packaging_asset_id", "template_id", "assembly_revision_id", "revision_id", "moment_id", "phrase_list_id"];
-  const pathFields: Record<string, string> = { events: "event_id", stages: "stage_id", suggestions: "suggestion_id", sessions: "session_id", assets: "asset_id", "packaging-assets": "packaging_asset_id", moments: "candidate_moment_id" };
+  const pathFields: Record<string, string> = { events: "event_id", stages: "stage_id", suggestions: "suggestion_id", "boundary-proposals": "proposal_id", sessions: "session_id", assets: "asset_id", "packaging-assets": "packaging_asset_id", moments: "candidate_moment_id" };
   const matched = capabilityRoutes[capability].find((entry) => entry.method === method && entry.path.test(segments.join("/")));
   const resources: Record<string, string | string[]> = {};
   // Only extract resources from matched routes, never from an arbitrary refused path.
@@ -396,7 +396,7 @@ function capabilityAudit(request: NextRequest, segments: string[], method: strin
       write({ phase: "result", backend_status: audit.backendStatus, status: response.status,
         outcome: response.ok ? "succeeded" : response.status >= 400 && response.status < 500 ? "rejected" : "failed",
         error_code: response.ok ? null : code, duration_ms: Math.max(0, Math.round(performance.now() - started)),
-        ...ids(value, ["revision_id", "decision_id", "operation_id", "template_id", "packaging_asset_id", "override_id", "review_id", "clip_id", "run_id", "output_id", "phrase_list_id", "suggestion_id", "session_id"]),
+        ...ids(value, ["revision_id", "decision_id", "operation_id", "template_id", "packaging_asset_id", "override_id", "review_id", "clip_id", "run_id", "output_id", "phrase_list_id", "suggestion_id", "session_id", "proposal_id"]),
         ...(capability === "rendering" && segments.at(-1) === "render-setting" && response.ok && Number.isSafeInteger(object.version) && Number(object.version) > 0 ? { setting_version: object.version } : {}),
         ...(capability === "session-suggestions" && segments.at(-1) === "boundary-cues" && response.ok && Number.isSafeInteger(object.version) && Number(object.version) > 0 ? { composition_version: object.version } : {}),
         ...(capability === "session-suggestions" && segments.at(-1) === "schedule-offset" && response.ok && Number.isSafeInteger(object.version) && Number(object.version) > 0 ? { setting_version: object.version } : {}),
@@ -414,6 +414,10 @@ const route = (method: string, path: string) => ({ method, path: new RegExp(`^${
 export const capabilityRoutes = {
   producer: [route("GET", `events/${uuid}/work-queue`)],
   "session-suggestions": [
+    route("GET", `events/${uuid}/sessions/${uuid}/boundary-proposals`),
+    route("POST", `events/${uuid}/sessions/${uuid}/boundary-proposals/${uuid}/apply`),
+    route("POST", `events/${uuid}/sessions/${uuid}/boundary-proposals/${uuid}/dismiss`),
+    route("GET", `events/${uuid}/sessions/${uuid}/boundary-proposals/history`),
     route("GET", `events/${uuid}/boundary-cue-catalog`),
     route("GET", `events/${uuid}/boundary-cues`),
     route("GET", `events/${uuid}/boundary-cues/history`),

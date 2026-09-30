@@ -13,6 +13,7 @@ from app.shared.time import Clock
 from .contracts import (
     POLICY_V3,
     BoundaryProposalDecision,
+    BoundaryProposalDecisionHistoryItem,
     BoundaryProposalDecisionKind,
     Candidate,
     EdgeKind,
@@ -71,7 +72,7 @@ class BoundaryProposalService:
 
     def history(self, event_id: EntityId, session_id: EntityId, *,
                 after: EntityId | None = None, limit: int = 50
-                ) -> tuple[tuple[BoundaryProposalDecision, ...], EntityId | None]:
+                ) -> tuple[tuple[BoundaryProposalDecisionHistoryItem, ...], EntityId | None]:
         if type(limit) is not int or not 1 <= limit <= 100:
             raise ValueError("invalid boundary decision page limit")
         with self.repository.transaction(self.clock) as tx:

@@ -1,6 +1,6 @@
 """Synthetic refinement production, human decisions, and atomic replay."""
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import FrozenInstanceError, replace
+from dataclasses import FrozenInstanceError, asdict, replace
 from unittest.mock import patch
 from uuid import NAMESPACE_URL, uuid5
 
@@ -403,3 +403,24 @@ def test_decision_contract_rejects_naive_time_and_invalid_digest() -> None:
     decision = BoundaryProposalDecision(*args, NOW)
     with pytest.raises(ValueError, match="request digest"):
         replace(decision, request_digest="bad")
+
+
+@pytest.mark.parametrize("apply", [False, True])
+def test_history_preserves_decisions_and_linked_edges_after_new_proposals(apply: bool) -> None:
+    h, session, _ = realized()
+    h.run()
+    opened = boundaries(h).open(h.event, session.id)
+    decisions = {p.id: decide(h, p, apply=apply) for p in opened}
+    h.service.clock = FixedClock(at(3))
+    proposal(h, session, "start", 10)
+    proposal(h, session, "end", 1790)
+    history, cursor = boundaries(h).history(h.event, session.id)
+    assert cursor is None
+    assert {d.proposal_id: d.boundary_kind for d in history} == {
+        p.id: p.boundary_kind for p in opened}
+    assert {d.proposal_id: asdict(d) for d in history} == {
+        p.id: {**asdict(decisions[p.id]), "boundary_kind": p.boundary_kind} for p in opened}
+    with pytest.raises(FrozenInstanceError):
+        history[0].boundary_kind = "end"  # type: ignore[misc]
+    with pytest.raises(ValueError, match="invalid boundary kind"):
+        replace(history[0], boundary_kind="middle")

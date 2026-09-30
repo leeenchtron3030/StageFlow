@@ -1,5 +1,5 @@
 """All database DDL and immutable rows roll back through render_postgres_dsn."""
-from dataclasses import replace
+from dataclasses import asdict, replace
 from typing import TypedDict
 from unittest.mock import patch
 
@@ -175,7 +175,10 @@ def test_postgres_apply_atomic_retry_dismiss_history_and_immutable_guard(
                                    proposal_id=end.id, command_id=EntityId.new(), actor_id=ACTOR_ID)
     assert not restarted.open(session.event_id, session.id)
     history, _ = restarted.history(session.event_id, session.id)
-    assert set(history) == {decision, dismissed}
+    assert {d.proposal_id: asdict(d) for d in history} == {
+        decision.proposal_id: {**asdict(decision), "boundary_kind": "start"},
+        dismissed.proposal_id: {**asdict(dismissed), "boundary_kind": "end"},
+    }
     page, cursor = restarted.history(session.event_id, session.id, limit=1)
     tail, cursor2 = restarted.history(session.event_id, session.id, limit=1, after=cursor)
     assert page + tail == history and cursor is not None and cursor2 is None

@@ -15,6 +15,12 @@ collapsed Details for diagnosis; shared facts appear once and exceptions remain 
 
 | Internal term | UI label |
 | --- | --- |
+| Session boundary proposal | Suggested boundaries; omit the section when none are open; Stage summary adds 1 boundary suggestion / N boundary suggestions; linked realized talks appear in collapsed Already Sessions · N with Boundary suggestion badges, independent of Decided rows |
+| Current / suggested boundary times | Current → suggested local times with seconds and an accessible current/suggested label; no repeated signed difference; show dates only outside the Session's own local date or across midnight (once for a shared date), including confirmation |
+| Realized talk timing | Session's current local start–end; same-day date once, both dates across midnight; never the latest suggestion's times |
+| Proposal reason `changeover_edge` / `recording_gap` / `recording_boundary` / `cue_supported` | a still-image changeover / a recording gap / the start/end of the recording / a spoken cue |
+| Boundary proposal decision | Apply / Dismiss, each with confirmation; optional dismissal reason from a fixed picker; Start applied · HH:mm · by producer / End dismissed · HH:mm · Not enough evidence inside Session Details; IDs and raw values in nested Details, without JSON dumps |
+| Boundary command refusal / uncertain outcome | Deterministic refusals offer Refresh; actions unlock after refresh. Transport failures, 5xx, and unknown outcomes retain Retry same command |
 | Session Suggestion / no expectation | Suggested presentations / Unscheduled activity; Mission Control counts are suggestions to review (including unscheduled activity) |
 | Suggestion strength `weak` / schedule edge / overlap | Needs a closer look / From the schedule only / Overlap; other strength and boundary evidence are in Details |
 | Schedule offset source `estimated` / `producer` / `none` | Running about N min behind (or ahead of) the printed schedule (estimated / set by producer) / No schedule offset applied; different blocks have separate local-time summaries |

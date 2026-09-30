@@ -26,6 +26,7 @@ from app.shared.time import Clock
 from .contracts import (
     AssetInput,
     BoundaryProposalDecision,
+    BoundaryProposalDecisionHistoryItem,
     InputSnapshot,
     Reference,
     ScheduleOffsetSetting,
@@ -129,11 +130,14 @@ class InMemorySuggestionRepository:
         self.boundary_decisions[value.command_id] = value
 
     def boundary_decision_history(self, session_id: EntityId, after: EntityId | None,
-                                  limit: int) -> tuple[BoundaryProposalDecision, ...]:
-        return tuple(sorted((d for d in self.boundary_decisions.values()
+                                  limit: int) -> tuple[BoundaryProposalDecisionHistoryItem, ...]:
+        decisions = tuple(sorted((d for d in self.boundary_decisions.values()
                              if d.session_id == session_id
                              and (after is None or d.command_id.value > after.value)),
                             key=lambda d: d.command_id.value))[:limit]
+        return tuple(BoundaryProposalDecisionHistoryItem.from_decision(
+            d, self.boundary_proposal(session_id, d.proposal_id).boundary_kind)
+            for d in decisions)
 
     def cue_event_scope(self, event_id: EntityId) -> None:
         if event_id not in cast(dict[EntityId, object], vars(self.kernel_repository)["_events"]):

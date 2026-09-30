@@ -59,6 +59,14 @@ Authenticated routes under `/session-suggestions/events/{event_id}`:
 - `GET /sessions/{session_id}/boundary-proposals/history`: decision pages, ordered by command
   UUID, `after` UUID cursor and `limit` 1–100 (default 50), with `next_after`.
 
+History items include `proposal_id`, `session_id`, `kind`, `command_id`, `actor_id`,
+`decided_at`, `reason`, and `boundary_kind` (`start` / `end`). Under the owner's ED-0113
+scope addition (2026-09-29), the history read joins the immutable Kernel proposal by
+proposal ID in PostgreSQL and memory; it does not infer the edge from current/open
+proposals or the bounded Kernel status snapshot. The existing page bound, UUID order,
+Event scope and all prior fields are unchanged. Apply/Dismiss responses and stored
+records are unchanged; this addition requires no migration.
+
 Both run and latest-run documents expose `boundary_proposals_created`. All proposal and
 history reads validate the Session's Event. Errors retain 404/409/422/503 conventions.
 Migration `0027_boundary_proposal_decisions` adds append-only decisions, unique proposal

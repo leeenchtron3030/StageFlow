@@ -11,6 +11,7 @@ from app.contexts.production.event_mode_kernel.contracts import (
 from app.contexts.production.event_mode_kernel.service import DurableEventModeKernel
 from app.contexts.production.session_suggestions.contracts import (
     BoundaryProposalDecision,
+    BoundaryProposalDecisionHistoryItem,
     BoundaryProposalDecisionKind,
     SuggestionConflictError,
     SuggestionNotFoundError,
@@ -109,15 +110,18 @@ class PostgresBoundaryProposalTransaction:
         )
 
     def boundary_decision_history(self, session_id: EntityId, after: EntityId | None,
-                                  limit: int) -> tuple[BoundaryProposalDecision, ...]:
+                                  limit: int) -> tuple[BoundaryProposalDecisionHistoryItem, ...]:
         rows = self.connection.execute(
-            """SELECT * FROM stageflow.boundary_proposal_decision
-               WHERE session_id=%s AND (%s::uuid IS NULL OR command_id>%s::uuid)
-               ORDER BY command_id LIMIT %s""",
+            """SELECT d.*, p.boundary_kind FROM stageflow.boundary_proposal_decision d
+               JOIN stageflow.session_boundary_proposal p
+                 ON p.boundary_proposal_id=d.proposal_id
+               WHERE d.session_id=%s AND (%s::uuid IS NULL OR d.command_id>%s::uuid)
+               ORDER BY d.command_id LIMIT %s""",
             (session_id.value, None if after is None else after.value,
              None if after is None else after.value, limit),
         ).fetchall()
-        return tuple(_decision(r) for r in rows)
+        return tuple(BoundaryProposalDecisionHistoryItem.from_decision(
+            _decision(r), r["boundary_kind"]) for r in rows)
 
 
 def _decision(row: dict[str, Any]) -> BoundaryProposalDecision:
