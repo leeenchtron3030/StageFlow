@@ -588,6 +588,30 @@ button:disabled { cursor: not-allowed; color: var(--subtle-foreground); backgrou
 .outputs-facts dt { color: var(--muted-foreground); font-size: 12px; }
 .outputs-facts dd { margin: 4px 0 0; }
 .outputs-rows { list-style: none; margin: 0; padding: 0; }
+.boundary-cues-panel { margin-top: 18px; }
+.boundary-cues-panel form, .cue-editor { display: grid; gap: 12px; }
+.cue-editor { border: 0; padding: 0; margin: 0; min-width: 0; }
+.cue-editor > legend { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.cue-groups { display: grid; gap: 8px; border: 1px solid var(--border); padding: 12px; min-width: 0; }
+.cue-groups label { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; }
+.cue-groups span { color: var(--muted-foreground); font-size: 13px; }
+.cue-selected-groups { border: 0; padding: 0; gap: 6px; }
+.cue-more-groups > fieldset { margin-top: 12px; }
+.cue-more-groups > summary { cursor: pointer; }
+.cue-role { border-top: 1px solid var(--border); padding: 12px 0; }
+.cue-role summary, .boundary-cues-panel > details > summary { cursor: pointer; }
+.cue-phrase-line { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.cue-source h4 { margin: 12px 0 6px; }
+.cue-phrases { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.cue-phrases .cue-phrase-line { padding: 4px 0; }
+.cue-phrase-text { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px; min-width: 0; overflow-wrap: anywhere; }
+.cue-phrase-text small { color: var(--muted-foreground); }
+.cue-phrases button { flex-shrink: 0; }
+.cue-badges { display: flex; flex-wrap: wrap; gap: 6px; }
+.cue-badge { border: 1px solid var(--border); border-radius: 6px; padding: 2px 6px; }
+.cue-profile-confirm { padding: 12px; border: 1px solid var(--border); }
+.boundary-cues-panel select, .boundary-cues-panel input:not([type="checkbox"]) { width: 100%; padding: 9px 11px; border: 1px solid var(--border); border-radius: 8px; background: var(--background); color: inherit; }
+.boundary-cues-panel :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .outputs-rows li { display: grid; gap: 5px; padding: 12px 0; border-top: 1px solid var(--border); overflow-wrap: anywhere; }
 .outputs-rows span { font-size: 13px; }
 .outputs-qualification { font-weight: 600; }

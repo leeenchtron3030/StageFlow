@@ -33,6 +33,14 @@ collapsed Details for diagnosis; shared facts appear once and exceptions remain 
 | Render profile h264-nvenc-1080p-video v3; v1/v2 history | 1080p with audio (v3); 1080p (v1/v2) |
 | Render Preset | 1080p Standard / 1080p High / 720p Compact |
 | Event Render Setting | Render quality; Default when no setting has been chosen |
+| Boundary cue composition | Boundary cue phrases; Composed [local time] |
+| Cue roles `start` / `end` / `changeover` / `segment` | Start / End / Between sessions / Inside a session (saved, not used for boundaries) |
+| Event profile / cue phrase group / boundary cue catalog | Event profile / Phrase groups / Boundary cue catalog; readable names in controls, keys in Details |
+| Cue evidence `M` / `R`; evidence containing `⚠` or opt-in phrase | measured on one conference (one shared legend); from published scripts (R-only badge); ⚠ often said mid-talk (including default phrases; never a guarantee) |
+| Cue selection differing from profile groups, or with include/exclude/custom choices | Custom (based on [profile name]); applies to draft, review and stored composition summaries |
+| Unselected cue groups / regional category | More groups (collapsed, by category); Regional add-ons (never pre-ticked) |
+| Deduplicated cue source / excluded phrases | First source group heading in catalog order; also in N other groups; Custom heading for custom phrases; Removed · N (collapsed) with Add back restoring all excluded sources |
+| Group selection overlapping removed phrases | N removed phrases stay removed; use Add back in Removed to restore them |
 | Render Adjustment | Video bitrate / Audio bitrate |
 | Explicit render with different current settings | Render again at current quality |
 | Slot bindings | Layout: Intro ([asset name]) → Recording |

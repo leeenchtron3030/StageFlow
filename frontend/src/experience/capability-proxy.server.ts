@@ -397,6 +397,7 @@ function capabilityAudit(request: NextRequest, segments: string[], method: strin
         error_code: response.ok ? null : code, duration_ms: Math.max(0, Math.round(performance.now() - started)),
         ...ids(value, ["revision_id", "decision_id", "operation_id", "template_id", "packaging_asset_id", "override_id", "review_id", "clip_id", "run_id", "output_id", "phrase_list_id"]),
         ...(capability === "rendering" && segments.at(-1) === "render-setting" && response.ok && Number.isSafeInteger(object.version) && Number(object.version) > 0 ? { setting_version: object.version } : {}),
+        ...(capability === "session-suggestions" && segments.at(-1) === "boundary-cues" && response.ok && Number.isSafeInteger(object.version) && Number(object.version) > 0 ? { composition_version: object.version } : {}),
         ...ids(object.decision, ["review_decision_id", "operation_id"]), ...ids(object.clip, ["clip_id"]),
         ...(Array.isArray(object.candidate_ids) ? { candidate_ids: object.candidate_ids.filter((id) => typeof id === "string" && uuidPattern.test(id) && safe(id)) } : {}),
       });
@@ -405,10 +406,16 @@ function capabilityAudit(request: NextRequest, segments: string[], method: strin
   return audit;
 }
 
-export type Capability = "demo" | "assembly" | "rendering" | "editorial" | "media-timing";
+export type Capability = "demo" | "assembly" | "rendering" | "editorial" | "media-timing" | "session-suggestions";
 const uuid = "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}";
 const route = (method: string, path: string) => ({ method, path: new RegExp(`^${path}$`) });
 export const capabilityRoutes = {
+  "session-suggestions": [
+    route("GET", `events/${uuid}/boundary-cue-catalog`),
+    route("GET", `events/${uuid}/boundary-cues`),
+    route("GET", `events/${uuid}/boundary-cues/history`),
+    route("POST", `events/${uuid}/boundary-cues`),
+  ],
   assembly: [
     route("GET", `events/${uuid}/templates`),
     route("POST", "templates"),

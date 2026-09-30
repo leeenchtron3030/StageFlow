@@ -13,7 +13,7 @@ export const numberedPageFields = { limit: revisionSchema.max(100), next_after: 
 export type ApiRead = (path: string) => Promise<unknown>;
 
 /** Browser transport: only same-origin capability routes; no secret or backend URL. */
-export function capabilityRead(capability: "assembly" | "rendering" | "editorial" | "media-timing"): ApiRead {
+export function capabilityRead(capability: "assembly" | "rendering" | "editorial" | "media-timing" | "session-suggestions"): ApiRead {
   return async (path) => {
     const response = await fetch(`/api/stageflow/${capability}/${path}`, { cache: "no-store", redirect: "error" });
     if (!response.ok) throw new Error(`outputs_http_${response.status}`);

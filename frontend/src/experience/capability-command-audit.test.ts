@@ -21,6 +21,18 @@ test("choose quality audit records Event, command, bounded outcome and resulting
   assert.equal(received.command_id, id(3)); assert.equal(result.setting_version, 3);
 });
 let lines: string[] = [];
+for (const status of [200, 409, 422, 503]) test(`cue publication audit at HTTP ${status} records version without phrase text`, async () => {
+  globalThis.fetch = async (_url, init) => {
+    const body = JSON.parse(String(init?.body));
+    assert.equal(body.actor_id, id(9));
+    return Response.json(status === 200 ? { version: 2, custom_phrases: [{ text: freeText, role: "start" }] } : { detail: { code: "cue_list_empty", role: "end", count: 0 } }, { status });
+  };
+  const response = await command({ capability: "session-suggestions", path: `events/${id(2)}/boundary-cues`, body: JSON.stringify({ command_id: id(3), actor_id: id(8), custom_phrases: [{ text: freeText, role: "start" }] }) });
+  assert.equal(response.status, status);
+  const { received, result } = pair("accepted", status === 200 ? "succeeded" : status < 500 ? "rejected" : "failed", status);
+  assert.equal(received.resource_ids.event_id, id(2)); assert.equal(received.command_id, id(3));
+  assert.equal(result.composition_version, status === 200 ? 2 : undefined);
+});
 beforeEach(() => {
   lines = []; console.info = (line) => { lines.push(String(line)); };
   process.env.STAGEFLOW_API_SHARED_SECRET = secret;

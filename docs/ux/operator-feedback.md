@@ -309,3 +309,41 @@ line; preserve resolved entries as concise evidence rather than deleting them.
   consequence-first wording, and all command, concurrency and authority behaviour.
 - Classification: Green (presentation and wording)
 - Status: validated (ED-0100)
+
+### 2026-09-29 - ED-0108 review checkpoints: boundary cue phrases
+
+- Route/scenario:
+  - the Event page (`/event`) on the render validation Event, in kernel mode;
+  - the *Conference stage* profile composed through the UI. "my name is" was removed, a
+    custom start phrase was added, and it was published as version 1;
+  - edits without publishing: removing "welcome back" then ticking Broadcast, and
+    switching to the *Film or studio set* profile.
+- Category: glance comprehension | repetition | honesty | recoverability
+- **First checkpoint.** Observations; the owner approved all six changes:
+  1. **Long group list.** All 21 groups were shown flat. Change: the ticked groups come
+     first, and the others fold under "More groups" by category, with the regional
+     add-ons separate.
+  2. **Repeated badges.** Every phrase row repeated its group and evidence badge on a
+     second line. Change: phrases are grouped under their first source group, one
+     compact row each, with an "also in N other groups" note. One legend line replaces
+     the repeated badge, and badges now appear only for the exceptions ("from published
+     scripts", ⚠).
+  3. **Removal could not be undone.** Change: a collapsed "Removed · N" list with Add
+     back, which restores the phrase to every source group.
+  4. **⚠ was missing on default noisy phrases** such as studio "moving on". Change: ⚠
+     follows the catalog evidence label, not only the opt-in flag.
+  5. **Profile name after edits.** The summary kept the profile name after the selection
+     changed. Change: it reads "Custom (based on <profile>)", for drafts and for stored
+     compositions.
+  6. **Removed phrases returned.** Ticking another group brought a removed phrase back.
+     Change: the removal persists, with the notice "N removed phrases stay removed".
+- **Second checkpoint:** the owner approved the result. Two small fixes were made after
+  review:
+  - singular wording for one removed phrase;
+  - re-adding a removed phrase as a custom phrase takes it out of Removed.
+- Noted, not changed: moving a group between the selected list and "More groups" moves
+  keyboard focus, as a consequence of item 1.
+- Unchanged: the confirmation before publishing and before a profile switch, the history
+  under Details, honest evidence wording, and all proxy, audit and authority behaviour.
+- Classification: Green (presentation and wording)
+- Status: validated (ED-0108)
