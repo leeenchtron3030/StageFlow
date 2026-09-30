@@ -21,7 +21,7 @@ export const suggestionSchema = z.object({
 export const runSchema = z.object({
   run_id: id, event_id: id, stage_id: id, input_digest: hashSchema, actor_id: id, created_at: time,
   policy: z.object({ id: z.string(), version: z.string() }),
-  skips: z.object({ no_timing_evidence: count, no_segmentation: count, clock_implausible: count, no_coverage: count, no_planned_time: count }),
+  skips: z.object({ no_timing_evidence: count, no_segmentation: count, clock_implausible: count, no_coverage: count, no_planned_time: count, already_realized: count }),
   blocks: z.array(z.object({ ordinal: count, first_planned_start: time, last_planned_start: time, talk_count: revision,
     schedule_offset_seconds: z.number().int(), schedule_offset_source: source, estimate_score_margin: z.number(), override_setting_version: revision.nullable() })),
   override_setting_version: revision.nullable(),

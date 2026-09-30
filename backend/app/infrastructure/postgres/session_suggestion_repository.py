@@ -329,8 +329,9 @@ class PostgresSuggestionTransaction(PostgresBoundaryCueTransaction):
                 expectation_references, asset_inputs, start_cue_list_id, start_cue_list_version,
                 end_cue_list_id, end_cue_list_version, policy_id, policy_version, policy_constants,
                 no_timing_evidence, no_segmentation, clock_implausible,
-                no_coverage, no_planned_time, override_setting_version, block_count)
-               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                no_coverage, no_planned_time, already_realized,
+                override_setting_version, block_count)
+               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
             (run.id.value, run.event_id.value, run.stage_id.value,
              run.input_digest, run.actor_id.value,
              run.created_at, Jsonb([reference_document(r) for r in run.expectations]),

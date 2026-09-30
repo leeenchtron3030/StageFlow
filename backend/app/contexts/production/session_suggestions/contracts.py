@@ -237,6 +237,7 @@ class SkipCounts:
     clock_implausible: int = 0
     no_coverage: int = 0
     no_planned_time: int = 0
+    already_realized: int = 0
 
     def __post_init__(self) -> None:
         if any(type(getattr(self, f.name)) is not int

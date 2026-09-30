@@ -903,6 +903,17 @@ claims.
 
 ## Session Suggestions core (ED-0104)
 
+New runs exclude suggestions for Program Expectations already linked to a Kernel Session
+on any Stage of the same Event, using the confirm path's realization rule. Realized talks
+remain in the unchanged v3 policy evaluation to preserve joint alignment and coverage;
+only storage of their resulting candidates is filtered. Rejected talks remain eligible.
+The sorted realized expectation IDs enter the input digest. The informational
+`already_realized` skip counts omitted candidates and is included in run/latest-run reads.
+Migration `0026_session_suggestions_already_realized` adds the nonnegative count with a
+zero default for old runs; reverse drops it. The Stage summary says "1 already a Session"
+or "N already Sessions", outside the exception-style skips list. Work Queue shape is
+unchanged and counts only stored open suggestions.
+
 The production-layer `session_suggestions` context implements the approved ADR-0034
 Phase 2/2b/2c policy and human run/confirm/reject workflow. It reads Stage Program Expectations,
 latest active Media Timing Evidence, segmentation intervals and optional latest complete

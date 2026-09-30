@@ -108,9 +108,11 @@ def test_registry_forward_reverse_order_and_sql_are_available(
     runner = PostgresMigrationRunner("unused")
     runner.apply_session_suggestions_v1()
     assert applied == ["0022_session_suggestions", "0023_session_suggestions_policy_v2",
-                       "0024_session_suggestions_policy_v3", "0025_boundary_cue_composition"]
+                       "0024_session_suggestions_policy_v3", "0025_boundary_cue_composition",
+                       "0026_session_suggestions_already_realized"]
     applied.clear()
     runner.reverse_session_suggestions_v1()
-    assert applied == ["0025_boundary_cue_composition", "0024_session_suggestions_policy_v3",
+    assert applied == ["0026_session_suggestions_already_realized",
+                       "0025_boundary_cue_composition", "0024_session_suggestions_policy_v3",
                        "0023_session_suggestions_policy_v2",
                         "0022_session_suggestions"]

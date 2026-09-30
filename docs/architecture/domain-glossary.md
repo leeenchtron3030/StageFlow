@@ -106,6 +106,15 @@ not-event-ready disclaimer retain their meaning.
   suggestion; otherwise its decision supplies confirmed/rejected, or it remains open.
   Supersession never removes the retained decision or a realized Session.
 
+### Already a Session (`already_realized` suggestion-run skip)
+
+- **Definition:** Number of evaluated candidates omitted from a new run because their
+  Program Expectation already has a Kernel Session on any Stage of the same Event.
+- **Meaning:** Informational, not an error. The Stage summary says "1 already a Session"
+  or "N already Sessions"; it is excluded from the exception-style skips list.
+- **Boundary:** Realized expectations stay in policy input, preserving joint alignment
+  and scheduled coverage. Rejection alone does not exclude a talk from a new run.
+
 ### Suggestion Run
 
 - **Definition:** The immutable result of a human invocation of `boundary-suggestion`

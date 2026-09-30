@@ -38,7 +38,8 @@ export function offsetSummary(blocks: SuggestionRun["blocks"], zone?: string): s
 export function suggestionSummary(data: SuggestionData, hasPlannedTalks: boolean, zone?: string) {
   const open = data.suggestions.filter((s) => s.status === "open"), weak = open.filter((s) => s.strength === "weak").length;
   const decided = data.suggestions.some((s) => s.run_id === data.run?.run_id && (s.status === "confirmed" || s.status === "rejected"));
-  return [!hasPlannedTalks ? labels.scheduleFirst : "", open.length ? `${open.length} suggested` : hasPlannedTalks ? decided ? labels.noneOpen : labels.none : "", weak ? closerLook(weak) : "",
+  return [!hasPlannedTalks ? labels.scheduleFirst : "", open.length ? `${open.length} suggested` : hasPlannedTalks ? decided || data.run?.skips.already_realized ? labels.noneOpen : labels.none : "", weak ? closerLook(weak) : "",
+    data.run?.skips.already_realized ? `${data.run.skips.already_realized} already ${data.run.skips.already_realized === 1 ? "a Session" : "Sessions"}` : "",
     data.run ? `last suggested ${localTime(data.run.created_at, zone)}` : "", offsetSummary(data.run?.blocks ?? [], zone)].filter(Boolean).join(" · ");
 }
 /** True when every suggestion shares one offset source and value; the summary line then states it once. */

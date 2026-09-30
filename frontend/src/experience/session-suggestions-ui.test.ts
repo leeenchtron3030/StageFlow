@@ -77,7 +77,7 @@ test("a Stage with zero planned talks prompts for its schedule before any counts
 
 test("every skip and hidden suggestion count uses singular and plural wording", () => {
   for (const count of [1, 2]) {
-    const html = harness({ ...data, run: { ...run, skips: { no_timing_evidence: count, no_segmentation: count, clock_implausible: count, no_coverage: count, no_planned_time: count } }, suggestions: Array.from({ length: count }, (_, i) => ({ ...s, suggestion_id: id(70 + i), status: "superseded" })) }).html();
+    const html = harness({ ...data, run: { ...run, skips: { no_timing_evidence: count, no_segmentation: count, clock_implausible: count, no_coverage: count, no_planned_time: count, already_realized: 0 } }, suggestions: Array.from({ length: count }, (_, i) => ({ ...s, suggestion_id: id(70 + i), status: "superseded" })) }).html();
     const expected = count === 1 ? ["recording without timing evidence", "recording without changeover evidence", "recording with an implausible clock", "planned talk without enough recording coverage", "scheduled talk missing planned times", "superseded suggestion hidden"] : ["recordings without timing evidence", "recordings without changeover evidence", "recordings with implausible clocks", "planned talks without enough recording coverage", "scheduled talks missing planned times", "superseded suggestions hidden"];
     for (const phrase of expected) assert.ok(html.includes(`${count} ${phrase}`), phrase);
   }
@@ -138,7 +138,7 @@ test("unrelated refresh preserves an uncertain retry and its exact command; succ
 });
 
 test("skips show only nonzero exceptions; missing planned times prompt schedule and offsets disclose block differences", () => {
-  const h = harness({ ...data, run: { ...run, blocks: [], skips: { no_timing_evidence: 2, no_segmentation: 0, clock_implausible: 1, no_coverage: 3, no_planned_time: 4 } } }, true, "synthetic", false);
+  const h = harness({ ...data, run: { ...run, blocks: [], skips: { no_timing_evidence: 2, no_segmentation: 0, clock_implausible: 1, no_coverage: 3, no_planned_time: 4, already_realized: 0 } } }, true, "synthetic", false);
   assert.match(h.html(), /Add the schedule first/); assert.match(h.html(), /2 recordings without timing evidence/); assert.match(h.html(), /1 recording with an implausible clock/); assert.doesNotMatch(h.html(), /0 recordings without changeover evidence/);
   assert.match(harness({ ...data, run: { ...run, blocks: [...run.blocks, { ...run.blocks[0], ordinal: 1, schedule_offset_source: "producer", schedule_offset_seconds: 600 }] } }).html(), /from Sep 29, 10:00: running about 12.*from Sep 29, 10:00: running about 10/);
 });
@@ -339,4 +339,20 @@ test("Mission Control page reads the queue only for a connected Event and distin
   assert.deepEqual((await render()).props.suggestions, [queueFixture]);
   fail = true; assert.equal((await render()).props.suggestions, undefined);
   workspace.dataSource.kind = "fixture"; assert.equal(JSON.stringify((await render()).props.suggestions), "[]"); assert.equal(calls, 2);
+});
+
+test("realized talks appear as informational singular/plural summary counts, never skip exceptions", () => {
+  for (const count of [0, 1, 2]) {
+    const html = harness({ ...data, run: { ...run, skips: { ...run.skips, already_realized: count } } }).html();
+    if (count) assert.ok(html.includes(` \u00b7 ${count} already ${count === 1 ? "a Session" : "Sessions"}`));
+    else assert.doesNotMatch(html, /already (a Session|Sessions)/);
+    const skips = html.match(/<ul class="suggestion-skips">([\s\S]*?)<\/ul>/)?.[1];
+    assert.equal(skips, "");
+  }
+});
+
+test("a run whose remaining talks are all already Sessions reads as no open suggestions, not 'yet'", () => {
+  const html = harness({ ...data, suggestions: [], run: { ...run, skips: { ...run.skips, already_realized: 2 } } }).html();
+  assert.ok(html.includes("No open suggestions · 2 already Sessions"));
+  assert.doesNotMatch(html, /No suggestions yet/);
 });
