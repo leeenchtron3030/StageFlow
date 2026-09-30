@@ -34,7 +34,7 @@ policy v2) is detailed below (2026-09-29), after the early accuracy check. After
 | --- | --- | --- |
 | **1. Media segmentation evidence (ED-0103)** | Advisory freeze and silence intervals per Completed Media Asset, from a new `media_segmentation` Durable Operation | `0021` |
 | 2. Session Suggestions core | Suggestion aggregate, deterministic `boundary-suggestion` policy v1 (schedule, timing, segmentation, transcript cues), human-invoked suggestion run, confirm and reject commands (confirm reuses the existing human Session realization and boundary commands) | `0022` |
-| 3. Boundary proposals for realized Sessions (ED-0112 backend, ED-0113 Session Detail; Proposed; next) | Suggestion runs propose start/end corrections (≥ 30 s) for realized, linked Sessions via the existing `session_boundary_proposal` table; human Apply/Dismiss with an append-only decision record; Session Detail section and Stage badge; UX checkpoint | `0027` (decision record; owner decision D5) |
+| 3. Boundary proposals for realized Sessions (ED-0112 backend, ED-0113 Session Detail; Approved) | Suggestion runs propose start/end corrections (≥ 30 s) for realized, linked Sessions via the existing `session_boundary_proposal` table; human Apply/Dismiss with an append-only decision record; Session Detail section and Stage badge; UX checkpoint | `0027` (decision record; owner decision D5) |
 | 4. Producer surfaces (ED-0109 backend, ED-0110 Stage page; Completed; follow-up ED-0111 Approved) | Work Queue item "confirm presentation" (additive, one per Stage), latest-run read, Suggested presentations panel on the Stage page with confirm/adjust/reject and schedule offset, Mission Control summary line; UX checkpoint | none |
 | 2c. Policy v3, schedule offset (ED-0106, Completed) | Per-block schedule offset (estimated or producer override) before v2 alignment; Stage offset override setting | `0024` |
 | 2d-1. Cue phrase presets and composition (ED-0107 backend, ED-0108 Event page; Completed) | Built-in catalog v1, human composition command publishing the Event's start and end cue lists, runs default to them, Event page section | `0025` |
@@ -1561,8 +1561,9 @@ Kernel Sessions, and are corrected through the existing commands.
 
 ### Status
 
-- **Proposed** (2026-09-29). It becomes Green and implementation-ready when the owner
-  approves this section, including decisions D1–D6.
+- **Approved** (owner, 2026-09-29), including decisions D1–D6 as recommended.
+- **Execution authority:** Green and implementation-ready. ED-0112 runs after ED-0111
+  merges, and ED-0113 after ED-0112.
 - **Order (owner, 2026-09-29):** Phase 3 follows Phase 4 and ED-0111. Phase 5 follows it.
 
 ### Why
