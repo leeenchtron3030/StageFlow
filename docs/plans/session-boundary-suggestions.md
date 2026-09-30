@@ -1975,12 +1975,12 @@ Kernel Sessions, and are corrected through the existing commands.
 
 ### Acceptance criteria
 
-- [ ] ED-0114:
+- [x] ED-0114:
   - the harness reproduces the Run 003 numbers from a manifest built from the local
     corpus, within the same seeds;
   - precision and the wrong-day check are reported;
   - the scenario suite passes in CI.
-- [ ] **Qualification Run 001** is recorded. It states pass or fail against the ADR target
+- [x] **Qualification Run 001** is recorded. It states pass or fail against the ADR target
   for each scenario, with no tuning.
 - [ ] ED-0115: one replay report (time-to-suggestion, stability) on a synthetic day is
   recorded.
@@ -2031,6 +2031,21 @@ Revert the code. There is no schema change.
   day. No code change. A per-suggestion day check was the alternative; it was not
   chosen.
 - **Status:** Completed. Next: qualification Run 001 (owner step), then ED-0115.
+
+### Qualification Run 001 record
+
+- **Result:** [session-suggestions-qualification-001.md](../validation/results/session-suggestions-qualification-001.md),
+  run at `main` `65cd54a`.
+- **Reproduction:** the harness reproduces the Run 003 zero-drift numbers exactly (0.93,
+  14 s / 18 s). This meets the last ED-0114 acceptance criterion.
+- **Target:** not met on the real published schedule for any event day. Wrong-day
+  suggestions are 0 in every cell.
+- **Cause:** per-talk duration and lateness error, which v3's one-offset-per-block model
+  cannot represent. No tuning was done.
+- **Open owner decisions:**
+  - whether the target is judged per event day or per event;
+  - the priority of a per-talk-lateness policy version relative to ED-0115.
+
 
 ## Ground-truth corpus handling (all phases)
 
