@@ -34,7 +34,7 @@ policy v2) is detailed below (2026-09-29), after the early accuracy check. After
 | --- | --- | --- |
 | **1. Media segmentation evidence (ED-0103)** | Advisory freeze and silence intervals per Completed Media Asset, from a new `media_segmentation` Durable Operation | `0021` |
 | 2. Session Suggestions core | Suggestion aggregate, deterministic `boundary-suggestion` policy v1 (schedule, timing, segmentation, transcript cues), human-invoked suggestion run, confirm and reject commands (confirm reuses the existing human Session realization and boundary commands) | `0022` |
-| 3. Boundary proposals for realized Sessions | The same policy produces `session_boundary_proposal` rows (existing table) for confirmed Sessions | none expected |
+| 3. Boundary proposals for realized Sessions (ED-0112 backend, ED-0113 Session Detail; Proposed; next) | Suggestion runs propose start/end corrections (≥ 30 s) for realized, linked Sessions via the existing `session_boundary_proposal` table; human Apply/Dismiss with an append-only decision record; Session Detail section and Stage badge; UX checkpoint | `0027` (decision record; owner decision D5) |
 | 4. Producer surfaces (ED-0109 backend, ED-0110 Stage page; Completed; follow-up ED-0111 Approved) | Work Queue item "confirm presentation" (additive, one per Stage), latest-run read, Suggested presentations panel on the Stage page with confirm/adjust/reject and schedule offset, Mission Control summary line; UX checkpoint | none |
 | 2c. Policy v3, schedule offset (ED-0106, Completed) | Per-block schedule offset (estimated or producer override) before v2 alignment; Stage offset override setting | `0024` |
 | 2d-1. Cue phrase presets and composition (ED-0107 backend, ED-0108 Event page; Completed) | Built-in catalog v1, human composition command publishing the Event's start and end cue lists, runs default to them, Event page section | `0025` |
@@ -1556,6 +1556,201 @@ Kernel Sessions, and are corrected through the existing commands.
   Event: after confirm → suggest again, the confirmed talks show as "already a Session",
   not as open suggestions.
 - **Rollback:** revert the code and reverse `0026`.
+
+## Phase 3: Boundary proposals for realized Sessions (ED-0112 backend, ED-0113 Session Detail)
+
+### Status
+
+- **Proposed** (2026-09-29). It becomes Green and implementation-ready when the owner
+  approves this section, including decisions D1–D6.
+- **Order (owner, 2026-09-29):** Phase 3 follows Phase 4 and ED-0111. Phase 5 follows it.
+
+### Why
+
+- A Session can be realized with rough boundaries:
+  - a producer confirms a suggestion early;
+  - a producer adjusts the times by hand;
+  - a Session is started and ended live with the Kernel commands.
+- ADR-0034 scope B says refinements after realization use the **existing**
+  `session_boundary_proposal` table.
+- With ED-0111, suggestion runs already evaluate realized talks and then drop their
+  suggestions. That same evaluation can instead propose better start and end boundaries
+  for their Sessions.
+
+### Verified current behavior
+
+- **Table and contract:**
+  - The Kernel table `session_boundary_proposal` was created in migration `0003`.
+  - The contract is `SessionBoundaryProposal` in `event_mode_kernel/contracts.py`, with
+    these fields:
+    - Session;
+    - `boundary_kind` (start or end);
+    - `boundary_at`, which must be timezone-aware;
+    - epistemic kind (observed, derived or inferred);
+    - proposer;
+    - evidence IDs, at least one;
+    - policy ID and version;
+    - reason;
+    - `proposed_at`.
+  - Proposals are immutable, and an identity conflict is refused.
+- **Kernel service:** `propose_session_boundary` exists (`service.py`). The Kernel
+  status read exposes `boundary_proposals` per Session (`api/v1/kernel_status.py`).
+  - **Nothing produces proposals today,** and there are 0 rows in the demo database.
+- **No frontend** shows boundary proposals.
+- **No general authenticated API** applies a boundary correction. `correct_session_boundary`
+  is reachable only through the Demo `end-presentation` endpoint (`api/v1/demo.py`) and
+  through the ED-0104 confirm path.
+- **The proposal table has no decision state** (applied or dismissed), and it records no
+  "based on" boundary revision. The Session has a boundary history
+  (`session_boundary_history`).
+
+### Decisions (owner approval of this section approves the recommended defaults)
+
+- **D1. When proposals are produced:** by the **suggestion run itself.**
+  - For each realized talk that ED-0111 now filters out, compare the v3 candidate's
+    start and end with the Session's current boundaries.
+  - A difference of **30 s or more** produces a start and/or end proposal, with
+    epistemic kind `derived`, policy `boundary-suggestion` v3, a system proposer ID, and
+    evidence IDs (the segmentation and timing evidence used).
+  - The reason is a bounded code, such as `changeover_edge`, `recording_gap`,
+    `recording_boundary`, `schedule_only` or `cue_supported`.
+  - No proposal is made when the candidate edge is only the schedule fallback.
+  - There is no separate trigger. "Suggest presentations / Suggest again" refreshes the
+    proposals.
+  - Alternative: a separate "Refine boundaries" command. Rejected, as an extra step
+    producers would forget.
+- **D2. Scope:** Sessions **linked to a Program Expectation** only in v1. Unlinked
+  (unscheduled) Sessions come later.
+- **D3. Deduplication:** a new proposal is written only when it differs from the latest
+  undecided proposal for the same Session and edge (time, policy version). Reruns do
+  not accumulate duplicates.
+- **D4. Applying (human authority):** a new Session Suggestions command, **Apply
+  suggested boundary.**
+  - It calls the existing Kernel `correct_session_boundary`, with operation IDs derived
+    from the command, and is idempotent by command ID and request digest.
+  - It is **refused as stale** when the Session's boundary changed after the proposal
+    was made (a boundary-history entry after `proposed_at`), or when a newer proposal
+    exists.
+- **D5. Dismissing and recording decisions:** a small, append-only
+  `boundary_proposal_decision` table in the Session Suggestions context (migration
+  `0027`).
+  - It records the proposal, the kind (`applied` or `dismissed`), the command ID and
+    digest, the actor, the time, and an optional bounded reason.
+  - Dismissed and applied proposals stop showing, and the history stays auditable.
+  - ADR-0034 expected no migration for Phase 3. This decision adds one, for clean
+    dismissal.
+  - Alternative: no dismiss, and hide proposals only once they are stale. Rejected,
+    because unwanted proposals would stay visible.
+- **D6. Where they appear:**
+  - a **Suggested boundaries** section on **Session Detail**, with summary first, for
+    example "Start could be 1 min 20 s later — at a still-image changeover";
+  - Apply and Dismiss with a confirmation step, current against suggested times, and
+    evidence under Details;
+  - on the Stage panel, a Decided row whose Session has an open proposal gets a small
+    "Boundary suggestion" badge;
+  - **no Work Queue item in v1**; it can be added later with an ED-0109-style item.
+
+### Desired behavior
+
+**ED-0112 (backend)**
+
+- **During a suggestion run (after ED-0111's filter):**
+  - For realized, linked talks, compute proposals per D1 and D3.
+  - Write them through the Kernel service (`propose_session_boundary`), in the same
+    transaction as the run. The Session Suggestions context depends on the Kernel, as
+    confirm already does; the Kernel never imports it.
+  - Record the count in a run field `boundary_proposals_created`. This is a column in
+    migration `0027`, with a default of 0.
+- **Commands and reads** (authenticated, ED-0104 conventions):
+  - list a Session's open proposals, meaning those with no decision and not stale;
+  - apply a proposal (D4);
+  - dismiss a proposal (D5);
+  - read the decision history.
+- **Migration `0027`:**
+  - the `boundary_proposal_decision` table, append-only with an immutable trigger, and a
+    foreign key to `session_boundary_proposal`;
+  - `session_suggestion_run.boundary_proposals_created`;
+  - a guarded reverse that refuses while decisions exist.
+
+**ED-0113 (frontend)**
+
+- **Session Detail:** a Suggested boundaries section per D6.
+- **Stage panel:** the badge on Decided rows (D6).
+- **Proxy:** the allowlist gains the proposal list, apply, dismiss and history routes,
+  with audit that logs no free text.
+- **Owner UX checkpoint** on the seeded review Event: confirm with rough times, suggest
+  again, then apply one proposal and dismiss one.
+
+### In scope
+
+- **ED-0112:**
+  1. Proposal production in runs.
+  2. Apply and dismiss commands, plus the reads.
+  3. Migration `0027`.
+  4. Tests.
+  5. Docs: the context README, the capability layer, and the glossary ("boundary
+     proposal decision").
+- **ED-0113:**
+  1. The Session Detail section.
+  2. The Stage badge.
+  3. The proxy.
+  4. Labels.
+  5. Tests.
+  6. The UX checkpoint record.
+
+### Out of scope
+
+- Unlinked Sessions.
+- A Work Queue item.
+- Automatic application: nothing is applied without a human.
+- Proposals from sources other than the suggestion policy, such as ADR-0035 markers.
+- Re-matching recordings after a boundary change.
+
+### Constraints
+
+- No policy constant or version change. No Kernel semantics change.
+- The Kernel stays free of Session Suggestions imports.
+- Applying a proposal uses only the existing human correction command.
+- No dependency. White-label. No real-event data in tests.
+
+### Test strategy
+
+- **ED-0112:**
+  - Proposals are created when an edge is 30 s or more away. None are created below
+    that, or for schedule-only edges.
+  - Deduplication across reruns.
+  - Evidence IDs and reason codes.
+  - Transaction atomicity with the run.
+  - Apply: it corrects the boundary, and it is idempotent. It is refused when stale,
+    whether the boundary changed or a newer proposal exists.
+  - Dismiss.
+  - Reads exclude decided and stale proposals.
+  - The Kernel import boundary.
+  - `0027` forward, reverse and guard (PostgreSQL, rolled back).
+- **ED-0113:**
+  - rendering with none, one and both edges;
+  - apply and dismiss flows and their refusals;
+  - the Stage badge;
+  - the proxy allowlist and audit;
+  - `npm run test`, `lint`, `typecheck` and `build`.
+- **Quality gate:** the full host backend suite, Ruff, Pyright, and `git diff --check`.
+
+### Acceptance criteria
+
+- [ ] ED-0112 and ED-0113 are implemented as above, and all checks pass on the host.
+- [ ] Live, on the review Event:
+  - confirm a talk with deliberately rough times;
+  - suggest again: a proposal appears on Session Detail;
+  - Apply corrects the boundary, and the proposal leaves the list;
+  - Dismiss hides another.
+- [ ] The owner UX checkpoint passes.
+
+### Rollback
+
+- Revert the code.
+- Reverse `0027` while no decisions exist.
+- Proposals already written are ordinary, immutable Kernel advisory rows. They stay
+  readable and never change a Session on their own.
 
 ## Ground-truth corpus handling (all phases)
 
