@@ -39,7 +39,7 @@ policy v2) is detailed below (2026-09-29), after the early accuracy check. After
 | 2c. Policy v3, schedule offset (ED-0106, Completed) | Per-block schedule offset (estimated or producer override) before v2 alignment; Stage offset override setting | `0024` |
 | 2d-1. Cue phrase presets and composition (ED-0107 backend, ED-0108 Event page; Completed) | Built-in catalog v1, human composition command publishing the Event's start and end cue lists, runs default to them, Event page section | `0025` |
 | 2d-2. Transcript cues as edges (outline) | Policy v4 with `cue` edges | to be detailed |
-| 5. Validation harness and Run 001 | Replay the ground-truth corpus (outside the repo) and measure recall, precision and start/end error against the ADR target; sanitized result | none |
+| 5. Validation harness and Run 001 (ED-0114 harness, ED-0115 live replay; Approved) | Committed pure harness + CLI over a local corpus manifest, precision and wrong-day checks, deterministic synthetic scenario suite in CI (gaps, multi-part, wrong clocks, short talks, late recording start), owner qualification Run 001 against the ADR target, local live-replay tool with time-to-suggestion | none |
 
 ## Phase 1: media segmentation evidence (ED-0103)
 
@@ -1752,6 +1752,159 @@ Kernel Sessions, and are corrected through the existing commands.
 - Reverse `0027` while no decisions exist.
 - Proposals already written are ordinary, immutable Kernel advisory rows. They stay
   readable and never change a Session on their own.
+
+## Phase 5: Validation harness and qualification Run 001 (ED-0114 harness, ED-0115 live replay)
+
+### Status
+
+- **Approved** (owner, 2026-09-29), with decisions D1–D5 as recommended.
+  - **Corpus scope:** the 28 main-stage talks now; other stages are added when their
+    blocks are segmented.
+  - **Order:** kept; Phase 5 runs after Phase 3.
+- **Execution authority:** Green and implementation-ready once ED-0113 merges.
+- **Additional corpus (owner, 2026-09-29):** a second event's legacy recordings,
+  available locally outside the repository. They may be used for the scenario and
+  replay work. Nothing from them is committed, and results stay anonymous.
+
+### Why
+
+- ADR-0034's validation approach requires:
+  - recall **and precision**;
+  - median and 95th-percentile start and end error;
+  - behaviour across recording gaps, multi-part sessions and wrong camera clocks;
+  - a **live-simulation replay**;
+  - the v1 target: at least 90% of talks suggested, median start and end error of 30 s or
+    less, and **no suggestion that places media on the wrong day**.
+- Runs 002 and 003 and Cue Run 001 used **ad hoc scratch scripts.** They are not
+  repeatable by anyone else, they do not measure precision, and they cover none of the
+  gap, multi-part or clock scenarios.
+
+### Verified current behavior
+
+- **Evaluator:** `evaluation.py` and `evaluate_cli.py` (ED-0105) compute recall, median and
+  95th-percentile errors, and the count within 60 s. Matching is one-to-one at IoU ≥ 0.5,
+  from anonymous intervals.
+  - **No precision:** the suggestion count is reported, but not matched ÷ suggested.
+- **Policies:** v1, v2 and v3 are pure, and run in-process without a database, which is
+  how Runs 002 and 003 ran.
+- **Corpus:** the real-event ground truth, segmentation cache and transcripts live
+  outside the repository, in `C:\StageFlowDemo\ground-truth\`.
+  - The measured subset is 28 main-stage talks; ADR-0034 mentions 40 decoded talks
+    across all stages.
+- **Synthetic generator:** generic synthetic stage days (test pattern, tones, silent
+  cards) were generated locally for the ED-0110 review. That generator is scratch code,
+  not committed.
+- **Pipeline:** discovery, timing inspection, segmentation workers and suggestion runs all
+  work end to end against the demo database (the ED-0110 live check).
+
+### Decisions (owner approval of this section approves the recommended defaults)
+
+- **D1. Harness form:** a committed, pure harness module with a CLI in the Session
+  Suggestions context.
+  - **Input:** a local **corpus manifest** JSON, kept outside the repository, per Stage:
+    - block start times and durations;
+    - cached segmentation intervals;
+    - optional transcript cue timestamps;
+    - the schedule (anonymous planned times);
+    - the ground-truth intervals.
+  - **Runs:** the chosen policy version, drift models (whole-day, two-part,
+    independent), seeds, and optionally a cue composition (catalog profile).
+  - **Output:** sanitized JSON and Markdown metrics only. The existing evaluator
+    principles are kept: no paths, names or text are ever printed.
+  - Alternative: keep scratch scripts. Rejected, because the results are not
+    reproducible.
+- **D2. Metrics added to the evaluator:**
+  - **precision** (matched ÷ suggested, with unscheduled suggestions reported
+    separately);
+  - a **wrong-day check** (any suggestion outside ±12 h of its Stage's planned span
+    counts as a failure);
+  - per-scenario tables.
+  - Existing fields stay unchanged.
+- **D3. Scenario suite:** a committed **synthetic generator.**
+  - It is generic, deterministic, and produces FFmpeg-free intervals directly, with no
+    media. It builds manifests for:
+    - recording gaps;
+    - multi-part talks (a talk split by a break);
+    - wrong camera clocks (a block years off, which must never be placed);
+    - short evenly spaced talks, the known aliasing weakness;
+    - a late recording start.
+  - It runs in CI as ordinary tests with fixed expectations. This is the regression net
+    for future policy versions.
+- **D4. Qualification Run 001 (owner step):** the harness on the real 28-talk corpus with
+  policy v3 and the composed *Conference stage* cue lists, against the ADR target.
+  - The result is recorded, sanitized, as `session-suggestions-qualification-001.md`.
+  - If the target is not met in a scenario, the result says so and names the policy
+    follow-up. **Measurement does not tune the policy in this phase.**
+- **D5. Live replay (ED-0115):** a local replay tool copies blocks into a watched source
+  folder at a chosen pace (real time, or ×N accelerated). It then:
+  - drives the real pipeline (discovery, timing, segmentation and periodic suggestion
+    runs) against a disposable review Event;
+  - reports **time-to-suggestion** per talk, and whether suggestions stay stable as
+    blocks arrive;
+  - never commits media;
+  - lives under `scripts/validation/`.
+
+### Desired behavior
+
+**ED-0114 (harness, evaluator additions, scenario generator)**
+
+- `session_suggestions/harness.py`, plus a CLI entry point: manifest → runs → sanitized
+  report, deterministic for a given manifest and seed.
+- Evaluator additions per D2, with the existing results unchanged.
+- `session_suggestions/scenarios.py`: a deterministic synthetic manifest generator per D3.
+- Tests: harness determinism and sanitization (no manifest strings in the output), each
+  D3 scenario's expected metrics, the wrong-day guard, and precision.
+- Docs: the context README (how to build a manifest from local data, and the privacy
+  rules), the capability layer, and the validation README (the method).
+
+**ED-0115 (live replay tool)**
+
+- `scripts/validation/replay_blocks.py` (or PowerShell, following the existing validation
+  script pattern):
+  - copies files in order at a chosen pace into a source folder;
+  - runs the worker `--once` loops;
+  - triggers suggestion runs every N blocks through the API;
+  - records per-talk time-to-first-suggestion and stability.
+- Its output is a sanitized JSON report. Nothing real-event is committed.
+
+### Out of scope
+
+- Policy changes or tuning, including the recording-start boundary follow-up.
+- New evidence kinds.
+- UI.
+- ADR-0035 markers.
+
+### Constraints
+
+- No real-event data in the repository or in tests; the generator uses generic
+  synthetic intervals only.
+- No dependency.
+- The harness is pure: no database, no network.
+- The live replay uses the demo database only through the normal APIs and workers.
+
+### Test strategy
+
+- Unit tests for the harness, evaluator additions and generator, with each scenario's
+  expectations pinned.
+- The full host backend suite, Ruff, Pyright, and `git diff --check`.
+- ED-0115 is checked by one owner-run replay on a synthetic day, with the sanitized
+  report attached to the result.
+
+### Acceptance criteria
+
+- [ ] ED-0114:
+  - the harness reproduces the Run 003 numbers from a manifest built from the local
+    corpus, within the same seeds;
+  - precision and the wrong-day check are reported;
+  - the scenario suite passes in CI.
+- [ ] **Qualification Run 001** is recorded. It states pass or fail against the ADR target
+  for each scenario, with no tuning.
+- [ ] ED-0115: one replay report (time-to-suggestion, stability) on a synthetic day is
+  recorded.
+
+### Rollback
+
+Revert the code. There is no schema change.
 
 ## Ground-truth corpus handling (all phases)
 
