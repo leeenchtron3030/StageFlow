@@ -35,7 +35,7 @@ policy v2) is detailed below (2026-09-29), after the early accuracy check. After
 | **1. Media segmentation evidence (ED-0103)** | Advisory freeze and silence intervals per Completed Media Asset, from a new `media_segmentation` Durable Operation | `0021` |
 | 2. Session Suggestions core | Suggestion aggregate, deterministic `boundary-suggestion` policy v1 (schedule, timing, segmentation, transcript cues), human-invoked suggestion run, confirm and reject commands (confirm reuses the existing human Session realization and boundary commands) | `0022` |
 | 3. Boundary proposals for realized Sessions | The same policy produces `session_boundary_proposal` rows (existing table) for confirmed Sessions | none expected |
-| 4. Producer surfaces | Work Queue item "confirm presentation" (additive), and suggestion review on Session Detail and Mission Control under the owner's scanning rule; UX checkpoint | none |
+| 4. Producer surfaces (ED-0109 backend, ED-0110 Stage page; Proposed; next) | Work Queue item "confirm presentation" (additive, one per Stage), latest-run read, Suggested presentations panel on the Stage page with confirm/adjust/reject and schedule offset, Mission Control summary line; UX checkpoint | none |
 | 2c. Policy v3, schedule offset (ED-0106, Completed) | Per-block schedule offset (estimated or producer override) before v2 alignment; Stage offset override setting | `0024` |
 | 2d-1. Cue phrase presets and composition (ED-0107 backend, ED-0108 Event page; Completed) | Built-in catalog v1, human composition command publishing the Event's start and end cue lists, runs default to them, Event page section | `0025` |
 | 2d-2. Transcript cues as edges (outline) | Policy v4 with `cue` edges | to be detailed |
@@ -1213,6 +1213,234 @@ as support for **both** edges of a shared changeover.
   published through the UI as version 1. It had one removal and one custom phrase, and
   the page's 32 start / 32 end counts matched the published lists.
 - **Status:** Completed. Phase 2d-1 (ED-0107 and ED-0108) is complete.
+
+## Phase 4: Producer surfaces for Session suggestions (ED-0109 backend, ED-0110 Stage page)
+
+### Status
+
+- **Proposed** (2026-09-29).
+- It becomes Green and implementation-ready when the owner approves this section,
+  including decisions D1–D6.
+- **Order (owner, 2026-09-29):** Phase 4 comes first, then Phase 3 (boundary proposals for
+  realized Sessions, on Session Detail), then Phase 5 (validation harness and
+  qualification run). Phases 3 and 5 each get a detailed section after this phase.
+
+### Why
+
+- Everything built in Phases 1–2d is reachable only through the API: suggestion runs,
+  policy v3 schedule offsets, and cue compositions.
+- A producer cannot yet see suggested presentations, confirm or reject them, or see and
+  correct how late a Stage is running.
+- ADR-0034 places suggestions in the Work Queue ("confirm presentation") and in the
+  Producer surfaces.
+
+### Verified current behavior
+
+- **Suggestion API** (`backend/app/api/v1/session_suggestions.py`, prefix
+  `/session-suggestions/events/{event_id}`):
+  - start a run;
+  - list suggestions for a Stage by status;
+  - read one suggestion;
+  - confirm, optionally with adjusted start and end; reject with a bounded reason;
+  - set, read and list the history of a Stage's schedule offset;
+  - the cue catalog and composition routes.
+  - There is **no read of the latest run**: its blocks, offsets, skips and cue lists.
+- **Work Queue** (`contexts/production/work_queue.py`): `ProducerWorkQueueService` merges
+  Kernel items with Assembly approval items.
+  - Priorities: association conflict 1, association unresolved 2, package correction 3,
+    package ready 4, Assembly approval pending 5 (ED-0101).
+  - The item types are `ProducerWorkDecisionType` and `ProducerWorkSubjectKind` in the
+    Kernel contracts.
+  - The Kernel does not import the Assembly context; an import-boundary test checks this.
+  - `GET /api/v1/events/{event_id}/work-queue` exists.
+  - **There is no Work Queue page in the frontend.** Its UX specification
+    (`docs/ux/producer-sessions-work-queue.md`) is still Draft v0.1.
+- **Frontend:**
+  - The Stage page (`frontend/app/stages/[stageKey]/page.tsx`,
+    `StageOperationalView`) shows operation and authority status for one Stage.
+  - Mission Control (`frontend/app/page.tsx`) shows the Event overview and Attention.
+  - The `session-suggestions` proxy capability currently allows only the catalog and
+    composition routes (ED-0108).
+- **Human authority:** confirm calls the existing Kernel `start_session` and
+  `correct_session_boundary` commands, with IDs derived deterministically from the
+  command (ED-0104). Nothing is realized automatically.
+
+### Decisions (owner approval of this section approves the recommended defaults)
+
+- **D1. Where suggestions are reviewed:** a **Suggested presentations** panel on the
+  **Stage page** (recommended). Suggestions are per Stage and ordered by time, and the
+  Stage page is where a producer already looks at one stage.
+  - Alternative: build the Work Queue page now. Rejected for this phase, because its UX
+    specification is still Draft and would need its own decisions.
+- **D2. Work Queue item:** a new additive item, `presentation_confirmation_pending`,
+  with subject kind `stage_suggestions`.
+  - There is **one item per Stage** that has open suggestions in its latest run. Its
+    reason codes carry the count of open and weak suggestions, and its action reference
+    points to the Stage.
+  - **Priority 6,** after Assembly approvals.
+  - It is visible through the Work Queue API now, and on a future Work Queue page.
+  - Alternative: one item per suggestion. Rejected, because a conference day would add
+    about 30 items and flood the queue.
+- **D3. Mission Control:** one summary line per Stage with open suggestions, such as
+  "Main stage: 9 suggested presentations to confirm (2 weak)", linking to the Stage page.
+  Nothing appears when there are none.
+- **D4. Confirming:** one suggestion at a time, with an optional adjustment of start and
+  end in local time and a confirmation step. **No batch confirm in v1**, so every Session
+  stays a deliberate human decision. Batch confirm can follow once you've used this.
+- **D5. Schedule offset on the Stage panel:**
+  - The latest run's block offsets are shown as a summary, for example "Running about 12
+    min behind the printed schedule (estimated)", or per block when blocks differ.
+  - An override editor sets or clears entries, using the existing ED-0106 API.
+  - Changing the override does not re-run anything. The panel then offers "Suggest
+    again".
+- **D6. Data for the UX checkpoint:** a local seeding script, not committed, creates
+  anonymous Program Expectations ("Talk 1…n") on the demo database.
+  - It runs segmentation and timing on local media, or uses the ground-truth corpus's
+    cached segmentation, locally only. Screenshots show only anonymous titles.
+  - Nothing real-event is committed, as for the earlier runs.
+
+### Desired behavior
+
+**ED-0109 (backend, additive)**
+
+- **Latest run read:** `GET .../stages/{stage_id}/runs/latest` returns the latest run's:
+  - ID;
+  - created at, and the actor;
+  - policy version;
+  - input digest;
+  - skips;
+  - blocks, with offset, source and margin;
+  - override version;
+  - cue-list references.
+
+  It returns 404 when there is no run.
+- **Work Queue item** (D2): a Session Suggestions read port lists Stages with open
+  suggestions in their latest run.
+  - `ProducerWorkQueueService` merges them with the other items under the unchanged
+    keyset cursor, as ED-0101 did.
+  - The enum values are added to the Kernel contracts.
+  - **The Kernel does not import the Session Suggestions context,** and the import-boundary
+    test is extended.
+  - The item appears as soon as any open suggestion exists, and disappears when none are
+    open or a newer run supersedes them. Its `updated_at` is the latest run's time.
+- The Work Queue API filter and serialization accept the new values.
+
+**ED-0110 (frontend)**
+
+- **Stage page, Suggested presentations panel.** Summary first, following the owner's
+  scanning rule:
+  - **Summary line:** "9 suggested · 2 weak · last suggested 14:05 · running about 12 min
+    behind (estimated)". Or "No suggestions yet". With no planned talks: "Add the
+    schedule first".
+  - **Actions:** **Suggest presentations**, which starts a run. It uses the Event's cue
+    composition by default, and shows the run's skips as readable exceptions when present.
+  - **List:** open suggestions in time order, one row each. Each row shows the planned
+    talk title (or "Unscheduled activity"), the suggested start and end in local time,
+    the length, and the difference from the printed schedule, for example "+12 min".
+    - Only exceptions get a badge: weak, overlap, schedule fallback, estimated offset,
+      producer offset. A strength explanation is under the row's Details.
+    - Evidence goes under Details: the edge kinds, silence and cue support, and the
+      internal IDs.
+  - **Confirm** opens a small confirmation. It shows the times and allows optional
+    adjustments, with validation that start is before end. Refusals are shown as readable
+    messages: a stale schedule revision, a Session already linked, a Kernel conflict.
+  - **Reject** takes a bounded reason picker.
+  - Confirmed and rejected suggestions collapse into "Decided · N". Superseded ones
+    are hidden, with a count.
+  - **Schedule offset** (D5): the summary and an override editor, with entries of "from
+    <local time>, ±N min" and clear.
+- **Mission Control:** the per-Stage summary line (D3).
+- **Proxy:** the `session-suggestions` allowlist is extended with exactly these routes:
+  - runs (POST) and runs/latest (GET);
+  - the suggestion list and read;
+  - confirm and reject;
+  - schedule offset set, current and history;
+  - the Work Queue read, if Mission Control needs it.
+
+  The POSTs are audited, with no free text in logs, and the same authorization rule as
+  the other sections applies.
+- **Labels** go in `ui-labels.ts` and the glossary "UI wording" section. For example,
+  weak → "Needs a closer look", and schedule fallback → "From the schedule only".
+- **Owner UX checkpoint** with screenshots before merge (D6 data).
+
+### In scope
+
+- **ED-0109:**
+  1. The latest-run read.
+  2. The Work Queue item and the read port.
+  3. The import-boundary test.
+  4. API filter and serialization updates.
+  5. Tests.
+  6. Docs: the context README, the capability layer, and the glossary (Work Queue item
+     type).
+- **ED-0110:**
+  1. The Stage panel.
+  2. The Mission Control line.
+  3. The proxy allowlist and audit.
+  4. Labels.
+  5. Frontend tests.
+  6. The UX checkpoint record.
+
+### Out of scope
+
+- The Work Queue page.
+- Batch confirm.
+- Boundary proposals for realized Sessions and their Session Detail surface (Phase 3).
+- The validation harness (Phase 5).
+- Automatic runs.
+- Cue edges (Phase 2d-2).
+- The override-splits-blocks follow-up.
+- ADR-0035 markers.
+
+### Constraints
+
+- No migration is expected for ED-0109. If one proves necessary, stop and report.
+- No dependency. No change to Kernel semantics or authority.
+- Confirm keeps using the existing human commands.
+- Existing Work Queue items, their order and the cursor behave as before.
+- White-label. No real-event data in tests or commits.
+
+### Test strategy
+
+- **ED-0109:**
+  - The latest run is read, and 404 is returned when none exists.
+  - The Work Queue item appears with open suggestions, and its counts are right.
+  - It disappears when all are decided or a newer run supersedes them.
+  - Priority and sort place it after Assembly approvals.
+  - The cursor works across the merged types.
+  - The import boundary holds.
+  - The API filter accepts the new type.
+  - PostgreSQL read tests use rolled-back fixtures.
+- **ED-0110:**
+  - rendering from fixtures: no suggestions, open, weak, decided, skips, and offsets;
+  - confirm with and without adjustment, validation, and refusal mapping;
+  - reject;
+  - "Suggest presentations" and its error states;
+  - the offset editor;
+  - the Mission Control line;
+  - the proxy allowlist: allowed and refused, including the absence of unrelated
+    routes;
+  - audit;
+  - `npm run test`, `lint`, `typecheck` and `build`.
+- **Quality gate:** the full host backend suite, Ruff, Pyright, and `git diff --check`.
+
+### Acceptance criteria
+
+- [ ] ED-0109: the latest-run read and the Work Queue item are implemented as above, and
+  all checks pass on the host.
+- [ ] ED-0110, end to end against the demo database with the D6 data, as a producer:
+  - see the Stage's suggestions and schedule offset;
+  - set an override and suggest again;
+  - confirm one suggestion, which creates a Session visible in Sessions;
+  - adjust and confirm another;
+  - reject one;
+  - see the Mission Control line and the Work Queue item update accordingly.
+- [ ] The owner UX checkpoint passes.
+
+### Rollback
+
+Revert the code. ED-0109 adds no schema. Sessions created by confirmations are ordinary
+Kernel Sessions, and are corrected through the existing commands.
 
 ## Ground-truth corpus handling (all phases)
 
