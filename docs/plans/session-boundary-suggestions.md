@@ -40,6 +40,7 @@ policy v2) is detailed below (2026-09-29), after the early accuracy check. After
 | 2d-1. Cue phrase presets and composition (ED-0107 backend, ED-0108 Event page; Completed) | Built-in catalog v1, human composition command publishing the Event's start and end cue lists, runs default to them, Event page section | `0025` |
 | 2d-2. Transcript cues as edges (outline) | Policy v4 with `cue` edges | to be detailed |
 | 5. Validation harness and Run 001 (ED-0114 harness, ED-0115 live replay; Approved) | Committed pure harness + CLI over a local corpus manifest, precision and wrong-day checks, deterministic synthetic scenario suite in CI (gaps, multi-part, wrong clocks, short talks, late recording start), owner qualification Run 001 against the ADR target, local live-replay tool with time-to-suggestion | none |
+| 6. Policy v4, per-talk lateness (proposed ED-0116; draft for owner approval) | Lateness-chain joint alignment replacing v3's per-block offset (fixes slot aliasing and per-talk duration error), override entries as mid-day anchors, realistic-schedule-error scenario generator; re-qualify with Qualification Run 002 (dev and held-out, per event day) and Live Replay Run 002 | `0028` |
 
 ## Phase 1: media segmentation evidence (ED-0103)
 
@@ -2078,6 +2079,277 @@ Revert the code. There is no schema change.
 - **Status:** Completed. **Phase 5's tooling is complete.** The policy follow-up is next,
   as sequenced above.
 
+
+## Phase 6: policy v4, per-talk lateness (proposed ED-0116)
+
+### Status
+
+- **Draft for owner approval** (2026-09-30). It follows the owner's sequencing decision
+  after Qualification Run 001 (see "Qualification Run 001 record" above). It is not
+  implementation-ready until the owner decides D1–D6.
+- **Execution classification:** Yellow until approved, because it adds a new policy
+  version and makes a version-numbering decision. After approval it is Green on the same
+  basis as Phase 2c:
+  - ADR-0034 allows a deterministic, versioned policy;
+  - no Kernel, confirmation or authority semantics change;
+  - the migration is additive with a guarded reverse;
+  - no dependency is added.
+- **ED number:** the plan delegates ED numbering, and the next free number is
+  **ED-0116**. It is proposed, not yet allocated in the index. The owner confirms it in
+  D6.
+
+### Why
+
+Qualification Run 001 missed the per-day target on the real published schedule on all
+three days. A sanitized per-talk diagnostic (run at `main` `94513ef`; relative minutes
+only, and nothing about the corpus committed) shows the mechanism behind the per-talk
+error:
+
+- **Block-offset aliasing.** v3 estimates one offset per block and searches up to
+  ±60 min. The actual start lateness was −2.8 to +18.1 min, but v3 chose:
+  - **Day 3:** +1,300 s for the morning block and +3,390 s for the afternoon block.
+  - **Day 2:** +1,300 s for its second block.
+- **Why aliasing happens:**
+  - Talks sit in evenly spaced 25 min slots, so shifting the plan by about one slot
+    still lines up with changeovers.
+  - Per-talk duration errors make the true offset fit no better than the alias. One
+    60 min slot ran 35 min; one 25 min slot ran 12.
+  - The offset penalty (`abs(offset) / 600 s`) is too weak to prefer the true, smaller
+    shift.
+  - This is the same weakness the synthetic suite pins as "short evenly spaced talks".
+- **Result of the aliasing:**
+  - v3 matched only 4 of 8 day-3 talks. v2, which has no offset, matched 7 of 8, but
+    with start and end errors of several minutes.
+  - The errors of v2 come from absolute plan distance: within ±20 min, a changeover
+    near the printed time wins over the correct one near the actual time.
+- **Other misses** (out of scope here; see Out of scope):
+  - Day 1: five unscheduled suggestions after the last talk. The recording continued
+    after the program.
+  - Day 2: the first suggestion starts at the recording start, 713 s early. This is the
+    known recording-start boundary follow-up.
+
+In short:
+
+- one offset per block cannot follow lateness that changes talk by talk, and its search
+  can pick a wrong alias;
+- no offset at all, as in v2, pays full cost for honest lateness.
+
+### Verified current behavior
+
+- **Policy v2** (`policy_v2.py`):
+  - joint dynamic-program alignment of a Stage's talks against changeover edges;
+  - edge cost `abs(edge - plan) / 30 s`;
+  - an inclusive ±20 min window around the printed plan;
+  - fallback to the printed plan, with kind `schedule`, when no edge is feasible.
+- **Policy v3** (`policy_v3.py`):
+  - v2's alignment against a plan shifted by one offset per block;
+  - blocks split at planned gaps of 20 min or more;
+  - the offset is estimated on a ±3,600 s grid, or comes from a producer override;
+  - an override entry applies only if it takes effect at or before a block's first
+    printed start, so it cannot split a block (Run 003 finding);
+  - run records store blocks, and each suggestion stores `schedule_offset_seconds` and
+    `schedule_offset_source`.
+- **Migration pattern:** `0023` and `0024` admit each policy version only with its exact
+  constants, and each reverse refuses while rows of that version exist. The latest
+  migration is `0027`.
+- **Stage page:** the run-level offset line comes from the run's `blocks`
+  (`frontend/src/experience/session-suggestions.ts`, `offsetSummary`). An empty list
+  shows no offset line. Each suggestion's offset fields are already rendered as
+  exceptions; a producer source shows a label.
+- **Phase 2d outline:** it reserves the name "policy v4" for `cue` edges. That work has
+  not been detailed or started.
+- **Validation tools:** the ED-0114 harness (policies 1–3, per-day manifests) and the
+  ED-0115 live replay.
+
+### Decisions (owner approval of this section approves the recommended defaults)
+
+- **D1. Approach.**
+  - **Recommended: C, lateness-chain alignment.** Keep v2's joint alignment and its
+    evidence, strength and cue support. Change how an edge's lateness is priced:
+    - define lateness as observed edge minus printed edge;
+    - the first observed edge of the day, or the first after an override entry, costs
+      `abs(lateness - anchor) / τ_anchor`. The anchor is the override offset, or 0;
+    - each later observed edge costs `abs(lateness - previous lateness) / τ_step`. The
+      previous lateness is that of the prior edge in the chain;
+    - so a talk that runs 10 min late *and stays late* costs little, while a jump back
+      and forth costs a lot;
+    - this prices a duration error once, at the edge where it happens, instead of at
+      every later edge;
+    - candidate windows follow the chain: ±W around printed plan + previous lateness,
+      inside a hard ±90 min bound around the printed plan;
+    - a fallback edge is placed at printed plan + previous lateness, not at the printed
+      plan;
+    - there are no blocks and no grid search, so no slot alias can be chosen as a whole.
+  - **Alternative A: harden v3's estimator.** A tighter search range, a stronger
+    penalty, and an anti-alias check. It is smaller, but it still gives one offset per
+    block, so duration errors inside a block stay. Also, +1,300 s lies inside any range
+    that still allows real lateness of 20–30 min. Not recommended.
+  - **Alternative B: greedy sequential re-anchoring**, talk by talk. It is simple, but
+    one wrong edge carries its error into every later talk, and nothing corrects it
+    globally. C is B inside the existing global optimization. Not recommended.
+  - **Complementary, and included in C:** override entries become lateness anchors at
+    their effective time, wherever that falls. This resolves the Run 003 finding
+    (entries could not split a block) without a separate change.
+- **D2. Version name.**
+  - **Recommended:** this becomes `boundary-suggestion` **v4**, and the Phase 2d-2 cue
+    edges outline moves to v5. Qualification is the blocker now; 2d-2 is still an
+    outline.
+  - Alternative: name this v5 and keep v4 reserved for 2d-2. This leaves a gap in the
+    shipped versions.
+- **D3. Constants, and how they are chosen.**
+  - Starting values:
+    - τ_anchor = 30 s per point, as v2's absolute cost;
+    - τ_step = 60 s per point;
+    - W = ±20 min, v2's window, now relative to the chain;
+    - the hard bound ±90 min;
+    - the minimum talk and changeover rules of v2.
+  - Before any held-out check, they are tuned **only** on:
+    - the synthetic scenario suite;
+    - a new generator, "realistic schedule error" (see Desired behavior);
+    - the three W3S25 days. These are dev data, already seen by the diagnostic.
+  - The constants are then **frozen in the migration** and recorded, and only then
+    evaluated on held-out data. Changing them after the held-out check requires a new
+    version.
+- **D4. Held-out evidence.**
+  - **Recommended:** the second event's legacy recordings (local only, 78 blocks, with
+    several recording runs). The owner supplies approximate talk start and end times
+    and, if available, the printed schedule for that day. Segmentation is run locally
+    with the existing worker path.
+  - If the owner cannot supply ground truth, Qualification Run 002 is recorded as
+    **dev-only**, says so, and does not claim a held-out pass. The held-out check then
+    stays an open follow-up.
+- **D5. Acceptance targets for Qualification Run 002**, judged per event day as the owner
+  decided:
+  1. **Real published schedule, dev (the three W3S25 days):**
+     - recall ≥ 0.90, and median start and end errors ≤ 30 s, on each day;
+     - wrong-day count 0;
+     - day 2's duplicate truth caps its recall at 0.91.
+  2. **Held-out event, when D4 is available:** the same targets, and the result is
+     reported separately.
+  3. **No regression against v3** on the Run 001 per-day drift matrix (whole-day and
+     two-part, ±0 to ±30 min): recall at least v3's, and medians within +5 s of v3's.
+  4. **Independent drift of ±5 and ±10 min:** recall at least v2's.
+  5. **Live replay** at `--run-every 1` on a synthetic day built by the new generator:
+     every talk suggested, and final accuracy within the targets.
+  - If any target is missed, the result says so. v4 is not made the default for new runs
+    until the owner decides, and v3 stays in use.
+- **D6. Sequencing and numbering.**
+  - One directive, **ED-0116**, covers:
+    - `policy_v4.py`;
+    - migration `0028`;
+    - a harness `--policy-version 4`;
+    - the new scenario generator;
+    - tests.
+  - Qualification Run 002 and the replay are owner steps after merge.
+  - Making v4 the default for new runs is a separate small step, after Run 002 passes.
+  - Stage page wording for per-talk lateness is a separate UI directive, with the UX
+    checkpoint, only if the owner wants it after Run 002.
+
+### Desired behavior
+
+- **`policy_v4.evaluate(snapshot, override)`**: pure and deterministic.
+  - v2's evidence (freeze, gap and coverage edges; strength; cue windows; silence
+    support), one-to-one monotonic alignment, fallback rules, and overlap marking stay
+    unchanged.
+  - Only the edge cost, the window centre and the fallback placement change, per D1.
+  - The dynamic-program state already fixes the previous observed edge, so lateness is
+    known on each transition. The complexity stays O(T·C³) time and O(T·C) space.
+    Rational arithmetic keeps ties exact; ties resolve as in v2.
+  - Override entries apply to the first printed start at or after each `effective_from`.
+    Before the first entry, the anchor is 0.
+- **Records and API:**
+  - v4 runs record `blocks = []`;
+  - each v4 suggestion stores its own `schedule_offset_seconds`, the lateness of its
+    start edge, rounded to whole seconds;
+  - `schedule_offset_source` is `producer` when an override anchor governs the chain,
+    `estimated` when the offset is not 0 without one, and otherwise `none`;
+  - no new API field, and no frontend change is required: the existing UI shows no run
+    offset line, and marks producer-sourced suggestions.
+- **Migration `0028_session_suggestions_policy_v4`:**
+  - admits v4 only with its exact frozen constants, and keeps the v1–v3 checks exact;
+  - allows v4 runs with zero blocks;
+  - reverse refuses while any v4 run or suggestion exists, and otherwise restores
+    exactly the `0024`–`0027` state.
+- **Default policy:** new runs keep using v3 until the owner switches the default (D6).
+  Whether the switch is a configuration value or a code constant is decided in the
+  directive. The smallest reversible option is preferred, with no runtime-configuration
+  change unless approved.
+- **Harness and CLI:** `--policy-version 4`, with override entries passed as in v3.
+- **`scenarios.py`** gains a deterministic, generic **"realistic schedule error"**
+  generator:
+  - evenly spaced slots of 20–30 min;
+  - per-talk duration errors drawn from a bounded symmetric distribution (up to ±40%);
+  - a cumulative lateness random walk;
+  - optionally, one dropped and one added talk;
+  - optionally, content after the program;
+  - seeded like the harness drift models.
+  - Its parameters are generic and are not fitted to the real corpus. It also produces
+    block media timelines for the replay's synthetic day, as data only; media generation
+    stays a local owner step.
+- **Tests:**
+  - hand-computed cost and chain cases: lateness carried, a jump penalised, the fallback
+    placed at plan + lateness, an override anchor mid-day, and the ±90 min bound;
+  - on the clean-day scenario and at zero drift, v4 matches v2's recall and medians
+    (the cost functions differ, so identical intervals are not required);
+  - the pinned slot-alias scenario is no longer aliased;
+  - every scenario in the suite, with v4's results pinned;
+  - migration forward, reverse and refusal;
+  - persistence of v4 records with zero blocks;
+  - determinism;
+  - a full-day cost bound.
+
+### In scope
+
+- `policy_v4.py`, the contracts it needs, and the version registry entry.
+- Migration `0028` and its tests.
+- The harness and CLI option `--policy-version 4`.
+- The new scenario generator and its pinned tests.
+- Docs: the context README policy section, the capability layer, and the plan phase
+  table.
+
+### Out of scope
+
+- Content after the program (Day 1's unscheduled tail) and the recording-start boundary.
+  Each is recorded as a separate follow-up.
+- Cue edges (Phase 2d-2).
+- Stage page wording and making v4 the default (separate steps, per D6).
+- Any change to v1–v3 behavior, constants or records.
+- Kernel, confirmation or authority changes.
+- Model-based detection.
+- New evidence kinds.
+
+### Constraints
+
+- Pure and deterministic; no dependency.
+- Aware timestamps; integer microseconds and Fraction arithmetic.
+- No real-event data in the repository or tests. The generator is generic.
+- The migration is additive and guarded, and rewrites no identity or lineage.
+- White-label wording.
+
+### Test strategy
+
+- Unit and property tests per Desired behavior.
+- The existing v1–v3 tests stay unchanged.
+- PostgreSQL migration and persistence tests that roll back.
+- The full host backend suite, Ruff, Pyright and `git diff --check`.
+- Frontend checks only if a frontend file changes. None is expected.
+
+### Acceptance criteria
+
+- [ ] ED-0116 is merged. Its tests pass, v1–v3 results are unchanged, and the
+  slot-alias scenario is fixed.
+- [ ] The v4 constants are frozen in `0028` before any held-out evaluation.
+- [ ] Qualification Run 002 is recorded, per D5, with dev and held-out results reported
+  separately, or marked dev-only.
+- [ ] A Live Replay Run 002 is recorded at `--run-every 1` on a generated synthetic day.
+- [ ] The owner decides on making v4 the default after Run 002.
+
+### Rollback
+
+- Revert the code after reversing `0028`. The reverse refuses while v4 rows exist, so
+  v4 rows block rollback, as with `0024`.
+- The default stays v3 until the owner switches it, so reverting before the switch
+  affects no producer.
 
 ## Ground-truth corpus handling (all phases)
 
