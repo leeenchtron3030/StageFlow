@@ -41,7 +41,7 @@ policy v2) is detailed below (2026-09-29), after the early accuracy check. After
 | 2d-2. Transcript cues as edges (outline; superseded by Phase 7) | See Phase 7 (policy v5) | see Phase 7 |
 | 5. Validation harness and Run 001 (ED-0114 harness, ED-0115 live replay; Approved) | Committed pure harness + CLI over a local corpus manifest, precision and wrong-day checks, deterministic synthetic scenario suite in CI (gaps, multi-part, wrong clocks, short talks, late recording start), owner qualification Run 001 against the ADR target, local live-replay tool with time-to-suggestion | none |
 | 6. Policy v4, per-talk lateness (ED-0116; Parked 2026-09-30 after dev evaluation; v3 remains) | Lateness-chain joint alignment replacing v3's per-block offset (fixes slot aliasing and per-talk duration error), override entries as mid-day anchors, realistic-schedule-error scenario generator; re-qualify with Qualification Run 002 (dev and held-out, per event day) and Live Replay Run 002 | `0028` |
-| 7. Boundary evidence, policy v5 (proposed ED-0117 pure policy, ED-0118 persistence and producer evidence; draft for owner approval) | Proximity-weighted cue support, `cue` edges with false-hit control, coverage bounds as fallback edges, program-span limit for unscheduled activity (`outside_program` skip); prototype measured on dev before the constants freeze | `0028` (ED-0118) |
+| 7. Boundary evidence, policy v5 (ED-0117 pure policy, Approved; ED-0118 persistence and producer evidence, reserved) | Proximity-weighted cue support, `cue` edges with false-hit control, coverage bounds as fallback edges, program-span limit for unscheduled activity (`outside_program` skip); prototype measured on dev before the constants freeze | `0028` (ED-0118) |
 
 ## Phase 1: media segmentation evidence (ED-0103)
 
@@ -2420,11 +2420,15 @@ In short:
 - **Acceptance:** the ED-0116 items above are **not met** and stay unchecked. No
   Qualification Run 002 or Live Replay Run 002 was run.
 
-## Phase 7: boundary evidence, policy v5 (proposed ED-0117 pure policy, ED-0118 persistence and producer evidence)
+## Phase 7: boundary evidence, policy v5 (ED-0117 pure policy, ED-0118 persistence and producer evidence)
 
 ### Status
 
-- **Draft for owner approval** (2026-09-30). It follows the owner decision recorded in
+- **Approved** (owner, 2026-09-30), with D1–D6 as recommended.
+  - **ED-0117:** Green and implementation-ready.
+  - **ED-0118:** its number is reserved. It is detailed in its own section, for owner
+    approval, after the ED-0117 dev measurement and Qualification Run 002.
+- Originally drafted for owner approval (2026-09-30). It follows the owner decision recorded in
   Phase 6's "Dev evaluation and parking record (ED-0116)": park v4 and improve the
   boundary evidence. It implements the Phase 2d-2 outline, whose owner decisions 1–4
   are already recorded, and adds two evidence fixes found by the diagnostic below.
