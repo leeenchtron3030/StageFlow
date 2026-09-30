@@ -2,7 +2,7 @@
 
 ## Status
 
-**Proposed** (2026-09-30), for owner approval of D1–D5.
+**Approved** (owner, 2026-09-30), with D1–D5 as recommended. ED-0119, ED-0120 and ED-0121 are allocated.
 
 It follows:
 - the owner's live-testing direction of 2026-09-30: simulate the live setting, where
@@ -23,7 +23,7 @@ It follows:
   - ED-0121 extends the ED-0115 replay tool.
 - **Authority evidence:** ADR-0036, ADR-0037, ADR-0034 (Phase 7 live condition), ED-0115,
   and the owner direction above.
-- **Implementation-ready:** yes, once D1–D5 are approved.
+- **Implementation-ready:** yes. D1–D5 were approved on 2026-09-30.
 - **ED numbers:** ED-0119 and ED-0120 were proposed to the owner on 2026-09-30. ED-0121
   is the next free number, split out because the replay upgrade is separable. All three
   are confirmed on approval.
