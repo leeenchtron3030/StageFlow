@@ -34,8 +34,8 @@ policy v2) is detailed below (2026-09-29), after the early accuracy check. After
 | --- | --- | --- |
 | **1. Media segmentation evidence (ED-0103)** | Advisory freeze and silence intervals per Completed Media Asset, from a new `media_segmentation` Durable Operation | `0021` |
 | 2. Session Suggestions core | Suggestion aggregate, deterministic `boundary-suggestion` policy v1 (schedule, timing, segmentation, transcript cues), human-invoked suggestion run, confirm and reject commands (confirm reuses the existing human Session realization and boundary commands) | `0022` |
-| 3. Boundary proposals for realized Sessions (ED-0112 backend, ED-0113 Session Detail; Approved) | Suggestion runs propose start/end corrections (≥ 30 s) for realized, linked Sessions via the existing `session_boundary_proposal` table; human Apply/Dismiss with an append-only decision record; Session Detail section and Stage badge; UX checkpoint | `0027` (decision record; owner decision D5) |
-| 4. Producer surfaces (ED-0109 backend, ED-0110 Stage page; Completed; follow-up ED-0111 Approved) | Work Queue item "confirm presentation" (additive, one per Stage), latest-run read, Suggested presentations panel on the Stage page with confirm/adjust/reject and schedule offset, Mission Control summary line; UX checkpoint | none |
+| 3. Boundary proposals for realized Sessions (ED-0112 backend, ED-0113 Session Detail; Completed) | Suggestion runs propose start/end corrections (≥ 30 s) for realized, linked Sessions via the existing `session_boundary_proposal` table; human Apply/Dismiss with an append-only decision record; Session Detail section and Stage badge; UX checkpoint | `0027` (decision record; owner decision D5) |
+| 4. Producer surfaces (ED-0109 backend, ED-0110 Stage page; Completed; follow-up ED-0111 Completed) | Work Queue item "confirm presentation" (additive, one per Stage), latest-run read, Suggested presentations panel on the Stage page with confirm/adjust/reject and schedule offset, Mission Control summary line; UX checkpoint | none |
 | 2c. Policy v3, schedule offset (ED-0106, Completed) | Per-block schedule offset (estimated or producer override) before v2 alignment; Stage offset override setting | `0024` |
 | 2d-1. Cue phrase presets and composition (ED-0107 backend, ED-0108 Event page; Completed) | Built-in catalog v1, human composition command publishing the Event's start and end cue lists, runs default to them, Event page section | `0025` |
 | 2d-2. Transcript cues as edges (outline) | Policy v4 with `cue` edges | to be detailed |
@@ -1556,6 +1556,24 @@ Kernel Sessions, and are corrected through the existing commands.
   Event: after confirm → suggest again, the confirmed talks show as "already a Session",
   not as open suggestions.
 - **Rollback:** revert the code and reverse `0026`.
+- **Completion record (ED-0111):**
+  - **Implemented revision:** merged in PR #165 (`main` `b589034`).
+  - **What changed:**
+    - one shared realization helper, used by both the run and confirm;
+    - the storage filter after the unchanged v3 evaluation;
+    - the `already_realized` skip (migration `0026`);
+    - the Stage summary wording.
+  - **Owner-side fixes after review:**
+    - "No open suggestions" when every remaining talk is a Session;
+    - the digest is scoped to this Stage's realized expectations, so a confirm on another
+      Stage does not force a new run.
+  - **Tests (host):** backend **2,991 passed, 0 failed, 2 skipped**; frontend **348
+    passed**. CI green.
+  - **Demo database:** backed up (`stageflow_demo-pre-ed0111-0026-*`) and migrated to
+    `0026`.
+  - **Live re-check on the review Event:** "3 suggested · 2 already Sessions". The
+    rejected talk was suggested again, and Mission Control dropped from 5 to 3.
+  - **Status:** Completed.
 
 ## Phase 3: Boundary proposals for realized Sessions (ED-0112 backend, ED-0113 Session Detail)
 
@@ -1766,6 +1784,57 @@ Kernel Sessions, and are corrected through the existing commands.
 - Reverse `0027` while no decisions exist.
 - Proposals already written are ordinary, immutable Kernel advisory rows. They stay
   readable and never change a Session on their own.
+
+
+### Completion record (ED-0112)
+
+- **Implemented revision:** merged in PR #166 (`main` `fb0b69d`).
+- **What changed:**
+  - proposal production in runs (`boundary_proposals.py`);
+  - Apply and Dismiss commands, plus the reads;
+  - `boundary_proposal_repository.py`;
+  - migration `0027` (the decision record and the run count);
+  - the API;
+  - the Kernel import-boundary test, now stricter;
+  - docs.
+- **Review:** `directive-reviewer` returned ESCALATE: a dismissed proposal was re-created
+  on the next run.
+  - Owner decision: **dismissals stick**. The D3 amendment above makes dedup check the
+    latest proposal regardless of its decision, until a same-edge correction.
+  - The review then returned APPROVE, and a probe confirmed no duplicate.
+- **Tests (host):** backend **3,042 passed, 0 failed, 2 skipped**. CI green.
+- **Demo database:** backed up (`stageflow_demo-pre-ed0112-0027-*`) and migrated to
+  `0027`.
+- **Status:** Completed.
+
+### Completion record (ED-0113)
+
+- **Implemented revision:** merged in PR #167 (`main` `25da008`).
+- **What changed:**
+  - the Session Detail Suggested boundaries section;
+  - the Stage summary count and the Already Sessions list;
+  - the proxy (four routes) and audit;
+  - labels and README;
+  - the owner-approved additive backend field `boundary_kind` in the decision history.
+    No migration.
+- **Review:** `directive-reviewer` returned APPROVE, and APPROVE again after the UX round
+  and the backend field.
+- **Owner UX checkpoints:**
+  - **First:** four changes: the Already Sessions list replacing the Decided-row badge,
+    compact rows, readable history, and Refresh-only after refusals.
+  - **Second:** approved, with one polish: the same range format in Already Sessions.
+  - Both are recorded in `docs/ux/operator-feedback.md`.
+- **Live check on the review Event:**
+  - proposals matched deliberately rough confirm times exactly (start −3 min, end
+    +2 min, and a 1 min start);
+  - Apply corrected the boundary;
+  - Dismiss stuck across Suggest again;
+  - the history reads "Start dismissed · 22:26 · by producer".
+- **Tests (host):** frontend **374 passed, 0 failed**; lint, typecheck and build clean.
+  Backend **3,044 passed, 0 failed, 2 skipped**. CI green.
+- **Status:** Completed. **Phase 3 is complete.**
+- **Codex note:** during the ED-0113 UX round, Codex's usage limit paused work until the
+  owner added credits. No work was lost.
 
 ## Phase 5: Validation harness and qualification Run 001 (ED-0114 harness, ED-0115 live replay)
 
