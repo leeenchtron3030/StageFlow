@@ -17,6 +17,7 @@ from .contracts import (
     BoundaryProposalDecisionKind,
     Candidate,
     EdgeKind,
+    Policy,
     SuggestionConflictError,
 )
 from .repository import SuggestionRepository, SuggestionTransaction
@@ -26,7 +27,7 @@ SYSTEM_PROPOSER_ID = EntityId(str(uuid5(
 
 
 def produce_boundary_proposals(tx: SuggestionTransaction, session: Session,
-                               candidate: Candidate) -> int:
+                               candidate: Candidate, *, policy: Policy = POLICY_V3) -> int:
     evidence = tuple(sorted({*candidate.segmentation_ids,
                              *(r.id for r in candidate.timing_references)},
                             key=lambda i: i.value))
@@ -44,7 +45,7 @@ def produce_boundary_proposals(tx: SuggestionTransaction, session: Session,
             continue
         prior = latest.get(edge)
         if (prior is not None and prior.boundary_at == boundary
-                and prior.policy_version == POLICY_V3.version):
+                and prior.policy_version == policy.version):
             continue
         reason = ("cue_supported" if getattr(candidate, edge + "_cue_support") else {
             EdgeKind.FREEZE: "changeover_edge", EdgeKind.GAP: "recording_gap",
@@ -53,7 +54,7 @@ def produce_boundary_proposals(tx: SuggestionTransaction, session: Session,
         tx.kernel.propose_session_boundary(
             session_id=session.id, boundary_kind=edge, boundary_at=boundary,
             epistemic_kind=EpistemicKind.DERIVED, proposer_id=SYSTEM_PROPOSER_ID,
-            evidence_ids=evidence, policy_id=POLICY_V3.id, policy_version=POLICY_V3.version,
+            evidence_ids=evidence, policy_id=policy.id, policy_version=policy.version,
             reason=reason,
         )
         count += 1

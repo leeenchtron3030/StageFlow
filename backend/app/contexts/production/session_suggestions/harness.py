@@ -17,7 +17,7 @@ from app.contexts.production.media_segmentation_evidence.contracts import (
 )
 from app.shared.ids import EntityId
 
-from . import policy, policy_v2, policy_v3
+from . import policy, policy_v2, policy_v3, policy_v4
 from .contracts import (
     MAX_INPUTS,
     AssetInput,
@@ -186,12 +186,12 @@ def run_manifest(stages: Sequence[StageManifest], *, policy_version: str = "3",
                  producer_offsets: tuple[ScheduleOffsetEntry, ...] = (),
                  ) -> dict[str, Any]:
     """Return only anonymous ordinals, closed labels, numeric metrics and pass booleans."""
-    if (policy_version not in ("1", "2", "3") or schedule_source not in ("manifest", "drift")
+    if (policy_version not in ("1", "2", "3", "4") or schedule_source not in ("manifest", "drift")
             or drift_model not in _MODELS or type(magnitude_seconds) is not int
             or not 0 <= magnitude_seconds <= 86400 or not seeds
             or len(seeds) > 100 or any(type(s) is not int for s in seeds)
             or not stages or len(stages) > MAX_INPUTS
-            or producer_offsets and policy_version != "3"):
+            or producer_offsets and policy_version not in ("3", "4")):
         raise ValueError("invalid_options")
     validate_offset_entries(producer_offsets)
     cues = None
@@ -220,7 +220,9 @@ def run_manifest(stages: Sequence[StageManifest], *, policy_version: str = "3",
             override = ScheduleOffsetSetting(
                 _id("event"), _id(f"stage:{index}"), 1, _id("command"), "0" * 64,
                 _id("actor"), _EPOCH, producer_offsets) if producer_offsets else None
-            if policy_version == "3":
+            if policy_version == "4":
+                result = policy_v4.evaluate(snapshot, override)
+            elif policy_version == "3":
                 result = policy_v3.evaluate(snapshot, override)
             else:
                 evaluator = policy.evaluate if policy_version == "1" else policy_v2.evaluate

@@ -12,6 +12,7 @@ from app.shared.human_commands import human_command_digest
 from app.shared.ids import EntityId
 from app.shared.time import Clock, require_aware_datetime
 
+from . import policy_v3, policy_v4
 from .boundary_proposals import produce_boundary_proposals
 from .contracts import (
     POLICY_V3,
@@ -27,9 +28,11 @@ from .contracts import (
     SuggestionStatus,
     validate_offset_entries,
 )
-from .policy_v3 import evaluate
 from .repository import SuggestionRepository, SuggestionTransaction
 from .work_queue import validate_work_queue_limit
+
+# Internal evaluation selector; changing the production default needs owner approval.
+POLICY_VERSION = 3
 
 
 def kernel_operation_id(command_id: EntityId, command: str) -> EntityId:
@@ -61,6 +64,10 @@ class SessionSuggestionService:
             start_cue_list: Reference | None = None, end_cue_list: Reference | None = None,
             authority_kind: str = "human") -> SuggestionRun:
         self._human(authority_kind)
+        policy, evaluate = {
+            3: (POLICY_V3, policy_v3.evaluate),
+            4: (policy_v4.POLICY_V4, policy_v4.evaluate),
+        }[POLICY_VERSION]
         with self.repository.transaction(self.clock) as tx:
             tx.lock_event(event_id)
             tx.scope(event_id, stage_id)
@@ -81,7 +88,7 @@ class SessionSuggestionService:
             linked = [tx.boundary_session(event_id, s.id, lock=True) for s in linked]
             digest = human_command_digest({
                 "event_id": event_id.value, "stage_id": stage_id.value,
-                "policy": asdict(POLICY_V3),
+                "policy": asdict(policy),
                 # Only this Stage's expectations: a confirm on another Stage must not
                 # force a new run here.
                 "realized_expectation_ids": sorted(
@@ -113,18 +120,18 @@ class SessionSuggestionService:
                             already_realized=len(result.candidates) - len(candidates))
             by_expectation = {c.expectation.id: c for c in result.candidates
                               if c.expectation is not None and c.expectation.id in realized}
-            proposals_created = sum(produce_boundary_proposals(tx, s, by_expectation[expected])
-                                    for s in linked if (expected := s.program_expectation_id)
-                                    in by_expectation)
+            proposals_created = sum(
+                produce_boundary_proposals(tx, s, by_expectation[expected], policy=policy)
+                for s in linked if (expected := s.program_expectation_id) in by_expectation)
             run = SuggestionRun(
                 EntityId.new(), event_id, stage_id, digest, actor_id, self.clock.now(),
                 tuple(Reference(x.id, x.revision) for x in inputs.expectations), inputs.assets,
-                start_cue_list, end_cue_list, skips, POLICY_V3, result.blocks,
+                start_cue_list, end_cue_list, skips, policy, result.blocks,
                 None if override is None else override.version,
                 proposals_created,
             )
             tx.save_run(run, tuple(SessionSuggestion(EntityId.new(), run.id, event_id, stage_id, x,
-                                                     POLICY_V3.id, POLICY_V3.version)
+                                                     policy.id, policy.version)
                                    for x in candidates))
             return run
 

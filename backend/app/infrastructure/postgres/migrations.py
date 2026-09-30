@@ -208,6 +208,13 @@ class PostgresMigrationRunner:
             "0027_boundary_proposal_decisions_forward.sql",
             version="0027_boundary_proposal_decisions",
         )
+        self.apply_session_suggestions_policy_v4()
+
+    def apply_session_suggestions_policy_v4(self) -> None:
+        self._execute_if_missing(
+            "0028_session_suggestions_policy_v4_forward.sql",
+            version="0028_session_suggestions_policy_v4",
+        )
 
     def reverse_event_mode_kernel_v1(self) -> None:
         self.reverse_demo_vertical_slice_v1()
@@ -376,9 +383,20 @@ class PostgresMigrationRunner:
         )
 
     def reverse_boundary_proposal_decisions(self) -> None:
+        # A refusal at either version preserves both migrations.
+        with ExitStack() as stack:
+            runner = (self if self._reversal is not None
+                      else replace(self, _reversal=_ReversalTransaction(stack)))
+            runner.reverse_session_suggestions_policy_v4()
+            runner._execute_if_present(
+                "0027_boundary_proposal_decisions_reverse.sql",
+                version="0027_boundary_proposal_decisions",
+            )
+
+    def reverse_session_suggestions_policy_v4(self) -> None:
         self._execute_if_present(
-            "0027_boundary_proposal_decisions_reverse.sql",
-            version="0027_boundary_proposal_decisions",
+            "0028_session_suggestions_policy_v4_reverse.sql",
+            version="0028_session_suggestions_policy_v4",
         )
 
     def _execute(self, filename: str) -> None:

@@ -261,6 +261,88 @@ override history. Deferred membership checks prevent appending to a committed se
 or run. Reverse refuses any v3 run or override setting; otherwise it removes the additions
 and restores exactly the v2 checks. No existing identity or lineage is rewritten.
 
+`policy_v4.evaluate(snapshot, override=None)` implements per-talk lateness with v2's
+printed-plan clock/coverage checks, evidence construction, changeover weights, silence
+and cue support, minimum durations, no-coverage skips, unscheduled activity and overlap
+marking. It imports v2's evidence helpers; v1-v3 modules and constants are unchanged.
+The starting constants live in `policy_v4.py` and its frozen migration record:
+
+| Constant | Value | Meaning |
+| --- | --- | --- |
+| `TAU_ANCHOR` | 30 s/point | First observed edge or first after an override anchor |
+| `TAU_STEP` | 60 s/point | Change in lateness at each later observed edge |
+| `WINDOW` | 1,200 s | Inclusive window around printed edge + carried lateness |
+| `HARD_BOUND` | 5,400 s | Inclusive observed-edge bound around the printed edge |
+
+Lateness is the observed edge minus that talk's printed start/end. The first observed
+edge costs `abs(lateness - anchor) / TAU_ANCHOR` (initial anchor 0); subsequent edges cost
+`abs(lateness - previous_lateness) / TAU_STEP`. Strength is counted once per changeover,
+including shared changeovers; cue bonus is counted per observed edge. Integer
+microseconds and `Fraction` keep all costs and comparisons exact. Equal paths use v2's
+earliest edge sequence/rank, with talks ordered by printed start and lowest expectation
+ID. Fallback edges are placed at printed edge + carried lateness, preserve that lateness
+and any pending anchor, and do not advance the evidence cursor. As in v2 they are used
+when no observed edge is feasible, not as an optional way to avoid a negative score.
+The hard bound constrains observed edges; a producer fallback can retain the full
+setting range of +/-7,200 s.
+
+Each override entry resets the chain at the first printed start at or after its
+`effective_from`; the latest applicable entry wins if several reach the same talk.
+The next observed edge uses the anchor cost, even if fallbacks intervene. No blocks or
+offset grid search are used. Runs record `blocks = ()`. Each scheduled suggestion's
+`schedule_offset_seconds` is its start lateness rounded to the nearest whole second,
+with half-second ties away from zero. Its source is `producer` after an applicable
+anchor, otherwise `estimated` for nonzero rounded offset, or `none`. Unscheduled
+suggestions always use 0/`none`. Offsets never raise strength.
+
+DP states distinguish `(evidence cursor, carried lateness in microseconds, pending
+anchor)`. Fallbacks can leave the same cursor with different lateness, so cursor-only
+pruning is unsound. At a layer there are O(T*C) states (lateness comes from an earlier
+printed edge or an anchor); conservative bounds are O(T^2*C^3) time and O(T^2*C)
+backpointer space. Candidate windows prune the practical workload. The synthetic
+30-talk/80-changeover test requires completion within 3 seconds; this is not a cost
+claim at the 10,000-input cap.
+
+Migration `0028_session_suggestions_policy_v4` admits only exact v4 constants and
+preserves exact v1-v3 constants and checks. v4 requires offset components, permits
+estimated offsets through +/-5,400 s, and requires zero blocks; v3 keeps its +/-3,600 s
+estimated limit. Forward rewrites no rows. Reverse refuses any v4 run or suggestion,
+otherwise restoring the prior constraints and removing only its registry entry.
+The existing PostgreSQL and memory repositories read/write v4. The single internal
+`service.POLICY_VERSION` selector defaults to **3**; tests select 4. Run digests,
+suggestions and any boundary proposals use the selected policy's actual identity.
+No runtime configuration, API or frontend option selects v4.
+
+**Residual short-slot ambiguity (owner decision, 2026-09-30).** The unchanged
+`short-evenly-spaced` fixture has eight 300 s talks at 420 s intervals, with the printed
+plan shifted +420 s. Exact v4 results are pinned both without and with a -420 s override:
+
+| Result | No override | -420 s override |
+| --- | --- | --- |
+| Winning score | 81 | 95 |
+| Best path retaining every talk's identity | 80 | 94 |
+| Interval recall (including unscheduled activity) | 1.0 | 1.0 |
+| Scheduled precision | 0.875 | 0.875 |
+| Median start/end error | 0 s / 0 s | 0 s / 0 s |
+
+Both runs assign expectation 0 to [-120, 300], expectations 1-5 to their own talks,
+expectation 6 to talk 7 at [2940, 3240], and expectation 7 to [3360, 3660]. Talk 6 at
+[2520, 2820] becomes unscheduled. Times are seconds relative to the first true start;
+IDs/ordinals are zero-based. Interval recall therefore does not establish correct
+Program Expectation assignment. A soft override cannot guarantee assignment when
+skipping a talk and jumping one slot costs about as much as a changeover earns.
+The separate asymmetric fixture uses unequal talk lengths/changeovers and a +1,500 s
+printed shift: without an override assignments are wrong; with -1,500 s every suggestion
+matches its own expectation and both true edges exactly, with recall 1.0.
+
+`test_session_suggestion_policy_v4.py` pins these results, all existing suite scenarios,
+hand-computed chain costs, windows/bounds, pending/mid-block anchors, rounded offsets,
+clean-day v2 equivalence, deterministic ordering and cost. The v4 harness tests cover
+CLI dispatch, generator/replay data, service replay and proposal provenance; the v4
+PostgreSQL tests cover exact constants, versioned components, zero-block persistence,
+legacy reads, forward/reverse/refusal and restart replay in a rolled-back schema.
+Qualification and switching the default remain owner steps.
+
 `SessionSuggestionService` owns human run/confirm/reject commands. Runs are idempotent by
 the input digest while that run is still the Stage's latest, independent of actor and
 invocation time; returning to earlier inputs creates a new latest run. At most 10,000 assets and
@@ -449,7 +531,7 @@ uv run --no-sync python -m app.contexts.production.session_suggestions.harness_c
 ```
 
 `harness.parse_manifest` produces frozen Stage inputs; `harness.run_manifest` runs the
-chosen unchanged policy (`1`, `2`, `3`) independently for each Stage. One invocation is
+chosen policy (`1`, `2`, `3`, `4`) independently for each Stage. One invocation is
 one scenario/model/magnitude; repeat invocations for a matrix. Stages may span multiple
 days. Metrics match only within a Stage, never across Stages. Reports use zero-based
 Stage ordinals and include each seed plus each metric's worst value **and its seed**;
@@ -485,11 +567,11 @@ or match text: supplied cue times must already represent matches for that compos
 Absent cue times stay absent; without a profile all cue inputs are disabled. To compare
 profiles with different matches, prepare separate external manifests.
 
-For v3 only, repeat `--producer-offset <aware-ISO-effective-from> <integer-seconds>` in
+For v3 or v4, repeat `--producer-offset <aware-ISO-effective-from> <integer-seconds>` in
 strictly increasing effective-time order (at most 20; offsets -7200..7200). Entries apply
 to each Stage in the invocation via `ScheduleOffsetSetting`; use separate invocations
 for different Stage settings. These are explicit producer offsets, not automatically
-inferred truth offsets. Existing v3 block/override precedence is preserved.
+inferred truth offsets. v3 keeps block/override precedence; v4 uses entries as per-talk chain anchors.
 
 JSON output contains only closed labels, ordinals, seed numbers, counts, errors, ratios
 and target booleans, never source keys, titles, timestamps, cue phrases or paths.
@@ -508,3 +590,36 @@ deliberately shifts the plan by one periodic slot; current behavior is pinned, n
 lineage, determinism, isolated Stages, manifest bounds/privacy, cues, offsets, precision,
 wrong-day margins and CLI exit codes. `test_session_suggestion_evaluation.py` retains the
 original metric fixtures and CLI privacy checks.
+
+`scenarios.realistic_schedule_error(seed, ...)` returns one manifest-shaped Stage;
+wrap it in `{"stages": [stage]}` for `parse_manifest` or the CLI. With `timeline=True`
+it returns `(stage, timeline)`, where `timeline` holds talk start/end seconds with their
+schedule index (null for extra content), and contiguous block start/end seconds with
+holding intervals. This plain data can drive a synthetic replay day's local media
+generation; it writes no files and generates no media.
+
+Parameters are `talk_count` (2..60, default 30), `slot_seconds` (1,200..1,800, default
+1,500), and optional `dropped`, `added`, `after_program` flags (all false by default).
+Slots are evenly spaced; planned talk duration is slot length minus 180 s. Each actual
+duration draws an integer percentage uniformly from -40..40; the error is truncated
+toward zero to whole seconds, preserving symmetry and the 40% bound. Each changeover draws
+180 s plus integer jitter uniformly from -60..60. Initial lateness is an integer draw
+from -300..300 s. Duration errors and changeover jitter accumulate into the next talk's
+lateness. Dropping one talk consumes no time; adding one uses a uniform integer
+600..1,200 s duration and a 180 s changeover. Optional post-program content lasts 900 s.
+Coverage includes 120 s holding at either end, split into contiguous 600 s blocks with
+clipped synthetic freeze/silence intervals. No generic parameter is fitted to a corpus.
+
+Use `random.Random` with string seed version 2:
+
+```text
+stageflow:session-suggestions:realistic:v1:{seed}
+```
+
+Draw initial lateness, dropped index, added index, then duration percentage and
+changeover jitter for each planned talk (including dropped talks); draw added duration
+when its index is reached. Flag-disabled index draws still occur. Parameters are not
+part of the seed string. Tests use development seeds only, pin seed 7's complete data,
+exercise seeds 1-20 and all optional changes, and leave reserved held-out evaluation to
+the owner after the constants freeze. For example, run a locally written manifest with
+`--policy-version 4 --schedule-source manifest`; producer-offset syntax is unchanged.

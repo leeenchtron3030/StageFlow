@@ -27,6 +27,7 @@ from app.contexts.production.session_suggestions.contracts import (
     Policy,
     PolicyV2,
     PolicyV3,
+    PolicyV4,
     Reference,
     ScheduleBlock,
     ScheduleOffsetEntry,
@@ -443,7 +444,7 @@ def _run(row: Row, blocks: tuple[ScheduleBlock, ...] = ()) -> SuggestionRun:
         None if row["end_cue_list_id"] is None else Reference(
             EntityId(str(row["end_cue_list_id"])), row["end_cue_list_version"]),
         SkipCounts(**{k: row[k] for k in SkipCounts.__dataclass_fields__}),
-        {"1": Policy, "2": PolicyV2, "3": PolicyV3}[row["policy_version"]](
+        {"1": Policy, "2": PolicyV2, "3": PolicyV3, "4": PolicyV4}[row["policy_version"]](
             **row["policy_constants"]),
         blocks, row.get("override_setting_version"), row["boundary_proposals_created"],
     )

@@ -12,7 +12,7 @@ from .harness import markdown_report, parse_manifest, run_manifest
 def main(argv: Sequence[str] | None = None) -> int:
     parser = SanitizedArgumentParser(prog="session-suggestion-harness", description=__doc__)
     parser.add_argument("manifest", type=Path)
-    parser.add_argument("--policy-version", choices=("1", "2", "3"), default="3")
+    parser.add_argument("--policy-version", choices=("1", "2", "3", "4"), default="3")
     parser.add_argument("--schedule-source", choices=("manifest", "drift"), default="manifest")
     parser.add_argument("--drift-model", choices=("whole-day", "two-part", "independent"),
                         default="whole-day")

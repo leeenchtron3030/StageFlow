@@ -98,6 +98,14 @@ class PolicyV3(PolicyV2):
 POLICY_V3 = PolicyV3()
 
 
+@dataclass(frozen=True, slots=True, kw_only=True)
+class PolicyV4(PolicyV2):
+    version: str = "4"
+    tau_anchor_seconds: int
+    tau_step_seconds: int
+    hard_bound_seconds: int
+
+
 class ScheduleOffsetSource(StrEnum):
     PRODUCER = "producer"
     ESTIMATED = "estimated"
@@ -309,6 +317,28 @@ class CandidateV3(CandidateV2):
 
 
 @dataclass(frozen=True, slots=True)
+class CandidateV4(CandidateV3):
+    def __post_init__(self) -> None:
+        from .policy_v4 import HARD_BOUND
+
+        CandidateV2.__post_init__(self)
+        # Observed lateness can reach the hard bound; producer fallbacks can
+        # retain the full setting range. Keep v3's validation unchanged.
+        if (type(self.schedule_offset_seconds) is not int
+                or not -7200 <= self.schedule_offset_seconds <= 7200
+                or self.schedule_offset_source not in tuple(ScheduleOffsetSource)
+                or self.schedule_offset_source == ScheduleOffsetSource.NONE
+                and self.schedule_offset_seconds != 0
+                or self.schedule_offset_source == ScheduleOffsetSource.ESTIMATED
+                and abs(self.schedule_offset_seconds) > HARD_BOUND):
+            raise ValueError("invalid schedule offset components")
+        if self.expectation is None and (
+                self.schedule_offset_seconds != 0
+                or self.schedule_offset_source != ScheduleOffsetSource.NONE):
+            raise ValueError("unscheduled suggestions require zero offset and source none")
+
+
+@dataclass(frozen=True, slots=True)
 class PolicyResult:
     candidates: tuple[Candidate, ...]
     skips: SkipCounts
@@ -345,6 +375,8 @@ class SuggestionRun:
     boundary_proposals_created: int = 0
 
     def __post_init__(self) -> None:
+        from .policy_v4 import POLICY_V4
+
         require_aware_datetime(self.created_at, "created_at")
         if (type(self.boundary_proposals_created) is not int
                 or not 0 <= self.boundary_proposals_created <= MAX_COUNT):
@@ -352,9 +384,12 @@ class SuggestionRun:
         object.__setattr__(self, "expectations", tuple(self.expectations))
         object.__setattr__(self, "assets", tuple(self.assets))
         object.__setattr__(self, "blocks", tuple(self.blocks))
-        if self.policy not in (POLICY_V1, POLICY_V2, POLICY_V3):
+        if self.policy not in (POLICY_V1, POLICY_V2, POLICY_V3, POLICY_V4):
             raise ValueError("unsupported suggestion policy")
-        if self.policy != POLICY_V3 and (self.blocks or self.override_setting_version is not None):
+        if self.policy == POLICY_V4 and self.blocks:
+            raise ValueError("v4 does not use schedule blocks")
+        if self.policy not in (POLICY_V3, POLICY_V4) and (
+                self.blocks or self.override_setting_version is not None):
             raise ValueError("schedule offset lineage requires v3")
         if tuple(b.ordinal for b in self.blocks) != tuple(range(len(self.blocks))):
             raise ValueError("schedule block ordinals must be contiguous")

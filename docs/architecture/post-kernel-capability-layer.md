@@ -945,6 +945,34 @@ wins; earlier blocks still estimate. Run digests include the setting version. Mi
 immutable blocks and setting history, with reversal refused while a v3 run or setting
 exists. No Program Expectation, Session or Kernel fact is changed by an override.
 
+Policy v4 adds per-talk lateness-chain alignment through `policy_v4.evaluate`, preserving
+v2 evidence, strength, cue support and printed-plan clock/coverage checks. The first
+observed edge and the first after an override anchor cost absolute lateness from the
+anchor at 30 s/point; later edges cost the change in lateness at 60 s/point. Candidates
+use a +/-1,200 s chain-relative window inside a +/-5,400 s printed-plan bound. Fallbacks
+carry lateness without consuming evidence. Overrides anchor the first printed start at
+or after their effective time, including within a v3 block. v4 records no blocks and
+reports rounded per-talk start lateness and its producer/estimated/none source without
+changing strength. State includes carried lateness and pending-anchor status; the
+conservative complexity is O(T^2*C^3) time and O(T^2*C) backpointer space, with a synthetic
+30-talk/80-changeover cost test. Migration `0028_session_suggestions_policy_v4` admits
+exact v4 constants and components, retaining v1-v3 checks and refusing reverse while
+any v4 rows exist. No existing identity or lineage is rewritten.
+
+v3 remains the default through one internal code selector; there is no runtime/API/UI
+policy option. Tests can persist/replay v4 with zero blocks through existing repositories;
+any boundary proposals retain the selected policy version. The harness accepts version
+4 and producer anchors. A seeded generic realistic-schedule-error generator supplies
+20-30 minute slots, bounded symmetric duration errors, cumulative lateness, optional
+dropped/added talks and post-program content, plus plain block/talk replay data.
+The context README documents its RNG and parameters. The short periodic fixture still
+aliases with and without its correct soft override (winning scores 81/95 versus 80/94
+for own-identity paths); interval recall 1.0 includes an unscheduled replacement and is
+not proof of identity assignment. A separate asymmetric shifted fixture proves exact
+own-expectation assignment with the correct anchor. These are synthetic regression
+results; qualification, reserved held-out evaluation and any default switch remain
+owner steps.
+
 Migration `0022_session_suggestions` adds immutable runs, suggestions and decisions.
 Status derives from run order and decisions. The PostgreSQL adapter binds the unchanged
 Kernel repository to the surrounding confirmation transaction: existing `start_session`
@@ -966,10 +994,10 @@ or runtime setting is added; corpus accuracy qualification remains separate.
 A pure anonymous interval evaluator preserves recall, median/p95 start/end error and
 both-edges-within-60-second counts, adding scheduled precision, unscheduled count,
 inclusive precision and a planned-span +/-12-hour wrong-day check. A pure corpus harness
-and local-file CLI run unchanged v1/v2/v3 policies against external manifests, using the
+and local-file CLI run v1/v2/v3/v4 policies against external manifests, using the
 published schedule as-is or seeded whole-day, two-part or independent drift. Optional
 catalog compositions enable only supplied cue timestamps; explicit producer offsets use
-the existing v3 setting contract. Reports contain per-Stage, per-seed and worst-seed
+the existing setting contract for v3/v4. Reports contain per-Stage, per-seed and worst-seed
 numeric metrics, with sanitized errors. Generic synthetic gap, multi-part, wrong-clock,
 short-talk and late-start scenarios pin current behavior in CI without policy tuning.
 Real-event data and manifests stay outside the repository; exact historical reproduction
