@@ -38,9 +38,10 @@ policy v2) is detailed below (2026-09-29), after the early accuracy check. After
 | 4. Producer surfaces (ED-0109 backend, ED-0110 Stage page; Completed; follow-up ED-0111 Completed) | Work Queue item "confirm presentation" (additive, one per Stage), latest-run read, Suggested presentations panel on the Stage page with confirm/adjust/reject and schedule offset, Mission Control summary line; UX checkpoint | none |
 | 2c. Policy v3, schedule offset (ED-0106, Completed) | Per-block schedule offset (estimated or producer override) before v2 alignment; Stage offset override setting | `0024` |
 | 2d-1. Cue phrase presets and composition (ED-0107 backend, ED-0108 Event page; Completed) | Built-in catalog v1, human composition command publishing the Event's start and end cue lists, runs default to them, Event page section | `0025` |
-| 2d-2. Transcript cues as edges (outline) | Policy v4 with `cue` edges | to be detailed |
+| 2d-2. Transcript cues as edges (outline; superseded by Phase 7) | See Phase 7 (policy v5) | see Phase 7 |
 | 5. Validation harness and Run 001 (ED-0114 harness, ED-0115 live replay; Approved) | Committed pure harness + CLI over a local corpus manifest, precision and wrong-day checks, deterministic synthetic scenario suite in CI (gaps, multi-part, wrong clocks, short talks, late recording start), owner qualification Run 001 against the ADR target, local live-replay tool with time-to-suggestion | none |
 | 6. Policy v4, per-talk lateness (ED-0116; Parked 2026-09-30 after dev evaluation; v3 remains) | Lateness-chain joint alignment replacing v3's per-block offset (fixes slot aliasing and per-talk duration error), override entries as mid-day anchors, realistic-schedule-error scenario generator; re-qualify with Qualification Run 002 (dev and held-out, per event day) and Live Replay Run 002 | `0028` |
+| 7. Boundary evidence, policy v5 (proposed ED-0117 pure policy, ED-0118 persistence and producer evidence; draft for owner approval) | Proximity-weighted cue support, `cue` edges with false-hit control, coverage bounds as fallback edges, program-span limit for unscheduled activity (`outside_program` skip); prototype measured on dev before the constants freeze | `0028` (ED-0118) |
 
 ## Phase 1: media segmentation evidence (ED-0103)
 
@@ -2418,6 +2419,252 @@ In short:
     with v3's block offset plus a local chain correction, is a recorded option.
 - **Acceptance:** the ED-0116 items above are **not met** and stay unchecked. No
   Qualification Run 002 or Live Replay Run 002 was run.
+
+## Phase 7: boundary evidence, policy v5 (proposed ED-0117 pure policy, ED-0118 persistence and producer evidence)
+
+### Status
+
+- **Draft for owner approval** (2026-09-30). It follows the owner decision recorded in
+  Phase 6's "Dev evaluation and parking record (ED-0116)": park v4 and improve the
+  boundary evidence. It implements the Phase 2d-2 outline, whose owner decisions 1–4
+  are already recorded, and adds two evidence fixes found by the diagnostic below.
+- **Execution classification:** Yellow until approved, because it adds a new policy
+  version, a new edge kind and an informational skip. After approval it is Green on the
+  same basis as Phase 2c:
+  - ADR-0034 allows a deterministic, versioned policy;
+  - no Kernel, confirmation or authority semantics change;
+  - migrations are additive with a guarded reverse;
+  - no dependency is added.
+- **ED numbers:** the plan delegates ED numbering. The next free numbers,
+  **ED-0117** and **ED-0118**, are proposed here and confirmed by the owner in D6.
+
+### Why
+
+The diagnostic ran on dev data only, on 2026-09-30 at `main` `8689c3b`. It gave v3 a
+perfect schedule (plans equal to truth) plus the Conference stage cues, with one Stage
+per day, and classified every one of the 56 true edges. Sanitized counts:
+
+| v3 outcome | Freeze within 30 s | Cue within 30 s, no freeze | Cue within 60 s, no freeze | Neither within 60 s |
+| --- | --- | --- | --- | --- |
+| Within 30 s | 22 | 8 | 0 | 2 |
+| More than 30 s off | 12 | 5 | 2 | 1 |
+| Unmatched | 3 | 1 | 0 | 0 |
+
+- **Selection errors dominate.** 15 of the 24 bad edges have a freeze within 30 s, but
+  v3 chose a different changeover.
+  - In most of those rows, a cue lies within 10 s of the true edge.
+  - v2 and v3 count cues only as a flat +1 within wide windows (−120/+180 s and
+    −180/+60 s), so a stronger freeze further away wins.
+- **Missing edges:** 8 bad edges have no freeze nearby but a cue within 60 s. Only a
+  `cue` edge kind can reach them. This includes day 3's missed 12-minute talk, which has
+  cues within 1–2 s.
+- **Coverage bounds win too easily.** The recording start and end have strength 30:
+  - they took two last-talk ends (47 s and 184 s off);
+  - on the real schedule, day 2's first suggestion starts at the recording start,
+    713 s early.
+- **After-program content:** day 1 produced 6 unscheduled suggestions after the last
+  planned talk. This is the main loss in day 1's precision.
+- **Proxy check, constants patched in memory on dev data.** Tighter cue windows (±30 s),
+  a stronger cue weight and weaker coverage bounds:
+  - moved day 3 on the real schedule from 0.50 recall and a 215 s start median to
+    0.88 and 11 s;
+  - but dropped day 2 from 0.91 to 0.64, through cue hits in talks that don't match the
+    published plan;
+  - and could not raise the perfect-schedule ceiling (still 1 of 3 days).
+  - So the change needs real cue edges plus false-hit control, not constants alone.
+- **Lesson from Phase 6:** measure a pure prototype on the host before persistence and a
+  migration freeze the constants.
+
+### Verified current behavior
+
+- **v3 is the policy for new runs** (`service.py` imports `policy_v3.evaluate`).
+  - Edges come from freezes, recording gaps and coverage bounds (`EdgeKind`); cues only
+    add `cue_bonus × count` inside the windows above (`policy_v2.align`,
+    `policy_v3.evaluate`).
+  - The coverage strength is a constant 30 (`PolicyV2.coverage_strength`).
+- **Unscheduled activity** is any remaining activity of at least 120 s, anywhere in the
+  coverage. There is no program-span limit.
+- **Cue lists:**
+  - ED-0107 and ED-0108 compose the Event's start and end lists from the accepted
+    catalog (`cue_catalog.py`, [catalog doc](../ux/cue-phrase-catalog.md)). The
+    catalog has `start`, `end`, `changeover` and `segment` roles.
+  - Runs use the Event's current lists by default.
+  - Studio "take / action / cut" phrases must not start or end a Session (Phase 2d,
+    Decision 2).
+- **Validation tools:** the ED-0114 harness (policies 1–3) and the ED-0115 replay are on
+  `main`. The realistic-schedule-error generator exists only on the parked branch
+  `codex/ed-0116-policy-v4`.
+- **Migrations:** the latest on `main` is `0027`. The parked branch defines `0028` for
+  v4 and is not merged.
+
+### Decisions (owner approval of this section approves the recommended defaults)
+
+- **D1. Scope of policy v5**, built on v3. It keeps v3's block offset, override,
+  evidence and joint alignment, and adds four things:
+  1. **Proximity-weighted cue support.** It replaces the flat count:
+     - each cue of the matching role within ±C seconds of an edge adds
+       `cue_weight × (1 − distance / C)`;
+     - `changeover`-role phrases support both edges of a shared changeover;
+     - `segment`-role phrases and studio takes never support a Session edge
+       (Decision 2).
+  2. **`cue` edges.** A start or end cue cluster becomes a candidate edge only where no
+     changeover edge lies within ±T seconds.
+     - A cluster is two or more hits of that role within 60 s, or one hit of a phrase the
+       catalog marks as specific (multi-word).
+     - Cue edges have a fixed strength below a real changeover's minimum, so a cue-only
+       suggestion is never `strong`.
+     - They must lie inside the offset-shifted ±20 min window, which controls false hits
+       deep inside talks.
+  3. **Coverage bounds are the fallback edges.** A recording start or end is a candidate
+     edge with a reduced strength, and it is used only when no changeover or cue edge
+     lies within the window.
+  4. **Program-span limit for unscheduled activity.**
+     - Activity starting more than M minutes after the last planned end, or ending more
+       than M minutes before the first planned start, is not suggested.
+     - It is counted in a new informational skip `outside_program`, in the same way as
+       `already_realized`.
+     - Producers still create Sessions manually for it.
+  - **Alternative for item 4:** keep that activity as weak suggestions with an
+    "after program" label. That needs frontend wording and keeps the precision loss.
+    Not recommended.
+- **D2. Version and migration numbers.**
+  - **Recommended:** name this **v5**. v4 stays reserved for the parked design, so records
+    and documents can't mix two meanings of "v4".
+  - The migration on `main` is **`0028`**. The parked branch renumbers its migration if
+    it is ever revived; migration numbers are assigned on `main` only.
+- **D3. Two directives: prototype first, then freeze.**
+  - **ED-0117, pure policy (no migration):**
+    - `policy_v5.py` with the constants in one place;
+    - the harness and CLI option `--policy-version 5`;
+    - the realistic-schedule-error generator, ported from the parked branch and extended
+      with synthetic cue hits: jittered cues at true edges, plus false in-talk hits;
+    - scenario tests;
+    - no persistence, service, API or UI change.
+    - The owner then measures v5 on dev data and adjusts the constants or rules. A
+      change that is not a constant goes back to the owner as an amendment.
+  - **ED-0118, freeze and product (after Qualification Run 002 passes D5):**
+    - migration `0028` admitting v5 with the frozen constants, and the `cue` edge kind
+      and `outside_program` skip;
+    - persistence, API fields and the default switch to v5;
+    - producer evidence on the Stage page: the matched phrase and its time for a
+      cue-supported edge, for example "Start: cue 'please welcome…' at 14:02:08", with
+      the UX checkpoint.
+    - ED-0118 is detailed after Run 002, in its own section.
+- **D4. Starting constants** (dev tuning allowed under D5's protocol):
+  - C = 30 s;
+  - cue weight 10;
+  - T = 30 s;
+  - cue-edge strength 3. A 60 s freeze scores 1 without silence and 3 with full
+    silence, so a cue edge ranks with a short silent freeze. Tuned on dev;
+  - coverage-bound strength 5;
+  - M = 30 min.
+  - These are proxy-informed starting points, not results.
+- **D5. Protocol and targets, judged per event day.**
+  - **Tuning data:** the three W3S25 days (real published schedule, perfect schedule,
+    and the Run 001 drift matrix), generator seeds 1–20, and the scenario suite.
+  - **Held-out:** seeds 1000–1099, evaluated once, after the constants are frozen in
+    ED-0118's migration.
+  - **Qualification Run 002 acceptance for ED-0118:**
+    1. **Perfect-schedule ceiling:** at least 2 of 3 days meet the ADR-0034 target
+       (currently 1). Wrong-day count 0 everywhere.
+    2. **Real published schedule:** no day below v3's recall. Day 3 recall ≥ 0.75 and
+       start median ≤ 60 s. Each day's pass or fail against the ADR target is reported
+       honestly.
+    3. **Run 001 drift matrix:** no regression against v3. Per cell and day, recall is at
+       least v3's, and medians are within +5 s of v3's.
+    4. **Held-out seeds:** the per-day targets on at least 90% of seeds, reported
+       separately.
+    5. **Precision:** day 1's scheduled and inclusive precision improves. Every
+       `outside_program` skip is correct, meaning no true talk was skipped.
+  - If ED-0117's measurement cannot meet items 1–3 on dev data, stop and report before
+    ED-0118. v3 stays in use.
+- **D6. Numbering and sequence:** ED-0117 now; ED-0118 after Run 002. Phase 2d-2's
+  outline is superseded by this phase.
+
+### Desired behavior (ED-0117)
+
+- **`policy_v5.evaluate(snapshot, override=None)`:** pure and deterministic, with
+  Fraction and integer-microsecond arithmetic.
+  - v3's block offset estimation, override precedence and joint alignment stay
+    unchanged, except for D1's four changes.
+  - A cue edge carries `EdgeKind` `cue` in the pure result type. This is additive to the
+    pure contracts only; persistence waits for ED-0118.
+  - `outside_program` joins the pure skip counts, also additive.
+  - Without transcripts or cue lists, v5 reduces to v3 plus D1's items 3 and 4. A test
+    proves the reduction.
+- **Cue roles:** `start` and `end` phrases support and create their own edge role;
+  `changeover` phrases support both edges of a shared changeover; `segment` phrases and
+  studio takes are ignored for Session edges.
+  - The pure input needs each cue's role. If the current `AssetInput` carries only start
+    and end timestamp lists, ED-0117 adds a changeover-role list additively, and the
+    harness manifest gains an optional `changeover_cues` field.
+- **Harness and generator:**
+  - `--policy-version 5`;
+  - `realistic_schedule_error`, ported from the parked branch, with a `cues` option:
+    jittered hits at true edges with configurable recall, plus false in-talk hits;
+  - seeds below 1000 in tests;
+  - new scenarios: "cue-only edge" (a talk edge without a freeze), "false in-talk end
+    cue", "recording starts early" and "content after program".
+- **Tests:**
+  - hand-computed proximity weights;
+  - cluster and specificity rules;
+  - cue edges only where no changeover lies within T;
+  - the coverage-bound fallback;
+  - `outside_program` bounds, including the exact margin;
+  - reduction to v3 without cues;
+  - determinism;
+  - the full-day cost bound;
+  - each scenario pinned;
+  - v1–v3 results unchanged.
+
+### In scope (ED-0117)
+
+- `policy_v5.py` and its additive pure contract fields (edge kind, skip counter, cue
+  role input).
+- The harness and CLI option, the ported and extended generator, the new scenarios, and
+  tests.
+- Docs: the context README policy section, the capability layer, and the phase table.
+
+### Out of scope (ED-0117)
+
+- Migration, persistence, service default, API and UI. These are ED-0118.
+- v1–v4 changes.
+- New cue phrases or catalog changes.
+- Transcription changes.
+- Studio take segments (a separate later capability).
+- Model-based detection.
+
+### Constraints
+
+- Pure; no dependency.
+- No real-event data in the repository or tests.
+- Aware timestamps.
+- White-label wording.
+- Additive contracts only.
+- Held-out seeds (1000–1099) never appear in tests or tuning.
+
+### Test strategy
+
+- Unit and property tests per Desired behavior.
+- The full host backend suite, Ruff, Pyright and `git diff --check`.
+- The owner's dev measurement after ED-0117 (D5 items 1–3 on dev data), recorded as a
+  plan note before ED-0118 is detailed.
+
+### Acceptance criteria
+
+- [ ] ED-0117 is merged. v1–v3 results are unchanged, and each new scenario is pinned.
+- [ ] The owner's dev measurement is recorded, with the constants chosen, D5 items 1–3
+  on dev data, and a go or no-go for ED-0118.
+- [ ] ED-0118 is detailed and approved, then merged, with the constants frozen in `0028`.
+- [ ] Qualification Run 002 is recorded against D5, with held-out results separate.
+- [ ] Live Replay Run 002 is recorded, at `--run-every 1` on a generated synthetic day
+  with cues.
+
+### Rollback
+
+- ED-0117 is pure and unused by the service. Revert the code.
+- ED-0118 follows the `0024` pattern: the reverse refuses while v5 rows exist, and the
+  default switch is reverted first.
 
 ## Ground-truth corpus handling (all phases)
 
