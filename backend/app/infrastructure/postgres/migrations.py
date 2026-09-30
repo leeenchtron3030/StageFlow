@@ -201,6 +201,13 @@ class PostgresMigrationRunner:
             "0026_session_suggestions_already_realized_forward.sql",
             version="0026_session_suggestions_already_realized",
         )
+        self.apply_boundary_proposal_decisions()
+
+    def apply_boundary_proposal_decisions(self) -> None:
+        self._execute_if_missing(
+            "0027_boundary_proposal_decisions_forward.sql",
+            version="0027_boundary_proposal_decisions",
+        )
 
     def reverse_event_mode_kernel_v1(self) -> None:
         self.reverse_demo_vertical_slice_v1()
@@ -362,9 +369,16 @@ class PostgresMigrationRunner:
             )
 
     def reverse_session_suggestions_already_realized(self) -> None:
+        self.reverse_boundary_proposal_decisions()
         self._execute_if_present(
             "0026_session_suggestions_already_realized_reverse.sql",
             version="0026_session_suggestions_already_realized",
+        )
+
+    def reverse_boundary_proposal_decisions(self) -> None:
+        self._execute_if_present(
+            "0027_boundary_proposal_decisions_reverse.sql",
+            version="0027_boundary_proposal_decisions",
         )
 
     def _execute(self, filename: str) -> None:

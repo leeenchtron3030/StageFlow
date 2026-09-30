@@ -106,6 +106,25 @@ not-event-ready disclaimer retain their meaning.
   suggestion; otherwise its decision supplies confirmed/rejected, or it remains open.
   Supersession never removes the retained decision or a realized Session.
 
+### Boundary proposal decision
+
+- **Definition:** An immutable Session Suggestions record of a human applying or
+  dismissing one existing Kernel `SessionBoundaryProposal`.
+- **Lineage:** Proposal and Session IDs, `applied`/`dismissed` kind, unique command ID,
+  request digest, actor, aware decision time, and optional bounded dismissal reason.
+  One decision per proposal; identical commands replay the original result.
+- **Authority:** Apply invokes the existing Kernel boundary correction for that edge.
+  Dismiss changes no Session boundary. Both commands reject stale or decided proposals.
+- **Open and stale:** Open means undecided and not stale. A later boundary-history entry
+  for the same edge, or a newer proposal for the same Session and edge, makes it stale.
+  Proposal ordering is `(proposed_at, ID)`, matching the Kernel's tie handling.
+- **Production:** Unchanged v3 candidates for realized, expectation-linked Sessions yield
+  derived proposals only for non-schedule edges at least 30 seconds from a known current
+  boundary, with segmentation/timing evidence. This grants no automatic correction authority.
+- **Persistence:** Migration `0027_boundary_proposal_decisions` adds append-only decisions
+  and the nonnegative `SuggestionRun.boundary_proposals_created` count; Kernel proposal
+  records stay in their existing table. Reversal refuses while decisions exist.
+
 ### Already a Session (`already_realized` suggestion-run skip)
 
 - **Definition:** Number of evaluated candidates omitted from a new run because their
@@ -122,7 +141,9 @@ not-event-ready disclaimer retain their meaning.
   start/end phrase-list versions.
 - **Identity:** A digest of Event/Stage, policy lineage, Program Expectation revisions,
   asset timing revisions, segmentation evidence IDs, complete transcript revisions and
-  cue-list versions, plus the Stage schedule offset setting version in v3. Identical
+  cue-list versions, plus the Stage schedule offset setting version in v3. Linked
+  Session IDs, revisions and current boundaries also enter new-run digests, ensuring
+  human corrections refresh refinement proposals. Identical
   inputs return the prior run only while it is the Stage's
   latest run. Returning to earlier inputs creates a fresh latest run and supersedes the
   intervening run's suggestions. Run order is commit-serialized and independent of clock ties.

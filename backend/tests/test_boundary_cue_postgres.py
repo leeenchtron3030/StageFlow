@@ -124,6 +124,8 @@ def test_forward_reserved_key_guard_and_exact_empty_reverse(
 ) -> None:
     _, seed = seeded(render_postgres_dsn)
     runner = PostgresMigrationRunner(render_postgres_dsn)
+    # Compare 0025's table delta from its own schema baseline, with 0027 reversed.
+    runner.reverse_boundary_proposal_decisions()
     with psycopg.Connection[dict[str, Any]].connect(
                     render_postgres_dsn, row_factory=dict_row) as connection:
         before = {r["tablename"] for r in connection.execute(

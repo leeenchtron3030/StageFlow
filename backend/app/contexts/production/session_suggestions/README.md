@@ -6,6 +6,75 @@ including the owner decision exempting schedule fallback edges from monotonicity
 implements advisory suggestions only. Kernel code and its Session, association and package
 semantics remain unchanged. There is no automated realization or ADR-0026 activation.
 
+## Boundary proposals for realized Sessions
+
+The approved Phase 3 backend plan is Green and implementation-ready. Runs evaluate the
+unchanged v3 policy, retaining realized talks in joint alignment. For each candidate
+linked by Program Expectation to a Session in the Event, each non-`schedule` edge is
+compared with that Session's **current** boundary. An absolute difference of at least
+30 seconds creates a Kernel `SessionBoundaryProposal`; smaller differences and absent
+current boundaries (an active Session's end) are skipped. Unlinked Sessions are excluded.
+The proposal freezes the candidate's deduplicated segmentation and timing evidence IDs;
+an empty evidence set is skipped. It is `derived`, policy `boundary-suggestion` / `3`.
+The fixed system proposer is UUIDv5 using `NAMESPACE_URL` and the exact name
+`stageflow:session-suggestion:boundary-proposer` (see `SYSTEM_PROPOSER_ID`).
+
+Each edge has one bounded reason: cue support takes precedence as `cue_supported`;
+otherwise `freeze` maps to `changeover_edge`, `gap` to `recording_gap`, and `coverage`
+to `recording_boundary`. `schedule` is always excluded, even if cue-supported.
+These are explanation codes, not additional policy constants or authority.
+
+An open proposal has no decision and is not stale. Staleness means a boundary-history
+entry for the **same edge** has `decided_at > proposed_at`, or a newer proposal exists
+for that Session and edge, even if the newer proposal was decided. Newness follows the
+existing Kernel order `(proposed_at, boundary_proposal_id)`; ID breaks clock ties.
+Open reads return at most two proposals. Under the owner's ED-0112 review decision
+(2026-09-29), production skips an edge when its latest proposal, whether undecided,
+dismissed or applied, has the same `boundary_at` and policy version and no same-edge
+boundary-history correction after its `proposed_at`. Dismissal therefore survives an
+unrelated change such as applying the other edge. A changed candidate time or a later
+same-edge correction permits a new proposal, subject to the existing threshold and
+evidence gates. Older proposals never deduplicate in place of the latest proposal.
+The run's `boundary_proposals_created` counts inserts, with legacy runs
+defaulting to zero. Identical-input replay returns the original run and count. Linked
+Session IDs, revisions and current boundaries participate in the run digest so a human
+correction (including a correction back to earlier times) forces reevaluation.
+
+Runs hold the existing Event advisory lock and lock only linked Session rows while
+reading current boundaries and producing proposals. Proposals go through the existing
+Kernel service and commit with the run. Human apply/dismiss commands serialize on command,
+Event and Session, replay by command ID plus request digest, and refuse
+`boundary_proposal_decided` or `boundary_proposal_stale`. Apply calls only the existing
+Kernel correction, using UUIDv5 `kernel_operation_id(command_id, "apply-boundary")`,
+then writes the decision last in the same borrowed transaction. Failure rolls back
+the correction and decision together; retry cannot duplicate a correction. Dismiss
+only records a decision, with an optional trimmed 1–500 character, NUL-free reason.
+Nothing applies automatically; association is not rerun.
+
+Authenticated routes under `/session-suggestions/events/{event_id}`:
+
+- `GET /sessions/{session_id}/boundary-proposals`: open proposals, at most one per edge.
+- `POST /sessions/{session_id}/boundary-proposals/{proposal_id}/apply`: human actor and command ID.
+- `POST /sessions/{session_id}/boundary-proposals/{proposal_id}/dismiss`: same, optional reason.
+- `GET /sessions/{session_id}/boundary-proposals/history`: decision pages, ordered by command
+  UUID, `after` UUID cursor and `limit` 1–100 (default 50), with `next_after`.
+
+Both run and latest-run documents expose `boundary_proposals_created`. All proposal and
+history reads validate the Session's Event. Errors retain 404/409/422/503 conventions.
+Migration `0027_boundary_proposal_decisions` adds append-only decisions, unique proposal
+and command identities, proposal/Session scope enforcement, and the nonnegative run
+count. Reverse locks the decision table and refuses while any decisions exist; otherwise
+it drops the table, function and count, preserving all Kernel proposals and identities.
+
+Synthetic tests in `test_session_boundary_proposals.py` cover production, threshold and
+reason mapping, deduplication, atomicity, current-boundary reevaluation, stale reads,
+apply/dismiss, replay and concurrency. `test_session_boundary_proposals_api.py` covers
+authentication, scope, bounds, refusals and count disclosure.
+`test_session_boundary_proposals_postgres.py` covers durable round trips, transaction
+rollback, decisions, staleness, immutability, forward/defaults/reverse/guard, using an
+entirely rolled-back schema. `test_session_suggestions.py::test_kernel_import_boundary`
+includes the Kernel PostgreSQL adapter and recursively checks Kernel modules.
+
 ## Boundary cue presets and composition
 
 The approved Phase 2d-1 plan and accepted cue phrase catalog v1.0 authorize the backend

@@ -12,6 +12,7 @@ from app.shared.human_commands import human_command_digest
 from app.shared.ids import EntityId
 from app.shared.time import Clock, require_aware_datetime
 
+from .boundary_proposals import produce_boundary_proposals
 from .contracts import (
     POLICY_V3,
     Reference,
@@ -71,6 +72,13 @@ class SessionSuggestionService:
             inputs = tx.snapshot(event_id, stage_id, start_cue_list, end_cue_list)
             override = tx.current_offset(event_id, stage_id)
             realized = realized_expectation_ids(tx, event_id)
+            expected_ids = {x.id for x in inputs.expectations}
+            linked = sorted((s for stage in tx.kernel.repository.list_stages(event_id)
+                             for s in tx.kernel.repository.list_sessions_for_stage(stage.id)
+                             if s.program_expectation_id in expected_ids), key=lambda s: s.id.value)
+            # Serialize current-boundary reads against Kernel corrections without
+            # locking unrelated Stage rows or changing the policy input snapshot.
+            linked = [tx.boundary_session(event_id, s.id, lock=True) for s in linked]
             digest = human_command_digest({
                 "event_id": event_id.value, "stage_id": stage_id.value,
                 "policy": asdict(POLICY_V3),
@@ -78,6 +86,12 @@ class SessionSuggestionService:
                 # force a new run here.
                 "realized_expectation_ids": sorted(
                     x.id.value for x in inputs.expectations if x.id in realized),
+                "linked_session_boundaries": [
+                    {"id": s.id.value, "revision": s.revision,
+                     "start": s.authoritative_start.isoformat(),
+                     "end": (None if s.authoritative_end is None
+                             else s.authoritative_end.isoformat())}
+                    for s in linked],
                 "override_setting_version": None if override is None else override.version,
                 "expectations": [reference_document(Reference(x.id, x.revision))
                                  for x in sorted(inputs.expectations, key=lambda x: x.id.value)],
@@ -97,11 +111,17 @@ class SessionSuggestionService:
                                if x.expectation is None or x.expectation.id not in realized)
             skips = replace(result.skips,
                             already_realized=len(result.candidates) - len(candidates))
+            by_expectation = {c.expectation.id: c for c in result.candidates
+                              if c.expectation is not None and c.expectation.id in realized}
+            proposals_created = sum(produce_boundary_proposals(tx, s, by_expectation[expected])
+                                    for s in linked if (expected := s.program_expectation_id)
+                                    in by_expectation)
             run = SuggestionRun(
                 EntityId.new(), event_id, stage_id, digest, actor_id, self.clock.now(),
                 tuple(Reference(x.id, x.revision) for x in inputs.expectations), inputs.assets,
                 start_cue_list, end_cue_list, skips, POLICY_V3, result.blocks,
                 None if override is None else override.version,
+                proposals_created,
             )
             tx.save_run(run, tuple(SessionSuggestion(EntityId.new(), run.id, event_id, stage_id, x,
                                                      POLICY_V3.id, POLICY_V3.version)

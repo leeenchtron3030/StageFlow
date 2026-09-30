@@ -5,12 +5,15 @@ from app.contexts.editorial.derivation_contracts import EditorialPhraseList
 from app.contexts.production.event_mode_kernel.contracts import (
     ProducerWorkQueuePosition,
     ProducerWorkQueueSubject,
+    Session,
+    SessionBoundaryProposal,
 )
 from app.contexts.production.event_mode_kernel.service import DurableEventModeKernel
 from app.shared.ids import EntityId
 from app.shared.time import Clock
 
 from .contracts import (
+    BoundaryProposalDecision,
     InputSnapshot,
     Reference,
     ScheduleOffsetSetting,
@@ -24,6 +27,22 @@ from .cue_composition import BoundaryCueComposition
 
 class SuggestionTransaction(Protocol):
     kernel: DurableEventModeKernel
+
+    def boundary_session(self, event_id: EntityId, session_id: EntityId,
+                         *, lock: bool = False) -> Session: ...
+    def boundary_proposal(self, session_id: EntityId,
+                          proposal_id: EntityId) -> SessionBoundaryProposal: ...
+    def boundary_decided(self, proposal_id: EntityId) -> bool: ...
+    def boundary_stale(self, proposal: SessionBoundaryProposal) -> bool: ...
+    def latest_nonstale_boundary_proposals(self, session_id: EntityId
+                                           ) -> tuple[SessionBoundaryProposal, ...]: ...
+    def open_boundary_proposals(self, session_id: EntityId
+                                ) -> tuple[SessionBoundaryProposal, ...]: ...
+    def replay_boundary_decision(self, command_id: EntityId, digest: str
+                                 ) -> BoundaryProposalDecision | None: ...
+    def save_boundary_decision(self, value: BoundaryProposalDecision) -> None: ...
+    def boundary_decision_history(self, session_id: EntityId, after: EntityId | None,
+                                  limit: int) -> tuple[BoundaryProposalDecision, ...]: ...
 
     def cue_event_scope(self, event_id: EntityId) -> None: ...
     def current_composition(self, event_id: EntityId) -> BoundaryCueComposition | None: ...
