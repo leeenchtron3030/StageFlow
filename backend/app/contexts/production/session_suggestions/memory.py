@@ -11,8 +11,11 @@ from app.contexts.editorial.derivation import match_phrases
 from app.contexts.editorial.derivation_contracts import EditorialPhraseList
 from app.contexts.editorial.derivation_memory import InMemoryEditorialDerivationRepository
 from app.contexts.production.event_mode_kernel.contracts import (
+    BoundaryDecision,
     ProducerWorkQueuePosition,
     ProducerWorkQueueSubject,
+    Session,
+    SessionBoundaryProposal,
 )
 from app.contexts.production.event_mode_kernel.repository import InMemoryEventModeKernelRepository
 from app.contexts.production.event_mode_kernel.service import DurableEventModeKernel
@@ -22,6 +25,7 @@ from app.shared.time import Clock
 
 from .contracts import (
     AssetInput,
+    BoundaryProposalDecision,
     InputSnapshot,
     Reference,
     ScheduleOffsetSetting,
@@ -46,6 +50,7 @@ class InMemorySuggestionRepository:
         self.runs: dict[EntityId, SuggestionRun] = {}
         self.suggestions: dict[EntityId, SessionSuggestion] = {}
         self.decisions: dict[EntityId, SuggestionDecision] = {}
+        self.boundary_decisions: dict[EntityId, BoundaryProposalDecision] = {}
         self.offsets: dict[EntityId, ScheduleOffsetSetting] = {}
         self.compositions: dict[EntityId, BoundaryCueComposition] = {}
 
@@ -58,15 +63,77 @@ class InMemorySuggestionRepository:
             kernel_state = {k: copy(v) for k, v in vars(self.kernel_repository).items()
                             if k != "_lock"}
             state = (self.runs.copy(), self.suggestions.copy(),
-                     self.decisions.copy(), self.offsets.copy(), self.compositions.copy())
+                     self.decisions.copy(), self.offsets.copy(), self.compositions.copy(),
+                     self.boundary_decisions.copy())
             self.kernel = DurableEventModeKernel(repository=self.kernel_repository, clock=clock)
             try:
                 yield self
             except BaseException:
                 vars(self.kernel_repository).update(kernel_state)
                 (self.runs, self.suggestions, self.decisions, self.offsets,
-                 self.compositions) = state
+                 self.compositions, self.boundary_decisions) = state
                 raise
+
+    def boundary_session(self, event_id: EntityId, session_id: EntityId,
+                         *, lock: bool = False) -> Session:
+        session = self.kernel_repository.get_session(session_id)
+        if session is None or session.event_id != event_id:
+            raise SuggestionNotFoundError("session_not_found")
+        return session
+
+    def _boundary_proposals(self) -> dict[EntityId, SessionBoundaryProposal]:
+        return cast(dict[EntityId, SessionBoundaryProposal],
+                    vars(self.kernel_repository)["_boundary_proposals"])
+
+    def boundary_proposal(self, session_id: EntityId,
+                          proposal_id: EntityId) -> SessionBoundaryProposal:
+        proposal = self._boundary_proposals().get(proposal_id)
+        if proposal is None or proposal.session_id != session_id:
+            raise SuggestionNotFoundError("boundary_proposal_not_found")
+        return proposal
+
+    def boundary_decided(self, proposal_id: EntityId) -> bool:
+        return any(d.proposal_id == proposal_id for d in self.boundary_decisions.values())
+
+    def boundary_stale(self, proposal: SessionBoundaryProposal) -> bool:
+        boundaries = cast(list[BoundaryDecision], vars(self.kernel_repository)["_boundaries"])
+        return any(b.session_id == proposal.session_id and b.boundary_kind == proposal.boundary_kind
+                   and b.decided_at > proposal.proposed_at for b in boundaries) or any(
+            p.session_id == proposal.session_id and p.boundary_kind == proposal.boundary_kind
+            and (p.proposed_at, p.id.value) > (proposal.proposed_at, proposal.id.value)
+            for p in self._boundary_proposals().values())
+
+    def latest_nonstale_boundary_proposals(self, session_id: EntityId
+                                           ) -> tuple[SessionBoundaryProposal, ...]:
+        """Latest per edge, regardless of decision, unless corrected since proposal."""
+        return tuple(sorted((p for p in self._boundary_proposals().values()
+                             if p.session_id == session_id and not self.boundary_stale(p)),
+                            key=lambda p: p.boundary_kind))
+
+    def open_boundary_proposals(self, session_id: EntityId
+                                ) -> tuple[SessionBoundaryProposal, ...]:
+        return tuple(sorted((p for p in self._boundary_proposals().values()
+                             if p.session_id == session_id and not self.boundary_decided(p.id)
+                             and not self.boundary_stale(p)), key=lambda p: p.boundary_kind))
+
+    def replay_boundary_decision(self, command_id: EntityId, digest: str
+                                 ) -> BoundaryProposalDecision | None:
+        prior = self.boundary_decisions.get(command_id)
+        if prior is not None and prior.request_digest != digest:
+            raise SuggestionConflictError("boundary_proposal_command_id_conflict")
+        return prior
+
+    def save_boundary_decision(self, value: BoundaryProposalDecision) -> None:
+        if value.command_id in self.boundary_decisions or self.boundary_decided(value.proposal_id):
+            raise SuggestionConflictError("boundary_proposal_decided")
+        self.boundary_decisions[value.command_id] = value
+
+    def boundary_decision_history(self, session_id: EntityId, after: EntityId | None,
+                                  limit: int) -> tuple[BoundaryProposalDecision, ...]:
+        return tuple(sorted((d for d in self.boundary_decisions.values()
+                             if d.session_id == session_id
+                             and (after is None or d.command_id.value > after.value)),
+                            key=lambda d: d.command_id.value))[:limit]
 
     def cue_event_scope(self, event_id: EntityId) -> None:
         if event_id not in cast(dict[EntityId, object], vars(self.kernel_repository)["_events"]):

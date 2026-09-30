@@ -492,10 +492,12 @@ def test_migration_registration_order(monkeypatch: pytest.MonkeyPatch) -> None:
                        "0020_event_render_setting", "0021_media_segmentation",
                        "0022_session_suggestions", "0023_session_suggestions_policy_v2",
                        "0024_session_suggestions_policy_v3", "0025_boundary_cue_composition",
-                       "0026_session_suggestions_already_realized"]
+                       "0026_session_suggestions_already_realized",
+                       "0027_boundary_proposal_decisions"]
     applied.clear()
     runner.reverse_packaging_asset_foundation_v1()
-    assert applied == ["0026_session_suggestions_already_realized",
+    assert applied == ["0027_boundary_proposal_decisions",
+                       "0026_session_suggestions_already_realized",
                        "0025_boundary_cue_composition", "0024_session_suggestions_policy_v3",
                        "0023_session_suggestions_policy_v2",
                         "0022_session_suggestions",

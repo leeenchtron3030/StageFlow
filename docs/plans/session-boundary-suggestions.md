@@ -1625,6 +1625,12 @@ Kernel Sessions, and are corrected through the existing commands.
 - **D3. Deduplication:** a new proposal is written only when it differs from the latest
   undecided proposal for the same Session and edge (time, policy version). Reruns do
   not accumulate duplicates.
+  - **Review amendment (owner, 2026-09-29):** the latest proposal is considered regardless
+    of whether it is undecided, dismissed or applied. Matching `boundary_at` and policy
+    version suppress a duplicate unless the same Session edge has a boundary-history
+    correction after that proposal's `proposed_at`. A changed candidate time or later
+    same-edge correction permits a new proposal, subject to the existing production gates.
+    This supersedes only D3's undecided restriction; Kernel ordering still breaks ties.
 - **D4. Applying (human authority):** a new Session Suggestions command, **Apply
   suggested boundary.**
   - It calls the existing Kernel `correct_session_boundary`, with operation IDs derived

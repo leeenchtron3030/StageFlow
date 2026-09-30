@@ -18,7 +18,9 @@ from app.contexts.production.event_mode_kernel.repository import (
     KernelNotFoundError,
     KernelStorageUnavailableError,
 )
+from app.contexts.production.session_suggestions.boundary_proposals import BoundaryProposalService
 from app.contexts.production.session_suggestions.contracts import (
+    BoundaryProposalDecision,
     Reference,
     ScheduleOffsetEntry,
     ScheduleOffsetSetting,
@@ -76,6 +78,14 @@ class ConfirmBody(HumanBody):
 class RejectBody(HumanBody):
     command_id: UUID
     reason: str = Field(min_length=1, max_length=500)
+
+
+class ApplyBoundaryBody(HumanBody):
+    command_id: UUID
+
+
+class DismissBoundaryBody(ApplyBoundaryBody):
+    reason: str | None = Field(default=None, min_length=1, max_length=500)
 
 
 class OffsetEntryBody(BaseModel):
@@ -176,6 +186,7 @@ def _run(result: SuggestionRun) -> dict[str, object]:
             "stage_id": result.stage_id.value, "input_digest": result.input_digest,
             "actor_id": result.actor_id.value, "created_at": result.created_at,
             "policy": asdict(result.policy), "skips": asdict(result.skips),
+            "boundary_proposals_created": result.boundary_proposals_created,
             "blocks": [asdict(b) for b in result.blocks],
             "start_cue_list": None if result.start_cue_list is None else {
                 "id": result.start_cue_list.id.value, "version": result.start_cue_list.revision},
@@ -290,3 +301,58 @@ def reject(event_id: UUID, suggestion_id: UUID, body: RejectBody,
         command_id=EntityId(str(body.command_id)), actor_id=EntityId(str(body.actor_id)),
         reason=body.reason, authority_kind=body.authority_kind,
     )))
+
+
+def _boundary_decision(value: BoundaryProposalDecision) -> dict[str, object]:
+    return {"proposal_id": value.proposal_id.value, "session_id": value.session_id.value,
+            "kind": value.kind.value, "command_id": value.command_id.value,
+            "actor_id": value.actor_id.value, "decided_at": value.decided_at,
+            "reason": value.reason}
+
+
+@router.get("/sessions/{session_id}/boundary-proposals")
+def open_boundaries(event_id: UUID, session_id: UUID, svc: Service) -> dict[str, object]:
+    values = _call(lambda: BoundaryProposalService(svc.repository, svc.clock).open(
+        EntityId(str(event_id)), EntityId(str(session_id))))
+    return {"items": [{
+        "proposal_id": p.id.value, "session_id": p.session_id.value,
+        "boundary_kind": p.boundary_kind, "boundary_at": p.boundary_at,
+        "epistemic_kind": p.epistemic_kind.value, "proposer_id": p.proposer_id.value,
+        "evidence_ids": [i.value for i in p.evidence_ids], "policy_id": p.policy_id,
+        "policy_version": p.policy_version, "reason": p.reason, "proposed_at": p.proposed_at,
+        "authorized_use": "advisory_only",
+    } for p in values]}
+
+
+@router.post("/sessions/{session_id}/boundary-proposals/{proposal_id}/apply")
+def apply_boundary(event_id: UUID, session_id: UUID, proposal_id: UUID,
+                   body: ApplyBoundaryBody, svc: Service) -> dict[str, object]:
+    boundaries = BoundaryProposalService(svc.repository, svc.clock)
+    return _boundary_decision(_call(lambda: boundaries.apply(
+        event_id=EntityId(str(event_id)), session_id=EntityId(str(session_id)),
+        proposal_id=EntityId(str(proposal_id)), command_id=EntityId(str(body.command_id)),
+        actor_id=EntityId(str(body.actor_id)), authority_kind=body.authority_kind,
+    )))
+
+
+@router.post("/sessions/{session_id}/boundary-proposals/{proposal_id}/dismiss")
+def dismiss_boundary(event_id: UUID, session_id: UUID, proposal_id: UUID,
+                     body: DismissBoundaryBody, svc: Service) -> dict[str, object]:
+    boundaries = BoundaryProposalService(svc.repository, svc.clock)
+    return _boundary_decision(_call(lambda: boundaries.dismiss(
+        event_id=EntityId(str(event_id)), session_id=EntityId(str(session_id)),
+        proposal_id=EntityId(str(proposal_id)), command_id=EntityId(str(body.command_id)),
+        actor_id=EntityId(str(body.actor_id)), reason=body.reason,
+        authority_kind=body.authority_kind,
+    )))
+
+
+@router.get("/sessions/{session_id}/boundary-proposals/history")
+def boundary_history(event_id: UUID, session_id: UUID, svc: Service,
+                     after: UUID | None = None,
+                     limit: Annotated[int, Query(ge=1, le=100)] = 50) -> dict[str, object]:
+    values, cursor = _call(lambda: BoundaryProposalService(svc.repository, svc.clock).history(
+        EntityId(str(event_id)), EntityId(str(session_id)),
+        after=None if after is None else EntityId(str(after)), limit=limit))
+    return {"items": [_boundary_decision(v) for v in values], "limit": limit,
+            "next_after": None if cursor is None else cursor.value}

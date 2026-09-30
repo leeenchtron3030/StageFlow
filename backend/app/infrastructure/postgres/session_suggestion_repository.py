@@ -49,6 +49,9 @@ from app.contexts.production.session_suggestions.work_queue import (
     validate_work_queue_limit,
 )
 from app.infrastructure.postgres.boundary_cue_repository import PostgresBoundaryCueTransaction
+from app.infrastructure.postgres.boundary_proposal_repository import (
+    PostgresBoundaryProposalTransaction,
+)
 from app.infrastructure.postgres.editorial_derivation_repository import (
     PostgresEditorialDerivationTransaction,
 )
@@ -95,7 +98,9 @@ class PostgresSuggestionRepository:
             raise SuggestionStorageUnavailableError("postgresql_unavailable") from exc
 
 
-class PostgresSuggestionTransaction(PostgresBoundaryCueTransaction):
+class PostgresSuggestionTransaction(
+    PostgresBoundaryCueTransaction, PostgresBoundaryProposalTransaction,
+):
     def __init__(self, connection: psycopg.Connection[Row], clock: Clock) -> None:
         self.connection = connection
         self.kernel = DurableEventModeKernel(
@@ -330,8 +335,8 @@ class PostgresSuggestionTransaction(PostgresBoundaryCueTransaction):
                 end_cue_list_id, end_cue_list_version, policy_id, policy_version, policy_constants,
                 no_timing_evidence, no_segmentation, clock_implausible,
                 no_coverage, no_planned_time, already_realized,
-                override_setting_version, block_count)
-               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                override_setting_version, block_count, boundary_proposals_created)
+               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
             (run.id.value, run.event_id.value, run.stage_id.value,
              run.input_digest, run.actor_id.value,
              run.created_at, Jsonb([reference_document(r) for r in run.expectations]),
@@ -341,7 +346,8 @@ class PostgresSuggestionTransaction(PostgresBoundaryCueTransaction):
              None if run.end_cue_list is None else run.end_cue_list.id.value,
              None if run.end_cue_list is None else run.end_cue_list.revision,
              run.policy.id, run.policy.version, Jsonb(asdict(run.policy)),
-             *asdict(run.skips).values(), run.override_setting_version, len(run.blocks)),
+             *asdict(run.skips).values(), run.override_setting_version, len(run.blocks),
+             run.boundary_proposals_created),
         )
         for block in run.blocks:
             self.connection.execute(
@@ -439,7 +445,7 @@ def _run(row: Row, blocks: tuple[ScheduleBlock, ...] = ()) -> SuggestionRun:
         SkipCounts(**{k: row[k] for k in SkipCounts.__dataclass_fields__}),
         {"1": Policy, "2": PolicyV2, "3": PolicyV3}[row["policy_version"]](
             **row["policy_constants"]),
-        blocks, row.get("override_setting_version"),
+        blocks, row.get("override_setting_version"), row["boundary_proposals_created"],
     )
 
 

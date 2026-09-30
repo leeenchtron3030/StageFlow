@@ -960,9 +960,9 @@ The authenticated latest-run read returns the same run document, including actor
 policy, digest, skips, blocks, override version and cue references, or
 `suggestion_run_not_found` 404 when no run exists. Latest follows recorded run sequence,
 including empty runs. The Work Queue read above implements the backend producer surface.
-No UI, boundary proposal producer, automatic authority, new dependency or runtime
-setting is added. Phase 3 boundary proposals, the Phase 4 Stage page and Phase 5 corpus
-accuracy qualification remain future work.
+The Phase 3 backend now produces boundary proposals as described below. Its Session
+Detail frontend remains a separate directive. No automatic authority, new dependency
+or runtime setting is added; corpus accuracy qualification remains separate.
 A pure anonymous interval evaluator and local-file CLI have been pulled forward: recall,
 median/p95 start/end error and both-edges-within-60-second counts are numeric aggregates.
 Synthetic tests prove the metrics; the evaluator is unchanged for the owner's Accuracy
@@ -970,6 +970,42 @@ Run 003. Corpus drift models and real-event data remain outside the repository.
 See the [context README](../../backend/app/contexts/production/session_suggestions/README.md)
 for policy, bounds and transaction details. Synthetic tests establish contract behavior;
 they do not qualify recorder clocks or production-event readiness.
+
+### Realized Session boundary proposals and decisions
+
+The approved Phase 3 backend reuses unchanged v3 evaluation for expectation-linked
+Sessions. Each non-schedule candidate edge at least 30 seconds from the current known
+Session edge produces a derived proposal through the existing Kernel service, with
+segmentation/timing evidence, policy `boundary-suggestion` / `3`, and a fixed UUIDv5
+system proposer. Cue-supported edges use `cue_supported`; other freeze, gap and coverage
+edges use `changeover_edge`, `recording_gap` and `recording_boundary`. Missing current
+edges and empty evidence are skipped. Unlinked Sessions are outside this scope.
+
+Proposals and the run's `boundary_proposals_created` count commit atomically. The
+latest proposal for the same Session/edge, regardless of decision, deduplicates equal
+boundary time and policy version unless same-edge boundary history is later than its
+`proposed_at`. Dismissal therefore persists across unrelated changes; changed candidate
+times and later same-edge corrections permit new proposals under the existing gates.
+Linked Session identity, revision and current boundaries enter the
+digest so corrections trigger a fresh evaluation. An identical run replays its original
+count. A proposal is stale if same-edge boundary history is later than `proposed_at`,
+or a newer proposal exists, ordered by `(proposed_at, ID)` as in Kernel reads.
+
+Authenticated Session-scoped open/history reads and explicit human apply/dismiss routes
+live under the session-suggestions Event router. Open reads return at most two proposals;
+history pages use command UUID cursors, limit 1–100. Apply/dismiss refuse stale or
+decided proposals; command ID/request digest provides original-result replay. Apply
+uses only `correct_session_boundary` with a deterministic UUIDv5 operation ID, then
+inserts its decision last in the same transaction. Dismiss records an optional bounded
+reason and changes no boundary. No proposal is applied automatically or rematches media.
+
+Migration `0027_boundary_proposal_decisions` adds the immutable decision table and
+nonnegative run count (old rows default to zero). Decision records enforce unique
+proposal and command identities and Session lineage. Guarded reversal refuses while
+decisions exist and otherwise preserves existing Kernel proposals. The Kernel imports
+no Session Suggestions code. Synthetic unit/API tests and rolled-back PostgreSQL tests
+in `test_session_boundary_proposals*.py` cover thresholds, evidence, reasons, dedup,
+atomicity, stale checks, decisions, replay, reads and forward/reverse/guard behavior.
 
 ### Boundary cue presets and composition
 

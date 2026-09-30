@@ -342,9 +342,13 @@ class SuggestionRun:
     policy: Policy = POLICY_V1
     blocks: tuple[ScheduleBlock, ...] = ()
     override_setting_version: int | None = None
+    boundary_proposals_created: int = 0
 
     def __post_init__(self) -> None:
         require_aware_datetime(self.created_at, "created_at")
+        if (type(self.boundary_proposals_created) is not int
+                or not 0 <= self.boundary_proposals_created <= MAX_COUNT):
+            raise ValueError("boundary proposal count out of bounds")
         object.__setattr__(self, "expectations", tuple(self.expectations))
         object.__setattr__(self, "assets", tuple(self.assets))
         object.__setattr__(self, "blocks", tuple(self.blocks))
@@ -408,3 +412,32 @@ class InputSnapshot:
         object.__setattr__(self, "assets", tuple(self.assets))
         if len(self.assets) > MAX_INPUTS or len(self.expectations) > MAX_INPUTS:
             raise SuggestionConflictError("suggestion_input_limit")
+
+
+class BoundaryProposalDecisionKind(StrEnum):
+    APPLIED = "applied"
+    DISMISSED = "dismissed"
+
+
+@dataclass(frozen=True, slots=True)
+class BoundaryProposalDecision:
+    proposal_id: EntityId
+    session_id: EntityId
+    kind: BoundaryProposalDecisionKind
+    command_id: EntityId
+    request_digest: str
+    actor_id: EntityId
+    decided_at: datetime
+    reason: str | None = None
+
+    def __post_init__(self) -> None:
+        require_aware_datetime(self.decided_at, "decided_at")
+        if self.kind not in tuple(BoundaryProposalDecisionKind):
+            raise ValueError("invalid boundary proposal decision kind")
+        if len(self.request_digest) != 64 or any(c not in "0123456789abcdef"
+                                                for c in self.request_digest):
+            raise ValueError("invalid boundary proposal request digest")
+        if self.reason is not None:
+            if not 1 <= len(self.reason.strip()) <= 500 or "\x00" in self.reason:
+                raise ValueError("boundary proposal reason out of bounds")
+            object.__setattr__(self, "reason", self.reason.strip())

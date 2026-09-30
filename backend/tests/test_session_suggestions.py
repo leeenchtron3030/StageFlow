@@ -164,9 +164,12 @@ def test_optional_cues_reuse_phrase_matching_without_editorial_candidates() -> N
 
 def test_kernel_import_boundary() -> None:
     root = Path(__file__).parents[1] / "app" / "contexts" / "production" / "event_mode_kernel"
-    assert tuple(root.glob("*.py")), "Kernel import-boundary scan must inspect real files"
-    assert all("session_suggestions" not in path.read_text(encoding="utf-8")
-               for path in root.glob("*.py"))
+    paths = (*root.rglob("*.py"), Path(inspect.getfile(event_mode_kernel_repository)))
+    assert len(paths) > 1, "Kernel import-boundary scan must inspect real files"
+    for path in paths:
+        source = path.read_text(encoding="utf-8")
+        assert "session_suggestions" not in source
+        assert "boundary_proposal_decision" not in source
 
 
 @pytest.mark.parametrize("decision", ["confirm", "reject"])
