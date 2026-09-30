@@ -39,7 +39,7 @@ policy v2) is detailed below (2026-09-29), after the early accuracy check. After
 | 2c. Policy v3, schedule offset (ED-0106, Completed) | Per-block schedule offset (estimated or producer override) before v2 alignment; Stage offset override setting | `0024` |
 | 2d-1. Cue phrase presets and composition (ED-0107 backend, ED-0108 Event page; Completed) | Built-in catalog v1, human composition command publishing the Event's start and end cue lists, runs default to them, Event page section | `0025` |
 | 2d-2. Transcript cues as edges (outline) | Policy v4 with `cue` edges | to be detailed |
-| 5. Validation harness and Run 001 (ED-0114 harness, ED-0115 live replay; Proposed) | Committed pure harness + CLI over a local corpus manifest, precision and wrong-day checks, deterministic synthetic scenario suite in CI (gaps, multi-part, wrong clocks, short talks, late recording start), owner qualification Run 001 against the ADR target, local live-replay tool with time-to-suggestion | none |
+| 5. Validation harness and Run 001 (ED-0114 harness, ED-0115 live replay; Approved) | Committed pure harness + CLI over a local corpus manifest, precision and wrong-day checks, deterministic synthetic scenario suite in CI (gaps, multi-part, wrong clocks, short talks, late recording start), owner qualification Run 001 against the ADR target, local live-replay tool with time-to-suggestion | none |
 
 ## Phase 1: media segmentation evidence (ED-0103)
 
@@ -1757,9 +1757,14 @@ Kernel Sessions, and are corrected through the existing commands.
 
 ### Status
 
-- **Proposed** (2026-09-29). It becomes Green and implementation-ready when the owner
-  approves this section, including decisions D1–D5.
-- **Order:** after Phase 3 (ED-0112 and ED-0113).
+- **Approved** (owner, 2026-09-29), with decisions D1–D5 as recommended.
+  - **Corpus scope:** the 28 main-stage talks now; other stages are added when their
+    blocks are segmented.
+  - **Order:** kept; Phase 5 runs after Phase 3.
+- **Execution authority:** Green and implementation-ready once ED-0113 merges.
+- **Additional corpus (owner, 2026-09-29):** a second event's legacy recordings,
+  available locally outside the repository. They may be used for the scenario and
+  replay work. Nothing from them is committed, and results stay anonymous.
 
 ### Why
 
