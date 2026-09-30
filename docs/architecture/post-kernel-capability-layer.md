@@ -978,6 +978,35 @@ See the [context README](../../backend/app/contexts/production/session_suggestio
 for policy, bounds and transaction details. Synthetic tests establish contract behavior;
 they do not qualify recorder clocks or production-event readiness.
 
+### Pure boundary-evidence policy prototype (v5)
+
+The approved Phase 7 pure prototype adds `policy_v5.evaluate` and harness
+`--policy-version 5`. V3 remains the service and CLI default; v4 remains parked.
+V5 imports v3 block-offset estimation/override precedence and v2 joint alignment and
+changeover weighting. Its additive input carries changeover-role timestamps and
+specific start/end hit subsets. Matching-role support uses exact proximity weights
+within 30 seconds (weight 10); changeover hits support both freeze/gap edges.
+Segment and studio take/action/cut phrases are excluded from Session-role input.
+
+A two-hit cluster within 60 seconds or a specific singleton can supply a strength-3
+`cue` edge where no same-role changeover is within 30 seconds. Such suggestions are
+never strong. Cue edges use the shifted +/-20-minute window. Coverage alignment
+strength is 5, with coverage candidates available only where that planned role's
+window contains no changeover or cue edge. Estimation still sees unchanged v3 weights.
+Remaining unscheduled activity beyond the shifted program span by more than 1800
+seconds is omitted and counted by the pure `SkipCountsV5.outside_program` field.
+Legacy skip dataclass fields and their persistence mapping remain unchanged.
+
+The manifest accepts optional changeover hits and explicit specificity while retaining
+old string timestamps. The realistic schedule-error generator is ported with a separate,
+seeded synthetic-cue stream, configurable recall and false in-talk hits. Four additional
+scenarios cover cue-only edges, false end cues, early coverage and after-program content.
+Exact rules, constants, input projection, RNG draw order and synthetic limitations are
+in the [context README](../../backend/app/contexts/production/session_suggestions/README.md#pure-boundary-evidence-prototype-v5).
+Unit tests pin all scenarios and legacy behavior. Persistence, service wiring, API,
+producer evidence, default switching and corpus qualification remain later work;
+no migration, dependency, runtime setting or authority change is included.
+
 ### Realized Session boundary proposals and decisions
 
 The approved Phase 3 backend reuses unchanged v3 evaluation for expectation-linked

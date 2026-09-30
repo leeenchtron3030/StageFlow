@@ -23,6 +23,13 @@
       "type": "string", "format": "date-time",
       "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,6})?(Z|[+-][0-9]{2}:[0-9]{2})$"
     },
+    "cue": {
+      "oneOf": [
+        {"$ref": "#/$defs/time"},
+        {"type": "object", "additionalProperties": false, "required": ["at"],
+         "properties": {"at": {"$ref": "#/$defs/time"}, "specific": {"type": "boolean"}}}
+      ]
+    },
     "span": {
       "type": "object", "additionalProperties": false, "required": ["start", "end"],
       "properties": {"start": {"$ref": "#/$defs/time"}, "end": {"$ref": "#/$defs/time"}}
@@ -54,8 +61,9 @@
             }
           }
         },
-        "start_cues": {"type": "array", "maxItems": 10000, "items": {"$ref": "#/$defs/time"}},
-        "end_cues": {"type": "array", "maxItems": 10000, "items": {"$ref": "#/$defs/time"}}
+        "start_cues": {"type": "array", "maxItems": 10000, "items": {"$ref": "#/$defs/cue"}},
+        "changeover_cues": {"type": "array", "maxItems": 10000, "items": {"$ref": "#/$defs/cue"}},
+        "end_cues": {"type": "array", "maxItems": 10000, "items": {"$ref": "#/$defs/cue"}}
       }
     }
   }

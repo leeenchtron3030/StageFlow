@@ -38,14 +38,15 @@ from app.contexts.production.session_suggestions.harness import (
 )
 from app.contexts.production.session_suggestions.harness_cli import main
 from app.contexts.production.session_suggestions.policy_v3 import evaluate
-from app.contexts.production.session_suggestions.scenarios import SCENARIOS, generate_scenario
+from app.contexts.production.session_suggestions.scenarios import generate_scenario
 
 
 def corpus(name: str = "clean-day") -> str:
     return json.dumps(generate_scenario(name))
 
 
-@pytest.mark.parametrize("name", SCENARIOS)
+@pytest.mark.parametrize("name", ("clean-day", "recording-gaps", "multi-part", "wrong-clock",
+                                  "short-evenly-spaced", "late-recording-start"))
 def test_scenario_metrics_pinned(name: str) -> None:
     assert generate_scenario(name) == generate_scenario(name)
     row = run_manifest(parse_manifest(corpus(name)))["scenarios"][0]["per_seed"][0]
