@@ -56,6 +56,21 @@ Future sanitized manifests may be stored under `docs/validation/corpora/`; compl
 results are stored under `docs/validation/results/` only when reviewed real values are
 available. Large media always remains in a separately controlled external corpus.
 
+## Session Suggestions validation method
+
+Session Suggestions corpus validation uses the pure
+[context harness](../../backend/app/contexts/production/session_suggestions/README.md#corpus-validation-harness)
+and its JSON manifest schema. Real manifests remain outside the repository. Each run
+selects unchanged policy v1/v2/v3 and either the published schedule or a documented seeded
+drift model, optionally with catalog-composed cue matches and producer offsets. Matching
+is one-to-one at IoU >=0.5 within each Stage. Reports preserve recall, matched start/end
+median and p95 errors and within-60 counts, adding scheduled and inclusive precision,
+unscheduled count and the +/-12-hour planned-span wrong-day check. Per-seed metrics and
+each metric's worst seed are reported; qualification requires the ADR recall/error target
+and zero wrong-day suggestions. Synthetic scenario tests pin current behavior without
+tuning. The owner separately runs the external corpus qualification and live replay;
+this method paragraph records no results.
+
 ## Evidence rules
 
 - Name the exact corpus item and manifest revision without committing its media.

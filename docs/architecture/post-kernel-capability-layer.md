@@ -963,10 +963,17 @@ including empty runs. The Work Queue read above implements the backend producer 
 The Phase 3 backend now produces boundary proposals as described below. Its Session
 Detail frontend remains a separate directive. No automatic authority, new dependency
 or runtime setting is added; corpus accuracy qualification remains separate.
-A pure anonymous interval evaluator and local-file CLI have been pulled forward: recall,
-median/p95 start/end error and both-edges-within-60-second counts are numeric aggregates.
-Synthetic tests prove the metrics; the evaluator is unchanged for the owner's Accuracy
-Run 003. Corpus drift models and real-event data remain outside the repository.
+A pure anonymous interval evaluator preserves recall, median/p95 start/end error and
+both-edges-within-60-second counts, adding scheduled precision, unscheduled count,
+inclusive precision and a planned-span +/-12-hour wrong-day check. A pure corpus harness
+and local-file CLI run unchanged v1/v2/v3 policies against external manifests, using the
+published schedule as-is or seeded whole-day, two-part or independent drift. Optional
+catalog compositions enable only supplied cue timestamps; explicit producer offsets use
+the existing v3 setting contract. Reports contain per-Stage, per-seed and worst-seed
+numeric metrics, with sanitized errors. Generic synthetic gap, multi-part, wrong-clock,
+short-talk and late-start scenarios pin current behavior in CI without policy tuning.
+Real-event data and manifests stay outside the repository; exact historical reproduction
+and qualification remain owner-run validation, not a readiness claim.
 See the [context README](../../backend/app/contexts/production/session_suggestions/README.md)
 for policy, bounds and transaction details. Synthetic tests establish contract behavior;
 they do not qualify recorder clocks or production-event readiness.

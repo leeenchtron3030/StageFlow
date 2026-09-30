@@ -20,6 +20,8 @@ def test_hand_computed_recall_errors_percentiles_and_both_edges_within_60() -> N
         "median_start_error_seconds": 60.0, "p95_start_error_seconds": 90.0,
         "median_end_error_seconds": 60.0, "p95_end_error_seconds": 120.0,
         "count_within_60_seconds": 2,
+        "precision": 1.0, "unscheduled_count": 0,
+        "precision_including_unscheduled": 1.0, "wrong_day_count": None,
     }
     assert evaluate_accuracy(tuple(reversed(predicted)), tuple(reversed(truth))) == result
 
