@@ -1,5 +1,112 @@
 # Safe local validation controller
 
+## Session Suggestions live replay
+
+`replay_blocks.py` replays local blocks through the normal demo APIs and workers on a
+**disposable review Event and demo database**. It uses only the Python standard library
+and the existing Session Suggestions evaluator from the backend environment. It does not
+access SQL, repositories, or Kernel internals. This is measurement tooling; a completed
+replay is not an accuracy pass or an event-readiness claim.
+
+Prerequisites and preparation:
+
+- The operator creates the disposable database and TOML config outside the repository,
+  sets `STAGEFLOW_KERNEL_CONFIG_PATH` to it, and supplies `STAGEFLOW_API_SHARED_SECRET`
+  through the environment only. The backend and tool must use the same config and secret.
+- Configure exactly one Stage, key `main`, with exactly one `[[event.stages.sources]]`
+  folder. Enable `[autonomous_event_node]`, `[local_media_timing]`, and
+  `[local_media_segmentation]`. Configure the normal operator-installed ffprobe/FFmpeg
+  paths and an appropriate `media_reconciliation_interval_seconds`. Install and qualify
+  these tools separately; the replay installs nothing.
+- From `backend`, bootstrap and sync the review program with
+  `uv run --no-sync python -m app.demo.cli bootstrap` and
+  `uv run --no-sync python -m app.demo.cli sync-program`, then run
+  `uv run --no-sync uvicorn app.main:app`. Use the same environment in each process.
+- Use a fresh Event with no discovered, stabilizing, ready, registered or associated media.
+  Keep its watched folder empty and exclusively reserved for this replay. Do not run other
+  producers, suggestion commands, or media writers against it during measurement.
+- Keep the input block directory, watched folder, optional truth JSON, config, and output
+  outside the repository. Blocks must be a flat directory of supported regular files,
+  ordered lexicographically by case-insensitive filename (use zero-padded ordinals).
+  Symlinks, hidden files, subdirectories and unsupported extensions are refused. At most
+  1,000 blocks, further limited by the configured source candidate bound, are accepted.
+
+Run from `backend` (angle-bracket values below are placeholders for operator inputs):
+
+```text
+uv run --no-sync python ../scripts/validation/replay_blocks.py --blocks <external-block-folder> --source <external-empty-watched-folder> --pace real --run-every 4 --api-base-url http://127.0.0.1:8000 --actor-id <operator-uuid> --truth <external-truth.json>
+```
+
+Use `--pace 10` for ten times real time; numeric pace must be at least 1. Without
+`--duration-seconds`, the tool probes each block using the configured ffprobe. Supplying
+`--duration-seconds 60` uses that duration for every block and bypasses the initial probes
+(the real timing worker still performs its normal inspection). `--run-every` defaults to
+1. `--timeout-seconds` defaults to 600 for each bounded pipeline phase, and
+`--poll-seconds` defaults to 1. Increase the timeout for long blocks or slow machines.
+The first block arrives after its duration divided by pace; subsequent deadlines use
+cumulative durations from replay start. Pipeline delays do not add another full pacing
+sleep: overdue blocks arrive as soon as the preceding pipeline cycle finishes.
+
+The tool copies into `block-NNNNNN.<extension>.partial` in the watched folder, flushes and
+closes it, then atomically renames it to the final name. Normal discovery excludes the
+`.partial` suffix before extension matching. Files are never removed; a failed copy may
+leave a partial file for the operator to inspect. Existing final or partial files are
+refused. A rerun needs a fresh disposable Event and empty watched folder.
+
+Before copying, the tool checks config/source agreement, matching Event/deployment/node
+identity, backend readiness and automation, waiting boundedly for startup readiness and
+tolerating running discovery reconciliations. It polls normal Kernel status for each new
+registration and identifies the asset through paginated timing requests (the recent-media
+status projection is capped). It posts timing/segmentation requests with the supplied actor
+and `confirmed: "confirmed"`, and runs each worker `--once` until all that Event's
+operations of the kind succeed. Terminal failure, cancellation, timeout, an unexpected
+asset or a mismatched latest suggestion run stops the replay. Every N blocks and after
+the last block (without duplicating a final cadence run), it requests a suggestion run,
+reads the latest run, and pages its open suggestions. It never confirms Sessions.
+
+Optional truth is a JSON array of 1..1,000 anonymous objects containing only `start` and
+`end`, both timezone-aware ISO timestamps, with end after start; maximum file size is
+64 MiB. Use the recording's absolute timeline. Truth is sorted chronologically, retaining
+duplicates. The first registered block's advisory timing start anchors replay media time;
+missing/invalid timing fails the pipeline rather than guessing from the first truth talk.
+Use a single continuous recording sequence; pacing concatenates durations and does not
+reconstruct unrecorded gaps or overnight breaks. Timing remains advisory and unqualified.
+
+Stdout is sanitized JSON with these fields:
+
+- `error_count`, `blocks_copied`, `blocks_registered`, `blocks_settled`.
+- `runs`: one-based `ordinal`, `blocks_copied`, monotonic `wall_seconds`,
+  `media_seconds` (= wall seconds multiplied by pace, including pipeline delay),
+  `suggestion_count`, and the closed numeric `skips` counters from the latest run.
+- With truth, `talks`: one-based chronological `ordinal`,
+  `time_to_first_suggestion_seconds` (= media elapsed at the first matching run minus
+  the truth end relative to the recording origin, clamped to zero for early matches;
+  null if never matched), `stability_change_count`, and `maximum_edge_move_seconds`.
+  Every run uses the evaluator's chronological one-to-one IoU >=0.5 matching, maximizing
+  count then minimizing absolute edge error with its existing tie rule. Stability compares
+  each later match with the previous match for that truth talk, retaining it across absent
+  runs. A run counts once if either edge moves **more than** 1 s; maximum movement is the
+  largest absolute start/end change, including changes at or below 1 s. Disappearance
+  alone is not an edge change. Zero changes/maximum means no observed movement, including
+  never-matched talks; consult latency and final recall alongside stability.
+- With truth, `final_accuracy`: truth/suggestion/matched counts, recall, and median
+  start/end errors from `evaluate_accuracy` on the last completed run. No completed run
+  yields zero matches and null errors. Partial reports use completed runs only.
+
+Exit codes: **0** completed (irrespective of measured accuracy), **1** invalid input or
+pre-copy safety refusal with only `{"error_count": 1}`, **3** pipeline failure/timeout with
+a sanitized partial report. `--help` exits 0. The optional Markdown form is not emitted;
+JSON is the report format. Paths, filenames, titles, IDs, absolute timestamps, DSNs,
+secrets, raw API dictionaries and child-process diagnostics are never emitted. The secret
+has no CLI option; HTTP sends it only in `X-StageFlow-API-Secret`, with redirects refused.
+Keep raw inputs and shell history private, and review sanitized output before publishing.
+
+`backend/tests/test_validation_replay_blocks.py` uses fake HTTP, subprocess, copy, clock
+and sleep effects; no real database, network, FFmpeg or media is required. The separate
+owner-run synthetic-day replay supplies qualification evidence.
+
+## Existing validation controller
+
 `Invoke-StageFlowValidation.ps1` is a thin, non-production PowerShell controller for
 the existing `backend/tests/qualification/real_event_playback.py` runner. It derives a
 Run-specific external workspace, performs conservative operator checks, and delegates

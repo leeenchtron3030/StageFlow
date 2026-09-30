@@ -370,6 +370,7 @@ Median and nearest-rank p95 (`ceil(0.95*n)`) start/end errors cover matched pair
 no matches yields null errors. `count_within_60_seconds` requires both edges <=60 s.
 Extra suggestions cannot increase recall through duplicate matches. Matching takes
 O(G*S) time and space for G truth intervals and S suggestions.
+`evaluation.match_intervals` exposes the same matches as immutable original-input `(truth_index, suggestion_index)` pairs in chronological order; `evaluate_accuracy` uses it internally.
 
 Run from `backend` with both local files outside the repository:
 
@@ -408,6 +409,8 @@ history, digest changes, Event scope and authenticated API responses.
 constants/components, immutable membership, ordered entries and both reversal guards.
 
 ## Corpus validation harness
+
+For paced replay through the demo APIs and workers, see the [live replay tool](../../../../../scripts/validation/README.md#session-suggestions-live-replay).
 
 The pure harness emits deterministic sanitized metrics and supplies synthetic scenario
 regression tests. Policy versions/constants, services, storage and runtime settings are

@@ -72,6 +72,19 @@ and zero wrong-day suggestions. Synthetic scenario tests pin current behavior wi
 tuning. The owner separately runs the external corpus qualification and live replay;
 this method paragraph records no results.
 
+The [live replay tool](../../scripts/validation/README.md#session-suggestions-live-replay)
+copies ordered external blocks into an empty external watched folder at real or accelerated
+pace on a disposable review Event and demo database. It polls discovery, enqueues timing
+and segmentation through their normal APIs, runs the workers to settlement, and requests
+suggestions every N blocks and after the last block. Sanitized reports retain per-run wall
+and media elapsed seconds, counts and skips, plus optional per-talk time-to-first-suggestion
+and boundary stability using the evaluator's shared one-to-one matcher. Media time is
+monotonic replay elapsed time multiplied by pace, anchored to the first block's advisory
+timing start; early matches have zero latency, and stability compares successive matches
+across absent runs with a strict greater-than-one-second threshold. Final recall and median
+edge errors use the existing evaluator. Fake-effect tests require no database or media;
+the owner performs the separate synthetic-day replay qualification. No results are recorded here.
+
 ## Evidence rules
 
 - Name the exact corpus item and manifest revision without committing its media.

@@ -6,7 +6,10 @@ import pytest
 
 from app.contexts.production.session_suggestions.contracts import Span
 from app.contexts.production.session_suggestions.evaluate_cli import main
-from app.contexts.production.session_suggestions.evaluation import evaluate_accuracy
+from app.contexts.production.session_suggestions.evaluation import (
+    evaluate_accuracy,
+    match_intervals,
+)
 from tests.test_session_suggestion_policy import at
 from tests.test_session_suggestions import Harness
 
@@ -103,3 +106,44 @@ def test_cli_invalid_arguments_never_echo_caller_input(
     assert main(arguments) == 1
     output = capsys.readouterr()
     assert output.out == '{"error_count": 1}\n' and not output.err
+
+
+@pytest.mark.parametrize(("predictions", "truth", "expected"), [
+    ((), (), ()),
+    (((1000, 1100),), ((0, 100),), ()),
+    (((25, 125), (75, 175)), ((0, 100), (50, 150)), ((0, 0), (1, 1))),
+    (((0, 100), (0, 100)), ((0, 100),), ((0, 0),)),
+    (((0, 100),), ((0, 100), (0, 100)), ((0, 0),)),
+    (((0, 200),), ((0, 100),), ((0, 0),)),
+    (((0, 200.001),), ((0, 100),), ()),
+    (((10, 1020), (2060, 3060), (4090, 5120)),
+     ((0, 1000), (2000, 3000), (4000, 5000), (6000, 7000)), ((0, 0), (1, 1), (2, 2))),
+    # Returned indices refer to caller order, not the sorted intervals.
+    (((4090, 5120), (2060, 3060), (10, 1020)),
+     ((6000, 7000), (4000, 5000), (2000, 3000), (0, 1000)), ((3, 2), (2, 1), (1, 0))),
+    # Lower edge error wins before the earlier-interval tie rule.
+    (((0, 90), (0, 100)), ((0, 100),), ((0, 1),)),
+    (((10, 110), (-10, 90)), ((0, 100),), ((0, 1),)),
+])
+def test_public_matches_preserve_existing_fixtures_and_objectives(
+    predictions: tuple[tuple[float, float], ...], truth: tuple[tuple[float, float], ...],
+    expected: tuple[tuple[int, int], ...],
+) -> None:
+    suggested = tuple(Span(at(start), at(end)) for start, end in predictions)
+    targets = tuple(Span(at(start), at(end)) for start, end in truth)
+    pairs = match_intervals(suggested, targets)
+    assert pairs == expected
+    assert len(pairs) == evaluate_accuracy(suggested, targets).matched_count
+    assert isinstance(pairs, tuple) and all(isinstance(pair, tuple) for pair in pairs)
+
+
+def test_public_matches_accept_contract_inputs_and_enforce_existing_limit() -> None:
+    suggestion = Harness().suggestion()
+    for value in (suggestion, suggestion.candidate, suggestion.candidate.span):
+        assert match_intervals((value,), (suggestion.candidate.span,)) == ((0, 0),)
+        assert len(match_intervals((value,), (suggestion.candidate.span,))) == (
+            evaluate_accuracy((value,), (suggestion.candidate.span,)).matched_count)
+    for suggestions, truth in (((suggestion,) * 10001, ()),
+                                ((), (suggestion.candidate.span,) * 10001)):
+        with pytest.raises(ValueError, match="evaluation_input_limit"):
+            match_intervals(suggestions, truth)

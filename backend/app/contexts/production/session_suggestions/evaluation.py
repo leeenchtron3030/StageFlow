@@ -25,27 +25,25 @@ class AccuracyMetrics:
     wrong_day_count: int | None
 
 
-def evaluate_accuracy(
+def match_intervals(
     suggestions: Sequence[Span | Candidate | SessionSuggestion], ground_truth: Sequence[Span],
-    *, planned_span: Span | None = None,
-) -> AccuracyMetrics:
-    """Match one Stage's intervals in chronological order at IoU >= 0.5.
+) -> tuple[tuple[int, int], ...]:
+    """Return immutable (truth index, suggestion index) pairs in chronological order.
 
-    Maximize one-to-one match count, then minimize total absolute edge error;
-    exact ties prefer earlier intervals. Recall is matched/truth (0 for no truth).
-    Errors describe matched pairs only; p95 uses nearest rank (ceil(0.95*n)).
-    Within-60 requires BOTH edges within 60 seconds, inclusive.
-    Legacy metrics still match all suggestions. Precision separately matches scheduled
-    suggestions (bare Spans count as scheduled); inclusive precision uses all matches.
-    Wrong-day counts either edge outside the planned span expanded by 12 hours,
-    inclusive at the margin. None means no planned span was supplied, not a pass.
+    Indices refer to the original input sequences. Match one Stage at IoU >= 0.5,
+    maximizing one-to-one count then minimizing total absolute edge error. Exact ties
+    retain earlier intervals; identical spans retain their input order.
     O(G*S) time and space for G truth and S suggested intervals.
     """
     if len(suggestions) > MAX_INPUTS or len(ground_truth) > MAX_INPUTS:
         raise ValueError("evaluation_input_limit")
-    predicted = sorted((s if isinstance(s, Span) else s.span if isinstance(s, Candidate)
-                        else s.candidate.span for s in suggestions), key=lambda s: (s.start, s.end))
-    truth = sorted(ground_truth, key=lambda s: (s.start, s.end))
+    spans = tuple(s if isinstance(s, Span) else s.span if isinstance(s, Candidate)
+                  else s.candidate.span for s in suggestions)
+    prediction_order = sorted(range(len(spans)), key=lambda i: (spans[i].start, spans[i].end))
+    truth_order = sorted(range(len(ground_truth)),
+                         key=lambda i: (ground_truth[i].start, ground_truth[i].end))
+    predicted = [spans[i] for i in prediction_order]
+    truth = [ground_truth[i] for i in truth_order]
     # Rolling objective rows plus byte-sized backpointers. No path copying.
     prior = [(0, 0)] * (len(predicted) + 1)
     paths: list[bytearray] = []
@@ -70,24 +68,44 @@ def evaluate_accuracy(
             path[j] = action
         prior = row
         paths.append(path)
-    starts: list[float] = []
-    ends: list[float] = []
+    pairs: list[tuple[int, int]] = []
     i, j = len(truth), len(predicted)
     while i and j:
         action = paths[i - 1][j]
         if action == 3:
-            starts.append(abs((predicted[j - 1].start - truth[i - 1].start).total_seconds()))
-            ends.append(abs((predicted[j - 1].end - truth[i - 1].end).total_seconds()))
+            pairs.append((truth_order[i - 1], prediction_order[j - 1]))
             i, j = i - 1, j - 1
         elif action == 2:
             j -= 1
         else:
             i -= 1
-    matched_count = len(starts)
+    return tuple(reversed(pairs))
+
+
+def evaluate_accuracy(
+    suggestions: Sequence[Span | Candidate | SessionSuggestion], ground_truth: Sequence[Span],
+    *, planned_span: Span | None = None,
+) -> AccuracyMetrics:
+    """Evaluate one Stage using match_intervals' chronological one-to-one matching.
+
+    Recall is matched/truth (0 for no truth). Errors describe matched pairs only;
+    p95 uses nearest rank (ceil(0.95*n)). Within-60 requires BOTH edges <=60 seconds.
+    Legacy metrics match all suggestions. Precision separately matches scheduled
+    suggestions (bare Spans count as scheduled); inclusive precision uses all matches.
+    Wrong-day counts either edge outside the planned span expanded by 12 hours,
+    inclusive at the margin. None means no planned span was supplied, not a pass.
+    """
+    pairs = match_intervals(suggestions, ground_truth)
+    predicted = tuple(s if isinstance(s, Span) else s.span if isinstance(s, Candidate)
+                      else s.candidate.span for s in suggestions)
+    truth = ground_truth
+    starts = [abs((predicted[j].start - truth[i].start).total_seconds()) for i, j in pairs]
+    ends = [abs((predicted[j].end - truth[i].end).total_seconds()) for i, j in pairs]
+    matched_count = len(pairs)
     scheduled = tuple(s for s in suggestions if isinstance(s, Span) or (
         s if isinstance(s, Candidate) else s.candidate).expectation is not None)
     unscheduled_count = len(suggestions) - len(scheduled)
-    scheduled_matches = (evaluate_accuracy(scheduled, ground_truth).matched_count
+    scheduled_matches = (len(match_intervals(scheduled, ground_truth))
                          if unscheduled_count else matched_count)
     margin = timedelta(hours=12)
     wrong_day_count = None if planned_span is None else sum(
