@@ -2656,8 +2656,8 @@ per day, and classified every one of the 56 true edges. Sanitized counts:
 
 ### Acceptance criteria
 
-- [ ] ED-0117 is merged. v1–v3 results are unchanged, and each new scenario is pinned.
-- [ ] The owner's dev measurement is recorded, with the constants chosen, D5 items 1–3
+- [x] ED-0117 is merged. v1–v3 results are unchanged, and each new scenario is pinned.
+- [x] The owner's dev measurement is recorded, with the constants chosen, D5 items 1–3
   on dev data, and a go or no-go for ED-0118.
 - [ ] ED-0118 is detailed and approved, then merged, with the constants frozen in `0028`.
 - [ ] Qualification Run 002 is recorded against D5, with held-out results separate.
@@ -2669,6 +2669,71 @@ per day, and classified every one of the 56 true edges. Sanitized counts:
 - ED-0117 is pure and unused by the service. Revert the code.
 - ED-0118 follows the `0024` pattern: the reverse refuses while v5 rows exist, and the
   default switch is reverted first.
+
+### Completion record (ED-0117)
+
+- **Implemented revision:** merged in PR #177 (`main` `f37c4cc`).
+- **What changed:**
+  - `policy_v5.py`: proximity-weighted cue support by role, `cue` edges, the
+    coverage-bound fallback, and the program-span limit with an additive
+    `outside_program` skip.
+  - Additive pure contracts: `EdgeKind.CUE`, changeover and specific cue inputs, and
+    `SkipCountsV5`.
+  - The harness option `--policy-version 5`, and cue objects in the manifest.
+  - The realistic-schedule-error generator, ported with synthetic cues, and four new
+    scenarios.
+  - Docs.
+  - No migration, persistence, service, API or UI change.
+- **Review:** `directive-reviewer` returned FIX-FIRST, then APPROVE after two fixes: the
+  cost test now creates cue edges (22), and the cue-edge score is documented.
+- **Non-blocking review observations:**
+  1. A cue edge receives its own cluster hits' support, so it ranks above D4's intent.
+     If the replay shows false-hit stealing, this goes to the owner as a rule amendment.
+  2. Cue-only changeovers leave an unscheduled gap suggestion.
+  3. Offset estimation keeps v3's weights.
+  4. Two scenario pins discriminate weakly.
+  5. `_WindowedEdges` relies on v2's iteration.
+- **Tests (host):** backend **3,279 passed, 0 failed, 2 skipped**. CI green.
+- **Status:** Completed.
+
+### Dev measurement record (after ED-0117, 2026-09-30)
+
+- **Data:** dev only, per D5.
+  - The three W3S25 days, with one Stage per day. Cues come from the composed Conference
+    stage lists, split by catalog role; every conference phrase is multi-word, so every
+    hit is specific.
+  - Generator seeds 1–20.
+  - Held-out seeds 1000–1099 were not used.
+- **Starting constants (D4):**
+  - **Perfect schedule:** recall 1.00 on every day, against v3's 1.00 / 0.91 / 0.88, but
+    only 1 of 3 days passes (day 2 end median 44 s).
+  - **Real published schedule:** 1 of 3 days passes, against v3's 0/3. Day 3 reaches
+    0.62 and 79 s, against 0.50 and 215 s.
+  - **Drift matrix:** recall is never below v3's in any cell.
+  - **Precision:** day 1 inclusive precision rises from 0.60 to 0.82.
+  - **Synthetic seeds:** 19 of 20 pass, against 17.
+- **Constant sweep:** 72 combinations of radius, weight, cue-edge strength and gap. No
+  combination has zero D5 item 3 violations as written; every violation is a median
+  increase, and no combination loses recall.
+  - **Option A** (radius 30, weight 3, strength 1, gap 60):
+    - perfect-schedule ceiling 3/3;
+    - real-schedule day 3 at 0.62 and 79 s, which misses item 2;
+    - 8 median violations.
+  - **Option B** (radius 60, weight 20, strength 1, gap 60):
+    - ceiling 2/3;
+    - real-schedule day 3 at 0.75 and 34 s, which meets item 2;
+    - 11 median violations, including day-2 ends up 6–24 s under whole-day lateness.
+- **Owner decisions (2026-09-30):**
+  - **Constants for ED-0118: Option B.** CUE_RADIUS 60 s, CUE_WEIGHT 20,
+    CUE_EDGE_STRENGTH 1, CUE_EDGE_GAP 60 s. The coverage-bound strength (5) and the
+    outside-program margin (1,800 s) keep their starting values.
+  - **D5 item 3 amended** to: "no recall regression against v3 in any cell. A median
+    increase of more than 5 s counts as a regression only in cells where either policy
+    meets the ADR target." Option B then passes item 3 on dev data.
+  - **Live condition added before ED-0118 merges.** A replay on real blocks at 1×, over
+    half a day, with transcription in the chain, must show v5's advantage arriving
+    early enough to be useful (Live Replay Run 002; see the live-testing direction
+    recorded 2026-09-30).
 
 ## Ground-truth corpus handling (all phases)
 
