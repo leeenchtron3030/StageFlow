@@ -40,7 +40,7 @@ policy v2) is detailed below (2026-09-29), after the early accuracy check. After
 | 2d-1. Cue phrase presets and composition (ED-0107 backend, ED-0108 Event page; Completed) | Built-in catalog v1, human composition command publishing the Event's start and end cue lists, runs default to them, Event page section | `0025` |
 | 2d-2. Transcript cues as edges (outline) | Policy v4 with `cue` edges | to be detailed |
 | 5. Validation harness and Run 001 (ED-0114 harness, ED-0115 live replay; Approved) | Committed pure harness + CLI over a local corpus manifest, precision and wrong-day checks, deterministic synthetic scenario suite in CI (gaps, multi-part, wrong clocks, short talks, late recording start), owner qualification Run 001 against the ADR target, local live-replay tool with time-to-suggestion | none |
-| 6. Policy v4, per-talk lateness (proposed ED-0116; draft for owner approval) | Lateness-chain joint alignment replacing v3's per-block offset (fixes slot aliasing and per-talk duration error), override entries as mid-day anchors, realistic-schedule-error scenario generator; re-qualify with Qualification Run 002 (dev and held-out, per event day) and Live Replay Run 002 | `0028` |
+| 6. Policy v4, per-talk lateness (ED-0116; Approved) | Lateness-chain joint alignment replacing v3's per-block offset (fixes slot aliasing and per-talk duration error), override entries as mid-day anchors, realistic-schedule-error scenario generator; re-qualify with Qualification Run 002 (dev and held-out, per event day) and Live Replay Run 002 | `0028` |
 
 ## Phase 1: media segmentation evidence (ED-0103)
 
@@ -2080,23 +2080,30 @@ Revert the code. There is no schema change.
   as sequenced above.
 
 
-## Phase 6: policy v4, per-talk lateness (proposed ED-0116)
+## Phase 6: policy v4, per-talk lateness (ED-0116)
 
 ### Status
 
-- **Draft for owner approval** (2026-09-30). It follows the owner's sequencing decision
-  after Qualification Run 001 (see "Qualification Run 001 record" above). It is not
-  implementation-ready until the owner decides D1–D6.
-- **Execution classification:** Yellow until approved, because it adds a new policy
-  version and makes a version-numbering decision. After approval it is Green on the same
-  basis as Phase 2c:
-  - ADR-0034 allows a deterministic, versioned policy;
-  - no Kernel, confirmation or authority semantics change;
-  - the migration is additive with a guarded reverse;
-  - no dependency is added.
-- **ED number:** the plan delegates ED numbering, and the next free number is
-  **ED-0116**. It is proposed, not yet allocated in the index. The owner confirms it in
-  D6.
+- **Approved** (owner, 2026-09-30), with D1–D6 as recommended:
+  - lateness-chain alignment;
+  - the name v4, with Phase 2d-2 cue edges moving to v5;
+  - the constants frozen before the held-out evaluation;
+  - the Run 002 targets;
+  - ED-0116 and migration `0028`;
+  - v3 stays the default until the owner switches.
+- **D4 outcome:** the owner has no talk timings for the second event's recordings, so
+  there is no held-out real event. The held-out evidence is instead:
+  - **held-out synthetic seeds:** constants are tuned only on the generator's seeds
+    1–20 and the dev corpus, then evaluated once, after freezing, on seeds 1000–1099;
+  - **the second event's recordings, unlabeled:** checked for a clean run (0 wrong-day
+    suggestions, no errors), and suggestion counts reported, with no accuracy claim.
+  - Qualification Run 002 states that no labeled held-out event exists.
+- **Execution authority:** Green and implementation-ready.
+  - It is authorized by ADR-0034 (a deterministic, versioned policy) and this approved
+    section.
+  - No Kernel, confirmation or authority semantics change. The migration is additive
+    with a guarded reverse, and no dependency is added.
+- **Engineering Directive:** **ED-0116**, allocated under the plan's delegated numbering.
 
 ### Why
 
@@ -2224,8 +2231,10 @@ In short:
      - recall ≥ 0.90, and median start and end errors ≤ 30 s, on each day;
      - wrong-day count 0;
      - day 2's duplicate truth caps its recall at 0.91.
-  2. **Held-out event, when D4 is available:** the same targets, and the result is
-     reported separately.
+  2. **Held-out synthetic seeds (1000–1099) of the realistic-schedule-error generator,
+     evaluated once after the freeze:** the same per-day targets, on every seed, reported
+     separately. The unlabeled second event is checked for a clean run only (D4
+     outcome).
   3. **No regression against v3** on the Run 001 per-day drift matrix (whole-day and
      two-part, ±0 to ±30 min): recall at least v3's, and medians within +5 s of v3's.
   4. **Independent drift of ±5 and ±10 min:** recall at least v2's.
