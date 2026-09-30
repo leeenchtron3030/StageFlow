@@ -19,10 +19,15 @@ class AccuracyMetrics:
     median_end_error_seconds: float | None
     p95_end_error_seconds: float | None
     count_within_60_seconds: int
+    precision: float
+    unscheduled_count: int
+    precision_including_unscheduled: float
+    wrong_day_count: int | None
 
 
 def evaluate_accuracy(
     suggestions: Sequence[Span | Candidate | SessionSuggestion], ground_truth: Sequence[Span],
+    *, planned_span: Span | None = None,
 ) -> AccuracyMetrics:
     """Match one Stage's intervals in chronological order at IoU >= 0.5.
 
@@ -30,6 +35,10 @@ def evaluate_accuracy(
     exact ties prefer earlier intervals. Recall is matched/truth (0 for no truth).
     Errors describe matched pairs only; p95 uses nearest rank (ceil(0.95*n)).
     Within-60 requires BOTH edges within 60 seconds, inclusive.
+    Legacy metrics still match all suggestions. Precision separately matches scheduled
+    suggestions (bare Spans count as scheduled); inclusive precision uses all matches.
+    Wrong-day counts either edge outside the planned span expanded by 12 hours,
+    inclusive at the margin. None means no planned span was supplied, not a pass.
     O(G*S) time and space for G truth and S suggested intervals.
     """
     if len(suggestions) > MAX_INPUTS or len(ground_truth) > MAX_INPUTS:
@@ -75,6 +84,15 @@ def evaluate_accuracy(
         else:
             i -= 1
     matched_count = len(starts)
+    scheduled = tuple(s for s in suggestions if isinstance(s, Span) or (
+        s if isinstance(s, Candidate) else s.candidate).expectation is not None)
+    unscheduled_count = len(suggestions) - len(scheduled)
+    scheduled_matches = (evaluate_accuracy(scheduled, ground_truth).matched_count
+                         if unscheduled_count else matched_count)
+    margin = timedelta(hours=12)
+    wrong_day_count = None if planned_span is None else sum(
+        s.start - planned_span.start < -margin or s.end - planned_span.end > margin
+        for s in predicted)
 
     def p95(values: list[float]) -> float | None:
         return sorted(values)[ceil(0.95 * len(values)) - 1] if values else None
@@ -85,6 +103,10 @@ def evaluate_accuracy(
         float(median(starts)) if starts else None, p95(starts),
         float(median(ends)) if ends else None, p95(ends),
         sum(a <= 60 and b <= 60 for a, b in zip(starts, ends, strict=True)),
+        scheduled_matches / len(scheduled) if scheduled else 0.0,
+        unscheduled_count,
+        matched_count / len(predicted) if predicted else 0.0,
+        wrong_day_count,
     )
 
 _MICROSECOND = timedelta(microseconds=1)

@@ -1,9 +1,6 @@
 # Session Suggestions
 
-Execution classification: Green under the approved Phase 2/2b/2c/2d-1 plan,
-ED-0104 through ED-0107,
-including the owner decision exempting schedule fallback edges from monotonicity. This context
-implements advisory suggestions only. Kernel code and its Session, association and package
+This context implements advisory suggestions only. Kernel code and its Session, association and package
 semantics remain unchanged. There is no automated realization or ADR-0026 activation.
 
 ## Boundary proposals for realized Sessions
@@ -387,8 +384,16 @@ return exit 1 with `{"error_count": 1}`. This evaluator is pulled forward from P
 not generate corpus suggestions or perform a transcription run. Owner Accuracy Run 002
 and its drift comparisons remain external qualification work. Real-event data and scripts
 stay outside the repository as required by the plan's corpus-handling rules.
-Accuracy Run 003 uses the unchanged evaluator with v3 candidates; drift models and the
-real corpus harness stay external. Its owner acceptance remains outstanding.
+Existing recall, counts, matched-pair errors and within-60 values remain unchanged.
+`precision` separately matches scheduled suggestions against truth, divided by scheduled
+suggestion count. Bare Spans are treated as scheduled. `unscheduled_count` reports
+unlinked suggestions; `precision_including_unscheduled` uses the original all-suggestion
+matches divided by all suggestions. Empty denominators give zero. This separate matching
+prevents an unscheduled candidate from taking a scheduled candidate's precision match.
+`wrong_day_count` counts suggestions with either edge outside the Stage's planned span
+expanded by 12 hours (exactly on the margin is allowed). It includes unscheduled
+suggestions and must be zero to pass. Without the optional `planned_span` argument it is
+null, meaning unchecked; the legacy interval CLI cannot certify the wrong-day target.
 
 Additional synthetic tests: `test_session_suggestion_policy_v2.py` covers joint alignment,
 shared changeovers, drift, thresholds, cues, fallback overlap and version lineage;
@@ -401,3 +406,102 @@ ties, bounds, printed offsets, v2 equivalence under a zero override and full-day
 history, digest changes, Event scope and authenticated API responses.
 `test_session_suggestions_policy_v3_postgres.py` covers persistence/restart, per-version
 constants/components, immutable membership, ordered entries and both reversal guards.
+
+## Corpus validation harness
+
+The pure harness emits deterministic sanitized metrics and supplies synthetic scenario
+regression tests. Policy versions/constants, services, storage and runtime settings are
+unchanged. Real-corpus reproduction and qualification remain owner-run checks; synthetic
+tests do not establish event readiness.
+
+The machine-readable contract is [corpus-manifest.schema.json](corpus-manifest.schema.json).
+Keep every real manifest, media file, decoded truth, transcript and extraction script
+**outside the repository**. Build a UTF-8 JSON object with a `stages` array; each Stage has:
+
+- `blocks`: array of `start` (aware ISO date-time), positive integer `duration_us`, and
+  `intervals`: objects with `kind` (`freeze` or `silence`), integer `start_us` and `end_us`
+  relative to that block. Optional `start_cues` / `end_cues` are arrays of aware absolute
+  timestamps from externally matched transcript cues.
+- `schedule`: objects with unique anonymous `key`, `planned_start` and `planned_end`.
+  Use the actual published schedule for `--schedule-source manifest`; it is used as-is.
+- `truth`: objects with `start` and `end`, retaining duplicate truth intervals if present.
+
+Use full `YYYY-MM-DDTHH:MM:SS[.ffffff]Z` or an explicit `+/-HH:MM` offset. Values normalize
+to UTC; naive timestamps are refused. Ends must follow starts, segmentation must satisfy
+`0 <= start_us < end_us <= duration_us`, and cues must be within their own block (inclusive).
+The parser rejects manifests larger than 64 MiB in UTF-8 before JSON decoding, with a
+sanitized error. It enforces these relational checks and the schema's structural bounds:
+at most 10,000 Stages, blocks, plans, truth intervals, intervals per block, or cues per role;
+durations at most 315,576,000,000,000 microseconds. Empty blocks and truth are allowed;
+the selected schedule must be nonempty to check wrong-day placement. Extra fields are
+rejected. Do not put paths, titles, speaker names, transcripts or other free text in it.
+Anonymous keys are checked for uniqueness then replaced with ordinal-based identities.
+Schema validation is implemented with the standard library; no package is added.
+
+From `backend`, with an external manifest:
+
+```text
+uv run --no-sync python -m app.contexts.production.session_suggestions.harness_cli <external-manifest.json> --policy-version 3 --schedule-source manifest --cue-profile conference
+uv run --no-sync python -m app.contexts.production.session_suggestions.harness_cli <external-manifest.json> --policy-version 3 --schedule-source drift --drift-model two-part --magnitude-seconds 900 --seeds 0 1 2 3 4 --markdown
+```
+
+`harness.parse_manifest` produces frozen Stage inputs; `harness.run_manifest` runs the
+chosen unchanged policy (`1`, `2`, `3`) independently for each Stage. One invocation is
+one scenario/model/magnitude; repeat invocations for a matrix. Stages may span multiple
+days. Metrics match only within a Stage, never across Stages. Reports use zero-based
+Stage ordinals and include each seed plus each metric's worst value **and its seed**;
+minimum recall/precision/matched/within-60, maximum errors/other counts, null errors
+considered worst, smallest seed on ties. There is no averaged-median aggregate.
+
+For drift schedules, order truth by `(start, end)` and start a new event day when the
+gap from the previous truth interval's end to the next start is at least six hours.
+Continuous talks crossing UTC midnight stay in one event day. Use Python `random.Random`
+(string seed version 2) with exactly:
+
+```text
+stageflow:session-suggestions:harness:v1:{model}:{seed}:{stage_ordinal}:{day_ordinal}
+```
+
+Day ordinals are chronological and zero-based. The magnitude is an integer in 0..86400
+seconds; one to 100 integer seeds are accepted, sorted and deduplicated. Each day has
+an independent RNG. Whole-day draws one uniform offset in `[-D, D]` per event day;
+two-part draws another before the talk after that day's largest planned break, measured
+on the truth-derived plan before drift (earliest break on ties).
+For each talk, draw start jitter then end jitter, both uniform in `[-60, 60]` seconds,
+and add to its part's offset. This jitter remains at D=0, matching the historical method.
+Independent drift draws start then end in `[-D, D]` with no shared offset or extra jitter.
+Timedelta rounds to microseconds. Every drift model clamps each planned talk to at least
+120 seconds: `planned_end = max(planned_end, planned_start + 120 s)`, as in Runs 002/003.
+Generated plans replace the manifest schedule and use truth ordinals.
+These documented RNG inputs make new runs reproducible; exact historical Run 003 numeric
+reproduction still requires the owner's local corpus and original seed/draw convention.
+
+An optional `--cue-profile` selects catalog groups and composes default phrases through
+`cue_composition.compose`. Only phrase counts are output. The harness does not transcribe
+or match text: supplied cue times must already represent matches for that composition.
+Absent cue times stay absent; without a profile all cue inputs are disabled. To compare
+profiles with different matches, prepare separate external manifests.
+
+For v3 only, repeat `--producer-offset <aware-ISO-effective-from> <integer-seconds>` in
+strictly increasing effective-time order (at most 20; offsets -7200..7200). Entries apply
+to each Stage in the invocation via `ScheduleOffsetSetting`; use separate invocations
+for different Stage settings. These are explicit producer offsets, not automatically
+inferred truth offsets. Existing v3 block/override precedence is preserved.
+
+JSON output contains only closed labels, ordinals, seed numbers, counts, errors, ratios
+and target booleans, never source keys, titles, timestamps, cue phrases or paths.
+`--markdown` appends numeric per-seed and worst-seed tables after the JSON. A target pass
+requires recall >=0.90, median start/end errors <=30 seconds, and wrong-day count zero;
+precision is reported without inventing an ADR precision threshold. Exit codes: 0 all
+Stage/seed targets met, 2 measured target failure (report still emitted), 1 invalid
+arguments/input/read with only `{"error_count": 1}`. `--help` exits 0. Exceptions never
+echo values, paths or parser diagnostics. Review sanitized outputs before publishing.
+
+`scenarios.generate_scenario` supplies clean day, recording gaps, multi-part talk,
+wrong clock, short evenly spaced talks and late recording start manifests with generic
+synthetic intervals only. No media or external files are needed. The short-talk case
+deliberately shifts the plan by one periodic slot; current behavior is pinned, not tuned.
+`test_session_suggestion_harness.py` covers every scenario's metrics, excluded wrong-clock
+lineage, determinism, isolated Stages, manifest bounds/privacy, cues, offsets, precision,
+wrong-day margins and CLI exit codes. `test_session_suggestion_evaluation.py` retains the
+original metric fixtures and CLI privacy checks.

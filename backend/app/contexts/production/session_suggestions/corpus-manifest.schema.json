@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Anonymous Session Suggestions corpus manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["stages"],
+  "properties": {
+    "stages": {
+      "type": "array", "minItems": 1, "maxItems": 10000,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["blocks", "schedule", "truth"],
+        "properties": {
+          "blocks": {"type": "array", "maxItems": 10000, "items": {"$ref": "#/$defs/block"}},
+          "schedule": {"type": "array", "maxItems": 10000, "items": {"$ref": "#/$defs/plan"}},
+          "truth": {"type": "array", "maxItems": 10000, "items": {"$ref": "#/$defs/span"}}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "time": {
+      "type": "string", "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,6})?(Z|[+-][0-9]{2}:[0-9]{2})$"
+    },
+    "span": {
+      "type": "object", "additionalProperties": false, "required": ["start", "end"],
+      "properties": {"start": {"$ref": "#/$defs/time"}, "end": {"$ref": "#/$defs/time"}}
+    },
+    "plan": {
+      "type": "object", "additionalProperties": false,
+      "required": ["key", "planned_start", "planned_end"],
+      "properties": {
+        "key": {"type": "string", "minLength": 1, "maxLength": 200},
+        "planned_start": {"$ref": "#/$defs/time"},
+        "planned_end": {"$ref": "#/$defs/time"}
+      }
+    },
+    "block": {
+      "type": "object", "additionalProperties": false,
+      "required": ["start", "duration_us", "intervals"],
+      "properties": {
+        "start": {"$ref": "#/$defs/time"},
+        "duration_us": {"type": "integer", "minimum": 1, "maximum": 315576000000000},
+        "intervals": {
+          "type": "array", "maxItems": 10000,
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["kind", "start_us", "end_us"],
+            "properties": {
+              "kind": {"enum": ["freeze", "silence"]},
+              "start_us": {"type": "integer", "minimum": 0, "maximum": 315575999999999},
+              "end_us": {"type": "integer", "minimum": 1, "maximum": 315576000000000}
+            }
+          }
+        },
+        "start_cues": {"type": "array", "maxItems": 10000, "items": {"$ref": "#/$defs/time"}},
+        "end_cues": {"type": "array", "maxItems": 10000, "items": {"$ref": "#/$defs/time"}}
+      }
+    }
+  }
+}
