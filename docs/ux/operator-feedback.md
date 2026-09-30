@@ -347,3 +347,43 @@ line; preserve resolved entries as concise evidence rather than deleting them.
   under Details, honest evidence wording, and all proxy, audit and authority behaviour.
 - Classification: Green (presentation and wording)
 - Status: validated (ED-0108)
+
+### 2026-09-29 - ED-0110 review checkpoint: suggested presentations
+
+- Route/scenario:
+  - the Stage page (`/stages/main`) and Mission Control, in kernel mode;
+  - two locally seeded synthetic review Events. Both have generic test-pattern talks with
+    silent changeover cards and anonymous "Talk 1…5" schedules printed early. Both were
+    run through the real discovery, timing and segmentation pipeline;
+  - on each: suggest, confirm one, adjust and confirm one, reject one, set a producer
+    offset, suggest again.
+- Category: prominence | repetition | honesty | recoverability
+- **Before the owner review (reviewer and live check):**
+  - the panel was moved up under the Stage summary, from below the evidence block;
+  - same-day ranges show the date once;
+  - compact rows with grouped actions;
+  - a styled Mission Control "Suggestions to review" strip;
+  - singular and plural wording;
+  - "Add the schedule first" for Stages with no schedule;
+  - "Suggest again" only after a run.
+- **Owner review, approved with one change:** the "Offset set by producer" badge
+  repeated on every row. It now shows only on rows whose offset differs from the one in
+  the summary.
+- **Findings recorded, not changed here:**
+  1. **Suggest again re-suggests decided talks.** A new run re-suggests talks that
+     already have a Session, and talks that were rejected. Owner decision: planned as a
+     small backend follow-up (ED-0111).
+     - talks with a Session are left out and shown as "already a Session";
+     - rejected talks may be suggested again.
+  2. **Recording start beats short changeovers.** The recording's start boundary
+     (strength 30) outscores a short real changeover. So the first talk's start snaps to
+     the recording start, and on short, evenly spaced talks the offset estimate can
+     alias by one talk (measured: 14 min estimated against 6 min true). This is a policy
+     follow-up candidate.
+  3. **Recordings are not re-matched after a confirm.** Media association still reports
+     "No Session matches this recording's time" after confirming. This behaviour
+     predates ED-0110 and is out of scope.
+- Unchanged: confirming one suggestion at a time with an explicit step, no batch
+  confirm, idempotent retries, honest estimate wording, and the proxy allowlist and audit.
+- Classification: Green (presentation and wording)
+- Status: validated (ED-0110)

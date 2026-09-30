@@ -352,11 +352,13 @@ export function StageOperationalView({
   workspace,
   demoActorId,
   demoLaunchContext,
+  suggestions,
 }: {
   stage?: StageView;
   workspace: OperationalWorkspace;
   demoActorId?: string;
   demoLaunchContext?: string;
+  suggestions?: ReactNode;
 }) {
   if (!stage) return <><WorkspaceTitle eyebrow="Producer · Stage" title="Stage unavailable" summary="The requested Stage is not present in this bounded projection." /><Link className="text-link" href={href("/", workspace)}>Return to Mission Control</Link></>;
   const isDemo = workspace.dataSource.runtimeProfile === "demo-single-stage";
@@ -429,6 +431,7 @@ export function StageOperationalView({
           </section>
         )}
       </div>
+      {suggestions}
       <MediaUncertaintyPanel
         assets={workspace.mediaAssets.filter((item) => item.stageKey === stage.key)}
         workspace={workspace}

@@ -686,3 +686,25 @@ button:disabled { cursor: not-allowed; color: var(--subtle-foreground); backgrou
 .derivation-result p { margin: 0; }
 
 .session-moments pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+.suggestions-panel { margin-top: 1.5rem; }
+.suggestion-rows { list-style: none; margin: 1rem 0; padding: 0; }
+.suggestion-row { padding: .7rem 0; border-bottom: 1px solid var(--border); }
+.suggestion-line { display: flex; flex-wrap: wrap; gap: .6rem 1rem; align-items: center; }
+.suggestion-info { display: flex; flex: 1 1 30rem; flex-wrap: wrap; gap: .4rem .8rem; align-items: center; min-width: 0; }
+.suggestion-info > strong { flex: 1 1 6rem; min-width: 0; overflow-wrap: anywhere; }
+.suggestion-facts { display: flex; flex-wrap: wrap; gap: .3rem .6rem; align-items: center; font-size: .85rem; }
+.suggestion-facts > span { white-space: nowrap; }
+.suggestion-actions { display: flex; flex: 0 0 auto; flex-wrap: nowrap; gap: .6rem; align-items: center; margin-left: auto; }
+.suggestion-actions > button, .suggestion-evidence > summary { white-space: nowrap; }
+.suggestion-actions:has(.suggestion-evidence[open]) { flex-basis: 100%; flex-wrap: wrap; }
+.suggestion-evidence[open] { flex-basis: 100%; order: 1; }
+.suggestions-panel pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .8rem; }
+.suggestion-confirm, .suggestion-offset { margin-top: 1rem; }
+.suggestion-confirm { flex-basis: 100%; }
+.suggestions-panel fieldset { display: grid; gap: .6rem; padding: 1rem; }
+.offset-entry { display: grid; gap: .4rem; padding: .6rem 0; }
+.suggestions-panel .output-dialog-actions { flex-wrap: wrap; }
+.suggestion-queue-lines { display: flex; flex-wrap: wrap; align-items: baseline; gap: .5rem 1.5rem; margin: 1rem 0; padding: .8rem 1rem; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+.suggestion-queue-lines h2 { font-size: .9rem; margin: 0; }
+.suggestion-queue-lines ul { flex: 1; list-style: none; padding: 0; margin: 0; }
+.suggestion-queue-lines li { display: flex; flex-wrap: wrap; gap: .4rem 1rem; align-items: baseline; padding: .2rem 0; font-size: .9rem; }

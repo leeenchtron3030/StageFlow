@@ -11,12 +11,22 @@ export const hashSchema = z.string().regex(/^[0-9a-f]{64}$/);
 export const pageFields = { limit: revisionSchema.max(100), next_after: idSchema.nullable() };
 export const numberedPageFields = { limit: revisionSchema.max(100), next_after: countSchema.nullable(), items_truncated: z.boolean() };
 export type ApiRead = (path: string) => Promise<unknown>;
+export class CapabilityReadError extends Error {
+  readonly status: number;
+  readonly detail?: string;
+  constructor(status: number, detail?: string) { super(`outputs_http_${status}`); this.status = status; this.detail = detail; }
+  static async fromResponse(response: Response) {
+    const payload: unknown = await response.json().catch(() => undefined);
+    const detail = payload && typeof payload === "object" && "detail" in payload && typeof payload.detail === "string" ? payload.detail : undefined;
+    return new CapabilityReadError(response.status, detail);
+  }
+}
 
 /** Browser transport: only same-origin capability routes; no secret or backend URL. */
-export function capabilityRead(capability: "assembly" | "rendering" | "editorial" | "media-timing" | "session-suggestions"): ApiRead {
+export function capabilityRead(capability: "assembly" | "rendering" | "editorial" | "media-timing" | "session-suggestions" | "producer"): ApiRead {
   return async (path) => {
     const response = await fetch(`/api/stageflow/${capability}/${path}`, { cache: "no-store", redirect: "error" });
-    if (!response.ok) throw new Error(`outputs_http_${response.status}`);
+    if (!response.ok) throw await CapabilityReadError.fromResponse(response);
     return response.json();
   };
 }

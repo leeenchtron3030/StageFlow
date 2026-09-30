@@ -6,6 +6,7 @@ import * as rendering from "../../app/api/stageflow/rendering/[...path]/route.ts
 import * as editorial from "../../app/api/stageflow/editorial/[...path]/route.ts";
 import * as suggestions from "../../app/api/stageflow/session-suggestions/[...path]/route.ts";
 import * as timing from "../../app/api/stageflow/media-timing/[...path]/route.ts";
+import * as producer from "../../app/api/stageflow/producer/[...path]/route.ts";
 import * as demo from "../../app/api/stageflow/demo/[...path]/route.ts";
 import { readCapability } from "./capability-proxy.server.ts";
 import { demoLaunchContextHeader } from "./demo-launch-context.ts";
@@ -14,7 +15,7 @@ const id = "10000000-0000-4000-8000-000000000001";
 const secret = "test-only-capability-secret-0123456789abcdef";
 const launch = "test-only-capability-launch-0123456789abcdef";
 const originalFetch = globalThis.fetch;
-const envKeys = ["STAGEFLOW_API_SHARED_SECRET", "STAGEFLOW_DEMO_LAUNCH_CONTEXT", "STAGEFLOW_DEMO_OPERATOR_ID", ...["ASSEMBLY", "RENDERING", "EDITORIAL", "MEDIA_TIMING", "SESSION_SUGGESTIONS"].map((name) => `STAGEFLOW_${name}_API_BASE_URL`)];
+const envKeys = ["STAGEFLOW_API_SHARED_SECRET", "STAGEFLOW_DEMO_LAUNCH_CONTEXT", "STAGEFLOW_DEMO_OPERATOR_ID", ...["ASSEMBLY", "RENDERING", "EDITORIAL", "MEDIA_TIMING", "SESSION_SUGGESTIONS", "PRODUCER"].map((name) => `STAGEFLOW_${name}_API_BASE_URL`)];
 const originalEnv = Object.fromEntries(envKeys.map((key) => [key, process.env[key]]));
 beforeEach(() => { process.env.STAGEFLOW_API_SHARED_SECRET = secret; process.env.STAGEFLOW_DEMO_LAUNCH_CONTEXT = launch; process.env.STAGEFLOW_DEMO_OPERATOR_ID = id; });
 afterEach(() => {
@@ -22,16 +23,17 @@ afterEach(() => {
   for (const key of envKeys) { const value = originalEnv[key]; if (value === undefined) delete process.env[key]; else process.env[key] = value; }
 });
 const cases = [
-  { name: "session-suggestions", handlers: suggestions, reads: [`events/${id}/boundary-cue-catalog`, `events/${id}/boundary-cues`, `events/${id}/boundary-cues/history`], commands: [`events/${id}/boundary-cues`] },
+  { name: "session-suggestions", handlers: suggestions, reads: [`events/${id}/boundary-cue-catalog`, `events/${id}/boundary-cues`, `events/${id}/boundary-cues/history`, `events/${id}/stages/${id}/runs/latest`, `events/${id}/stages/${id}/suggestions`, `events/${id}/suggestions/${id}`, `events/${id}/stages/${id}/schedule-offset`, `events/${id}/stages/${id}/schedule-offset/history`], commands: [`events/${id}/boundary-cues`, `events/${id}/stages/${id}/runs`, `events/${id}/suggestions/${id}/confirm`, `events/${id}/suggestions/${id}/reject`, `events/${id}/stages/${id}/schedule-offset`] },
+  { name: "producer", handlers: producer, reads: [`events/${id}/work-queue`], commands: [] },
   { name: "assembly", handlers: assembly, reads: [`events/${id}/templates`, `events/${id}/sessions/${id}/revisions`, `events/${id}/sessions/${id}/metadata-overrides`, `events/${id}/packaging-assets`, `events/${id}/packaging-assets/${id}/revisions`], commands: ["templates", `sessions/${id}/revisions`, `sessions/${id}/approvals`, `sessions/${id}/metadata-overrides`, "packaging-assets", `packaging-assets/${id}/revisions`, `packaging-assets/${id}/approvals`] },
   { name: "rendering", handlers: rendering, reads: ["operations", "outputs"], commands: ["requests"] },
   { name: "editorial", handlers: editorial, reads: [`sessions/${id}/moments`, `events/${id}/review-queue`, `events/${id}/phrase-lists`], commands: [`moments/${id}/reviews`, `events/${id}/phrase-lists`, `sessions/${id}/derivations`] },
   { name: "media-timing", handlers: timing, reads: [`events/${id}/operations`, `assets/${id}/latest`], commands: [] },
 ] as const;
 const methods = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"] as const;
-test("session suggestions refuses run, confirm, reject, suggestion and schedule-offset routes", async () => {
+test("session suggestions refuses unrelated, batch and automatic authority routes", async () => {
   globalThis.fetch = async () => { assert.fail("must not forward"); };
-  for (const suffix of [`stages/${id}/runs`, `stages/${id}/schedule-offset`, `stages/${id}/schedule-offset/history`, `stages/${id}/suggestions`, `suggestions/${id}`, `suggestions/${id}/confirm`, `suggestions/${id}/reject`]) {
+  for (const suffix of [`stages/${id}/runs/history`, `stages/${id}/suggestions/confirm`, `stages/${id}/suggestions/batch-confirm`, `suggestions/${id}/approve`, `stages/${id}/automatic-authority`, "work-queue", "markers"]) {
     const path = `events/${id}/${suffix}`;
     for (const method of methods) assert.equal((await suggestions[method](request("session-suggestions", path, method), context(path))).status, 404);
   }
