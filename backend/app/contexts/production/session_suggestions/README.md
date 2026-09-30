@@ -216,6 +216,8 @@ ordinary confirmed Sessions are retained.
 API base: `/api/v1/session-suggestions/events/{event_id}`. Routes:
 
 - `POST /stages/{stage_id}/runs` (actor and optional cue-list ID/version pairs).
+- `GET /stages/{stage_id}/runs/latest` (latest by recorded run sequence, including
+  empty runs; `suggestion_run_not_found` 404 before the first run).
 - `POST /stages/{stage_id}/schedule-offset` (actor, command ID, ordered entries).
 - `GET /stages/{stage_id}/schedule-offset` (`current`, null before the first version).
 - `GET /stages/{stage_id}/schedule-offset/history` (after version, limit 1..100;
@@ -228,9 +230,41 @@ API base: `/api/v1/session-suggestions/events/{event_id}`. Routes:
 All routes use existing API authentication. Cue lists must belong to the same Event.
 Missing resources return 404, stale/realized/not-open or command conflicts 409, invalid
 bounds/authority 422, unavailable persistence 503. No media paths or transcript text are
-returned. No UI, Work Queue item, boundary proposal or dependency is added.
+returned. No UI, boundary proposal or dependency is added.
 Run responses include `blocks` and `override_setting_version`; v3 suggestion responses
 include both schedule offset components. v1/v2 suggestion components remain unchanged.
+
+The latest-run read returns the same run document as the run command: ID, Event/Stage,
+actor, creation time, policy ID/version/constants, input digest, skips, blocks (ordinal,
+first/last printed start, talk count, offset/source/margin and override version), overall
+override version and start/end cue-list references. It does not run the policy again.
+
+## Producer Work Queue read
+
+The Event-scoped `list_pending_confirmations` port returns one read-only item per Stage
+whose latest run has open suggestions (no decision and not superseded). Its projection
+ID is `suggestions:<stage_id>`, subject kind `stage_suggestions`, subject ID the latest
+run ID, subject revision 1 and Session ID null. The decision type and reason code are
+`presentation_confirmation_pending`; `open_count:<n>` and `weak_count:<n>` count only
+open suggestions, with counts bounded by the existing signed 32-bit count contract.
+Priority is 6, both timestamps are the run's creation time, and the action reference is
+`stage:<stage_id>:suggestions`. Decisions change counts without changing that timestamp.
+An empty latest run or deciding every suggestion removes the item.
+
+The production-layer `ProducerWorkQueueService` merges this read with Kernel and
+Assembly reads, requesting `limit + 1` after the same cursor from each source. The sort
+key and v1 cursor remain `(priority, updated_at, projection_id)`. SQL selects only latest
+runs, excludes decisions and aggregates counts before the bounded keyset page; no
+suggestion history is loaded into the application to compute counts. The Kernel imports
+neither capability. No write, migration, task claiming or authority is added.
+
+Any source storage outage returns the existing bounded 503.
+
+`test_session_suggestions_surfaces.py` covers latest-run API lineage/absence/authentication,
+queue counts and disappearance, Event scope, three-source ordering/cursors and
+bounded failures. `test_session_suggestions_surfaces_postgres.py` covers real SQL latest
+v1/v2/v3 reads, blocks, counts, sequence and cursor behavior with rolled-back fixtures.
+`test_work_queue_assembly.py` enforces both Kernel import boundaries.
 
 Tests: `test_session_suggestion_policy.py`, `test_session_suggestions.py`,
 `test_session_suggestions_api.py`, and `test_session_suggestions_postgres.py` cover the

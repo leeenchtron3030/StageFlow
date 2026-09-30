@@ -10,8 +10,13 @@ from typing import cast
 from app.contexts.editorial.derivation import match_phrases
 from app.contexts.editorial.derivation_contracts import EditorialPhraseList
 from app.contexts.editorial.derivation_memory import InMemoryEditorialDerivationRepository
+from app.contexts.production.event_mode_kernel.contracts import (
+    ProducerWorkQueuePosition,
+    ProducerWorkQueueSubject,
+)
 from app.contexts.production.event_mode_kernel.repository import InMemoryEventModeKernelRepository
 from app.contexts.production.event_mode_kernel.service import DurableEventModeKernel
+from app.contexts.production.event_mode_kernel.work_queue import work_queue_sort_key
 from app.shared.ids import EntityId
 from app.shared.time import Clock
 
@@ -29,6 +34,7 @@ from .contracts import (
 )
 from .cue_composition import BoundaryCueComposition
 from .repository import SuggestionTransaction
+from .work_queue import suggestion_work_queue_subject, validate_work_queue_limit
 
 
 class InMemorySuggestionRepository:
@@ -164,6 +170,31 @@ class InMemorySuggestionRepository:
                 return run
             seen_stages.add(run.stage_id)
         return None
+
+    def latest_run(self, event_id: EntityId, stage_id: EntityId) -> SuggestionRun | None:
+        return next((r for r in reversed(tuple(self.runs.values()))
+                     if r.event_id == event_id and r.stage_id == stage_id), None)
+
+    def list_pending_confirmations(
+        self, event_id: EntityId, *, after: ProducerWorkQueuePosition | None = None,
+        limit: int = 50,
+    ) -> tuple[ProducerWorkQueueSubject, ...]:
+        validate_work_queue_limit(limit)
+        latest = {r.stage_id: r for r in self.runs.values() if r.event_id == event_id}
+        items: list[ProducerWorkQueueSubject] = []
+        for run in latest.values():
+            opened = [s for s in self.suggestions.values()
+                      if s.run_id == run.id and self.status(s) == SuggestionStatus.OPEN]
+            if opened:
+                item = suggestion_work_queue_subject(
+                    event_id=event_id, stage_id=run.stage_id, run_id=run.id,
+                    created_at=run.created_at, open_count=len(opened),
+                    weak_count=sum(s.candidate.strength == "weak" for s in opened),
+                )
+                if after is None or work_queue_sort_key(item) > (
+                        after.priority, after.updated_at, after.projection_id):
+                    items.append(item)
+        return tuple(sorted(items, key=work_queue_sort_key)[:limit])
 
     def save_run(self, run: SuggestionRun, suggestions: tuple[SessionSuggestion, ...]) -> None:
         if run.id in self.runs or any(x.id in self.suggestions for x in suggestions):

@@ -3,7 +3,11 @@ from datetime import UTC, datetime
 from uuid import NAMESPACE_URL, uuid5
 
 from app.contexts.events import ProgramExpectationLifecycle
-from app.contexts.production.event_mode_kernel.contracts import StartSessionRequest
+from app.contexts.production.event_mode_kernel.contracts import (
+    ProducerWorkQueuePosition,
+    ProducerWorkQueueSubject,
+    StartSessionRequest,
+)
 from app.shared.human_commands import human_command_digest
 from app.shared.ids import EntityId
 from app.shared.time import Clock, require_aware_datetime
@@ -17,12 +21,14 @@ from .contracts import (
     Span,
     SuggestionConflictError,
     SuggestionDecision,
+    SuggestionNotFoundError,
     SuggestionRun,
     SuggestionStatus,
     validate_offset_entries,
 )
 from .policy_v3 import evaluate
 from .repository import SuggestionRepository
+from .work_queue import validate_work_queue_limit
 
 
 def kernel_operation_id(command_id: EntityId, command: str) -> EntityId:
@@ -84,6 +90,22 @@ class SessionSuggestionService:
                                                      POLICY_V3.id, POLICY_V3.version)
                                    for x in result.candidates))
             return run
+
+    def latest_run(self, event_id: EntityId, stage_id: EntityId) -> SuggestionRun:
+        with self.repository.transaction(self.clock) as tx:
+            tx.scope(event_id, stage_id)
+            run = tx.latest_run(event_id, stage_id)
+            if run is None:
+                raise SuggestionNotFoundError("suggestion_run_not_found")
+            return run
+
+    def list_pending_confirmations(
+        self, event_id: EntityId, *, after: ProducerWorkQueuePosition | None = None,
+        limit: int = 50,
+    ) -> tuple[ProducerWorkQueueSubject, ...]:
+        validate_work_queue_limit(limit)
+        with self.repository.transaction(self.clock) as tx:
+            return tx.list_pending_confirmations(event_id, after=after, limit=limit)
 
     def set_offset(self, *, event_id: EntityId, stage_id: EntityId, command_id: EntityId,
                    actor_id: EntityId, entries: tuple[ScheduleOffsetEntry, ...],

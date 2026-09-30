@@ -740,6 +740,15 @@ The Work Queue is a bounded read model answering which Producer decisions or app
 are waiting. It derives from authoritative commands/decisions, association exceptions,
 package state, Assembly approval state, and automation-policy exceptions.
 
+The implemented queue also includes `presentation_confirmation_pending` (subject kind
+`stage_suggestions`, priority 6), one per Stage with open suggestions in its latest run.
+Open means no decision and not superseded. Bounded reason codes carry the open count and
+its weak subset; the action reference targets the Stage's suggestions. The latest run ID
+is the subject (revision 1), both timestamps are its creation time, and Session ID is
+null. Deciding all suggestions or a new run without open suggestions removes the item.
+The production-layer service merges the Session Suggestions read port with Kernel and
+Assembly items using the unchanged v1 keyset; the Kernel imports neither context.
+
 The companion
 [Producer Sessions & Work Queue UX specification](../ux/producer-sessions-work-queue.md)
 distinguishes three questions: Mission Control asks what needs immediate attention, Work
@@ -936,9 +945,13 @@ The memory repository is only a transactional test double.
 Authenticated Event-scoped API routes start runs, page/read suggestions, set/read Stage
 schedule offsets and page their history, and accept human confirm/reject commands.
 Run responses include block provenance; v3 suggestions include offset seconds/source.
-No UI, Work Queue item, boundary proposal producer, automatic
-authority, new dependency or runtime setting is added. Phase 3 boundary proposals,
-Phase 4 producer surfaces and Phase 5 corpus accuracy qualification remain future work.
+The authenticated latest-run read returns the same run document, including actor,
+policy, digest, skips, blocks, override version and cue references, or
+`suggestion_run_not_found` 404 when no run exists. Latest follows recorded run sequence,
+including empty runs. The Work Queue read above implements the backend producer surface.
+No UI, boundary proposal producer, automatic authority, new dependency or runtime
+setting is added. Phase 3 boundary proposals, the Phase 4 Stage page and Phase 5 corpus
+accuracy qualification remain future work.
 A pure anonymous interval evaluator and local-file CLI have been pulled forward: recall,
 median/p95 start/end error and both-edges-within-60-second counts are numeric aggregates.
 Synthetic tests prove the metrics; the evaluator is unchanged for the owner's Accuracy

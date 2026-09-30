@@ -73,6 +73,18 @@ not-event-ready disclaimer retain their meaning.
   offset, source, estimate margin, and applicable override version.
 - **Distinction:** A policy grouping, not a Session or Recording Block.
 
+### Presentation confirmation pending (Work Queue item)
+
+- **Definition:** `presentation_confirmation_pending`, a read-only Work Queue item with
+  subject kind `stage_suggestions`, for each Stage with open suggestions in its latest run.
+- **Identity and order:** `suggestions:<stage_id>` identifies the projection; the subject
+  is the latest run ID with revision 1. Priority 6 follows Assembly approvals. Both
+  timestamps are the run's creation time; there is no Session ID.
+- **Counts and action:** `open_count:<n>` and `weak_count:<n>` count open suggestions and
+  their weak subset; `stage:<stage_id>:suggestions` targets the Stage review workflow.
+  Deciding every suggestion or superseding the run with one having no open suggestions
+  removes the item. It confers no authority and creates no Session.
+
 ### Session Suggestion
 
 - **Definition:** An immutable advisory proposed presentation interval for one Business
