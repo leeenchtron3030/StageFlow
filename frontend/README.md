@@ -298,6 +298,27 @@ Literal path segments are case-sensitive. All other method/path pairs return 404
 | session-suggestions | POST | `events/U/stages/U/schedule-offset` |
 | session-suggestions | GET | `events/U/stages/U/schedule-offset` |
 | session-suggestions | GET | `events/U/stages/U/schedule-offset/history` |
+| session-suggestions | GET | `events/U/sessions/U/boundary-proposals` |
+| session-suggestions | POST | `events/U/sessions/U/boundary-proposals/U/apply` |
+| session-suggestions | POST | `events/U/sessions/U/boundary-proposals/U/dismiss` |
+| session-suggestions | GET | `events/U/sessions/U/boundary-proposals/history` |
+
+Session Detail shows open boundary estimates next to Session timing; Apply and Dismiss
+each require producer confirmation. Rows and confirmations show compact current → suggested
+local times; dates appear only outside the Session date or across midnight. Deterministic
+refusals offer Refresh and unlock actions when it completes; transport, 5xx and unknown
+outcomes retain the original command ID for retry. Evidence stays in Details, and readable
+decision history loads in pages of 50 inside the Session's collapsed Details, even when
+no proposals remain. Every history row uses the history API's `boundary_kind` for its
+Start/End label.
+IDs and raw values are in nested Details without JSON dumps. Stage badges use Program
+Expectation identity from the existing Kernel projection, independent of the latest run:
+linked Sessions appear in collapsed Already Sessions with current times and badges,
+and the summary counts open proposals. Decided rows have no badges. Sessions are checked
+once each, with at most 50 reads and four in flight under the page read budget.
+An incomplete check is disclosed; Sessions
+outside the workspace's bounded projection are not scanned. POST audit records retain
+identities and result codes, never reason text.
 
 The ED-0108 catalog and composition routes support the Event's Boundary cue phrases
 section. ED-0110 adds the Stage's Suggested presentations panel and the per-Stage

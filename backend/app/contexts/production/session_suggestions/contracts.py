@@ -441,3 +441,23 @@ class BoundaryProposalDecision:
             if not 1 <= len(self.reason.strip()) <= 500 or "\x00" in self.reason:
                 raise ValueError("boundary proposal reason out of bounds")
             object.__setattr__(self, "reason", self.reason.strip())
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class BoundaryProposalDecisionHistoryItem(BoundaryProposalDecision):
+    """Decision read enriched from its immutable linked Kernel proposal."""
+
+    boundary_kind: str
+
+    def __post_init__(self) -> None:
+        BoundaryProposalDecision.__post_init__(self)
+        if self.boundary_kind not in ("start", "end"):
+            raise ValueError("invalid boundary kind")
+
+    @classmethod
+    def from_decision(cls, decision: BoundaryProposalDecision,
+                      boundary_kind: str
+                      ) -> "BoundaryProposalDecisionHistoryItem":
+        return cls(decision.proposal_id, decision.session_id, decision.kind,
+                   decision.command_id, decision.request_digest, decision.actor_id,
+                   decision.decided_at, decision.reason, boundary_kind=boundary_kind)

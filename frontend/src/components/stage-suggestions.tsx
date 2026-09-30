@@ -5,6 +5,10 @@ import { useRouter } from "next/navigation";
 import { suggestionsApi, type Suggestion, type SuggestionData, type ScheduleOffset } from "../experience/session-suggestions-api.ts";
 import { localInput, localRange, localTime, minutes, offsetSummary, prepareConfirm, prepareOffset, prepareReject, prepareRun, sendSuggestionCommand, signedMinutes, strengthExplanation, suggestionExceptions, suggestionSummary, timeOrder, uniformOffset, type OffsetDraft, type SuggestionCommand } from "../experience/session-suggestions.ts";
 import { suggestionLabels as labels } from "../experience/ui-labels.ts";
+import { boundaryLabels } from "../experience/ui-labels.ts";
+import type { BoundaryBadges } from "../experience/session-boundaries-api.ts";
+import type { SessionView } from "../experience/model.ts";
+import { boundaryStageCount, sessionBoundaryRange } from "../experience/session-boundaries.ts";
 
 const subscribe = () => () => undefined;
 const zoneSnapshot = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -37,8 +41,8 @@ export function SuggestionRow({ item: s, titles, timeZone, children, decisionFor
   </li>;
 }
 
-export function StageSuggestions({ eventId, stageId, data, titles, hasPlannedTalks, authorized, launchContext, serverTimeZone = "UTC" }: {
-  eventId: string; stageId: string; data?: SuggestionData; titles: Titles; hasPlannedTalks: boolean; authorized: boolean; launchContext?: string; serverTimeZone?: string;
+export function StageSuggestions({ eventId, stageId, data, titles, hasPlannedTalks, authorized, launchContext, boundaryBadges, realizedSessions = [], serverTimeZone = "UTC" }: {
+  eventId: string; stageId: string; data?: SuggestionData; titles: Titles; hasPlannedTalks: boolean; authorized: boolean; launchContext?: string; boundaryBadges?: BoundaryBadges; realizedSessions?: SessionView[]; serverTimeZone?: string;
 }) {
   const router = useRouter();
   const timeZone = useSyncExternalStore(subscribe, zoneSnapshot, () => serverTimeZone);
@@ -99,7 +103,7 @@ export function StageSuggestions({ eventId, stageId, data, titles, hasPlannedTal
     </form> : null;
   return <section id="suggested-presentations" className="detail-panel suggestions-panel" aria-labelledby="suggestions-title">
     <div className="section-heading"><div><span className="eyebrow">Producer · Stage</span><h2 id="suggestions-title">{labels.title}</h2></div></div>
-    <p><strong>{data ? suggestionSummary(data, hasPlannedTalks, timeZone) : labels.unavailable}</strong></p>
+    <p><strong>{data ? suggestionSummary(data, hasPlannedTalks, timeZone) : labels.unavailable}{boundaryStageCount(boundaryBadges)}</strong></p>
     <p>{labels.honesty}</p>
     {!authorized || !launchContext ? <p>{labels.readOnly}</p> : null}
     <div className="output-dialog-actions">
@@ -112,6 +116,13 @@ export function StageSuggestions({ eventId, stageId, data, titles, hasPlannedTal
       <button type="button" disabled={locked || Boolean(selection) || editing} onClick={() => choose(item, "reject")}>{labels.reject}</button>
     </SuggestionRow>)}</ul>
 
+    {realizedSessions.length ? <details><summary>{boundaryLabels.alreadySessions} · {realizedSessions.length}</summary><ul className="suggestion-rows">{realizedSessions.map((session) => <li className="suggestion-row" key={session.id}>
+      <div className="suggestion-line"><a className="text-link" href={`/sessions/${encodeURIComponent(session.id)}#suggested-boundaries`}>{session.title}</a>
+        <span>{session.authoritativeStart && session.authoritativeEnd ? localRange(session.authoritativeStart, session.authoritativeEnd, timeZone) : sessionBoundaryRange(session.authoritativeStart, session.authoritativeEnd, timeZone)}</span>
+        {boundaryBadges?.sessions[session.id] ? <span className="cue-badge">{boundaryLabels.badge}</span> : null}
+      </div>
+    </li>)}</ul></details> : null}
+    {realizedSessions.length > 0 && (!boundaryBadges || boundaryBadges.incomplete) ? <p>{boundaryLabels.badgesIncomplete}</p> : null}
     {decided.length ? <details><summary>Decided · {decided.length}</summary><ul className="suggestion-rows">{decided.map((item) => <SuggestionRow key={item.suggestion_id} item={item} titles={titles} timeZone={timeZone} />)}</ul></details> : null}
     {superseded ? <p>{superseded} superseded {superseded === 1 ? "suggestion" : "suggestions"} hidden</p> : null}
     {data ? <div className="suggestion-offset">

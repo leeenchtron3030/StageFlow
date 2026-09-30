@@ -387,3 +387,35 @@ line; preserve resolved entries as concise evidence rather than deleting them.
   confirm, idempotent retries, honest estimate wording, and the proxy allowlist and audit.
 - Classification: Green (presentation and wording)
 - Status: validated (ED-0110)
+
+### 2026-09-30 - ED-0113 review checkpoints: suggested boundaries
+
+- Route/scenario:
+  - Session Detail and the Stage page on the locally seeded synthetic review Event, in
+    kernel mode;
+  - Talk 3 confirmed with deliberately rough times, then Suggest again. Proposals matched
+    the offsets exactly (start −3 min, end +2 min). Talk 2's earlier 1 min adjustment
+    was also proposed;
+  - Apply one, Dismiss one, then Suggest again: the dismissal stuck, and the applied edge
+    was not re-proposed.
+- Category: prominence | repetition | recoverability
+- **First checkpoint.** The owner approved four changes:
+  1. **Stage page.** Since ED-0111, realized talks are not listed in new runs, so the
+     planned badge on Decided rows never appeared. Change: the summary gains "· N
+     boundary suggestions", and a collapsed **Already Sessions** list gives one linked
+     row per realized talk, with a badge when a proposal is open.
+  2. **Session Detail repetition.** Rows repeated the date, the year and the signed
+     difference. Change: the sentence plus "10:51:30 → 10:48:30", with the date only
+     when it differs, and accessible labels. The confirmation step uses the same form.
+  3. **Decision history** showed raw values. Change: readable rows such as "Start applied
+     · 22:25 · by producer", with IDs one level deeper. This needed a small additive
+     backend field (`boundary_kind` in history), which the owner approved at a Yellow
+     stop.
+  4. **Retry** was offered after deterministic refusals. Change: those show Refresh
+     only; retry is kept for transport failures, 5xx and unknown outcomes.
+- **Second checkpoint:** approved, with one polish. Already Sessions rows now use the same
+  range format as the suggestion rows ("Sep 29, 10:00–10:26").
+- Unchanged: Apply and Dismiss each have a confirmation step, there is no batch apply,
+  retries stay idempotent, and the honest wording is kept.
+- Classification: Green (presentation and wording; one owner-approved additive API field)
+- Status: validated (ED-0113)

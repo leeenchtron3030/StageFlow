@@ -54,6 +54,12 @@ def test_boundary_api_authentication_shapes_apply_dismiss_history_and_run_count(
                         headers=AUTH_HEADERS).json()
     assert len(first["items"]) == len(second["items"]) == 1
     assert first["next_after"] and second["next_after"] is None
+    history = {row["proposal_id"]: row for row in first["items"] + second["items"]}
+    assert history == {
+        p.id.value: {**applied.json(), "boundary_kind": "start"},
+        end["proposal_id"]: {**dismissed.json(), "boundary_kind": "end"},
+    }
+    assert "boundary_kind" not in applied.json() and "boundary_kind" not in dismissed.json()
 
 
 @pytest.mark.parametrize("action", ["apply", "dismiss"])

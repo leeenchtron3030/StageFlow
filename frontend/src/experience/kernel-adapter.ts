@@ -20,6 +20,7 @@ export interface KernelSessionStatus {
   authoritative_start: string;
   authoritative_end: string | null;
   program_expectation_title: string | null;
+  program_expectation_id?: string | null;
 }
 
 export interface KernelStageStatus {
@@ -366,6 +367,7 @@ function sessionFromProjection(
     stageKey: stage.key,
     stageName: stage.name,
     expectationTitle: projection.program_expectation_title ?? undefined,
+    programExpectationId: projection.program_expectation_id ?? undefined,
     activityState: activityState(projection.activity_state),
     packageState: packageState(projection.package_state),
     packageRevision: projection.package_revision,

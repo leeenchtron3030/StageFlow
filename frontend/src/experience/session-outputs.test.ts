@@ -511,6 +511,9 @@ test("Session page passes one five-second budget through workspace and Outputs l
     "@/components/operational-views": { SessionOperationalView: empty },
     "@/components/session-outputs-panel": { SessionOutputsPanel: empty },
     "@/components/session-output-actions": { SessionOutputActions: empty },
+    "@/components/session-boundaries": { SessionBoundaries: empty, BoundaryDecisionHistory: empty },
+    "@/experience/session-boundaries-api.ts": require("./session-boundaries-api.ts"),
+    "@/experience/capability-proxy.server.ts": { readCapability: () => assert.fail("fixture must not read boundary proposals") },
   };
   runInNewContext(compiledPage.outputText, { exports: pageExports, process: { env: {} }, require: (id: string) => imports[id] ?? require(id) });
   await pageExports.default!({ params: Promise.resolve({ sessionId: workspace.sessions[0].id }), searchParams: Promise.resolve({}) });

@@ -251,13 +251,14 @@ test("Stage page resolves the workspace UUID and titles, gates mutations, and pr
   const source = readFileSync(new URL("../../app/stages/[stageKey]/page.tsx", import.meta.url), "utf8");
   const compiled = ts.transpileModule(source, { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS } });
   const stage = { id: stageId, key: "stage A", name: "Stage A", programExpectations: [{ id: s.expectation_id, stageId, title: "Talk 1", plannedStart: s.suggested_start, plannedEnd: s.suggested_end }], withdrawnProgramExpectations: [{ id: id(80), title: "Earlier talk", stageId, plannedStart: s.suggested_start, plannedEnd: s.suggested_end }] };
-  const workspace = { event: { id: eventId }, stages: [stage], dataSource: { kind: "kernel", state: "live_connected", authoritative: true } };
+  const workspace = { event: { id: eventId }, stages: [stage], sessions: [], dataSource: { kind: "kernel", state: "live_connected", authoritative: true } };
   const calls: string[][] = []; let disposed = 0;
   let loaded: SuggestionData = data, fail = false;
   const exports: { default?: (props: unknown) => Promise<Node> } = {};
   const imports: Record<string, unknown> = {
     "@/components/operational-shell": { OperationalShell: "shell" }, "@/components/operational-views": { StageOperationalView: "stage-view" },
     "@/components/stage-suggestions": { StageSuggestions: "stage-suggestions" },
+    "@/experience/session-boundaries-api.ts": require("./session-boundaries-api.ts"),
     "@/experience/data-source.ts": { loadWorkspace: async () => workspace },
     "@/experience/session-suggestions-api.ts": { suggestionsApi: () => ({ load: async (event: string, stage: string) => { calls.push([event, stage]); if (fail) throw new Error("stage_not_found"); return loaded; } }) },
     "@/experience/capability-proxy.server.ts": { readCapability() { assert.fail("API is stubbed"); } },

@@ -1656,6 +1656,14 @@ Kernel Sessions, and are corrected through the existing commands.
   - on the Stage panel, a Decided row whose Session has an open proposal gets a small
     "Boundary suggestion" badge;
   - **no Work Queue item in v1**; it can be added later with an ED-0109-style item.
+  - **Owner UX checkpoint amendments (2026-09-29):**
+    - Since ED-0111, realized talks are not listed in new runs, so a badge on Decided
+      rows would never appear. The Stage panel instead shows "· N boundary suggestions"
+      in its summary, and a collapsed **Already Sessions** list with links. Each row
+      carries a "Boundary suggestion" badge when one is open.
+    - To keep history readable, the decision-history API also returns `boundary_kind`
+      from the linked proposal. This is a small additive backend change inside ED-0113,
+      with no migration.
 
 ### Desired behavior
 

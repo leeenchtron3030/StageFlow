@@ -70,6 +70,7 @@ export interface SessionView {
   stageKey: string;
   stageName: string;
   expectationTitle?: string;
+  programExpectationId?: string;
   activityState: "expected" | "presentation_active" | "presentation_ended";
   packageState:
     | "assembling"

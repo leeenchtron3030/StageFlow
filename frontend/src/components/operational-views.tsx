@@ -451,12 +451,16 @@ export function SessionOperationalView({
   demoActorId,
   demoLaunchContext,
   outputs,
+  boundaries,
+  boundaryHistory,
 }: {
   session?: SessionView;
   workspace: OperationalWorkspace;
   demoActorId?: string;
   demoLaunchContext?: string;
   outputs?: ReactNode;
+  boundaries?: ReactNode;
+  boundaryHistory?: ReactNode;
 }) {
   if (!session) return <><WorkspaceTitle eyebrow="Producer · Session" title="Session unavailable" summary="The requested Session is not available in this view." /><Link className="text-link" href={href("/sessions", workspace)}>Return to Sessions</Link></>;
   return (
@@ -472,7 +476,7 @@ export function SessionOperationalView({
             <Definition label="Session start" value={session.authoritativeStart ?? "Not declared"} />
             <Definition label="Presentation end" value={session.authoritativeEnd ?? "Not declared"} />
           </dl>
-          <details><summary>{uiLabels.details}</summary><p>{session.provenance} · {session.activityState} · {session.packageState} · Session revision {session.sessionRevision} · Package revision {session.packageRevision}</p></details>
+          <details><summary>{uiLabels.details}</summary><p>{session.provenance} · {session.activityState} · {session.packageState} · Session revision {session.sessionRevision} · Package revision {session.packageRevision}</p>{boundaryHistory}</details>
         </section>
         <section className="detail-panel">
           <div className="section-heading"><h2>{uiLabels.recordings}</h2></div>
@@ -487,6 +491,7 @@ export function SessionOperationalView({
           {session.media.unresolved ? <p className="review-callout">{unplacedRecordings(session.media.unresolved)}</p> : null}
         </section>
       </div>
+      {boundaries}
       {outputs}
       <MediaUncertaintyPanel
         assets={workspace.mediaAssets.filter(

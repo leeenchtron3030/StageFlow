@@ -6,6 +6,7 @@ import { suggestionsApi } from "@/experience/session-suggestions-api.ts";
 import { readCapability } from "@/experience/capability-proxy.server.ts";
 import { createReadBudget } from "@/experience/read-budget.ts";
 import { createHash } from "node:crypto";
+import { loadBoundaryBadges, realizedStageSessions } from "@/experience/session-boundaries-api.ts";
 
 export const dynamic = "force-dynamic";
 
@@ -20,11 +21,13 @@ export default async function StagePage({ params, searchParams }: { params: Prom
   try {
     const data = connected && workspace.event.id && stage ? await suggestionsApi((path) => budget.read(() => readCapability("session-suggestions", path))).load(workspace.event.id, stage.id).catch(() => undefined) : undefined;
     const titles = Object.fromEntries([...(stage?.withdrawnProgramExpectations ?? []), ...(stage?.programExpectations ?? [])].map((p) => [p.id, p.title]));
+    const realizedSessions = stage ? realizedStageSessions(stage.key, workspace.sessions) : [];
+    const boundaryBadges = connected && stage && workspace.event.id ? await loadBoundaryBadges(workspace.event.id, stage.key, realizedSessions, (path) => budget.read(() => readCapability("session-suggestions", path))) : undefined;
     // Unrelated refreshes preserve drafts and retry locks; changed suggestion data resets them.
     const readKey = createHash("sha256").update(JSON.stringify([workspace.event.id, stage?.id, data?.run?.run_id, data?.offset?.version, data?.suggestions.map((s) => [s.suggestion_id, s.status]).sort()])).digest("hex");
     const hasPlannedTalks = stage?.programExpectations.some((p) => p.stageId === stage.id && p.plannedStart && p.plannedEnd) ?? false;
     return <OperationalShell activePath="/" workspace={workspace}>
-      <StageOperationalView demoActorId={demoActorId} demoLaunchContext={demoLaunchContext} stage={stage} workspace={workspace} suggestions={stage ? <StageSuggestions key={readKey} eventId={workspace.event.id ?? ""} stageId={stage.id} data={data} titles={titles} hasPlannedTalks={hasPlannedTalks} authorized={connected && Boolean(demoActorId)} launchContext={demoLaunchContext} serverTimeZone={Intl.DateTimeFormat().resolvedOptions().timeZone} /> : null} />
+      <StageOperationalView demoActorId={demoActorId} demoLaunchContext={demoLaunchContext} stage={stage} workspace={workspace} suggestions={stage ? <StageSuggestions key={readKey} eventId={workspace.event.id ?? ""} stageId={stage.id} data={data} titles={titles} hasPlannedTalks={hasPlannedTalks} authorized={connected && Boolean(demoActorId)} launchContext={demoLaunchContext} realizedSessions={realizedSessions} boundaryBadges={boundaryBadges} serverTimeZone={Intl.DateTimeFormat().resolvedOptions().timeZone} /> : null} />
     </OperationalShell>;
   } finally { budget.dispose(); }
 }
