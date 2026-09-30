@@ -261,6 +261,102 @@ override history. Deferred membership checks prevent appending to a committed se
 or run. Reverse refuses any v3 run or override setting; otherwise it removes the additions
 and restores exactly the v2 checks. No existing identity or lineage is rewritten.
 
+### Pure boundary-evidence prototype (v5)
+
+`policy_v5.evaluate(snapshot, override=None)` exposes `boundary-suggestion` version 5
+for local harness evaluation. The approved Phase 7 work is Green and implementation-ready;
+its scope is the pure prototype. The service still imports v3. V5 is not registered as a
+persistable run policy, and this prototype changes no API, migration or runtime setting.
+
+V5 retains printed-plan clock filtering and imports v3's `schedule_blocks` unchanged,
+including block ordering, estimation and producer-override precedence. Estimation sees exactly
+v3's weighted changeovers, including strength-30 coverage bounds, before cue edges are
+added. The reduced coverage strength applies to alignment only; otherwise coverage
+changes would silently change the offset estimator as well. All other v3 constants
+are inherited by `PolicyV5`; the v5 starting values live only in `policy_v5.py`:
+
+| Module constant | PolicyV5 field | Value |
+| --- | --- | --- |
+| `CUE_RADIUS` | `cue_radius` | 30 seconds |
+| `CUE_WEIGHT` | `cue_weight` | 10 |
+| `CUE_EDGE_GAP` | `cue_edge_gap` | 30 seconds |
+| `CUE_EDGE_STRENGTH` | `cue_edge_strength` | 3 |
+| `COVERAGE_STRENGTH_V5` | `coverage_strength` | 5 |
+| `OUTSIDE_PROGRAM_MARGIN` | `outside_program_margin` | 1800 seconds |
+
+For each matching-role hit within the inclusive radius, edge support adds the exact
+Fraction `10 * (1 - abs(hit - edge) / 30 seconds)`, using integer microseconds.
+Cue helpers normalize aware times to UTC, preserving distinct daylight-saving folds.
+A hit exactly 30 seconds away contributes zero and does not set the support flag.
+Start/end hits support their respective role. Changeover hits support both the end
+and start of freeze/gap changeovers, measured separately against each edge; they do
+not create cue edges or support coverage bounds. Segment phrases and studio
+"take/action/cut" matches never enter Session-role timestamp lists. The pure contract
+carries classified times, not text; callers must respect the accepted catalog roles.
+The service's cue wiring remains a later step.
+
+`AssetInput` retains its existing `start_cues` and `end_cues` datetime tuples. It adds
+`changeover_cues`, `specific_start_cues` and `specific_end_cues`, all defaulting empty.
+The latter two are subsets of their role's hit times: membership represents the
+per-cue `specific` flag without changing the old timestamp element type. Equal-time
+hits retain their count; specificity applies to that role/time. Inputs detach supplied
+sequences into tuples and reject naive times or specificity outside the role's hits.
+Specificity is an explicit caller fact, not inferred from timestamps or a new catalog rule.
+
+Cue clusters are formed in chronological order, greedily collecting hits no more than
+60 seconds from the first hit (inclusive), then beginning the next cluster. This does
+not chain a long series through adjacent hits. Two or more hits qualify; a singleton
+qualifies only if specific. Start edges use the earliest cluster hit, end edges the
+latest, preserving the outward extent of evidence for the talk. An eligible cluster
+creates `EdgeKind.CUE` only if no freeze/gap edge of that same role is within the
+inclusive 30-second gap of that chosen timestamp. Coverage does not suppress cue
+creation. A cue edge is available only for its own role, within the inclusive shifted
++/-20-minute planned-edge window. Its strength is 3. Any suggestion using a cue edge
+is at most medium; schedule/overlap/unscheduled cases stay weak.
+
+A cue edge also receives its own cluster hits' proximity support: a hit at distance
+zero adds the full `CUE_WEIGHT`, so a single-hit edge scores
+`CUE_EDGE_STRENGTH + CUE_WEIGHT` (3 + 10), and a two-hit cluster up to 3 + 20 before plan cost.
+
+Coverage bounds have alignment strength 5 and are fallback candidates **per planned
+edge and role**: if any freeze, gap or eligible cue edge is inside that edge's shifted
++/-20-minute window, every coverage candidate for that role is excluded. This check
+happens before predecessor/cursor feasibility, not after an observed edge loses an
+alignment comparison. Otherwise coverage candidates still need to be inside that
+same window. Schedule fallback placement and overlap handling stay v3's.
+
+The v5 adapter calls the actual imported v2 `align`, preserving its shared-changeover
+strength, recurrence, evidence ordering and tie-breaking. Per-call `_WindowedEdges`
+views mask excluded timestamps only during v2's once-per-talk candidate enumeration;
+indexed edges retain their real timestamps for scoring and results. Exact Fraction
+bonuses replace counts through v2's unchanged unit cue multiplier. Tests protect this
+interface, role separation and replay; no policy globals are patched. Freeze/gap
+weighting and silence support import v2; placement, evidence lineage and candidate
+construction follow v3.
+
+After scheduled spans and real changeovers are subtracted, remaining activity of at
+least 120 seconds is suppressed only when its start is **strictly after** the latest
+shifted planned end plus 1800 seconds, or its end is **strictly before** the earliest
+shifted planned start minus 1800 seconds. Each current complete expectation contributes
+its printed times plus its own applicable block offset; the min/max are taken after
+shifting, even when block offsets differ. Exact margins remain eligible. With no
+complete plan there is no program-span filter. Each suppressed remaining interval
+increments `outside_program` once; no clipped replacement is created.
+
+`SkipCounts.outside_program` defaults to zero without entering legacy dataclass fields.
+The pure `SkipCountsV5` subtype promotes it to a validated field for v5 results and
+harness output. Legacy SQL positional writes, row-key reads and API skip documents
+therefore retain their existing shape, and v1-v3 report zero through the default attribute.
+V5 is not passed to persistence. Without cues, only coverage fallback/strength and
+the unscheduled program-span filter differ from v3; the unchanged-scenario comparison
+and isolated coverage/program fixtures prove this reduction.
+
+`test_session_suggestion_policy_v5.py` covers the exact weights, roles, clusters,
+specificity, gap/window/margin boundaries, offset and coverage behavior, immutable
+inputs, legacy skip mapping, no-cue reduction, and deterministic 30-talk/80-changeover/
+200-cue evaluation within 10 seconds. These constants are starting values for owner
+measurement, not a corpus qualification or readiness claim.
+
 `SessionSuggestionService` owns human run/confirm/reject commands. Runs are idempotent by
 the input digest while that run is still the Stage's latest, independent of actor and
 invocation time; returning to earlier inputs creates a new latest run. At most 10,000 assets and
@@ -413,9 +509,9 @@ constants/components, immutable membership, ordered entries and both reversal gu
 For paced replay through the demo APIs and workers, see the [live replay tool](../../../../../scripts/validation/README.md#session-suggestions-live-replay).
 
 The pure harness emits deterministic sanitized metrics and supplies synthetic scenario
-regression tests. Policy versions/constants, services, storage and runtime settings are
-unchanged. Real-corpus reproduction and qualification remain owner-run checks; synthetic
-tests do not establish event readiness.
+regression tests. Versions 1-3 keep their constants and behavior; version 5 is a pure
+prototype. Services, storage and runtime settings are unchanged. Real-corpus reproduction
+and qualification remain owner-run checks; synthetic tests do not establish event readiness.
 
 The machine-readable contract is [corpus-manifest.schema.json](corpus-manifest.schema.json).
 Keep every real manifest, media file, decoded truth, transcript and extraction script
@@ -423,8 +519,9 @@ Keep every real manifest, media file, decoded truth, transcript and extraction s
 
 - `blocks`: array of `start` (aware ISO date-time), positive integer `duration_us`, and
   `intervals`: objects with `kind` (`freeze` or `silence`), integer `start_us` and `end_us`
-  relative to that block. Optional `start_cues` / `end_cues` are arrays of aware absolute
-  timestamps from externally matched transcript cues.
+  relative to that block. Optional `start_cues`, `end_cues` and `changeover_cues` are
+  arrays of aware absolute timestamps from externally matched transcript cues, or
+  objects with an explicit `specific` flag (see the v5 input section below).
 - `schedule`: objects with unique anonymous `key`, `planned_start` and `planned_end`.
   Use the actual published schedule for `--schedule-source manifest`; it is used as-is.
 - `truth`: objects with `start` and `end`, retaining duplicate truth intervals if present.
@@ -449,7 +546,7 @@ uv run --no-sync python -m app.contexts.production.session_suggestions.harness_c
 ```
 
 `harness.parse_manifest` produces frozen Stage inputs; `harness.run_manifest` runs the
-chosen unchanged policy (`1`, `2`, `3`) independently for each Stage. One invocation is
+chosen policy (`1`, `2`, `3`, or pure prototype `5`) independently for each Stage. One invocation is
 one scenario/model/magnitude; repeat invocations for a matrix. Stages may span multiple
 days. Metrics match only within a Stage, never across Stages. Reports use zero-based
 Stage ordinals and include each seed plus each metric's worst value **and its seed**;
@@ -485,7 +582,7 @@ or match text: supplied cue times must already represent matches for that compos
 Absent cue times stay absent; without a profile all cue inputs are disabled. To compare
 profiles with different matches, prepare separate external manifests.
 
-For v3 only, repeat `--producer-offset <aware-ISO-effective-from> <integer-seconds>` in
+For v3 or v5, repeat `--producer-offset <aware-ISO-effective-from> <integer-seconds>` in
 strictly increasing effective-time order (at most 20; offsets -7200..7200). Entries apply
 to each Stage in the invocation via `ScheduleOffsetSetting`; use separate invocations
 for different Stage settings. These are explicit producer offsets, not automatically
@@ -508,3 +605,54 @@ deliberately shifts the plan by one periodic slot; current behavior is pinned, n
 lineage, determinism, isolated Stages, manifest bounds/privacy, cues, offsets, precision,
 wrong-day margins and CLI exit codes. `test_session_suggestion_evaluation.py` retains the
 original metric fixtures and CLI privacy checks.
+
+
+### V5 harness inputs and synthetic generator
+
+`--policy-version 5` selects the pure prototype; v3 remains the CLI default. Producer
+offsets are accepted for 3 and 5 only. The optional `changeover_cues` block array joins
+`start_cues` and `end_cues`. Each array accepts the original aware ISO string or an
+object `{"at": "2000-01-01T09:00:00Z", "specific": true}`; `specific` defaults false.
+The parser projects specificity into the corresponding subset for start/end hits;
+changeover specificity has no edge-creation effect. Unknown fields, non-boolean flags,
+naive timestamps and hits outside the block are refused with sanitized errors.
+Old manifests parse identically. Without `--cue-profile`, all three cue arrays and
+specificity subsets are disabled. Profiles still enable pre-matched supplied times;
+this harness does not infer text matches, catalog specificity or studio semantics.
+
+The four additional `generate_scenario` names use generic synthetic values:
+
+- `cue-only-edge`: specific end/start hits without a freeze at the first changeover;
+- `false-in-talk-end-cue`: a lone nonspecific in-talk end hit;
+- `recording-starts-early`: coverage begins before a true start changeover;
+- `content-after-program`: a separate recording after the program margin.
+
+`test_session_suggestion_harness_v5.py` pins all ten scenarios' complete v5 metrics
+and skips, including the unscheduled interval between cue-only edges and the extra
+suggestion in the periodic short-talk case. The original six v3 scenario fixtures
+retain their existing assertions. These measurements describe synthetic behavior only.
+
+`realistic_schedule_error(seed, *, talk_count=30, slot_seconds=1500, dropped=False,
+added=False, after_program=False, cues=False, cue_recall=0.8, timeline=False)` returns
+a manifest **Stage**, wrapped as `{"stages": [stage]}` for parsing. With `timeline=True`
+it returns `(stage, relative_second_replay_data)`. This ports the parked generator
+without changing its no-cue draws: `Random` uses Python string seeding version 2 with
+`stageflow:session-suggestions:realistic:v1:{seed}`. Draw order is initial integer
+lateness (-300..300), dropped index, added index, then for every scheduled talk its
+integer duration error (-40..40 percent) and changeover jitter (-60..60 seconds),
+including dropped talks; an added talk then draws duration (600..1200). Duration error
+truncates toward zero; changeovers are 180 seconds plus jitter. A dropped slot consumes
+no time; an added talk consumes its duration and a 180-second changeover. Optional tail
+content is 900 seconds. Recording blocks span 600 seconds, with clipped holding intervals.
+
+`cues=True` uses an independent Python version-2 string seed
+`stageflow:session-suggestions:realistic:cues:v1:{seed}`, leaving the original schedule,
+holds and replay data unchanged. For each actual talk in chronological order (including
+added/tail activity), draw recall (`random() < cue_recall`) then integer jitter (-10..10)
+for start, end, and changeover, in that order. Always draw jitter even if the hit is
+omitted. Start uses the true start, end and changeover the true end. Then draw one false
+nonspecific end time uniformly among integer seconds from start+60 through end-60.
+True hits are marked specific. Hits go into half-open recording blocks once, including
+on block boundaries. Recall zero still emits the false hits. No media or transcript
+content is generated. Seed 7 draw fixtures and development seeds 1-20 protect the port,
+recall bounds, optional edits and determinism; reserved held-out seeds are never used.

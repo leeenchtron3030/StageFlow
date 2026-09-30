@@ -38,6 +38,7 @@ class EdgeKind(StrEnum):
     GAP = "gap"
     COVERAGE = "coverage"
     SCHEDULE = "schedule"
+    CUE = "cue"
 
 
 class Strength(StrEnum):
@@ -220,12 +221,20 @@ class AssetInput:
     transcript: Reference | None = None
     start_cues: tuple[datetime, ...] = ()
     end_cues: tuple[datetime, ...] = ()
+    changeover_cues: tuple[datetime, ...] = ()
+    specific_start_cues: tuple[datetime, ...] = ()
+    specific_end_cues: tuple[datetime, ...] = ()
 
     def __post_init__(self) -> None:
-        for name in ("segmentation_ids", "intervals", "start_cues", "end_cues"):
+        for name in ("segmentation_ids", "intervals", "start_cues", "end_cues",
+                     "changeover_cues", "specific_start_cues", "specific_end_cues"):
             object.__setattr__(self, name, tuple(getattr(self, name)))
-        for cue in (*self.start_cues, *self.end_cues):
+        for cue in (*self.start_cues, *self.end_cues, *self.changeover_cues,
+                    *self.specific_start_cues, *self.specific_end_cues):
             require_aware_datetime(cue, "cue")
+        if (not set(self.specific_start_cues) <= set(self.start_cues)
+                or not set(self.specific_end_cues) <= set(self.end_cues)):
+            raise ValueError("specific cues must belong to their role's cue list")
         if self.coverage is not None and (self.timing is None or self.qualification is None):
             raise ValueError("placed assets require timing lineage")
 
@@ -239,10 +248,19 @@ class SkipCounts:
     no_planned_time: int = 0
     already_realized: int = 0
 
+    # Unannotated default is intentionally not a legacy dataclass/SQL field.
+    # V5 promotes it to an instance field only in its pure result subtype.
+    outside_program = 0
+
     def __post_init__(self) -> None:
         if any(type(getattr(self, f.name)) is not int
                or not 0 <= getattr(self, f.name) <= MAX_COUNT for f in fields(self)):
             raise ValueError("skip count out of bounds")
+
+
+@dataclass(frozen=True, slots=True)
+class SkipCountsV5(SkipCounts):
+    outside_program: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -276,8 +294,9 @@ class Candidate:
             raise ValueError("planned offsets require expectation lineage")
         weak = (self.expectation is None or self.overlap
                 or EdgeKind.SCHEDULE in (self.start_edge_kind, self.end_edge_kind))
-        supported = (self.start_silence_support or self.end_silence_support
-                     or self.start_cue_support or self.end_cue_support)
+        supported = (EdgeKind.CUE not in (self.start_edge_kind, self.end_edge_kind)
+                     and (self.start_silence_support or self.end_silence_support
+                          or self.start_cue_support or self.end_cue_support))
         strength = Strength.WEAK if weak else Strength.STRONG if supported else Strength.MEDIUM
         if self.strength != strength:
             raise ValueError("strength must follow policy components")

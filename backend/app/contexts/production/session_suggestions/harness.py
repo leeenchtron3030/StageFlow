@@ -17,7 +17,7 @@ from app.contexts.production.media_segmentation_evidence.contracts import (
 )
 from app.shared.ids import EntityId
 
-from . import policy, policy_v2, policy_v3
+from . import policy, policy_v2, policy_v3, policy_v5
 from .contracts import (
     MAX_INPUTS,
     AssetInput,
@@ -102,11 +102,22 @@ def parse_manifest(payload: str) -> tuple[StageManifest, ...]:
         raise ManifestError() from None
 
 
+def _cue(value: Any) -> tuple[datetime, bool]:
+    if isinstance(value, str):
+        return _time(value), False
+    item = _record(value, {"at"}, {"specific"})
+    specific = item.get("specific", False)
+    if type(specific) is not bool:
+        raise ManifestError()
+    return _time(item["at"]), specific
+
+
 def _stage(value: Any, index: int) -> StageManifest:
     stage = _record(value, {"blocks", "schedule", "truth"})
     assets: list[AssetInput] = []
     for ordinal, value in enumerate(_array(stage["blocks"])):
-        block = _record(value, {"start", "duration_us", "intervals"}, {"start_cues", "end_cues"})
+        block = _record(value, {"start", "duration_us", "intervals"},
+                        {"start_cues", "end_cues", "changeover_cues"})
         duration = block["duration_us"]
         if type(duration) is not int or not 0 < duration <= MAX_OFFSET_US:
             raise ManifestError()
@@ -119,8 +130,9 @@ def _stage(value: Any, index: int) -> StageManifest:
             if interval.end_microseconds > duration:
                 raise ManifestError()
             intervals.append(interval)
-        cues = [tuple(_time(v) for v in _array(block.get(role, [])))
-                for role in ("start_cues", "end_cues")]
+        hits = [tuple(_cue(v) for v in _array(block.get(role, [])))
+                for role in ("start_cues", "end_cues", "changeover_cues")]
+        cues = [tuple(t for t, _ in role) for role in hits]
         if any(not coverage.start <= t <= coverage.end for role in cues for t in role):
             raise ManifestError()
         prefix = f"{index}:block:{ordinal}"
@@ -128,7 +140,9 @@ def _stage(value: Any, index: int) -> StageManifest:
             _id(prefix), Reference(_id(prefix + ":timing"), 1), coverage,
             TimingQualification.UNQUALIFIED, (_id(prefix + ":segmentation"),),
             tuple(intervals), Reference(_id(prefix + ":transcript"), 1) if any(cues) else None,
-            cues[0], cues[1],
+            cues[0], cues[1], cues[2],
+            tuple(t for t, specific in hits[0] if specific),
+            tuple(t for t, specific in hits[1] if specific),
         ))
     expectations: list[ProgramExpectation] = []
     keys: set[str] = set()
@@ -186,12 +200,12 @@ def run_manifest(stages: Sequence[StageManifest], *, policy_version: str = "3",
                  producer_offsets: tuple[ScheduleOffsetEntry, ...] = (),
                  ) -> dict[str, Any]:
     """Return only anonymous ordinals, closed labels, numeric metrics and pass booleans."""
-    if (policy_version not in ("1", "2", "3") or schedule_source not in ("manifest", "drift")
+    if (policy_version not in ("1", "2", "3", "5") or schedule_source not in ("manifest", "drift")
             or drift_model not in _MODELS or type(magnitude_seconds) is not int
             or not 0 <= magnitude_seconds <= 86400 or not seeds
             or len(seeds) > 100 or any(type(s) is not int for s in seeds)
             or not stages or len(stages) > MAX_INPUTS
-            or producer_offsets and policy_version != "3"):
+            or producer_offsets and policy_version not in ("3", "5")):
         raise ValueError("invalid_options")
     validate_offset_entries(producer_offsets)
     cues = None
@@ -216,12 +230,15 @@ def run_manifest(stages: Sequence[StageManifest], *, policy_version: str = "3",
                 raise ValueError("planned_span_required")
             if cues is None:
                 snapshot = replace(snapshot, assets=tuple(replace(
-                    a, start_cues=(), end_cues=(), transcript=None) for a in snapshot.assets))
+                    a, start_cues=(), end_cues=(), changeover_cues=(),
+                    specific_start_cues=(), specific_end_cues=(), transcript=None)
+                    for a in snapshot.assets))
             override = ScheduleOffsetSetting(
                 _id("event"), _id(f"stage:{index}"), 1, _id("command"), "0" * 64,
                 _id("actor"), _EPOCH, producer_offsets) if producer_offsets else None
-            if policy_version == "3":
-                result = policy_v3.evaluate(snapshot, override)
+            if policy_version in ("3", "5"):
+                evaluate = policy_v3.evaluate if policy_version == "3" else policy_v5.evaluate
+                result = evaluate(snapshot, override)
             else:
                 evaluator = policy.evaluate if policy_version == "1" else policy_v2.evaluate
                 result = evaluator(snapshot)
