@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (2026-09-30). This is for owner review; it is not authority until accepted.
+Accepted (owner, 2026-09-30).
 
 ## Date
 

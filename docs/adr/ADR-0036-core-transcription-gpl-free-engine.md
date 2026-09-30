@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (2026-09-30). This is for owner review; it is not authority until accepted.
+Accepted (owner, 2026-09-30).
 
 When implemented, it supersedes the deferral recorded by ED-0075, which is option 3 of the
 [2026-08-21 SBOM record](../security/dependency-license-sbom-2026-08-21.md#decision-options-for-the-pyavffmpeg-exposure).
