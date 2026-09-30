@@ -35,7 +35,7 @@ policy v2) is detailed below (2026-09-29), after the early accuracy check. After
 | **1. Media segmentation evidence (ED-0103)** | Advisory freeze and silence intervals per Completed Media Asset, from a new `media_segmentation` Durable Operation | `0021` |
 | 2. Session Suggestions core | Suggestion aggregate, deterministic `boundary-suggestion` policy v1 (schedule, timing, segmentation, transcript cues), human-invoked suggestion run, confirm and reject commands (confirm reuses the existing human Session realization and boundary commands) | `0022` |
 | 3. Boundary proposals for realized Sessions | The same policy produces `session_boundary_proposal` rows (existing table) for confirmed Sessions | none expected |
-| 4. Producer surfaces (ED-0109 backend, ED-0110 Stage page; Proposed; next) | Work Queue item "confirm presentation" (additive, one per Stage), latest-run read, Suggested presentations panel on the Stage page with confirm/adjust/reject and schedule offset, Mission Control summary line; UX checkpoint | none |
+| 4. Producer surfaces (ED-0109 backend, ED-0110 Stage page; Approved) | Work Queue item "confirm presentation" (additive, one per Stage), latest-run read, Suggested presentations panel on the Stage page with confirm/adjust/reject and schedule offset, Mission Control summary line; UX checkpoint | none |
 | 2c. Policy v3, schedule offset (ED-0106, Completed) | Per-block schedule offset (estimated or producer override) before v2 alignment; Stage offset override setting | `0024` |
 | 2d-1. Cue phrase presets and composition (ED-0107 backend, ED-0108 Event page; Completed) | Built-in catalog v1, human composition command publishing the Event's start and end cue lists, runs default to them, Event page section | `0025` |
 | 2d-2. Transcript cues as edges (outline) | Policy v4 with `cue` edges | to be detailed |
@@ -1218,9 +1218,9 @@ as support for **both** edges of a shared changeover.
 
 ### Status
 
-- **Proposed** (2026-09-29).
-- It becomes Green and implementation-ready when the owner approves this section,
-  including decisions D1–D6.
+- **Approved** (owner, 2026-09-29), including decisions D1–D6 as recommended.
+- **Execution authority:** Green and implementation-ready. ED-0109 first; ED-0110 after
+  ED-0109 merges.
 - **Order (owner, 2026-09-29):** Phase 4 comes first, then Phase 3 (boundary proposals for
   realized Sessions, on Session Detail), then Phase 5 (validation harness and
   qualification run). Phases 3 and 5 each get a detailed section after this phase.
