@@ -23,6 +23,15 @@ cd backend
 uv sync --dev
 ```
 
+When local transcription is configured, Demo media reconciliation enqueues every
+registered Completed Media Asset of the Event, regardless of Session association.
+It drains the registration backlog in batches of up to 500, oldest first. Operation
+identity is scoped to Event, asset, manifest revision and execution profile; the
+Session-scoped trigger reuses existing operations, including old Session-keyed work.
+Worker retries stay on the same operation; terminal failures are not automatically
+re-enqueued. Suggestion runs can use an unassociated asset's latest complete transcript
+reference. See [trigger scope and replay](../docs/architecture/transcription-evidence-readiness.md#trigger-scope-and-replay).
+
 Local transcription is an optional, operator-installed capability: an operator can
 explicitly install it locally with `uv sync --group transcription`. Under ED-0075, the
 `transcription` group and its runtime dependencies must be excluded from every

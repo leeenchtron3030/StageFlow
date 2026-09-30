@@ -8,7 +8,6 @@ import pytest
 from test_render_work_execution import NOW
 
 from app.bootstrap.event_mode_kernel import KernelComponents
-from app.contexts.production.event_mode_kernel import AssociationStatus
 from app.contexts.production.media_segmentation_evidence.enqueue import (
     RegisteredSegmentationAsset,
 )
@@ -35,20 +34,22 @@ def test_enabled_reconciliation_enqueues_assets_lacking_a_segmentation_operation
 ) -> None:
     components = Mock(spec=KernelComponents)
     components.event_key = "synthetic"
+    components.transcription_scan_after = None
     components.kernel = SimpleNamespace(clock=FixedClock(NOW))
     components.configuration = SimpleNamespace(postgres_dsn="unused", deployment=SimpleNamespace(
         local_media_timing=None,
         local_media_segmentation=None if not enabled else SimpleNamespace(enabled=True),
-        local_transcription=object(), deployment_id="synthetic",
+        local_transcription=SimpleNamespace(execution_profile_id="synthetic",
+                                            execution_profile_version="1"),
+        deployment_id="synthetic",
     ))
     components.repository.get_event_by_key.return_value = SimpleNamespace(id=EntityId.new())
     assets = tuple(RegisteredSegmentationAsset(EntityId.new(), EntityId.new(), NOW)
                    for _ in range(asset_count))
-    components.repository.list_recent_media.return_value = ()
     components.run_media_cycle.return_value = SimpleNamespace(
         candidates_seen=0, assets_registered=0)
     work = Mock()
-    work.list_operations.return_value = ()
+    work.list_transcription_targets.return_value = ()
     timing = Mock()
     timing.assets_without_operation.return_value = assets
     monkeypatch.setattr(service, "PostgresMediaSegmentationRepository", Mock(return_value=timing))
@@ -89,6 +90,7 @@ def test_demo_segmentation_enqueue_storage_failure_still_enqueues_transcription(
 ) -> None:
     components = Mock(spec=KernelComponents)
     components.event_key = "synthetic"
+    components.transcription_scan_after = None
     components.kernel = SimpleNamespace(clock=FixedClock(NOW))
     components.configuration = SimpleNamespace(postgres_dsn="unused", deployment=SimpleNamespace(
         local_media_timing=None, local_media_segmentation=SimpleNamespace(enabled=True),
@@ -97,19 +99,17 @@ def test_demo_segmentation_enqueue_storage_failure_still_enqueues_transcription(
                                             execution_profile_version="1"),
     ))
     components.repository.get_event_by_key.return_value = SimpleNamespace(id=EntityId.new())
-    asset = SimpleNamespace(id=EntityId.new(), manifest_id=EntityId.new(), registered_at=NOW)
-    candidate_id = EntityId.new()
+    asset = SimpleNamespace(id=EntityId.new(), manifest_id=EntityId.new(), registered_at=NOW,
+                            candidate_id=EntityId.new())
+    candidate_id = asset.candidate_id
     components.repository.get_asset.return_value = asset
     components.repository.get_candidate.return_value = SimpleNamespace(
         proposed_asset_id=asset.id, source_reference="synthetic.mp4")
-    components.repository.list_recent_media.return_value = (SimpleNamespace(
-        asset_id=asset.id, candidate_id=candidate_id, session_id=EntityId.new(),
-        association_status=AssociationStatus.ASSOCIATED),)
     components.run_media_cycle.return_value = SimpleNamespace(
         candidates_seen=1, assets_registered=1,
         candidate_results=(SimpleNamespace(outcome="registered", candidate_id=candidate_id),))
     repository, work, timing = Mock(), Mock(), Mock()
-    repository.list_operations.return_value = ()
+    repository.list_transcription_targets.return_value = ((asset.id, None),)
     timing.assets_without_operation.return_value = (
         RegisteredSegmentationAsset(asset.id, asset.manifest_id, NOW),)
     timing.enqueue.side_effect = WorkExecutionStorageUnavailableError("synthetic")

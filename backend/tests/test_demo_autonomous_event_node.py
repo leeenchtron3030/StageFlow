@@ -19,6 +19,7 @@ from app.contexts.production.event_mode_kernel import (
     InMemoryEventModeKernelRepository,
     StartSessionRequest,
 )
+from app.contexts.production.event_mode_kernel.contracts import RegisteredMediaAsset
 from app.contexts.work_execution import (
     DurableOperation,
     OperationStatus,
@@ -52,6 +53,19 @@ class MemoryWorkRepository:
         self.operations: list[DurableOperation] = []
         self.enqueue_calls = 0
         self.fail_enqueue_numbers = fail_enqueue_numbers or set()
+        self.kernel_repository: InMemoryEventModeKernelRepository
+
+    def list_transcription_targets(
+        self, *, deployment_id: str, event_id: EntityId,
+        execution_profile_id: str, execution_profile_version: str,
+        session_id: EntityId | None = None, after: EntityId | None = None, limit: int = 500,
+    ) -> tuple[tuple[EntityId, DurableOperation | None], ...]:
+        return memory_transcription_targets(
+            self.kernel_repository, tuple(self.operations), deployment_id=deployment_id,
+            event_id=event_id, execution_profile_id=execution_profile_id,
+            execution_profile_version=execution_profile_version,
+            session_id=session_id, after=after, limit=limit,
+        )
 
     def list_operations(self, **_: object) -> tuple[DurableOperation, ...]:
         return tuple(self.operations)
@@ -93,6 +107,44 @@ class MemoryWorkRepository:
         )
         self.operations.append(operation)
         return operation
+
+
+def memory_transcription_targets(
+    kernel: InMemoryEventModeKernelRepository, operations: tuple[DurableOperation, ...], *,
+    deployment_id: str, event_id: EntityId, execution_profile_id: str,
+    execution_profile_version: str, session_id: EntityId | None = None,
+    after: EntityId | None = None, limit: int = 500,
+) -> tuple[tuple[EntityId, DurableOperation | None], ...]:
+    """Test-only join over memory stores; production selection is a bounded SQL read."""
+    assets = cast(dict[EntityId, RegisteredMediaAsset], vars(kernel)["_assets"])
+    stages = {s.id for s in kernel.list_stages(event_id)}
+    targets: list[tuple[EntityId, DurableOperation | None]] = []
+    for asset in sorted(assets.values(), key=lambda a: (a.registered_at, a.id.value)):
+        if asset.stage_id not in stages:
+            continue
+        if after is not None and (asset.registered_at, asset.id.value) <= (
+            assets[after].registered_at, after.value,
+        ):
+            continue
+        matches = [o for o in operations if o.deployment_id == deployment_id
+                   and o.event_id == event_id and o.input.asset_id == asset.id
+                   and o.input.manifest_id == asset.manifest_id
+                   and o.input.manifest_version == "1.0"
+                   and o.input.execution_profile_id == execution_profile_id
+                   and o.input.execution_profile_version == execution_profile_version]
+        prior = min(matches, key=lambda o: (
+            o.status is OperationStatus.TERMINAL_FAILED, o.created_at, o.id.value,
+        ), default=None)
+        if session_id is None:
+            if prior is not None:
+                continue
+        else:
+            association = kernel.get_association(asset.id)
+            if (association is None or association.session_id != session_id
+                    or association.status.value != "associated"):
+                continue
+        targets.append((asset.id, prior))
+    return tuple(targets[:limit])
 
 
 def _write_schedule(path: Path, *, title: str = "Opening") -> None:
@@ -184,6 +236,7 @@ def _application(
     components: KernelComponents,
     repository: MemoryWorkRepository,
 ) -> DemoApplication:
+    repository.kernel_repository = cast(InMemoryEventModeKernelRepository, components.repository)
     return DemoApplication(
         components=components,
         work=TranscriptionOperationApplication(
@@ -292,7 +345,8 @@ def test_sessionless_media_remains_unresolved_then_later_associates_safely(
     assert media.asset_id is not None
     assert media.association_status is not None
     assert media.association_status.value == "unresolved"
-    assert work_repository.operations == []
+    assert len(work_repository.operations) == 1
+    assert coordinator.status().transcription_operations_enqueued == 1
     original_association = repository.get_association(media.asset_id)
     assert original_association is not None
 

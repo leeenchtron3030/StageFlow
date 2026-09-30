@@ -307,17 +307,19 @@ def test_demo_recovery_timing_covers_all_assets_in_bounded_idempotent_cycles(
     monkeypatch.setattr(demo_service, "PostgresMediaTimingWorkRepository", factory)
     components = Mock(spec=KernelComponents)
     components.event_key = "synthetic"
+    components.transcription_scan_after = None
     components.kernel = SimpleNamespace(clock=FixedClock(NOW))
     components.configuration = SimpleNamespace(postgres_dsn="unused", deployment=SimpleNamespace(
         local_media_timing=None if enabled is None else SimpleNamespace(enabled=enabled),
-        local_transcription=object(), deployment_id="synthetic"))
+        local_transcription=SimpleNamespace(execution_profile_id="synthetic",
+                                            execution_profile_version="1"),
+        deployment_id="synthetic"))
     components.repository.get_event_by_key.return_value = SimpleNamespace(id=event)
-    components.repository.list_recent_media.return_value = ()
     # No registrations in this cycle: all assets came from startup/recovery.
     components.run_media_cycle.return_value = SimpleNamespace(
         candidates_seen=0, assets_registered=0)
     work = Mock()
-    work.list_operations.return_value = ()
+    work.list_transcription_targets.return_value = ()
     for expected in (100, 200, 205, 205):
         app = DemoApplication(components, cast(TranscriptionOperationApplication, Mock()),
                               cast(PostgresWorkExecutionRepository, work))
@@ -358,26 +360,23 @@ def test_postgres_timing_missing_selection_is_event_scoped_and_excludes_any_outc
 def test_timing_selection_failure_preserves_transcription_reconciliation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from app.contexts.production.event_mode_kernel import AssociationStatus
-
     components = Mock(spec=KernelComponents)
     components.event_key = "synthetic"
+    components.transcription_scan_after = None
     components.kernel = SimpleNamespace(clock=FixedClock(NOW))
     components.configuration = SimpleNamespace(postgres_dsn="unused", deployment=SimpleNamespace(
         local_media_timing=SimpleNamespace(enabled=True), deployment_id="synthetic",
         local_transcription=SimpleNamespace(execution_profile_id="synthetic",
                                             execution_profile_version="1")))
     components.repository.get_event_by_key.return_value = SimpleNamespace(id=EntityId.new())
-    asset = SimpleNamespace(id=EntityId.new(), manifest_id=EntityId.new(), registered_at=NOW)
+    asset = SimpleNamespace(id=EntityId.new(), manifest_id=EntityId.new(), registered_at=NOW,
+                            candidate_id=EntityId.new())
     components.repository.get_asset.return_value = asset
     components.repository.get_candidate.return_value = SimpleNamespace(source_reference="test.mp4")
-    components.repository.list_recent_media.return_value = (SimpleNamespace(
-        asset_id=asset.id, candidate_id=EntityId.new(), session_id=EntityId.new(),
-        association_status=AssociationStatus.ASSOCIATED),)
     components.run_media_cycle.return_value = SimpleNamespace(
         candidates_seen=0, assets_registered=0)
     repository, work, timing = Mock(), Mock(), Mock()
-    repository.list_operations.return_value = ()
+    repository.list_transcription_targets.return_value = ((asset.id, None),)
     timing.assets_without_operation.side_effect = WorkExecutionStorageUnavailableError("synthetic")
     monkeypatch.setattr(demo_service, "PostgresMediaTimingWorkRepository",
                         Mock(return_value=timing))

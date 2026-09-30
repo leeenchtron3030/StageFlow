@@ -111,6 +111,20 @@ Media Now` and `Refresh Program` remain idempotent fallback/diagnostic actions. 
 operation never starts or ends a Session, marks a Moment, changes package authority, or
 performs external publication.
 
+With local transcription configured, each media reconciliation enqueues transcription for
+registered assets across the Event, including media that has no Session yet. Each cycle selects up
+to 500 assets in registration order; durable operations remove processed registrations
+from the backlog, so older media is not hidden behind a recent-media limit. The
+scan advances past full pages even when enqueues fail, then wraps to retry earlier
+registrations; restart safely rescans using durable operations. The
+Session-scoped `Process Media Now` trigger reports/reuses those same operations for its
+associated assets. Association and re-association do not duplicate transcription.
+Old Session-keyed operations are reused by their asset, manifest and execution profile
+inputs. Retryable failures stay on the existing operation (three attempts, 30-second
+delay); terminal failures are not automatically replaced. Enqueue failures that stored
+no operation are retried by later cycles. Configuration defaults and the optional,
+operator-installed transcription dependency boundary are unchanged.
+
 Media registered before a safely eligible Session remains unresolved until the material
 Session input set changes. Demo 2 then reevaluates only the existing deterministic
 unresolved association through the accepted policy; unchanged inputs create no revision,

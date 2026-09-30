@@ -93,6 +93,8 @@ class KernelComponents:
     session_suggestions: SessionSuggestionService | None = None
     media_cycle_lock: Lock = field(default_factory=Lock, repr=False)
     program_sync_lock: Lock = field(default_factory=Lock, repr=False)
+    # Non-authoritative scan progress; durable operation inputs govern restart replay.
+    transcription_scan_after: EntityId | None = None
 
     @property
     def event_key(self) -> str:
