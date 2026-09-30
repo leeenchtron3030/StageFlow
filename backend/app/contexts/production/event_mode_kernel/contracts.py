@@ -70,12 +70,14 @@ class ProducerWorkDecisionType(StrEnum):
     ASSOCIATION_UNRESOLVED = "association_unresolved"
     ASSOCIATION_CONFLICT = "association_conflict"
     ASSEMBLY_APPROVAL_PENDING = "assembly_approval_pending"
+    PRESENTATION_CONFIRMATION_PENDING = "presentation_confirmation_pending"
 
 
 class ProducerWorkSubjectKind(StrEnum):
     SESSION_PACKAGE = "session_package"
     MEDIA_ASSOCIATION = "media_association"
     SESSION_ASSEMBLY = "session_assembly"
+    STAGE_SUGGESTIONS = "stage_suggestions"
 
 
 class HumanCommandKind(StrEnum):

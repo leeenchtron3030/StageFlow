@@ -306,3 +306,6 @@ def test_kernel_must_not_import_assembly() -> None:
             assert not any(name == "app.contexts.assembly" or name.startswith(
                 "app.contexts.assembly.",
             ) for name in imports), path
+            assert not any(name == "app.contexts.production.session_suggestions" or name.startswith(
+                "app.contexts.production.session_suggestions.",
+            ) for name in imports), path

@@ -18,6 +18,7 @@ from app.contexts.production.event_mode_kernel import (
     ProducerWorkQueuePosition,
     ProducerWorkQueueSubject,
 )
+from app.contexts.production.session_suggestions.contracts import SuggestionStorageUnavailableError
 from app.contexts.production.work_queue import ProducerWorkQueueService
 from app.shared.ids import EntityId
 
@@ -34,8 +35,11 @@ class ProducerWorkQueueItemResponse(BaseModel):
         "association_unresolved",
         "association_conflict",
         "assembly_approval_pending",
+        "presentation_confirmation_pending",
     ]
-    subject_kind: Literal["session_package", "media_association", "session_assembly"]
+    subject_kind: Literal[
+        "session_package", "media_association", "session_assembly", "stage_suggestions",
+    ]
     subject_id: str
     subject_revision: int
     event_id: str
@@ -160,13 +164,15 @@ def producer_work_queue(
             components.repository,
             None if components.session_assemblies is None
             else components.session_assemblies.repository,
+            components.session_suggestions,
         )
         subjects = service.list_items(
             parsed_event_id,
             after=after,
             limit=limit,
         )
-    except (KernelStorageUnavailableError, AssemblyStorageUnavailableError) as exc:
+    except (KernelStorageUnavailableError, AssemblyStorageUnavailableError,
+            SuggestionStorageUnavailableError) as exc:
         raise HTTPException(
             status_code=503,
             detail="postgresql_unavailable",

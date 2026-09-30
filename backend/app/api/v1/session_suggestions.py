@@ -26,6 +26,7 @@ from app.contexts.production.session_suggestions.contracts import (
     SuggestionConflictError,
     SuggestionDecision,
     SuggestionNotFoundError,
+    SuggestionRun,
     SuggestionStatus,
     SuggestionStorageUnavailableError,
 )
@@ -162,6 +163,15 @@ def run(event_id: UUID, stage_id: UUID, body: RunBody, svc: Service) -> dict[str
         start_cue_list=None if body.start_cue_list is None else body.start_cue_list.reference(),
         end_cue_list=None if body.end_cue_list is None else body.end_cue_list.reference(),
     ))
+    return _run(result)
+
+
+@router.get("/stages/{stage_id}/runs/latest")
+def latest_run(event_id: UUID, stage_id: UUID, svc: Service) -> dict[str, object]:
+    return _run(_call(lambda: svc.latest_run(EntityId(str(event_id)), EntityId(str(stage_id)))))
+
+
+def _run(result: SuggestionRun) -> dict[str, object]:
     return {"run_id": result.id.value, "event_id": result.event_id.value,
             "stage_id": result.stage_id.value, "input_digest": result.input_digest,
             "actor_id": result.actor_id.value, "created_at": result.created_at,

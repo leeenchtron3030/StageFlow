@@ -13,6 +13,10 @@ from psycopg.types.json import Jsonb
 
 from app.contexts.editorial.derivation import match_phrases
 from app.contexts.editorial.derivation_contracts import TimingQualification
+from app.contexts.production.event_mode_kernel.contracts import (
+    ProducerWorkQueuePosition,
+    ProducerWorkQueueSubject,
+)
 from app.contexts.production.event_mode_kernel.service import DurableEventModeKernel
 from app.contexts.production.media_segmentation_evidence.contracts import SegmentationInterval
 from app.contexts.production.session_suggestions import serialization as serde
@@ -40,6 +44,10 @@ from app.contexts.production.session_suggestions.contracts import (
 )
 from app.contexts.production.session_suggestions.repository import SuggestionTransaction
 from app.contexts.production.session_suggestions.service import reference_document
+from app.contexts.production.session_suggestions.work_queue import (
+    suggestion_work_queue_subject,
+    validate_work_queue_limit,
+)
 from app.infrastructure.postgres.boundary_cue_repository import PostgresBoundaryCueTransaction
 from app.infrastructure.postgres.editorial_derivation_repository import (
     PostgresEditorialDerivationTransaction,
@@ -255,8 +263,17 @@ class PostgresSuggestionTransaction(PostgresBoundaryCueTransaction):
                    FROM stageflow.session_suggestion_run WHERE stage_id=r.stage_id)""",
             (digest,),
         ).fetchone()
-        if row is None:
-            return None
+        return None if row is None else self._read_run(row)
+
+    def latest_run(self, event_id: EntityId, stage_id: EntityId) -> SuggestionRun | None:
+        row = self.connection.execute(
+            """SELECT * FROM stageflow.session_suggestion_run
+               WHERE event_id=%s AND stage_id=%s ORDER BY run_sequence DESC LIMIT 1""",
+            (event_id.value, stage_id.value),
+        ).fetchone()
+        return None if row is None else self._read_run(row)
+
+    def _read_run(self, row: Row) -> SuggestionRun:
         blocks: tuple[ScheduleBlock, ...] = ()
         if row["policy_version"] == "3":
             rows = self.connection.execute(
@@ -270,6 +287,40 @@ class PostgresSuggestionTransaction(PostgresBoundaryCueTransaction):
                 r["estimate_score_margin"], r["override_setting_version"],
             ) for r in rows)
         return _run(row, blocks)
+
+    def list_pending_confirmations(
+        self, event_id: EntityId, *, after: ProducerWorkQueuePosition | None = None,
+        limit: int = 50,
+    ) -> tuple[ProducerWorkQueueSubject, ...]:
+        validate_work_queue_limit(limit)
+        cursor_sql = ""
+        parameters: list[object] = [event_id.value]
+        if after is not None:
+            cursor_sql = """AND (6, r.created_at, ('suggestions:' || r.stage_id::text) COLLATE "C")
+                > (%s, %s, %s COLLATE "C")"""
+            parameters.extend((after.priority, after.updated_at, after.projection_id))
+        parameters.append(limit)
+        rows = self.connection.execute(
+            """SELECT r.run_id, r.event_id, r.stage_id, r.created_at,
+                      count(*) AS open_count,
+                      count(*) FILTER (WHERE s.strength='weak') AS weak_count
+               FROM stageflow.session_suggestion_run r
+               JOIN stageflow.session_suggestion s ON s.run_id=r.run_id
+               WHERE r.event_id=%s
+                 AND NOT EXISTS (SELECT 1 FROM stageflow.session_suggestion_run newer
+                     WHERE newer.stage_id=r.stage_id AND newer.run_sequence>r.run_sequence)
+                 AND NOT EXISTS (SELECT 1 FROM stageflow.session_suggestion_decision d
+                     WHERE d.suggestion_id=s.suggestion_id)
+               """ + cursor_sql + """
+               GROUP BY r.run_id, r.event_id, r.stage_id, r.created_at
+               ORDER BY r.created_at, ('suggestions:' || r.stage_id::text) COLLATE "C"
+               LIMIT %s""", parameters,
+        ).fetchall()
+        return tuple(suggestion_work_queue_subject(
+            event_id=EntityId(str(r["event_id"])), stage_id=EntityId(str(r["stage_id"])),
+            run_id=EntityId(str(r["run_id"])), created_at=r["created_at"],
+            open_count=r["open_count"], weak_count=r["weak_count"],
+        ) for r in rows)
 
     def save_run(self, run: SuggestionRun, suggestions: tuple[SessionSuggestion, ...]) -> None:
         self.connection.execute(

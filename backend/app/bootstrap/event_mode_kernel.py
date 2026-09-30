@@ -28,6 +28,7 @@ from app.contexts.production.event_mode_kernel.repository import (
 from app.contexts.production.event_mode_kernel.service import StableAssetIngressPublisher
 from app.contexts.production.media_timing_evidence import MediaTimingEvidenceRepository
 from app.contexts.production.runtime import StageFlowRuntime
+from app.contexts.production.session_suggestions.service import SessionSuggestionService
 from app.core.config.deployment import (
     EffectiveKernelConfiguration,
     RuntimeProfile,
@@ -47,6 +48,7 @@ from app.infrastructure.postgres.packaging_asset_repository import PostgresPacka
 from app.infrastructure.postgres.session_assembly_repository import (
     PostgresSessionAssemblyRepository,
 )
+from app.infrastructure.postgres.session_suggestion_repository import PostgresSuggestionRepository
 from app.shared.ids import EntityId
 from app.shared.time import Clock, SystemClock
 
@@ -88,6 +90,7 @@ class KernelComponents:
     editorial_derivation: EditorialDerivationService | None = None
     packaging_assets: PackagingAssetService | None = None
     session_assemblies: SessionAssemblyService | None = None
+    session_suggestions: SessionSuggestionService | None = None
     media_cycle_lock: Lock = field(default_factory=Lock, repr=False)
     program_sync_lock: Lock = field(default_factory=Lock, repr=False)
 
@@ -331,6 +334,9 @@ def build_kernel_components(
         ),
         session_assemblies=SessionAssemblyService(
             PostgresSessionAssemblyRepository(configuration.postgres_dsn), kernel.clock,
+        ),
+        session_suggestions=SessionSuggestionService(
+            PostgresSuggestionRepository(configuration.postgres_dsn), kernel.clock,
         ),
         editorial_moments=EditorialMomentService(
             PostgresEditorialMomentRepository(configuration.postgres_dsn),
