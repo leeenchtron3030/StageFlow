@@ -37,7 +37,7 @@ policy v2) is detailed below (2026-09-29), after the early accuracy check. After
 | 3. Boundary proposals for realized Sessions | The same policy produces `session_boundary_proposal` rows (existing table) for confirmed Sessions | none expected |
 | 4. Producer surfaces | Work Queue item "confirm presentation" (additive), and suggestion review on Session Detail and Mission Control under the owner's scanning rule; UX checkpoint | none |
 | 2c. Policy v3, schedule offset (ED-0106, Completed) | Per-block schedule offset (estimated or producer override) before v2 alignment; Stage offset override setting | `0024` |
-| 2d-1. Cue phrase presets and composition (ED-0107 backend, ED-0108 Event page; Approved) | Built-in catalog v1, human composition command publishing the Event's start and end cue lists, runs default to them, Event page section | `0025` |
+| 2d-1. Cue phrase presets and composition (ED-0107 backend, ED-0108 Event page; Completed) | Built-in catalog v1, human composition command publishing the Event's start and end cue lists, runs default to them, Event page section | `0025` |
 | 2d-2. Transcript cues as edges (outline) | Policy v4 with `cue` edges | to be detailed |
 | 5. Validation harness and Run 001 | Replay the ground-truth corpus (outside the repo) and measure recall, precision and start/end error against the ADR target; sanitized result | none |
 
@@ -1180,6 +1180,39 @@ as support for **both** edges of a shared changeover.
     - the catalog GET does not check that the Event exists;
     - the reserved-key check is case-sensitive, which is harmless because keys are
       stored case-sensitively.
+
+
+### Completion record (ED-0108)
+
+- **Implemented revision:** `a73499c`, merged in PR #157 (`main` `7ce8267`). Codex
+  implemented it and the owner committed it.
+- **Changed files:**
+  - the Event page (`frontend/app/event/page.tsx`) and the new
+    `event-boundary-cues.tsx` component;
+  - the `boundary-cues` helpers, API client and fixtures;
+  - the new `session-suggestions` proxy route and its allowlist entries;
+  - command audit;
+  - `ui-labels.ts` and styles;
+  - tests;
+  - the glossary "UI wording" section;
+  - the UX checkpoint record in `docs/ux/operator-feedback.md`.
+- **Changed existing assertions:**
+  - the proxy and audit test matrices were extended;
+  - two assertions in the new cue tests changed at the owner's UX request: removed
+    phrases move to Removed and persist across group ticks.
+- **Review:** `directive-reviewer` returned APPROVE, and APPROVE again after the UX
+  changes.
+- **Owner UX checkpoints:**
+  - **First:** six changes requested and implemented: ticked groups first with "More
+    groups"; grouped one-line phrases with exception-only badges; Removed with Add back;
+    ⚠ from evidence; "Custom (based on …)"; removals persist across group ticks.
+  - **Second:** approved.
+- **Tests (host):** frontend `npm run test` **304 passed, 0 failed**; lint, typecheck and
+  build clean. Full backend suite **2,966 passed, 0 failed, 2 skipped**. CI green.
+- **Live check:** against the demo database, the *Conference stage* composition was
+  published through the UI as version 1. It had one removal and one custom phrase, and
+  the page's 32 start / 32 end counts matched the published lists.
+- **Status:** Completed. Phase 2d-1 (ED-0107 and ED-0108) is complete.
 
 ## Ground-truth corpus handling (all phases)
 
