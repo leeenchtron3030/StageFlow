@@ -35,7 +35,7 @@ policy v2) is detailed below (2026-09-29), after the early accuracy check. After
 | **1. Media segmentation evidence (ED-0103)** | Advisory freeze and silence intervals per Completed Media Asset, from a new `media_segmentation` Durable Operation | `0021` |
 | 2. Session Suggestions core | Suggestion aggregate, deterministic `boundary-suggestion` policy v1 (schedule, timing, segmentation, transcript cues), human-invoked suggestion run, confirm and reject commands (confirm reuses the existing human Session realization and boundary commands) | `0022` |
 | 3. Boundary proposals for realized Sessions | The same policy produces `session_boundary_proposal` rows (existing table) for confirmed Sessions | none expected |
-| 4. Producer surfaces (ED-0109 backend, ED-0110 Stage page; Approved) | Work Queue item "confirm presentation" (additive, one per Stage), latest-run read, Suggested presentations panel on the Stage page with confirm/adjust/reject and schedule offset, Mission Control summary line; UX checkpoint | none |
+| 4. Producer surfaces (ED-0109 backend, ED-0110 Stage page; Completed; follow-up ED-0111 Proposed) | Work Queue item "confirm presentation" (additive, one per Stage), latest-run read, Suggested presentations panel on the Stage page with confirm/adjust/reject and schedule offset, Mission Control summary line; UX checkpoint | none |
 | 2c. Policy v3, schedule offset (ED-0106, Completed) | Per-block schedule offset (estimated or producer override) before v2 alignment; Stage offset override setting | `0024` |
 | 2d-1. Cue phrase presets and composition (ED-0107 backend, ED-0108 Event page; Completed) | Built-in catalog v1, human composition command publishing the Event's start and end cue lists, runs default to them, Event page section | `0025` |
 | 2d-2. Transcript cues as edges (outline) | Policy v4 with `cue` edges | to be detailed |
@@ -1441,6 +1441,121 @@ as support for **both** edges of a shared changeover.
 
 Revert the code. ED-0109 adds no schema. Sessions created by confirmations are ordinary
 Kernel Sessions, and are corrected through the existing commands.
+
+
+### Completion record (ED-0109)
+
+- **Implemented revision:** merged in PR #160 (`main` `c715c6b`). Codex implemented it
+  and the owner committed it.
+- **Changed files:**
+  - the latest-run read: API, service, and the PostgreSQL and in-memory repositories;
+  - the Session Suggestions Work Queue read port (`session_suggestions/work_queue.py`);
+  - the three-source merge in `production/work_queue.py`;
+  - the Kernel contract enum values;
+  - the Work Queue API response literals;
+  - bootstrap wiring;
+  - tests: `test_session_suggestions_surfaces{,_postgres}.py`, plus the import-boundary
+    assertion;
+  - the context README, capability layer and glossary.
+- **Plan correction:** this section assumed that the Work Queue API already had a
+  decision-type filter. It had none.
+  - Codex added one. The reviewer found it out of scope, with unbounded cost for rare
+    item types, so it was **removed**.
+  - No filter exists. If a later phase needs one, plan it then (for example, a
+    priority-window push-down).
+- **Review:** `directive-reviewer` returned FIX-FIRST (the filter), then APPROVE.
+- **Tests (host):** full backend suite **2,979 passed, 0 failed, 2 skipped**. Ruff and
+  Pyright clean. CI green. No migration.
+- **Status:** Completed.
+
+### Completion record (ED-0110)
+
+- **Implemented revision:** merged in PR #161 (`main` `e9b224e`).
+- **Changed files:**
+  - the Stage page Suggested presentations panel (`stage-suggestions.tsx`);
+  - the Mission Control strip (`suggestion-queue-lines.tsx`);
+  - the session-suggestions helpers, API client and fixtures;
+  - the proxy allowlist extension, plus a read-only `producer` capability for the Work
+    Queue GET;
+  - audit, labels and styles;
+  - the frontend README capability table;
+  - tests;
+  - the glossary "UI wording" section;
+  - the UX checkpoint record.
+- **Review:**
+  - `directive-reviewer` returned FIX-FIRST: "Add the schedule first" was missing for
+    Stages with no schedule.
+  - The owner's live-check fixes followed: panel placement, same-day ranges, compact
+    rows, the Mission Control strip, and plurals.
+  - The reviewer then returned APPROVE.
+- **Owner UX checkpoint:** approved with one change: the producer-offset badge appears
+  only when a row differs from the summary.
+- **Live check (D6):** two locally seeded synthetic review Events were processed through
+  real discovery, timing inspection and segmentation (24 blocks on the second). Suggest,
+  confirm, adjust-and-confirm, reject, offset override and suggest again were exercised
+  end to end. The lateness estimate matched the true 8 min on the realistic day.
+- **Tests (host):** frontend `npm run test` **346 passed, 0 failed**; lint, typecheck and
+  build clean. Full backend suite **2,979 passed, 0 failed, 2 skipped**. CI green.
+- **Findings recorded** (in `docs/ux/operator-feedback.md`):
+  - re-suggesting talks that already have a Session: see ED-0111 below;
+  - the recording start outscoring short changeovers, which can alias the offset
+    estimate on short, evenly spaced talks: a policy follow-up candidate;
+  - recordings not re-matched after a confirm: this predates ED-0110 and is out of
+    scope.
+- **Status:** Completed. **Phase 4 is complete.**
+
+### Follow-up: exclude talks that already have a Session from new runs (ED-0111)
+
+- **Status:** Proposed (2026-09-29), from the ED-0110 UX checkpoint.
+  - It becomes Green and implementation-ready on owner approval of this section.
+- **Owner decisions (2026-09-29):**
+  - a talk that already has a Session is not suggested again;
+  - it is counted and shown as "already a Session";
+  - rejected talks **may** be suggested again on a new run.
+- **Problem:**
+  - Every run suggests every current, planned Program Expectation.
+  - After a producer confirms Talk 1, "Suggest again" re-suggests it as open, and Mission
+    Control counts it again.
+  - Confirming it again is safely refused (`expectation_already_realized` in the
+    service), but the list and counts mislead.
+- **Design, with no policy change:**
+  - Realized expectations **stay in the policy input.** They still anchor the joint
+    alignment of their neighbours, and their spans are not re-suggested as unscheduled
+    activity.
+  - The run then **stores no suggestion** for an expectation that has a Session linked
+    to it (`Session.program_expectation_id`), and counts it in a new run skip,
+    `already_realized`.
+  - The set of realized expectation IDs becomes part of the run's input digest, so
+    confirming a talk and suggesting again creates a new run.
+  - This is a service-level filter over the unchanged v3 result. v1–v3 policy constants
+    and stored runs are unaffected.
+- **Migration `0026` (additive):**
+  - `session_suggestion_run.already_realized` is added as `integer NOT NULL DEFAULT 0
+    CHECK (already_realized >= 0)`, so existing runs read as 0.
+  - The reverse drops the column.
+- **API and UI:**
+  - The run and latest-run responses carry `already_realized`.
+  - The Stage panel summary adds "· N already a Session" (singular and plural) when it
+    is non-zero.
+  - The Work Queue counts are unchanged in shape; they now exclude realized talks,
+    because no suggestion is stored for them.
+- **Out of scope:**
+  - hiding rejected talks;
+  - re-matching recordings to Sessions after a confirm;
+  - policy tuning for the recording-start boundary.
+- **Tests:**
+  - confirm Talk 1, then run again: no suggestion for Talk 1, `already_realized = 1`, and
+    Talk 2's alignment is unchanged;
+  - no unscheduled suggestion over Talk 1's span;
+  - a rejected talk is suggested again;
+  - the digest changes after a confirm;
+  - `0026` forward and reverse, and old runs read as 0;
+  - the frontend summary wording;
+  - the full host backend and frontend suites.
+- **Acceptance:** the tests above pass on the host, plus a live re-check on the review
+  Event: after confirm → suggest again, the confirmed talks show as "already a Session",
+  not as open suggestions.
+- **Rollback:** revert the code and reverse `0026`.
 
 ## Ground-truth corpus handling (all phases)
 
