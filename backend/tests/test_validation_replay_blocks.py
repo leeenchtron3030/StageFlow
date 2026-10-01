@@ -707,7 +707,8 @@ class UpgradedEffects(FakeEffects):
             self.requests.append((method, path, body))
             return {"current": {} if self.existing_cues else None}
         if path.endswith("/boundary-cue-catalog"):
-            return {"version": 9, "profiles": [{"name": "Conference stage", "key": "conference-9"}]}
+            return {"version": 9, "profiles": [{"name": "Conference stage", "key": "conference-9",
+                                                 "group_keys": ["group-a", "group-b"]}]}
         if "/transcription/assets/" in path:
             self.status_reads += 1
             done = self.transcribed == self.copied
@@ -774,7 +775,8 @@ def test_transcription_cues_counter_worker_and_timeline() -> None:
     body = compositions[0]
     assert UUID(body["command_id"])
     assert {k: v for k, v in body.items() if k != "command_id"} == {
-        "catalog_version": 9, "profile_key": "conference-9", "group_keys": [],
+        "catalog_version": 9, "profile_key": "conference-9",
+        "group_keys": ["group-a", "group-b"],
         "actor_id": ACTOR, "authority_kind": "human",
     }
     assert doc["evidence_timeline"]["runs"][-1]["transcription"] == 2
@@ -1006,7 +1008,8 @@ def test_growing_transcription_sampling_timeout_is_degradable() -> None:
                 return {"current": None}
             if path.endswith("/boundary-cue-catalog"):
                 return {"version": 1, "profiles": [
-                    {"key": "conference", "name": "Conference stage"}]}
+                    {"key": "conference", "name": "Conference stage",
+                     "group_keys": ["group-a"]}]}
             if "/transcription/assets/" in path:
                 if UUID(path.split("/")[-2]).int == 102:
                     raise TimeoutError("private")
@@ -1139,3 +1142,18 @@ def test_run_availability_snapshot_survives_later_block_timeout() -> None:
     doc = replay.report(progress, (), 0)
     assert doc["evidence_timeline"]["blocks"][0]["transcription"] is None
     assert doc["evidence_timeline"]["runs"][0]["transcription"] == 1
+
+
+def test_transcription_refuses_conference_profile_without_groups() -> None:
+    class NoGroups(UpgradedEffects):
+        def request(self, method: str, path: str, body: dict[str, Any] | None,
+                    timeout: float) -> dict[str, Any]:
+            if path.endswith("/boundary-cue-catalog"):
+                return {"version": 9, "profiles": [
+                    {"name": "Conference stage", "key": "conference-9", "group_keys": []}]}
+            return super().request(method, path, body, timeout)
+    effects = NoGroups()
+    assert replay.execute(replace(settings(), transcription=True), effects) == (
+        1, {"error_count": 1})
+    assert not [1 for method, path, _ in effects.requests
+                if method == "POST" and path.endswith("/boundary-cues")]

@@ -580,9 +580,15 @@ def compose_cues(io: Effects, settings: Settings, event: str) -> None:
     profiles = [p for p in catalog["profiles"] if p["name"] == "Conference stage"]
     if len(profiles) != 1:
         raise Refusal()
+    # A profile selects its groups as the producer UI does; empty groups compose no cues.
+    groups = profiles[0]["group_keys"]
+    if (not isinstance(groups, list) or not groups
+            or not all(isinstance(key, str) and key for key in cast(list[Any], groups))):
+        raise Refusal()
     io.request("POST", path + "/boundary-cues", {
         "catalog_version": catalog["version"], "profile_key": profiles[0]["key"],
-        "group_keys": [], "actor_id": settings.actor, "command_id": str(uuid4()),
+        "group_keys": list(cast(list[str], groups)), "actor_id": settings.actor,
+        "command_id": str(uuid4()),
         "authority_kind": "human",
     }, remaining(io, deadline))
 
