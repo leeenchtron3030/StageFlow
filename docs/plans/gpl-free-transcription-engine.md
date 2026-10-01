@@ -2,10 +2,10 @@
 
 ## Status
 
-**Proposed** (2026-09-30) for owner approval. Approval approves the recommended defaults
-in D1–D7. The directive number **ED-0122** is proposed (next free number). The follow-on
-switch step is proposed as **ED-0123**; that number is confirmed only when its step is
-approved.
+**Approved** (owner, 2026-09-30), with D1–D7 as recommended, including the D5 parity
+tolerances and the D6 profile-switch rule. **ED-0122** is allocated for the additive
+engine. **ED-0123** is reserved for the default switch, and its scope is confirmed when
+the owner parity run passes.
 
 ## Execution authority
 
@@ -23,7 +23,7 @@ approved.
     whose recommendation and requirements this plan carries over;
   - the ED-0075 [distribution boundary](transcription-distribution-boundary.md);
   - the [SBOM record](../security/dependency-license-sbom-2026-08-21.md).
-- **Implementation-ready:** no. It becomes ready on owner approval of D1–D7.
+- **Implementation-ready:** yes. D1–D7 were approved on 2026-09-30.
 - **Escalation:** stop and report if any of the following turns out to be needed:
   - a change to the transcript evidence contract, its storage schema or the Work
     Execution port;
@@ -104,7 +104,7 @@ Once it is qualified on the appliance, it becomes the default engine and its
 dependencies become default dependencies. faster-whisper and ED-0075's exclusion are
 then retired, and the SBOM shows no GPL or AGPL component.
 
-## Decisions (recommended defaults; approval of this plan approves them)
+## Decisions (approved by the owner 2026-09-30)
 
 - **D1. The engine is a StageFlow-owned port of the subset in use.**
   - **Location:** a new module, `app/infrastructure/transcription/ctranslate2_whisper/`.
