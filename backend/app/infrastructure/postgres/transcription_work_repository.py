@@ -1469,6 +1469,48 @@ class PostgresWorkExecutionRepository[
                 "postgresql_work_execution_unavailable"
             ) from exc
 
+    def asset_transcription_status(
+        self, asset_id: EntityId, *, deployment_id: str,
+        execution_profile_id: str, execution_profile_version: str,
+    ) -> tuple[DurableOperation[InputT] | None, bool, bool]:
+        """Bounded read; complete evidence follows suggestion snapshot selection.
+
+        Evidence availability is asset-wide, independent of the current operation.
+        Later partial revisions must not hide an earlier complete revision.
+        """
+        try:
+            with self._connect() as connection:
+                row = connection.execute(
+                    """SELECT o.* FROM stageflow.work_operation o
+                       JOIN stageflow.completed_media_asset_registry a USING (asset_id)
+                       JOIN stageflow.stage s ON s.stage_id=a.stage_id
+                       WHERE a.asset_id=%s AND o.operation_kind='transcription'
+                         AND o.deployment_id=%s AND o.event_id=s.event_id
+                         AND o.manifest_id=a.manifest_id AND o.manifest_version='1.0'
+                         AND o.execution_profile_id=%s AND o.execution_profile_version=%s
+                       ORDER BY (o.operation_status='terminal_failed'),
+                                o.created_at, o.operation_id LIMIT 1""",
+                    (asset_id.value, deployment_id, execution_profile_id,
+                     execution_profile_version),
+                ).fetchone()
+                evidence = connection.execute(
+                    """SELECT
+                       (SELECT evidence_id FROM stageflow.transcript_evidence_revision
+                        WHERE asset_id=%s AND evidence_status='complete'
+                        ORDER BY evidence_revision DESC LIMIT 1) IS NOT NULL AS complete,
+                       EXISTS (SELECT 1 FROM stageflow.transcript_evidence_revision
+                               WHERE asset_id=%s AND evidence_status='partial') AS partial""",
+                    (asset_id.value, asset_id.value),
+                ).fetchone()
+                assert evidence is not None
+                complete = bool(evidence["complete"])
+                return (None if row is None else self._operation(row, connection),
+                        complete, bool(evidence["partial"]) and not complete)
+        except (psycopg.InterfaceError, psycopg.OperationalError) as exc:
+            raise WorkExecutionStorageUnavailableError(
+                "postgresql_work_execution_unavailable"
+            ) from exc
+
     def list_operations(
         self,
         *,
