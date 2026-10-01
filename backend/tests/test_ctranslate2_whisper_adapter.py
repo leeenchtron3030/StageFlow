@@ -206,6 +206,9 @@ def test_stageflow_accepts_distinct_operator_profile(device: str, compute: str) 
 def test_clean_process_exercises_adapter_and_native_loader_without_forbidden_imports(
     tmp_path: Path,
 ) -> None:
+    # The real engine modules need the optional transcription-core runtime.
+    pytest.importorskip("numpy")
+    pytest.importorskip("tokenizers")
     script = '''
 import importlib
 import sys
