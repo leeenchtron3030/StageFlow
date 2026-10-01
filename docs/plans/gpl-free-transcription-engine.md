@@ -28,7 +28,7 @@ the owner parity run passes.
   - a change to the transcript evidence contract, its storage schema or the Work
     Execution port;
   - a dependency outside the licenses in D2;
-  - a native library bundled in a candidate wheel whose license is not permissive.
+  - a copyleft native library bundled in a candidate wheel (see the D2 amendment).
 
 ## Related findings or ADRs
 
@@ -128,6 +128,17 @@ then retired, and the SBOM shows no GPL or AGPL component.
   - **CUDA runtime:** stays operator-provisioned, as today.
   - **While ED-0122 is active:** the old `transcription` group stays for comparison, and
     `transcription-core` is not yet a default group.
+- **D2 amendment (owner, 2026-10-01).** ED-0122's native-library inventory found that the
+  CTranslate2 Windows wheel bundles **NVIDIA cuDNN** (`cudnn64_9.dll`, 9.10.2.21) and the
+  Intel OpenMP runtime (`libiomp5md.dll`), beside its MIT libraries. Today's faster-whisper
+  path already loads that same wheel.
+  - **The licensing rule is now no copyleft components:** no GPL or AGPL, and no LGPL
+    linked statically into a shipped artifact.
+  - **NVIDIA runtime libraries are allowed:** the bundled cuDNN, the operator-provisioned
+    CUDA runtime and the driver. So is the OpenMP runtime.
+  - Each allowed library is recorded in the SBOM under its own license.
+  - ADR-0036's GPL-free goal is unchanged.
+  - The escalation trigger becomes a copyleft native component.
 - **D3. Decode:** the operator's LGPL FFmpeg runs as a separate process at an explicit
   path.
   - **Configuration:** a new optional `ffmpeg_path` in `[local_transcription]`. It is
