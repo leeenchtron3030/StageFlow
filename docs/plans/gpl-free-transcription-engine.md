@@ -326,11 +326,11 @@ None verified as needed:
 
 ## Acceptance criteria
 
-- [ ] ED-0122 merged: the engine, decode, configuration, worker selection, parity mode,
+- [x] ED-0122 merged: the engine, decode, configuration, worker selection, parity mode,
   docs and tests, with the default provider unchanged.
-- [ ] The CTranslate2 wheel's native-library license inventory is recorded, with no
+- [x] The CTranslate2 wheel's native-library license inventory is recorded, with no
   non-permissive component.
-- [ ] The licensing guard test proves that no PyAV, faster-whisper, huggingface_hub,
+- [x] The licensing guard test proves that no PyAV, faster-whisper, huggingface_hub,
   onnxruntime or tqdm is loaded.
 - [ ] Owner parity run recorded: D5 tolerances met on GPU (with and without render load),
   and a CPU `int8` run completed.
@@ -354,11 +354,47 @@ None verified as needed:
 
 ## Completion record
 
-- Implemented revision:
-- Files and migrations actually changed:
-- Commands and tests actually run:
-- Results and warnings:
-- Execution authority used:
-- Approved deviations:
-- Rollback status:
-- Remaining work:
+ED-0122 is complete. The owner parity run (D5) and ED-0123 remain open.
+
+- **Implemented revision:** PR #189, `main` 88b13c8, 2026-10-01.
+- **Files changed:**
+  - the new `backend/app/infrastructure/transcription/ctranslate2_whisper/` (engine, decode,
+    adapter and MIT `LICENSE`);
+  - `deployment.py` (optional `ffmpeg_path`, provider pairs and the profile refusal);
+  - `demo/worker.py` and `demo/cli.py` (selection by provider, and decode-tool identity in
+    the startup line);
+  - the `transcription-core` group in `pyproject.toml` and `uv.lock`;
+  - the spike's `--candidate stageflow` mode;
+  - new tests and synthetic fixtures;
+  - the architecture doc and READMEs.
+  - **No migrations.**
+- **Commands and tests actually run:**
+  - **Host backend suite, with the host-only tests enabled:** 3,562 passed, 0 failed, 2
+    skipped. This includes PCM equivalence with the PyAV decoder at 16 kHz and 48 kHz
+    (within one 16-bit step), and an end-to-end CPU `int8` run.
+  - **After the CI fix:** 3,559 passed, 0 failed, 5 skipped.
+  - Ruff and Pyright (0 errors) were clean, and CI was green.
+- **Results and warnings:**
+  - **Native inventory (Windows wheel):**
+    - MIT: `ctranslate2.dll` and `_ext`;
+    - NVIDIA cuDNN 9.10.2.21, allowed by the D2 amendment;
+    - the Intel OpenMP runtime, allowed.
+  - The Linux wheel is unverified; check it with ED-0123 and the SBOM.
+  - **CI coverage:** CI does not install `transcription-core`, so the engine, decode and
+    isolation tests skip there and run only on the host. Installing the group in CI
+    belongs with ED-0123.
+- **Execution authority used:** Green under the approved plan and its D2 amendment.
+  - The reviewer escalated two items, and they were resolved within the plan's
+    constraints.
+  - **Decode-tool identity** was being written into transcript `limitations`. It moved
+    to the worker startup line, because the transcript contract stays unchanged. A
+    first-class decode provenance field is deferred to a later contract plan.
+  - **Forced English** applies when no language is requested, per ADR-0036 decision 5.
+    The parity mode therefore compares the engines with English forced on both sides.
+- **Approved deviations:** none beyond the D2 amendment.
+- **Rollback status:** additive. The default provider is unchanged.
+- **Remaining work:**
+  - the owner parity run with `--candidate stageflow` against D5, on GPU with and without
+    render load, plus CPU `int8`;
+  - then ED-0123: the default switch, retiring faster-whisper, the GPL-free guard, the
+    SBOM, and CI installing `transcription-core`.
