@@ -8,9 +8,10 @@ This document defines the first transcription evidence boundary requested by the
 recorder-calibration/transcription-readiness milestone. It specializes the accepted
 post-Kernel direction and accepted ADR-0025. Migration 0007 and the bounded internal
 contracts/repository implement the provider-neutral evidence and operation substrate.
-Automatic enqueue exists only in the bounded, default-off Demo 2 coordinator
-(`docs/plans/demo2-autonomous-event-node.md:14`, `backend/app/demo/autonomous.py:270`),
-not as a general automatic-enqueue selection.
+When local transcription is configured, Demo media reconciliation enqueues transcription
+for registered Completed Media Assets across the Event, including unassociated assets.
+The bounded, default-off Demo 2 coordinator invokes this reconciliation automatically
+(`backend/app/demo/autonomous.py`); configuration defaults are unchanged.
 The first local provider was subsequently accepted on 2026-08-18: faster-whisper 1.2.1,
 CTranslate2 4.8.1, and the pinned large-v3-turbo model; broader production selection
 remains conditional (`docs/validation/transcription-engine-evaluation.md:133`). The worker
@@ -22,6 +23,39 @@ distributable artifacts without granting legal clearance (`backend/pyproject.tom
 
 `Transcript Evidence Revision` is the accepted internal asset/manifest-scoped evidence
 term. Session Transcript composition and any public API naming remain unresolved.
+
+## Trigger scope and replay
+
+`DemoApplication.reconcile_media` selects up to 500 registrations per Event cycle in
+ascending `registered_at` order, with asset ID breaking ties. The PostgreSQL query selects
+assets without matching transcription work, rather than the newest 500 media records.
+Durable enqueues remove assets from subsequent batches. A process-local keyset cursor
+advances past each full page, including enqueue failures, and wraps after a short or empty
+page. This lets later registrations proceed even if 500 earlier assets persistently fail.
+The cursor is selection progress only: restart resets it and safely rescans using durable
+operation inputs. A backlog larger than 500 drains across cycles.
+Timing and segmentation retain their existing independent enqueue paths and bounds.
+
+Operation identity derives from deployment, Event, asset, manifest identity/version and
+execution profile identity/version. The idempotency key uses that deterministic UUID to
+stay within the existing identifier length bound. Session identity is absent. The existing
+Session-scoped manual trigger retains its request/response shape and 500-asset bound;
+it selects associated registrations in arrival order and reports their existing operations.
+Later association or re-association does not create new transcription work.
+
+Selection checks operation inputs across the full journal, including operations with old
+Session-scoped keys. All statuses count as existing work. Retryable execution failures
+remain on the original operation with its existing attempt limit and retry delay (three
+attempts and 30 seconds for Demo enqueues); terminal failures are reported by the Session
+trigger and are not automatically replaced. An enqueue failure that stored no operation
+is eligible again on a later scan pass. A changed execution profile is distinct work.
+Absence of local transcription still enqueues nothing and retains the existing
+`local_transcription_not_configured` error; this does not change installation defaults.
+
+Suggestion runs read the latest complete transcript reference per asset even before
+association. Transcript arrival supplies evidence only; it grants no Session, association,
+Editorial, or package authority. Synthetic memory and rolled-back PostgreSQL coverage is
+in `backend/tests/test_event_asset_transcription.py`.
 
 ## Evidence and authority boundary
 

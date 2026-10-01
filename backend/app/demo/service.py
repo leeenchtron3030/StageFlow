@@ -3,11 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import cast
 from uuid import NAMESPACE_URL, uuid5
 
 from app.bootstrap.event_mode_kernel import KernelComponents
-from app.contexts.production.event_mode_kernel.contracts import AssociationStatus
 from app.contexts.production.event_mode_kernel.repository import KernelNotFoundError
 from app.contexts.production.media_segmentation_evidence.enqueue import MediaSegmentationEnqueue
 from app.contexts.production.media_timing_evidence.enqueue import (
@@ -149,55 +147,32 @@ class DemoApplication:
         if transcription is None:
             raise RuntimeError("local_transcription_not_configured")
 
-        existing = self.repository.list_operations(
+        targets = self.repository.list_transcription_targets(
             deployment_id=self.components.configuration.deployment.deployment_id,
             event_id=event.id,
+            execution_profile_id=transcription.execution_profile_id,
+            execution_profile_version=transcription.execution_profile_version,
+            session_id=request.session_id,
+            after=(self.components.transcription_scan_after
+                   if request.session_id is None else None),
             limit=500,
         )
-        by_subject = {
-            (
-                operation.input.asset_id,
-                operation.input.manifest_id,
-                operation.input.execution_profile_id,
-                operation.input.execution_profile_version,
-            ): cast(DurableOperation, operation)
-            for operation in existing
-            if isinstance(operation.input, TranscriptionOperationInput)
-        }
         operations: list[DurableOperation] = []
         failures: list[str] = timing_failures
         enqueued = 0
-        seen_assets: set[EntityId] = set()
 
-        for media in self.components.repository.list_recent_media(event.id, limit=500):
-            if (
-                media.asset_id is None
-                or media.asset_id in seen_assets
-                or media.session_id is None
-                or media.association_status is not AssociationStatus.ASSOCIATED
-                or (
-                    request.session_id is not None
-                    and media.session_id != request.session_id
-                )
-            ):
-                continue
-            seen_assets.add(media.asset_id)
-            asset = self.components.repository.get_asset(media.asset_id)
-            candidate = self.components.repository.get_candidate(media.candidate_id)
-            if asset is None or candidate is None:
-                failures.append("registered_media_facts_unavailable")
-                continue
-            subject = (
-                asset.id,
-                asset.manifest_id,
-                transcription.execution_profile_id,
-                transcription.execution_profile_version,
-            )
-            prior = by_subject.get(subject)
+        for asset_id, prior in targets:
             if prior is not None:
                 operations.append(prior)
                 continue
-
+            asset = self.components.repository.get_asset(asset_id)
+            candidate = (
+                None if asset is None
+                else self.components.repository.get_candidate(asset.candidate_id)
+            )
+            if asset is None or candidate is None:
+                failures.append("registered_media_facts_unavailable")
+                continue
             asset_format = Path(candidate.source_reference).suffix.casefold().lstrip(".")
             if not asset_format:
                 failures.append("registered_media_format_unavailable")
@@ -209,8 +184,8 @@ class DemoApplication:
                         (
                             "stageflow:demo-transcription:"
                             f"{self.components.configuration.deployment.deployment_id}:"
-                            f"{event.id.value}:{media.session_id.value}:{asset.id.value}:"
-                            f"{asset.manifest_id.value}:"
+                            f"{event.id.value}:{asset.id.value}:"
+                            f"{asset.manifest_id.value}:1.0:"
                             f"{transcription.execution_profile_id}:"
                             f"{transcription.execution_profile_version}"
                         ),
@@ -219,9 +194,7 @@ class DemoApplication:
             )
             enqueue = EnqueueTranscriptionOperation(
                 operation_id=operation_id,
-                idempotency_key=(
-                    f"demo-process:{media.session_id.value}:{asset.id.value}"
-                ),
+                idempotency_key=f"demo-process:{operation_id.value}",
                 deployment_id=self.components.configuration.deployment.deployment_id,
                 event_id=event.id,
                 input=TranscriptionOperationInput(
@@ -251,9 +224,14 @@ class DemoApplication:
                 failures.append("transcription_enqueue_failed")
                 continue
             operations.append(operation)
-            by_subject[subject] = operation
             enqueued += 1
 
+        if request.session_id is None:
+            # Move past persistent per-asset failures as well as successful enqueues.
+            # Wrap at the end; restart may safely rescan because operations are durable.
+            self.components.transcription_scan_after = (
+                targets[-1][0] if len(targets) == 500 else None
+            )
         return MediaTranscriptionReconciliation(
             scope=request.scope,
             candidates_seen=cycle.candidates_seen,

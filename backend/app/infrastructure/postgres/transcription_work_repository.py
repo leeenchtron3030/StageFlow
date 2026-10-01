@@ -1377,6 +1377,98 @@ class PostgresWorkExecutionRepository[
                 "postgresql_work_execution_unavailable"
             ) from exc
 
+    def list_transcription_targets(
+        self, *, deployment_id: str, event_id: EntityId,
+        execution_profile_id: str, execution_profile_version: str,
+        session_id: EntityId | None = None, after: EntityId | None = None, limit: int = 500,
+    ) -> tuple[tuple[EntityId, DurableOperation[InputT] | None], ...]:
+        """Drain registrations in arrival order; Session reads also report prior work.
+
+        Match inputs, never the enqueue key, so legacy Session-keyed operations remain
+        authoritative. All statuses count: retries belong to the existing operation.
+        """
+        if not 1 <= limit <= 500:
+            raise ValueError("limit must be between 1 and 500")
+        session = None if session_id is None else session_id.value
+        cursor = None if after is None else after.value
+        try:
+            with self._connect() as connection:
+                if session_id is None:
+                    # Only existence matters here. Keep this flattenable into an
+                    # anti-join instead of sorting the operation journal per asset.
+                    rows = connection.execute(
+                        """
+                        SELECT a.asset_id, NULL::uuid AS operation_id
+                        FROM stageflow.completed_media_asset_registry a
+                        JOIN stageflow.stage s USING (stage_id)
+                        WHERE s.event_id = %s
+                          AND (%s::uuid IS NULL OR (a.registered_at, a.asset_id) > (
+                              SELECT registered_at, asset_id
+                              FROM stageflow.completed_media_asset_registry WHERE asset_id = %s
+                          ))
+                          AND NOT EXISTS (
+                              SELECT 1 FROM stageflow.work_operation o
+                              WHERE o.operation_kind = 'transcription'
+                                AND o.deployment_id = %s AND o.event_id = s.event_id
+                                AND o.asset_id = a.asset_id AND o.manifest_id = a.manifest_id
+                                AND o.manifest_version = '1.0'
+                                AND o.execution_profile_id = %s
+                                AND o.execution_profile_version = %s
+                          )
+                        ORDER BY a.registered_at, a.asset_id
+                        LIMIT %s
+                        """,
+                        (event_id.value, cursor, cursor, deployment_id,
+                         execution_profile_id, execution_profile_version, limit),
+                    ).fetchall()
+                else:
+                    rows = connection.execute(
+                        """
+                        SELECT a.asset_id, prior.operation_id
+                        FROM stageflow.completed_media_asset_registry a
+                        JOIN stageflow.stage s USING (stage_id)
+                        LEFT JOIN stageflow.media_association x USING (asset_id)
+                        LEFT JOIN LATERAL (
+                            SELECT o.operation_id FROM stageflow.work_operation o
+                            WHERE o.operation_kind = 'transcription'
+                              AND o.deployment_id = %s AND o.event_id = s.event_id
+                              AND o.asset_id = a.asset_id AND o.manifest_id = a.manifest_id
+                              AND o.manifest_version = '1.0'
+                              AND o.execution_profile_id = %s
+                              AND o.execution_profile_version = %s
+                            ORDER BY (o.operation_status = 'terminal_failed'),
+                                     o.created_at, o.operation_id
+                            LIMIT 1
+                        ) prior ON true
+                        WHERE s.event_id = %s
+                          AND (%s::uuid IS NULL OR (a.registered_at, a.asset_id) > (
+                              SELECT registered_at, asset_id
+                              FROM stageflow.completed_media_asset_registry WHERE asset_id = %s
+                          ))
+                          AND x.session_id = %s::uuid AND x.association_status = 'associated'
+                        ORDER BY a.registered_at, a.asset_id
+                        LIMIT %s
+                        """,
+                        (deployment_id, execution_profile_id, execution_profile_version,
+                         event_id.value, cursor, cursor, session, limit),
+                    ).fetchall()
+                targets: list[tuple[EntityId, DurableOperation[InputT] | None]] = []
+                for row in rows:
+                    prior = None
+                    if row["operation_id"] is not None:
+                        operation = connection.execute(
+                            "SELECT * FROM stageflow.work_operation WHERE operation_id = %s",
+                            (row["operation_id"],),
+                        ).fetchone()
+                        assert operation is not None
+                        prior = self._operation(operation, connection)
+                    targets.append((EntityId(str(row["asset_id"])), prior))
+                return tuple(targets)
+        except (psycopg.InterfaceError, psycopg.OperationalError) as exc:
+            raise WorkExecutionStorageUnavailableError(
+                "postgresql_work_execution_unavailable"
+            ) from exc
+
     def list_operations(
         self,
         *,
