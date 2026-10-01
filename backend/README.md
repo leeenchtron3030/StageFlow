@@ -41,6 +41,55 @@ FFmpeg build. Do not promote these dependencies into the default installation or
 and is not legal clearance. See the
 [SBOM decision record](../docs/security/dependency-license-sbom-2026-08-21.md#decision-options-for-the-pyavffmpeg-exposure).
 
+## Additive CTranslate2 transcription provider (ED-0122)
+
+The optional `transcription-core` group contains CTranslate2 4.8.1, tokenizers 0.23.1,
+and NumPy 2.5.2. Provision these and the local large-v3-turbo model offline. The
+default remains faster-whisper; the existing `transcription` group and ED-0075
+distribution exclusion remain unchanged pending owner parity qualification and ED-0123.
+
+Example operator configuration (paths refer to locally provisioned resources):
+
+```toml
+[local_transcription]
+provider = "stageflow-ctranslate2-whisper"
+model_id = "large-v3-turbo"
+model_version = "<provisioned-model-revision>"
+model_path = "C:/StageFlowModels/large-v3-turbo"
+ffmpeg_path = "C:/StageFlowTools/ffmpeg/bin/ffmpeg.exe"
+device = "cuda"
+compute_type = "float16"
+execution_profile_id = "ct2-whisper-large-v3-turbo-cuda-float16"
+execution_profile_version = "1.0"
+```
+
+`tokenizer.json` is required in the model directory. The explicit FFmpeg path is
+required for this provider; an LGPL `ffprobe` executable must be alongside it.
+Both binaries are versioned and hashed, and GPL/nonfree build flags are refused.
+Decode averages all 1–8 channels, produces 16 kHz s16 PCM, renews the lease, and has
+duration-based output and timeout bounds (maximum input duration four hours).
+Inference fixes English, beam 5, word alignment, previous-text conditioning, and
+the reference temperature fallback, without VAD, batching, or downloads.
+Under ADR-0036 decision 5, an unspecified `requested_language` also means English;
+the engine does not auto-detect language. Explicit non-English requests are refused.
+Worker startup JSON reports decode/probe tool names, versions and SHA-256 hashes
+alongside `device`, `compute_type` and `execution_profile`.
+
+The other supported pair is `device = "cpu"`, `compute_type = "int8"`, with profile
+`ct2-whisper-large-v3-turbo-cpu-int8`. Other pairs fail at construction. CPU is an
+explicit profile, never an automatic fallback. Demo preflight retains its existing
+appliance GPU check; the standalone transcription worker can execute the CPU profile.
+
+**D6 switching rule:** switch profiles between Events. Keep profile identities
+distinct for each engine: the StageFlow provider refuses the default
+`faster-whisper-large-v3-turbo-cuda-float16` and every id starting with `faster-whisper`.
+Set an explicit, distinct `execution_profile_id`. Keep an existing Event's
+profile throughout its life. A deliberate mid-Event change causes ED-0120 to
+enqueue new transcription for every registered asset; previous transcript evidence
+remains immutable. Keep the current profile available when operating older Events.
+See the [parity procedure](../scripts/validation/README.md#stageflow-adapter-parity-ed-0122)
+before selecting the replacement as a production default.
+
 ## Run the Backend
 
 ```bash

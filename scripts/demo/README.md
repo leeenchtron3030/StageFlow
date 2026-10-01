@@ -1,5 +1,31 @@
 # Guarded Demo rehearsal controller
 
+## Optional StageFlow transcription engine (ED-0122)
+
+The worker and CLI select the adapter using `[local_transcription].provider`.
+The default remains `faster-whisper`. To exercise the additive engine, provision
+`transcription-core` offline and set `provider = "stageflow-ctranslate2-whisper"`,
+an absolute `ffmpeg_path`, and a model directory containing `tokenizer.json`.
+Provision an LGPL `ffprobe` alongside FFmpeg; neither executable is searched on PATH.
+See the [complete configuration example](../../backend/README.md#additive-ctranslate2-transcription-provider-ed-0122).
+
+Use CUDA/float16 with profile `ct2-whisper-large-v3-turbo-cuda-float16`, or explicitly
+select CPU/int8 with `ct2-whisper-large-v3-turbo-cpu-int8`. Keep a distinct profile id
+for each engine/device/compute choice. Other pairs are refused; there is no automatic
+CPU fallback. Demo preflight still checks the appliance GPU requirement. The standalone
+transcription worker supports the explicit CPU profile.
+The StageFlow provider requires an explicit, distinct `execution_profile_id`: it
+refuses the default `faster-whisper-large-v3-turbo-cuda-float16` and every id starting
+with `faster-whisper`.
+
+**D6:** change profiles between Events. An existing Event keeps its profile for life.
+A deliberate mid-Event change re-transcribes all registered Event assets under ED-0120;
+earlier transcript evidence remains immutable. Keep the old profile available for older
+Events. The owner must complete the D5 parity run before the ED-0123 default switch.
+The old dependency group and ED-0075 distribution exclusion are unchanged.
+
+## Rehearsal controller
+
 Use `StageFlow-Demo.ps1` for the local Demo rehearsal. It is a thin operator
 controller around the existing Python Demo CLI, loopback APIs, and
 `Start-StageFlowDemo.ps1`; it does not implement alternate application behavior.

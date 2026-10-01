@@ -67,6 +67,7 @@ class LocalTranscriptionConfiguration(BaseModel):
     compute_type: str = "float16"
     execution_profile_id: str = "faster-whisper-large-v3-turbo-cuda-float16"
     execution_profile_version: str = "1.0"
+    ffmpeg_path: str | None = Field(default=None, repr=False)
 
     @field_validator(
         "provider",
@@ -98,6 +99,14 @@ class LocalTranscriptionConfiguration(BaseModel):
 
     @model_validator(mode="after")
     def qualified_demo_baseline(self) -> LocalTranscriptionConfiguration:
+        if self.provider == "stageflow-ctranslate2-whisper":
+            if self.execution_profile_id.startswith("faster-whisper"):
+                raise ValueError("StageFlow transcription requires a distinct execution profile id")
+            if (self.model_id != "large-v3-turbo" or
+                    (self.device, self.compute_type) not in {("cuda", "float16"), ("cpu", "int8")}
+                    or self.ffmpeg_path is None):
+                raise ValueError("local transcription requires a qualified pair and ffmpeg_path")
+            return self
         if (
             self.provider != "faster-whisper"
             or self.model_id != "large-v3-turbo"
@@ -108,6 +117,18 @@ class LocalTranscriptionConfiguration(BaseModel):
                 "Demo transcription must use faster-whisper large-v3-turbo CUDA float16"
             )
         return self
+
+    @field_validator("ffmpeg_path")
+    @classmethod
+    def explicit_ffmpeg_path(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip()
+        cls.absolute_model_path(value)
+        if (value.startswith(("\\\\", "//")) or any(c in value for c in "\r\n\0")
+                or PureWindowsPath(value).suffix.casefold() in {".cmd", ".bat"}):
+            raise ValueError("local transcription requires an explicit local executable")
+        return value
 
 
 class LocalRenderConfiguration(BaseModel):

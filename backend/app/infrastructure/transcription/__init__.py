@@ -1,5 +1,6 @@
 """Production transcription provider adapters."""
 
+from .ctranslate2_whisper import CTranslate2WhisperExecutionAdapter
 from .faster_whisper import (
     FasterWhisperExecutionAdapter,
     KernelMediaPathResolver,
@@ -7,6 +8,7 @@ from .faster_whisper import (
 )
 
 __all__ = [
+    "CTranslate2WhisperExecutionAdapter",
     "FasterWhisperExecutionAdapter",
     "KernelMediaPathResolver",
     "MediaPathResolver",

@@ -54,6 +54,7 @@ class Parser(argparse.ArgumentParser):
 def parser() -> Parser:
     result = Parser(prog="transcription_engine_spike", description=__doc__)
     result.add_argument("--blocks", required=True)
+    result.add_argument("--candidate", choices=("option_a", "stageflow"), default="option_a")
     result.add_argument("--whisper-cpp-binary")
     result.add_argument("--whisper-cpp-model")
     result.add_argument("--render-load", action="store_true")
@@ -95,10 +96,13 @@ class Settings:
     cpp_model: Path | None = None
     render_load: bool = False
     engine_timeout_seconds: int = ENGINE_TIMEOUT
+    candidate: str = "option_a"
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "blocks", tuple(self.blocks))
         if not 60 <= self.engine_timeout_seconds <= 14400:
+            raise Refusal()
+        if self.candidate not in {"option_a", "stageflow"}:
             raise Refusal()
 
 
@@ -106,6 +110,8 @@ def load_settings(args: argparse.Namespace, environ: Mapping[str, str]) -> Setti
     if not 1 <= args.max_blocks <= 1000:
         raise Refusal()
     if bool(args.whisper_cpp_binary) != bool(args.whisper_cpp_model):
+        raise Refusal()
+    if args.candidate == "stageflow" and args.whisper_cpp_binary:
         raise Refusal()
     folder = local_path(args.blocks, directory=True, external=True)
     entries = sorted(folder.iterdir(), key=lambda p: (p.name.casefold(), p.name))
@@ -123,9 +129,12 @@ def load_settings(args: argparse.Namespace, environ: Mapping[str, str]) -> Setti
     transcription = config["local_transcription"]
     device = args.device or transcription.get("device", "cuda")
     compute_type = transcription.get("compute_type", "float16")
+    if args.candidate == "stageflow":
+        compute_type = "int8" if device == "cpu" else "float16"
     if device not in {"cuda", "cpu"} or not isinstance(compute_type, str) or not compute_type:
         raise Refusal()
-    ffmpeg = local_path(config["local_media_segmentation"]["ffmpeg_path"])
+    ffmpeg = local_path(transcription["ffmpeg_path"] if args.candidate == "stageflow"
+                        else config["local_media_segmentation"]["ffmpeg_path"])
     ffprobe = local_path(config["local_media_timing"]["ffprobe_path"])
     cpp = local_path(args.whisper_cpp_binary) if args.whisper_cpp_binary else None
     if any(p.suffix.casefold() in {".bat", ".cmd"} for p in (ffmpeg, ffprobe, cpp) if p):
@@ -138,6 +147,7 @@ def load_settings(args: argparse.Namespace, environ: Mapping[str, str]) -> Setti
         device, compute_type, ffmpeg, ffprobe, args.profile, args.language, cpp,
         local_path(args.whisper_cpp_model) if cpp else None, args.render_load,
         args.engine_timeout_seconds,
+        args.candidate,
     )
 
 
@@ -347,6 +357,8 @@ class LocalEffects:
         self.settings = settings
         self.model: Any = None
         self.command_timeout = TIMEOUT
+        self.adapters: dict[str, Any] = {}
+        self.decode_seconds = 0.0
 
     def warm_cache(self, block: Path) -> None:
         with block.open("rb") as source:
@@ -354,6 +366,20 @@ class LocalEffects:
                 pass
 
     def warm_up(self, engine: str) -> None:
+        if self.settings.candidate == "stageflow":
+            from app.contexts.transcription_evidence import TranscriptionExecutionError
+
+            with tempfile.TemporaryDirectory(prefix="transcription-parity-") as directory:
+                path = Path(directory) / "silence.wav"
+                with wave.open(str(path), "wb") as audio:
+                    audio.setparams((1, 2, 16000, 16000, "NONE", "not compressed"))
+                    audio.writeframes(bytes(32000))
+                try:
+                    self.adapter_measure(engine, path)
+                except TranscriptionExecutionError as exc:
+                    if exc.reason_code != "provider_no_speech_segments":
+                        raise
+            return
         if engine == "option_b":
             root = local_path(tempfile.gettempdir(), directory=True, external=True)
             with tempfile.TemporaryDirectory(prefix="transcription-spike-", dir=root) as directory:
@@ -394,10 +420,106 @@ class LocalEffects:
         return RenderLoad(self.settings.ffmpeg, block)
 
     def measure(self, engine: str, block: Path) -> Measurement:
+        if self.settings.candidate == "stageflow":
+            return self.adapter_measure(engine, block)
         if engine == "option_b":
             return self.cpp_measure(block)
         self.load_model()
         return self.whisper_measure(engine, block)
+
+    def adapter_measure(self, engine: str, block: Path) -> Measurement:
+        """ED-0122 measures the complete adapter boundary, including normalization.
+
+        CPU comparison binds the reference factory to CPU int8 in this private
+        harness only; the production faster-whisper constructor stays CUDA-only.
+        """
+        from app.contexts.transcription_evidence import TranscriptionExecutionRequest
+        from app.contexts.work_execution import TranscriptionOperationInput
+        from app.core.config.deployment import LocalTranscriptionConfiguration
+        from app.infrastructure.transcription import (
+            CTranslate2WhisperExecutionAdapter,
+            FasterWhisperExecutionAdapter,
+        )
+        from app.shared.ids import EntityId
+        from app.shared.time import SystemClock
+
+        class Resolver:
+            def resolve(inner, input: TranscriptionOperationInput) -> Path:
+                return self.current_block
+
+        self.current_block = block
+        stageflow = engine == "stageflow"
+        if engine not in self.adapters:
+            configuration = LocalTranscriptionConfiguration(
+                provider="stageflow-ctranslate2-whisper" if stageflow else "faster-whisper",
+                model_version="offline-parity-model", model_path=str(self.settings.model),
+                device=self.settings.device if stageflow else "cuda",
+                compute_type=self.settings.compute_type if stageflow else "float16",
+                execution_profile_id=f"parity-{engine}-{self.settings.device}",
+                ffmpeg_path=str(self.settings.ffmpeg) if stageflow else None,
+            )
+            if stageflow:
+                from app.infrastructure.transcription.ctranslate2_whisper.decode import (
+                    FFmpegDecoder,
+                )
+
+                class TimedDecoder(FFmpegDecoder):
+                    def decode(inner, path: Path, heartbeat: Callable[[], None]) -> Any:
+                        started = time.perf_counter()
+                        try:
+                            return super().decode(path, heartbeat)
+                        finally:
+                            self.decode_seconds += time.perf_counter() - started
+
+                self.adapters[engine] = CTranslate2WhisperExecutionAdapter(
+                    configuration, resolver=Resolver(), clock=SystemClock(),
+                    decoder_factory=TimedDecoder)
+            else:
+                def factory(path: str, **kwargs: Any) -> Any:
+                    module = importlib.import_module("faster_whisper")
+                    return module.WhisperModel(path, device=self.settings.device,
+                                               compute_type=self.settings.compute_type,
+                                               local_files_only=True)
+
+                self.adapters[engine] = FasterWhisperExecutionAdapter(
+                    configuration, resolver=Resolver(), clock=SystemClock(), model_factory=factory)
+        identity = EntityId("42000000-0000-0000-0000-000000000001")
+        request = TranscriptionExecutionRequest(
+            operation_id=identity, attempt_id=identity, fence_generation=1, work_key="0" * 64,
+            input=TranscriptionOperationInput(
+                asset_id=identity, manifest_id=identity, manifest_version="1.0", asset_format="wav",
+                execution_profile_id=f"parity-{engine}-{self.settings.device}",
+                execution_profile_version="1.0", requested_language="en", request_word_timing=True))
+        self.decode_seconds = 0.0
+        module: Any = None
+        original: Any = None
+        if not stageflow:
+            module = importlib.import_module("faster_whisper.transcribe")
+            original = module.decode_audio
+
+            def timed_decode(*args: Any, **kwargs: Any) -> Any:
+                started = time.perf_counter()
+                try:
+                    with decoding():
+                        return original(*args, **kwargs)
+                finally:
+                    self.decode_seconds += time.perf_counter() - started
+
+            module.decode_audio = timed_decode
+        started = time.perf_counter()
+        try:
+            result = self.adapters[engine].execute(request, lambda: None)
+            if result.status.value != "complete":
+                raise WorkerFailure("engine_failed")
+            words = tuple(Word(w.text, w.asset_start_microseconds / 1e6,
+                               w.asset_end_microseconds / 1e6, segment.ordinal)
+                          for segment in result.segments for w in segment.words)
+            total = time.perf_counter() - started
+            return Measurement(words, self.decode_seconds,
+                               max(0, total - self.decode_seconds), total)
+        finally:
+            if module is not None:
+                module.decode_audio = original
 
     def load_model(self) -> None:
         if self.model is None:
@@ -502,6 +624,10 @@ def decoding() -> Generator[None]:
 
 
 def measurement_failure(exc: Exception, engine: str, device: str) -> str:
+    from app.contexts.transcription_evidence import TranscriptionExecutionError
+
+    if isinstance(exc, TranscriptionExecutionError) and exc.reason_code == "media_decode_failed":
+        return "decode_failed"
     if isinstance(exc, (EngineTimeout, subprocess.TimeoutExpired)):
         return "engine_timeout"
     if isinstance(exc, WorkerFailure):
@@ -635,7 +761,7 @@ def flatten_numbers(value: Mapping[str, Any], prefix: str = "") -> dict[str, flo
 
 def aggregate(rows: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
     result: list[dict[str, Any]] = []
-    for engine in ENGINES:
+    for engine in (*ENGINES, "stageflow"):
         for pass_id in (1, 2):
             for load in ("off", "active", "unavailable"):
                 selected = [r for r in rows
@@ -658,7 +784,8 @@ def run(settings: Settings, effects: Effects) -> tuple[int, dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     failures: list[dict[str, Any]] = []
     phrases = profile_phrases(settings.profile)
-    engines = ENGINES if settings.cpp_binary else ENGINES[:2]
+    engines = (("baseline", "stageflow") if settings.candidate == "stageflow" else
+               ENGINES[:3] if settings.cpp_binary else ENGINES[:2])
     durations: dict[Path, float] = {}
     for ordinal, block in enumerate(settings.blocks, 1):
         try:
@@ -678,7 +805,8 @@ def run(settings: Settings, effects: Effects) -> tuple[int, dict[str, Any]]:
             except Exception as exc:
                 code = warm_up_failure(exc, engine, settings.device)
                 unavailable[engine] = code
-                if settings.device == "cuda" and engine != "option_b":
+                if (settings.candidate == "option_a" and settings.device == "cuda"
+                        and engine != "option_b"):
                     unavailable.update(baseline=code, option_a=code)
     for pass_id in range(1, 3 if settings.render_load else 2):
         for ordinal, block in enumerate(settings.blocks, 1):
