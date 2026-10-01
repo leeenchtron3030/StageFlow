@@ -4,6 +4,9 @@
 
 **Approved** (owner, 2026-09-30), with D1–D5 as recommended. ED-0119, ED-0120 and ED-0121 are allocated.
 
+ED-0119 and ED-0120 are completed (see the [completion record](#completion-record-ed-0119-and-ed-0120)).
+ED-0121, Live Replay Run 002 and the D5 evaluation remain.
+
 It follows:
 - the owner's live-testing direction of 2026-09-30: simulate the live setting, where
   StageFlow sits at the tail of the signal flow, recordings appear in small blocks, and
@@ -193,9 +196,9 @@ The current tests leave four gaps against the live setting:
 
 ## Acceptance criteria
 
-- [ ] ED-0119 merged; spike result recorded, with engine timings and parity, and a
+- [x] ED-0119 merged; spike result recorded, with engine timings and parity, and a
   recommendation between A and B for the GPL-free adapter.
-- [ ] ED-0120 merged. Registered assets are transcribed without a Session, and existing
+- [x] ED-0120 merged. Registered assets are transcribed without a Session, and existing
   behavior is unchanged.
 - [ ] ED-0121 merged, with the growing-file mode, time-of-use accuracy, per-stage
   timings and the availability timeline.
@@ -207,3 +210,64 @@ The current tests leave four gaps against the live setting:
 - ED-0119 and ED-0121 are validation tools; revert the code.
 - ED-0120: revert the code. Already-enqueued or completed asset transcripts remain valid,
   immutable evidence.
+
+## Completion record (ED-0119 and ED-0120)
+
+ED-0121, Live Replay Run 002 and the D5 evaluation are still open. This record covers
+only the first two directives.
+
+### ED-0120: Event-wide asset transcription on arrival
+
+- **Merged:** PR #181 (`main` a856d4a), 2026-09-30.
+- **Delivered (D1):**
+  - When transcription is configured for an Event, `reconcile_media` enqueues every
+    registered Completed Media Asset on arrival, in registration order, whatever its
+    Session association.
+  - Operation identity is per asset: Event, asset, manifest revision and execution
+    profile.
+  - The Session-scoped trigger keeps its API and reuses existing operations, including
+    legacy Session-keyed ones, matched by input.
+  - The scan is bounded and cursor-paged (500 per cycle). The target query is an
+    input-matching `NOT EXISTS` anti-join, so cost stays linear.
+  - Docs: the transcription evidence readiness architecture doc, and the backend and
+    demo READMEs.
+- **Validation:**
+  - `directive-reviewer` approved twice; the second approval followed the anti-join
+    performance fix.
+  - Host backend suite: 3,302 passed, 0 failed, 2 skipped. Ruff and Pyright were clean.
+- **One existing test expectation changed:** unassociated media now produces one
+  operation instead of none. The test also proves that later association creates no
+  duplicate.
+- **Unchanged:** no schema, migration, dependency, configuration default, Session,
+  association, Editorial or ED-0075 boundary change.
+
+### ED-0119: transcription engine spike
+
+- **Merged:** PR #183 (`main` c050c39), 2026-09-30.
+- **Delivered (D2):** `scripts/validation/transcription_engine_spike.py`, with fake-effect
+  tests and both validation README sections. Validation tooling only; no production
+  change.
+  - Inference runs in a supervised worker with a CUDA preflight and
+    `--engine-timeout-seconds`. Cache warming is per block, and warm-up is untimed.
+  - Engine order alternates. Failures surface as closed codes, and the output is
+    sanitized.
+- **Review history:**
+  - The owner's first smoke run hung because the CUDA runtime was not on `PATH`. The
+    supervised worker and preflight fixed this.
+  - `directive-reviewer` approved, asked for fixes after the hang fix, then approved.
+- **Validation:** host backend suite 3,425 passed, 0 failed, 2 skipped. Ruff and
+  Pyright were clean, and CI was green.
+- **Environment, not repository:** the shared local test database had been polluted by
+  the parked ED-0116 branch's migration `0028`. It was rebuilt from `main`'s migrations.
+  ED-0118's migration tests must use the transactional, renamed-schema fixture.
+- **Owner run:** [Transcription Engine Spike - Run 001](../validation/results/transcription-engine-spike-001.md).
+  - **Recommendation:** option A. Its speed matches the baseline on GPU, including under
+    an NVENC render, and it is faster on CPU.
+  - **Parity:** option A has parity once the stereo downmix is averaged. The one
+    block's cue divergence came from `-ac 1` being +3 dB louder than PyAV's decode.
+  - **Option B:** not measured.
+  - **The production adapter directive** must require an explicit channel-average
+    downmix, compute types chosen per device, and parity tolerances confirmed by the
+    owner, and must requalify on the appliance.
+- **CPU-run note:** the configured `float16` compute type is GPU-only. CPU measurement
+  used a separate config with `int8`, as the spike README documents.
