@@ -4,8 +4,8 @@
 
 **Approved** (owner, 2026-09-30), with D1–D5 as recommended. ED-0119, ED-0120 and ED-0121 are allocated.
 
-ED-0119 and ED-0120 are completed (see the [completion record](#completion-record-ed-0119-and-ed-0120)).
-ED-0121, Live Replay Run 002 and the D5 evaluation remain.
+ED-0119, ED-0120 and ED-0121 are completed (see the [completion record](#completion-record-ed-0119-and-ed-0120)
+and the [ED-0121 record](#completion-record-ed-0121)). Live Replay Run 002 and the D5 evaluation remain.
 
 It follows:
 - the owner's live-testing direction of 2026-09-30: simulate the live setting, where
@@ -200,7 +200,7 @@ The current tests leave four gaps against the live setting:
   recommendation between A and B for the GPL-free adapter.
 - [x] ED-0120 merged. Registered assets are transcribed without a Session, and existing
   behavior is unchanged.
-- [ ] ED-0121 merged, with the growing-file mode, time-of-use accuracy, per-stage
+- [x] ED-0121 merged, with the growing-file mode, time-of-use accuracy, per-stage
   timings and the availability timeline.
 - [ ] Live Replay Run 002 recorded (D4), with the D5 evaluation and the ED-0118 go or
   no-go.
@@ -271,3 +271,42 @@ only the first two directives.
     owner, and must requalify on the appliance.
 - **CPU-run note:** the configured `float16` compute type is GPU-only. CPU measurement
   used a separate config with `int8`, as the spike README documents.
+
+## Completion record (ED-0121)
+
+- **Merged:** PR #186 (`main` ab7b064), 2026-10-01.
+- **Owner-approved deviation (2026-09-30):** a read-only endpoint,
+  `GET /api/v1/transcription/assets/{asset_id}/status`, protected by the shared secret.
+  - **Why:** the implementer stopped at the Yellow gate. The worker reports `succeeded`
+    for both partial and complete transcripts, and suggestion runs use only complete
+    ones. No existing API exposed transcript status for an unassociated asset.
+  - **Returns:** the asset's operation for the configured profile and current manifest,
+    `complete_evidence` (the same rule as suggestion inputs, proven by a PostgreSQL
+    test) and `partial_evidence`.
+  - **Never returns** text, paths or diagnostics. No schema change.
+  - This expands the "In scope" line for ED-0121 above. It is the only production change.
+- **Delivered (D3)**, all opt-in. Without them, the output is unchanged.
+  - **`--transcription`.**
+    - It composes cue lists with the Conference profile, waits on the node's cumulative
+      enqueue counter, and runs the worker until the block's operation is terminal.
+    - Transcription is degradable: a failed, partial-only or timed-out transcript is
+      recorded as unavailable and counted, and the replay continues.
+  - **`--arrival growing`:** a background writer writes chunks to the final name and
+    finishes at each block's deadline.
+  - **Time-of-use accuracy:** at a talk's first match, and at its truth end +300 s and
+    +900 s.
+  - **Per-stage timings,** with a median and p95, measured from block close.
+  - **An evidence availability timeline.**
+  - **`--profile-label`.**
+- **Validation:**
+  - `directive-reviewer`: APPROVE.
+  - Host backend suite: 3,470 passed, 0 failed, 2 skipped. Ruff and Pyright were clean.
+  - CI was green, after a rebase onto docs-only `main` commits.
+- **Reviewer observations to keep in mind when reading Run 002:**
+  - **Late transcripts:** a transcript that completes after its block's transcription
+    timeout is not re-sampled into the timeline. That under-reports availability
+    conservatively. Use a timeout comfortably above the expected inference time.
+  - **Run timing:** a run's media time is taken right after `POST /runs`. It differs by
+    sub-second read latency from Run 001's measurement point.
+  - **Serial driving:** the replay drives the stages one after another, so the stage
+    timings are a lower bound on contention, not a measure of it.
