@@ -86,6 +86,30 @@ across absent runs with a strict greater-than-one-second threshold. Final recall
 edge errors use the existing evaluator. Fake-effect tests require no database or media;
 the owner performs the separate synthetic-day replay qualification. No results are recorded here.
 
+The [transcription engine spike](../../scripts/validation/README.md#transcription-engine-spike)
+compares owner-supplied external blocks using the existing faster-whisper path baseline,
+explicit LGPL FFmpeg-to-PCM decoding with the same model/settings, and optional whisper.cpp
+with token-timed JSON. Separate decode/inference/total seconds and media/processing ratios
+are measured per engine and block, optionally repeated under one concurrent NVENC encode;
+unavailable load is reported separately. Word agreement uses normalized text alignment
+after all engines for a block complete. Each block is read once untimed immediately before
+its engines run in each pass to warm the OS cache; one untimed silence inference per
+engine/device warms inference and preflights
+CUDA execution. Odd/even blocks use forward/reverse engine order, recorded with closed
+first-engine labels and numeric positions. Python inference is supervised in a persistent
+worker with bounded calls (`--engine-timeout-seconds`, default 300, range 60..14400;
+increase for CPU measurements) and nonblocking null-device diagnostics; failed CUDA preflight
+returns a sanitized partial report and exit 3 even when no engine runs. Warm-up, cache
+reads, worker startup and IPC are excluded from timings. Word agreement reports
+median/p95 absolute timing deltas; catalog-composed start/end/changeover cue agreement
+uses one-to-one same-phrase hits within 2 seconds. Aggregates summarize block metrics,
+with nulls for missing comparisons. CPU/device and process-startup differences are
+documented in the runbook. Output is sanitized numbers and closed labels only. Fake-effect
+tests establish the measurement method without media or hardware; the owner separately
+runs the spike and records the result and engine recommendation. This paragraph records
+no results, changes no production engine, and leaves the optional-transcription
+distribution exclusion in force.
+
 ## Evidence rules
 
 - Name the exact corpus item and manifest revision without committing its media.

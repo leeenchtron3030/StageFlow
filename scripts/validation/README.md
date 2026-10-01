@@ -1,5 +1,167 @@
 # Safe local validation controller
 
+## Transcription engine spike
+
+`transcription_engine_spike.py` measures the existing path-decoding baseline against
+external FFmpeg PCM decoding with the same faster-whisper model (option A), and optionally
+a local whisper.cpp CLI (option B). This is offline measurement tooling, authorized by
+[the approved plan](../../docs/plans/live-chain-validation.md#decisions-owner-approval-of-this-plan-approves-the-recommended-defaults).
+The owner runs it on external blocks and records the result and engine recommendation.
+It changes no application behavior, evidence, configuration, or distribution boundary.
+Option A still imports faster-whisper/PyAV; it does not qualify a GPL-free package.
+
+Run from `backend`, using the operator-installed transcription environment:
+
+```text
+uv run --no-sync python ../scripts/validation/transcription_engine_spike.py --blocks <external-block-folder> --device cuda --language en --profile conference --max-blocks 6 --render-load --markdown
+```
+
+Set `STAGEFLOW_KERNEL_CONFIG_PATH` to the existing local TOML file. Only
+`[local_transcription]` (`model_path`, `device`, `compute_type`),
+`[local_media_segmentation].ffmpeg_path`, and `[local_media_timing].ffprobe_path` are read.
+Device/compute defaults match the existing config defaults (`cuda`/`float16`). No server,
+database, credentials, or enabled-worker switches are needed. All input paths must be
+absolute local paths; binaries must be explicit files, not PATH names or batch wrappers.
+The model directory must include `tokenizer.json`: missing tokenizers are refused to
+prevent faster-whisper's upstream network fallback. Models and binaries are provisioned
+by the operator; the script installs/downloads nothing and reads the config without writing it.
+For GPU runs, the operator-provisioned CUDA runtime directory must be on `PATH` before
+launching Python, so the native engine can load its CUDA runtime libraries.
+
+The blocks folder and every resolved block must be outside the repository. Use a flat
+folder of 1..1,000 regular `.mov`, `.mp4`, `.mkv`, `.mxf`, or `.wav` files. Hidden entries,
+symlinks, junction entries, subdirectories, and other extensions are refused. Files are
+ordered by case-insensitive filename (case-sensitive tie break); `--max-blocks` selects
+the first N, default 6, allowed range 1..1,000. No input file is modified. The operator
+supplies the qualified LGPL FFmpeg/ffprobe binaries; this script does not certify licenses.
+
+`--device cpu` overrides only the device, preserving the configured compute type for
+both baseline and option A. For CPU measurements, point the environment variable at an
+operator-prepared config with a CPU-supported compute type (for example `float32`);
+CUDA `float16` may fail on CPU. No automatic precision change hides that difference.
+Run CUDA and CPU separately and keep that precision distinction in the owner's external
+measurement notes. `--language` accepts only `en`; `--profile` accepts catalog keys and
+defaults to `conference`. Default phrases are composed through the existing catalog;
+start, end, and changeover phrases are included, deduplicated by normalized tokens.
+
+Engine and timing method:
+
+- **Baseline:** the adapter's lazy model factory is reused. The measurement script mirrors
+  `FasterWhisperExecutionAdapter.execute` at
+  `backend/app/infrastructure/transcription/faster_whisper.py:273-280`: `beam_size=5`,
+  word timestamps enabled, `vad_filter=False`, `condition_on_previous_text=True`, English.
+  It passes the media path. A temporary timer around faster-whisper's `decode_audio`
+  measures PyAV decode and is restored even on failure. Inference is total minus decode,
+  including feature extraction and full consumption of the lazy segment iterator.
+- **Option A:** the same model object and settings receive a numpy array. The explicit
+  FFmpeg subprocess uses `-map 0:a:0 -vn -ac 1 -ar 16000 -f f32le -`; little-endian
+  float32 bytes are copied to an array. Decode time includes subprocess launch and
+  byte-to-array conversion. Inference and total use the same timing boundary as baseline.
+- **Option B:** supply both `--whisper-cpp-binary <absolute-binary>` and
+  `--whisper-cpp-model <absolute-model>`. FFmpeg writes 16 kHz mono `pcm_s16le` WAV into
+  private temporary storage outside the repository. The CLI flags are
+  `-m <model> -f <wav> -l en -bs 5 -ojf -of <output-prefix> -ml 1000000 -sow`, plus `-ng` for CPU.
+  A positive maximum segment text length enables token timing; the high cap avoids
+  forcing single-word segments, which would prevent the phrase matcher from finding cues.
+  Full JSON token `offsets.from/to` (milliseconds) are required; special tokens are
+  discarded and subwords/punctuation merged within each returned segment. Missing or
+  invalid token timing fails that engine; segment text/timing is never substituted.
+  The operator must supply a CLI supporting these flags and verify its GPU build for
+  CUDA runs (the device label is the requested device). Private WAV/JSON scratch is
+  removed when the call finishes. Ensure the OS temporary directory is outside the repo.
+  Its inference interval includes CLI/model startup and JSON parsing, unlike the reused
+  Python model's excluded initial load. Treat this as process-per-block option B latency.
+
+Before measurement, each engine/device performs one untimed inference on one second
+of synthetic silence, fully consuming lazy results. For CUDA this is also the runtime
+preflight: loading a model alone does not exercise the runtime libraries. Preflight has
+a 60-second deadline, including initial model loading. CUDA library/runtime failures
+classified by the existing adapter produce `cuda_runtime_unavailable`; other provider,
+import, model, or compute-type failures produce `warm_up_failed`. Parent-side worker
+spawn failures produce `worker_start_failed`; preflight deadline expiry produces
+`warm_up_timeout`. Option B warm-up failures always produce `warm_up_failed`, including
+CLI errors and timeouts. These closed codes mark the affected engine's blocks and
+produce exit **3**, even if no engine can run; a shared Python model failure on CUDA
+excludes both baseline and A. Optional B can still run if the Python engine fails.
+Neither preflight nor warm-up contributes samples or timings.
+
+Odd blocks run baseline, A, then optional B; even blocks reverse that order. Both passes
+use the same alternation. Immediately before each block's engines run in each pass,
+that block is read once in bounded chunks to warm the OS cache; these reads are untimed.
+Each row records the closed `first_engine` label and numeric
+`engine_ordinal`. Agreement is computed after all engines for that block have finished,
+so A/B still compare with baseline when baseline runs last. Probing, cache reads,
+worker startup, IPC, warm-up and Python model loading are outside processing timings.
+Cache warming is best effort against OS eviction, not a cache-residency guarantee.
+The Python model remains resident
+during option B, so its GPU memory footprint is part of that comparison's conditions.
+Python inference runs in one persistent spawned worker. The parent bounds each measured
+call with `--engine-timeout-seconds` (integer seconds, default 300, range 60..14400;
+`engine_timeout` on expiry), receives only closed failure codes,
+and terminates/reaps the worker on failure or completion. Measurement codes are:
+
+- `decode_failed`: baseline PyAV decode, FFmpeg PCM/WAV decode, or byte-to-array conversion failed.
+- `cuda_runtime_unavailable`: the existing adapter classifies a CUDA library/runtime
+  failure during Python inference on CUDA, including lazy result consumption.
+- `engine_timeout`: the parent measurement deadline or a decoder/engine subprocess timeout expired.
+- `engine_failed`: other measurement failures, including invalid provider results;
+  unknown worker failure payloads are reduced to this code.
+
+Exception text never crosses the failure IPC boundary or enters the report. Worker
+supervision prevents a native library's stalled inference or destructor from holding
+the report open indefinitely.
+A replacement worker is warmed before measurement. For CPU runs, choose a larger bound
+such as `--engine-timeout-seconds 3600`: large-v3-turbo with beam 5 and word timestamps
+can take longer than 300 seconds per 10-minute block. Preflight remains 60 seconds.
+Python, native CRT descriptors, and Windows OS stdout/stderr handles go to `os.devnull`,
+never a diagnostic capture pipe;
+the separate private IPC connection carries results and is consumed by the parent.
+The worker's FFmpeg decode subprocess timeout is the configured engine deadline minus
+10 seconds (290 by default), so it can be reaped before the worker deadline.
+Other external measurement subprocesses retain a two-hour
+timeout; B's warm-up uses the 60-second deadline. Peak RSS is omitted:
+parent lifetime high-water marks would not fairly
+compare the subprocess engine. Raw provider output, diagnostics, transcript text, paths,
+phrases, titles, config values, and absolute/word timestamps never enter public output.
+
+With `--render-load`, a second pass repeats every engine/block. Each measurement starts
+one looping FFmpeg video encode using `-c:v h264_nvenc -f null -`, waits up to 30 seconds
+for encoded-frame progress, and stops/reaps that encode afterward, including on engine
+failure. It never starts overlapping load processes. Missing NVENC/video or a render
+that exits during measurement is `render_load: unavailable`; timings still complete but
+are aggregated separately from `active` load. This is a contention probe, not a scheduler
+or throughput qualification. The first pass is `render_load: off`.
+
+Stdout is JSON; optional `--markdown` writes a compact aggregate timing table to stderr
+so redirected stdout remains parseable JSON. Output contains only ordinals, counts,
+seconds, ratios, nulls, and closed engine/device/profile/status/failure labels:
+
+- Per block/engine/pass: media, decode, inference and total seconds, real-time factor
+  **media seconds / total processing seconds**, word count, and cue-hit count.
+- Word agreement: `difflib.SequenceMatcher` with `autojunk=False` on each word's normalized
+  token tuple; matched count and fraction of nonempty baseline words, plus median and
+  nearest-rank p95 absolute start/end deltas. Insertions/deletions are unmatched, not
+  assigned artificial timing penalties. Punctuation-only words are excluded from alignment.
+- Cue agreement: literal Unicode-normalized tokens, as in the existing phrase matcher,
+  non-overlapping per phrase and never crossing transcript segments. Hits use the first
+  word's start. Chronological one-to-one matching of the same phrase uses an inclusive
+  2-second window; reports both hit counts, matched count, baseline-hit fraction, and
+  median/p95 absolute timing delta. Changeovers are counted once, not once per role.
+- Aggregates: median and nearest-rank p95 of each numeric block metric, grouped by engine,
+  pass and render status, with block/sample counts. Nested agreement medians/p95 are
+  themselves summarized across blocks, not pooled across all words. Empty comparisons
+  are null and excluded from aggregate samples. Failed baselines leave comparison fields
+  null while other engines' timings and counts remain available.
+
+Exit codes: **0** completed (including render unavailability); **1** invalid input/refusal,
+exactly `{"error_count": 1}`; **3** partial, with completed measurements retained and only
+closed `cache_warm_failed`, `probe_failed`, `warm_up_failed`, `cuda_runtime_unavailable`,
+`worker_start_failed`, `warm_up_timeout`, `decode_failed`, `engine_timeout`, or `engine_failed` codes.
+Engine failures continue to the next engine
+and block. No parity pass/fail threshold or engine recommendation is inferred by the tool.
+Fake-effect coverage lives in `backend/tests/test_validation_transcription_engine_spike.py`;
+these tests require no optional packages, media, FFmpeg, models, GPU, or network.
+
 ## Session Suggestions live replay
 
 `replay_blocks.py` replays local blocks through the normal demo APIs and workers on a
