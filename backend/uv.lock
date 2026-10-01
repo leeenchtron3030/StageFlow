@@ -787,6 +787,11 @@ transcription = [
     { name = "ctranslate2" },
     { name = "faster-whisper" },
 ]
+transcription-core = [
+    { name = "ctranslate2" },
+    { name = "numpy" },
+    { name = "tokenizers" },
+]
 
 [package.metadata]
 requires-dist = [
@@ -807,6 +812,11 @@ dev = [
 transcription = [
     { name = "ctranslate2", specifier = "==4.8.1" },
     { name = "faster-whisper", specifier = "==1.2.1" },
+]
+transcription-core = [
+    { name = "ctranslate2", specifier = "==4.8.1" },
+    { name = "numpy", specifier = "==2.5.2" },
+    { name = "tokenizers", specifier = "==0.23.1" },
 ]
 
 [[package]]

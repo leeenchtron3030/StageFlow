@@ -24,6 +24,56 @@ distributable artifacts without granting legal clearance (`backend/pyproject.tom
 `Transcript Evidence Revision` is the accepted internal asset/manifest-scoped evidence
 term. Session Transcript composition and broader transcript APIs remain unresolved.
 
+## Additive local engine (ED-0122)
+
+`CTranslate2WhisperExecutionAdapter`, in
+`backend/app/infrastructure/transcription/ctranslate2_whisper/`, provides the
+`stageflow-ctranslate2-whisper` identity, provider version `1.0`, execution revision
+`stageflow-ctranslate2-whisper-adapter-1.0`, and execution tool `ctranslate2` 4.8.1.
+The MIT faster-whisper 1.2.1 inference subset is ported locally: numeric features,
+tokenizer, sequential 30-second windows, temperature fallback, prior-text conditioning,
+and native word alignment with reference word-merging/timing rules. English is fixed
+under ADR-0036 decision 5, including when `requested_language` is `None`; there is no
+automatic language detection, and explicit non-English requests are refused.
+VAD, batching, translation and model downloads are absent. Infrastructure owns all
+NumPy and CTranslate2 use; domain contracts and persistence are unchanged.
+
+The optional `transcription-core` group does not change installation defaults or
+ED-0075. CTranslate2's version-pinned native extension is loaded directly because
+its public package initializer imports conversion helpers that attempt to import
+`huggingface_hub`. The new inference path loads none of PyAV, faster-whisper,
+huggingface_hub, onnxruntime or tqdm. Synthetic tests exercise this in a clean process.
+
+The decoder uses explicit-path operator LGPL FFmpeg and sibling ffprobe, checks
+their versions/build flags and hashes, probes the first audio stream, and averages
+1–8 channels explicitly. It produces s16le at 16 kHz, converted to float32 by
+32768. Output is capped at the probed duration plus one second; decode time is bounded
+to 30–600 seconds and inputs over four hours are refused. Probe output is capped at
+64 KiB. Lease callbacks run during subprocess waits and once per inference window,
+including silent windows. Decode failures are retryable `media_decode_failed`;
+missing/refused tools, tokenizer, model and runtime are non-retryable. An iteration
+failure after retained segments produces partial evidence, except `IndexError`, which
+raises retryable `provider_execution_failed` even after a segment was retained.
+Worker startup JSON reports first-class decode/probe tool names, versions and SHA-256
+hashes alongside `device`, `compute_type` and `execution_profile`, without paths.
+These disclosures do not enter persisted transcript evidence or its `limitations`.
+A first-class decode provenance field in transcript evidence is deferred to a later
+contract plan; ED-0122 does not change that contract.
+
+Supported execution pairs are CUDA/float16 and CPU/int8, selected explicitly and
+validated at configuration and adapter construction. Suggested distinct profiles are
+`ct2-whisper-large-v3-turbo-cuda-float16` and `ct2-whisper-large-v3-turbo-cpu-int8`.
+The StageFlow provider refuses every profile id starting with `faster-whisper`,
+including the configuration default; operators must name a distinct profile.
+Worker capabilities report the configured profile and provider. The default provider
+and existing configuration defaults remain faster-whisper CUDA/float16.
+
+Under D6, switch profiles between Events and keep each existing Event's profile for
+its lifetime. A deliberate mid-Event switch creates new ED-0120 work for every
+registered asset; earlier evidence stays immutable. The owner-run D5 parity gate and
+ED-0123 default switch remain separate from this additive implementation. The
+synthetic tests establish implementation behavior, not event readiness.
+
 ## Trigger scope and replay
 
 `DemoApplication.reconcile_media` selects up to 500 registrations per Event cycle in

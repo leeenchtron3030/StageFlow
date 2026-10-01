@@ -1138,3 +1138,75 @@ def test_cache_failure_is_sanitized_and_does_not_run_engines() -> None:
     code, report, _ = invoke(effects)
     assert code == 3 and not effects.calls
     assert report["failures"] == [{"ordinal": 1, "failure_code": "cache_warm_failed"}]
+
+
+def test_stageflow_candidate_uses_same_metrics_load_order_and_sanitization() -> None:
+    effects = FakeEffects()
+    config = settings(candidate="stageflow", blocks=(Path("private-one"), Path("private-two")),
+                      render_load=True)
+    code, report, table = invoke(effects, config, ["--candidate", "stageflow", "--markdown"])
+    assert code == 0
+    assert effects.calls == ["baseline", "stageflow", "stageflow", "baseline"] * 2
+    assert {r["engine"] for r in report["measurements"]} == {"baseline", "stageflow"}
+    assert all(r["metrics"]["word_agreement"]["matched_word_fraction"] == 1
+               for r in report["measurements"])
+    assert {r["engine"] for r in report["aggregates"]} == {"baseline", "stageflow"}
+    assert "private" not in json.dumps(report) + table
+
+
+def test_stageflow_measure_calls_adapter_end_to_end_and_normalizes_words(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import app.infrastructure.transcription as adapters
+    from app.contexts.transcription_evidence import TranscriptEvidenceStatus
+
+    calls: list[Any] = []
+    module = SimpleNamespace(decode_audio=constant(None))
+    monkeypatch.setattr(spike.importlib, "import_module", constant(module))
+
+    class Adapter:
+        def __init__(self, configuration: Any, **kwargs: Any) -> None:
+            calls.append((configuration, kwargs))
+
+        def execute(self, request: Any, renew: Callable[[], None]) -> Any:
+            assert request.input.requested_language == "en"
+            calls.append(request)
+            return SimpleNamespace(status=TranscriptEvidenceStatus.COMPLETE, segments=[
+                SimpleNamespace(ordinal=2, words=[SimpleNamespace(
+                    text="synthetic", asset_start_microseconds=500000,
+                    asset_end_microseconds=900000)])])
+
+    monkeypatch.setattr(adapters, "CTranslate2WhisperExecutionAdapter", Adapter)
+    monkeypatch.setattr(adapters, "FasterWhisperExecutionAdapter", Adapter)
+    config = settings(candidate="stageflow", model=Path.cwd() / "synthetic-model",
+                      ffmpeg=Path.cwd() / "ffmpeg.exe", device="cpu", compute_type="int8")
+    effects = spike.LocalEffects(config)
+    for name in ("stageflow", "baseline", "stageflow"):
+        result = effects.measure(name, Path("synthetic.wav"))
+        assert result.words == (spike.Word("synthetic", .5, .9, 2),)
+    assert len(calls) == 5  # two constructions; three executions
+    assert calls[0][0].provider == "stageflow-ctranslate2-whisper"
+    assert calls[0][0].compute_type == "int8"
+    assert calls[1].input.execution_profile_id == "parity-stageflow-cpu"
+
+
+def test_stageflow_decode_failure_uses_closed_report_code() -> None:
+    from app.contexts.transcription_evidence import TranscriptionExecutionError
+
+    error = TranscriptionExecutionError("media_decode_failed", retryable=True,
+                                        diagnostic_summary="private")
+    assert spike.measurement_failure(error, "stageflow", "cpu") == "decode_failed"
+
+
+def test_stageflow_warmup_failure_preserves_valid_baseline_measurement() -> None:
+    class Partial(FakeEffects):
+        def warm_up(self, engine: str) -> None:
+            if engine == "stageflow":
+                raise RuntimeError("private local decoder unavailable")
+
+    effects = Partial()
+    code, report, _ = invoke(effects, settings(candidate="stageflow"))
+    assert code == 3 and effects.calls == ["baseline"]
+    assert report["measurements"][0]["status"] == "completed"
+    assert report["measurements"][1]["failure_code"] == "warm_up_failed"
+    assert "private" not in json.dumps(report)

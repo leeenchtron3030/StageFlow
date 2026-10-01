@@ -6,6 +6,7 @@ import sys
 import time
 from collections.abc import Sequence
 from datetime import timedelta
+from typing import cast
 from uuid import NAMESPACE_URL, uuid5
 
 from app.bootstrap.event_mode_kernel import load_kernel_components_from_environment
@@ -21,6 +22,7 @@ from app.contexts.work_execution import (
 )
 from app.infrastructure.postgres import PostgresWorkExecutionRepository
 from app.infrastructure.transcription import (
+    CTranslate2WhisperExecutionAdapter,
     FasterWhisperExecutionAdapter,
     KernelMediaPathResolver,
 )
@@ -69,7 +71,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             components.repository,
             source_roots=configuration.sources,
         )
-        execution = FasterWhisperExecutionAdapter(
+        adapter_type = (CTranslate2WhisperExecutionAdapter
+                        if transcription.provider == "stageflow-ctranslate2-whisper"
+                        else FasterWhisperExecutionAdapter)
+        execution = adapter_type(
             transcription,
             resolver=resolver,
             clock=clock,
@@ -138,6 +143,17 @@ def main(argv: Sequence[str] | None = None) -> int:
             network_policy=EventNetworkPolicy.LOCAL_ONLY,
             lease_duration=timedelta(minutes=5),
         )
+        decode_identity: dict[str, object] = {}
+        if transcription.provider == "stageflow-ctranslate2-whisper":
+            local_execution = cast(CTranslate2WhisperExecutionAdapter, execution)
+            decode_identity = {
+                "decode_tool": "ffmpeg",
+                "decode_tool_version": local_execution.decode_tool_version,
+                "decode_tool_sha256": local_execution.decode_tool_sha256,
+                "probe_tool": "ffprobe",
+                "probe_tool_version": local_execution.probe_tool_version,
+                "probe_tool_sha256": local_execution.probe_tool_sha256,
+            }
         _safe_write(
             {
                 "worker_id": worker.id.value,
@@ -150,6 +166,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "compute_type": transcription.compute_type,
                 "execution_profile": capability.execution_profile_id,
                 "state": "available",
+                **decode_identity,
             }
         )
 

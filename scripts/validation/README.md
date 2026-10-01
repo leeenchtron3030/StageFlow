@@ -1,5 +1,46 @@
 # Safe local validation controller
 
+## StageFlow adapter parity (ED-0122)
+
+`--candidate stageflow` compares `FasterWhisperExecutionAdapter` with
+`CTranslate2WhisperExecutionAdapter` end to end, including decode, word timing,
+normalization and partial/failure handling. Existing word/cue metrics, alternating
+engine order, optional render load, bounded worker deadlines and sanitized reports
+are reused. The old option-A spike remains the default mode.
+The parity run forces `requested_language="en"` for both adapters, comparing the
+engines with English fixed on both sides under ADR-0036 decision 5.
+
+```text
+uv run --no-sync python ../scripts/validation/transcription_engine_spike.py --candidate stageflow --blocks <external-block-folder> --device cuda --max-blocks 6 --render-load --markdown
+uv run --no-sync python ../scripts/validation/transcription_engine_spike.py --candidate stageflow --blocks <external-block-folder> --device cpu --engine-timeout-seconds 3600
+```
+
+Provision both optional dependency groups locally for comparison. No installation or
+download is performed by the script. In the operator TOML, set
+`[local_transcription].ffmpeg_path` to the LGPL FFmpeg executable, with LGPL ffprobe
+alongside it, and `[local_media_timing].ffprobe_path` for the measurement duration
+probe. Supply the same offline `model_path` (including `tokenizer.json`) for both.
+This mode selects float16 for CUDA and int8 for CPU. The CPU baseline uses an injected
+CPU model factory only in this private measurement harness; the production
+faster-whisper adapter remains CUDA-only. No live deployment configuration is changed.
+Whisper.cpp arguments cannot be combined with this mode. Warm-up consumes synthetic
+silence through each adapter; partial results are reported as failures, not parity data.
+
+D5 owner evaluation: matched words at least 95% and p95 word-start difference at most
+0.6 seconds on every block; over the set, candidate cue hits at least 90% of baseline
+hits, and at least 90% of candidate hits matched to baseline. Use per-block cue counts
+to compute the totals; the script reports measurements, not an automatic qualification.
+Run six or more blocks with and without render load, plus CPU. The owner records the
+result and hardware profile. Synthetic automated tests do not replace that gate.
+
+Host-only automated tests use generated unequal-channel stereo audio at 16 kHz and
+48 kHz (the latter exercises resampling):
+set `STAGEFLOW_TEST_FFMPEG_PATH` and, for CPU inference,
+`STAGEFLOW_TEST_WHISPER_MODEL_PATH`, then run
+`uv run --no-sync pytest tests/test_ctranslate2_whisper_host.py` from `backend`.
+They skip without the operator paths/runtimes. The PCM comparison uses the reference
+PyAV decoder and requires agreement within one signed-16-bit step.
+
 ## Transcription engine spike
 
 `transcription_engine_spike.py` measures the existing path-decoding baseline against

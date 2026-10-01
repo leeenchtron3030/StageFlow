@@ -20,6 +20,12 @@ transcription = [
   "ctranslate2==4.8.1",
   "faster-whisper==1.2.1",
 ]
+# ED-0122: additive, offline-provisioned inference; not a default group.
+transcription-core = [
+  "ctranslate2==4.8.1",
+  "tokenizers==0.23.1",
+  "numpy==2.5.2",
+]
 dev = [
   "httpx>=0.28.0,<1.0.0",
   "pyright>=1.1.390,<2.0.0",
