@@ -679,3 +679,463 @@ def test_enqueue_failure_retains_registration_already_observed() -> None:
     assert document["blocks_copied"] == document["blocks_registered"] == 1
     assert document["blocks_settled"] == 0
     assert "private" not in json.dumps(document)
+
+
+class UpgradedEffects(FakeEffects):
+    def __init__(self) -> None:
+        super().__init__()
+        self.transcription_state = "succeeded"
+        self.complete = True
+        self.partial = False
+        self.existing_cues = False
+        self.enqueued = 7
+        self.enqueue_reads = 0
+        self.transcribed = 0
+        self.status_reads = 0
+
+    def worker(self, kind: str, timeout: float) -> Any:
+        if kind != "transcription":
+            return super().worker(kind, timeout)
+        self.workers.append(kind)
+        self.transcribed = self.copied
+        self.clock += self.work_seconds
+        return "terminal_failed" if self.transcription_state == "terminal_failed" else "succeeded"
+
+    def request(self, method: str, path: str, body: dict[str, Any] | None,
+                timeout: float) -> dict[str, Any]:
+        if path.endswith("/boundary-cues"):
+            self.requests.append((method, path, body))
+            return {"current": {} if self.existing_cues else None}
+        if path.endswith("/boundary-cue-catalog"):
+            return {"version": 9, "profiles": [{"name": "Conference stage", "key": "conference-9"}]}
+        if "/transcription/assets/" in path:
+            self.status_reads += 1
+            done = self.transcribed == self.copied
+            return {"operation": {"state": self.transcription_state if done else "pending"},
+                    "complete_evidence": self.complete and done,
+                    "partial_evidence": self.partial and done, "text": "private transcript"}
+        value = super().request(method, path, body, timeout)
+        if path == "/api/v1/kernel/status":
+            self.enqueue_reads += 1
+            value["automation"]["transcription_operations_enqueued"] = (
+                self.enqueued + max(0, self.copied - int(self.enqueue_reads % 2 == 0)))
+        return value
+
+
+def test_default_report_shape_is_byte_identical() -> None:
+    code, document = replay.execute(settings(1, 1), FakeEffects())
+    assert code == 0
+    expected = {"error_count": 0, "blocks_copied": 1, "blocks_registered": 1,
+                "blocks_settled": 1, "runs": [{"ordinal": 1, "blocks_copied": 1,
+                "wall_seconds": 7.0, "media_seconds": 14.0, "suggestion_count": 1,
+                "skips": dict.fromkeys(replay.SKIPS, 0)}]}
+    assert json.dumps(document, sort_keys=True) == json.dumps(expected, sort_keys=True)
+
+
+def test_transcription_prepare_requires_table(monkeypatch: pytest.MonkeyPatch) -> None:
+    args, env = fake_inputs(monkeypatch)
+    args.transcription = True
+    with pytest.raises(replay.Refusal):
+        replay.prepare(args, env)
+    original = Path.open
+    def opened(path: Path, mode: str) -> io.BytesIO:
+        with original(path, mode) as f:
+            return io.BytesIO(f.read() + b"\n[local_transcription]\n")
+    monkeypatch.setattr(Path, "open", opened)
+    assert replay.prepare(args, env).transcription
+
+
+@pytest.mark.parametrize("label", ["", "A", "a b", "a/secret", "-a", "a" * 65, "a\n"])
+def test_profile_label_refused(monkeypatch: pytest.MonkeyPatch, label: str) -> None:
+    args, env = fake_inputs(monkeypatch)
+    args.profile_label = label
+    with pytest.raises(replay.Refusal):
+        replay.prepare(args, env)
+
+
+def test_profile_label_allowed_and_reported(monkeypatch: pytest.MonkeyPatch) -> None:
+    args, env = fake_inputs(monkeypatch)
+    args.profile_label = "appliance.v1_gpu-0"
+    assert replay.prepare(args, env).profile_label == args.profile_label
+    code, doc = replay.execute(
+        replace(settings(1), profile_label=args.profile_label), FakeEffects())
+    assert code == 0 and doc["profile_label"] == args.profile_label
+
+
+def test_transcription_cues_counter_worker_and_timeline() -> None:
+    effects = UpgradedEffects()
+    code, doc = replay.execute(replace(settings(2, 1), transcription=True), effects)
+    assert code == 0 and doc["transcription_unavailable_count"] == 0
+    assert effects.workers.count("transcription") == 2
+    assert effects.status_reads == 4
+    compositions = [body for method, path, body in effects.requests
+                    if method == "POST" and path.endswith("/boundary-cues")]
+    assert len(compositions) == 1
+    body = compositions[0]
+    assert UUID(body["command_id"])
+    assert {k: v for k, v in body.items() if k != "command_id"} == {
+        "catalog_version": 9, "profile_key": "conference-9", "group_keys": [],
+        "actor_id": ACTOR, "authority_kind": "human",
+    }
+    assert doc["evidence_timeline"]["runs"][-1]["transcription"] == 2
+    assert doc["evidence_timeline"]["runs"][-1]["segmentation"] == 2
+    assert doc["evidence_timeline"]["blocks"][0]["transcription"] >= 14
+    assert "private" not in json.dumps(doc)
+
+
+def test_transcription_refuses_existing_composition_before_arrival() -> None:
+    effects = UpgradedEffects()
+    effects.existing_cues = True
+    assert replay.execute(replace(settings(), transcription=True), effects) == (
+        1, {"error_count": 1})
+    assert not effects.copy_times
+
+
+@pytest.mark.parametrize("state,complete,partial", [
+    ("terminal_failed", False, False), ("succeeded", False, True), ("pending", False, False),
+    ("terminal_failed", True, False), ("pending", True, False),
+])
+def test_transcription_unavailable_degrades_and_retains_runs(
+    state: str, complete: bool, partial: bool,
+) -> None:
+    effects = UpgradedEffects()
+    effects.transcription_state, effects.complete, effects.partial = state, complete, partial
+    code, doc = replay.execute(replace(settings(2, 1), transcription=True), effects)
+    assert code == 0 and len(doc["runs"]) == 2
+    assert doc["transcription_unavailable_count"] == 2
+    assert doc["transcription_partial_count"] == (2 if partial else 0)
+    assert all(b["transcription"] is None for b in doc["evidence_timeline"]["blocks"])
+    assert doc["stage_summary"]["transcription"] == {"median": None, "p95": None}
+
+
+def test_transcription_worker_timeout_degrades() -> None:
+    class Timeout(UpgradedEffects):
+        def worker(self, kind: str, timeout: float) -> Any:
+            if kind == "transcription":
+                raise replay.subprocess.TimeoutExpired("private", timeout)
+            return super().worker(kind, timeout)
+    code, doc = replay.execute(replace(settings(1), transcription=True), Timeout())
+    assert code == 0 and doc["transcription_unavailable_count"] == 1
+
+
+def test_transcription_enqueue_timeout_degrades_without_worker() -> None:
+    class NeverEnqueued(UpgradedEffects):
+        def request(self, method: str, path: str, body: dict[str, Any] | None,
+                    timeout: float) -> dict[str, Any]:
+            value = super().request(method, path, body, timeout)
+            if path == "/api/v1/kernel/status":
+                value["automation"]["transcription_operations_enqueued"] = 7
+            return value
+    effects = NeverEnqueued()
+    code, doc = replay.execute(replace(settings(1), transcription=True), effects)
+    assert code == 0 and doc["transcription_unavailable_count"] == 1
+    assert "transcription" not in effects.workers
+
+
+def test_transcription_protocol_failure_retains_observations() -> None:
+    class Broken(UpgradedEffects):
+        def worker(self, kind: str, timeout: float) -> Any:
+            if kind == "transcription" and self.copied == 2:
+                raise replay.PipelineFailure("private")
+            return super().worker(kind, timeout)
+    code, doc = replay.execute(replace(settings(2, 1), transcription=True), Broken())
+    assert code == 3 and len(doc["runs"]) == 1 and "private" not in json.dumps(doc)
+
+
+def test_worker_startup_line_outcome_only_and_cap() -> None:
+    startup = b'{"state":"available","worker_id":"private"}\n'
+    assert replay.worker_outcome(startup) is None
+    for outcome in ("succeeded", "retry_scheduled", "terminal_failed"):
+        assert replay.worker_outcome(startup + json.dumps(
+            {"outcome": outcome, "text": "private"}).encode()) == outcome
+    for raw in (b"x" * 16385, startup + b'{"outcome":"private"}', b'{}',
+                startup + b'{}\n{}'):
+        with pytest.raises(replay.PipelineFailure):
+            replay.worker_outcome(raw)
+
+
+def test_time_of_use_accuracy_cutoffs_first_nulls_and_final_unchanged() -> None:
+    progress = replay.Progress(upgraded=True, origin=BASE, observations=[
+        observation(90, span(1, 99)), observation(400, span(2, 98)),
+        observation(401, span(3, 97)), observation(1000, span(4, 96)),
+        observation(1001, span(5, 95)),
+    ])
+    truth = (span(0, 100), span(200, 300))
+    doc = replay.report(progress, truth, 0)
+    talk = doc["talks"][0]
+    for prefix, error in (("first", 1), ("plus_300", 2), ("plus_900", 4)):
+        assert talk[prefix + "_start_error_seconds"] == error
+        assert talk[prefix + "_end_error_seconds"] == error
+        assert doc["talks"][1][prefix + "_start_error_seconds"] is None
+    progress.upgraded = False
+    assert replay.report(progress, truth, 0)["final_accuracy"] == doc["final_accuracy"]
+
+
+def test_stage_summary_nearest_rank_p95_and_timeline() -> None:
+    progress = replay.Progress(upgraded=True, transcription=True,
+        blocks=[replay.BlockObservation(i, i * 10, i * 10 + i, i * 10 + 2 * i,
+                                        i * 10 + 3 * i, None, i * 10 + 4 * i)
+                for i in range(1, 21)], observations=[observation(130), observation(260)])
+    doc = replay.report(progress, (), 0)
+    assert doc["stage_summary"]["registered"] == {"median": 10.5, "p95": 19}
+    assert doc["stage_summary"]["segmentation"] == {"median": 31.5, "p95": 57}
+    assert doc["stage_timings"][0] == {"ordinal": 1, "registered": 1, "timing": 2,
+                                      "segmentation": 3, "transcription": None, "suggestion": 4}
+    assert doc["evidence_timeline"]["runs"] == [
+        {"ordinal": 1, "media_seconds": 130, "segmentation": 10, "transcription": 0},
+        {"ordinal": 2, "media_seconds": 260, "segmentation": 20, "transcription": 0},
+    ]
+
+
+def test_growing_chunks_deadline_exclusive_flush_fsync(monkeypatch: pytest.MonkeyPatch) -> None:
+    from types import SimpleNamespace
+    effects = FakeEffects()
+    writes: list[tuple[float, bytes]] = []
+    events: list[Any] = []
+    class Buffer(io.BytesIO):
+        def write(self, data: Any) -> int:
+            writes.append((effects.now(), bytes(data)))
+            return super().write(data)
+        def flush(self) -> None:
+            events.append("flush")
+        def fileno(self) -> int:
+            return 42
+    def opened(path: Path, mode: str) -> io.BytesIO:
+        events.append((path, mode))
+        return Buffer() if mode == "xb" else io.BytesIO(b"abcdefgh")
+    monkeypatch.setattr(Path, "open", opened)
+    def stat(path: Path) -> SimpleNamespace:
+        return SimpleNamespace(st_size=8)
+    def sync(fd: int) -> None:
+        events.append(fd)
+    monkeypatch.setattr(Path, "stat", stat)
+    monkeypatch.setattr(replay.os, "fsync", sync)
+    replay.growing_copy(Path("input.mp4"), Path("output"), 1, 0, 4, effects.now, effects.sleep)
+    assert writes == [(1, b"ab"), (2, b"cd"), (3, b"ef"), (4, b"gh")]
+    assert events[0] == (Path("output/block-000001.mp4"), "xb")
+    assert events[-2:] == ["flush", 42]
+    def exists(path: Path, mode: str) -> Any:
+        raise FileExistsError("private")
+    monkeypatch.setattr(Path, "open", exists)
+    with pytest.raises(FileExistsError):
+        replay.growing_copy(Path("input.mp4"), Path("output"), 1, 0, 4, effects.now, effects.sleep)
+
+
+class GrowingEffects(FakeEffects):
+    def __init__(self, count: int = 2, failure: bool = False) -> None:
+        super().__init__()
+        self.count, self.failure = count, failure
+        self.stopped = False
+        self.work_seconds = 6
+
+    def writer(self, settings: Any, started: float) -> Any:
+        return self
+
+    def closed(self, ordinal: int) -> float | None:
+        if self.failure and self.clock >= 10:
+            raise replay.PipelineFailure("private writer")
+        return ordinal * 5 if self.clock >= ordinal * 5 else None
+
+    def stop(self) -> None:
+        self.stopped = True
+
+    def copy(self, block: Path, source: Path, ordinal: int) -> None:
+        pytest.fail("growing arrival must use the writer")
+
+    def request(self, method: str, path: str, body: dict[str, Any] | None,
+                timeout: float) -> dict[str, Any]:
+        self.copied = min(self.count, int(self.clock // 5))
+        if "/media-timing/assets/" in path:
+            ordinal = UUID(path.split("/")[-2]).int - 100
+            return {"evidence": {"candidate_interval": {
+                "started_at": (BASE + timedelta(seconds=(ordinal - 1) * 10)).isoformat(),
+                "ended_at": (BASE + timedelta(seconds=ordinal * 10)).isoformat(),
+            }}}
+        if "/media-timing/events/" in path or "/media-segmentation/events/" in path:
+            kind = "media_timing" if "/media-timing/" in path else "media_segmentation"
+            return {"items": [{"asset_id": str(UUID(int=100 + i)),
+                               "state": "succeeded" if i <= self.done[kind] else "pending"}
+                              for i in range(1, self.copied + 1)], "next_after": None}
+        result = super().request(method, path, body, timeout)
+        if path == "/api/v1/kernel/status":
+            # Scan timestamp ties and a capped projection must not determine order.
+            result["recent_media"] = []
+        return result
+
+
+def test_growing_writer_seam_overlap_timeline_and_failure() -> None:
+    for failure in (False, True):
+        effects = GrowingEffects(failure=failure)
+        code, doc = replay.execute(replace(settings(2, 1), arrival="growing"), effects)
+        assert code == (3 if failure else 0)
+        assert effects.stopped
+        assert "private" not in json.dumps(doc)
+        if not failure:
+            assert doc["evidence_timeline"]["runs"][0]["segmentation"] == 2
+            assert doc["evidence_timeline"]["blocks"][1]["segmentation"] <= doc["runs"][0][
+                "media_seconds"]
+            # Both registered assets were included in the first suggestion run.
+            assert [b["suggestion"] + i * 10 for i, b in enumerate(doc["stage_timings"], 1)] == [
+                doc["runs"][0]["media_seconds"]] * 2
+            assert doc["stage_timings"][1]["timing"] < doc["stage_timings"][1]["suggestion"]
+
+
+@pytest.mark.parametrize("phase", ["enqueue", "status", "http"])
+def test_transcription_timeout_during_poll_degrades(phase: str) -> None:
+    class SlowPoll(UpgradedEffects):
+        def request(self, method: str, path: str, body: dict[str, Any] | None,
+                    timeout: float) -> dict[str, Any]:
+            value = super().request(method, path, body, timeout)
+            if (self.copied and self.done["media_segmentation"] == self.copied
+                    and ((phase == "enqueue" and path == "/api/v1/kernel/status")
+                         or (phase != "enqueue" and "/transcription/assets/" in path))):
+                self.clock = float(self.clock) + timeout
+                if phase == "http":
+                    raise TimeoutError("private timeout")
+            return value
+    code, doc = replay.execute(replace(settings(1), transcription=True), SlowPoll())
+    assert code == 0 and doc["transcription_unavailable_count"] == 1
+
+
+
+def test_growing_transcription_sampling_timeout_is_degradable() -> None:
+    class Transcribing(GrowingEffects):
+        def request(self, method: str, path: str, body: dict[str, Any] | None,
+                    timeout: float) -> dict[str, Any]:
+            if path.endswith("/boundary-cues"):
+                return {"current": None}
+            if path.endswith("/boundary-cue-catalog"):
+                return {"version": 1, "profiles": [
+                    {"key": "conference", "name": "Conference stage"}]}
+            if "/transcription/assets/" in path:
+                if UUID(path.split("/")[-2]).int == 102:
+                    raise TimeoutError("private")
+                return {"complete_evidence": True, "partial_evidence": False,
+                        "operation": {"state": "succeeded"}}
+            result = super().request(method, path, body, timeout)
+            if path == "/api/v1/kernel/status":
+                result["automation"]["transcription_operations_enqueued"] = self.copied
+            return result
+    code, doc = replay.execute(replace(settings(2, 1), arrival="growing", transcription=True),
+                               Transcribing())
+    assert code == 0 and doc["transcription_unavailable_count"] == 1
+    assert doc["runs"][0]["blocks_copied"] == 2
+    assert doc["evidence_timeline"]["runs"][0]["transcription"] == 1
+
+
+def test_http_wrapped_timeout_is_normalized() -> None:
+    from urllib.error import URLError
+    class Opener:
+        def open(self, request: Any, timeout: float) -> Any:
+            raise URLError(TimeoutError("private"))
+    effects = replay.LocalEffects("http://localhost:8000", {
+        "STAGEFLOW_API_SHARED_SECRET": "private-secret"})
+    effects.opener = Opener()
+    with pytest.raises(TimeoutError):
+        effects.request("GET", "/test", None, 2)
+
+
+@pytest.mark.parametrize("overflow,timeout", [(False, False), (True, False), (False, True)])
+def test_transcription_subprocess_bounded_pipe_and_timeout(
+    monkeypatch: pytest.MonkeyPatch, overflow: bool, timeout: bool,
+) -> None:
+    commands: list[Any] = []
+    class Child:
+        def __init__(self, command: list[str], **kwargs: Any) -> None:
+            commands.append((command, kwargs))
+            self.stdout = io.BytesIO(b"x" * 16385 if overflow else
+                b'{"state":"available","worker_id":"private"}\n'
+                b'{"outcome":"succeeded","text":"private"}\n')
+            self.returncode = 0
+            self.killed = False
+        def __enter__(self) -> Any:
+            return self
+        def __exit__(self, *args: Any) -> None:
+            self.stdout.close()
+        def wait(self, timeout: float | None = None) -> int:
+            if timeout is not None and timeout_case:
+                raise replay.subprocess.TimeoutExpired("private", timeout)
+            return self.returncode
+        def kill(self) -> None:
+            self.killed = True
+            self.returncode = -1
+    timeout_case = timeout
+    monkeypatch.setattr(replay.subprocess, "Popen", Child)
+    effects = replay.LocalEffects("http://localhost:8000", {
+        "STAGEFLOW_API_SHARED_SECRET": "private-secret"})
+    if overflow or timeout:
+        with pytest.raises((replay.PipelineFailure, replay.subprocess.TimeoutExpired)):
+            effects.worker("transcription", 2)
+    else:
+        assert effects.worker("transcription", 2) == "succeeded"
+    assert commands[0][0] == [sys.executable, "-m", "app.demo.worker", "--once"]
+    assert commands[0][1]["stderr"] == replay.subprocess.DEVNULL
+
+
+def test_growing_backlog_beyond_recent_media_cap_and_tied_scans() -> None:
+    class Backlog(GrowingEffects):
+        def worker(self, kind: str, timeout: float) -> None:
+            self.workers.append(kind)
+            self.clock += 600
+            self.done[kind] = self.copied
+    effects = Backlog(count=102)
+    code, doc = replay.execute(
+        replace(settings(102, 102), arrival="growing", timeout=3000), effects)
+    assert code == 0 and doc["blocks_registered"] == 102
+    assert doc["evidence_timeline"]["runs"][0]["segmentation"] == 102
+
+
+
+def test_transcription_counter_reset_is_a_pipeline_failure() -> None:
+    class Reset(UpgradedEffects):
+        def request(self, method: str, path: str, body: dict[str, Any] | None,
+                    timeout: float) -> dict[str, Any]:
+            value = super().request(method, path, body, timeout)
+            if path == "/api/v1/kernel/status" and self.copied == 2:
+                value["automation"]["transcription_operations_enqueued"] = 0
+            return value
+    code, doc = replay.execute(replace(settings(2, 1), transcription=True), Reset())
+    assert code == 3 and len(doc["runs"]) == 1
+    assert doc["transcription_enqueue_baseline"] == 7
+
+
+def test_background_writer_retains_schedule_and_propagates_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[int, float, float]] = []
+    class Thread:
+        def __init__(self, target: Any, args: Any, daemon: bool) -> None:
+            self.target, self.args = target, args
+        def start(self) -> None:
+            self.target(*self.args)
+        def join(self) -> None:
+            pass
+    def copy(block: Path, source: Path, ordinal: int, start: float, end: float,
+             now: Any, sleep: Any) -> None:
+        calls.append((ordinal, start, end))
+        if fail and ordinal == 2:
+            raise OSError("private")
+    monkeypatch.setattr(replay.threading, "Thread", Thread)
+    monkeypatch.setattr(replay, "growing_copy", copy)
+    for fail in (False, True):
+        calls.clear()
+        writer = replay.GrowingWriter(settings(2), 100)
+        assert calls == [(1, 100, 105), (2, 105, 110)]
+        if fail:
+            with pytest.raises(replay.PipelineFailure):
+                writer.closed(2)
+        else:
+            assert writer.closed(1) is not None and writer.closed(2) is not None
+        writer.stop()
+
+
+
+def test_run_availability_snapshot_survives_later_block_timeout() -> None:
+    progress = replay.Progress(upgraded=True, transcription=True,
+        blocks=[replay.BlockObservation(1, 10, 12, 14, 16, None, 20)],
+        observations=[replay.Observation(1, 10, 20, (), (0,) * len(replay.SKIPS), 1, 1)])
+    # A subsequent phase timeout clears this block's final availability but cannot
+    # change what was observed available at an earlier suggestion run.
+    doc = replay.report(progress, (), 0)
+    assert doc["evidence_timeline"]["blocks"][0]["transcription"] is None
+    assert doc["evidence_timeline"]["runs"][0]["transcription"] == 1

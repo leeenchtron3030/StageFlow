@@ -94,3 +94,18 @@ Lower layers must not import from higher layers. ED-0002 creates the physical pa
 - Authentication or authorization implementation.
 - Background workers.
 - Media processing, transcription, rendering, or integration adapters before future directives approve them.
+
+## Asset transcription availability (ED-0121)
+
+`GET /api/v1/transcription/assets/{asset_id}/status` requires the existing
+`X-StageFlow-API-Secret` authentication. It returns `asset_id`, `operation` (null or
+`state`, `execution_profile_id`, `execution_profile_version`), `complete_evidence`,
+and `partial_evidence`. The operation matches the currently configured profile and
+current manifest; evidence flags follow the asset-wide latest-complete rule used by
+Session Suggestions. Partial is true only without a complete revision. No transcript
+text, words, paths, worker diagnostics, or connection details are exposed.
+
+Unknown assets: 404 `completed_media_asset_not_found`. Missing composition/configuration:
+503 `kernel_not_configured` or `local_transcription_not_configured`. Unavailable storage:
+503 `postgresql_unavailable`. This endpoint is read-only; no schema/migration or
+configuration default changes. See [transcription evidence readiness](../docs/architecture/transcription-evidence-readiness.md#read-only-asset-availability).

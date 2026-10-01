@@ -11,6 +11,7 @@ from app.api.v1.media_timing import router as media_timing_router
 from app.api.v1.media_timing_evidence import router as media_timing_evidence_router
 from app.api.v1.rendering import router as rendering_router
 from app.api.v1.session_suggestions import router as session_suggestions_router
+from app.api.v1.transcription import router as transcription_router
 from app.api.v1.work_queue import router as work_queue_router
 
 router = APIRouter()
@@ -25,4 +26,5 @@ router.include_router(media_timing_evidence_router, dependencies=_protected_depe
 router.include_router(media_timing_router, dependencies=_protected_dependencies)
 router.include_router(media_segmentation_router, dependencies=_protected_dependencies)
 router.include_router(session_suggestions_router, dependencies=_protected_dependencies)
+router.include_router(transcription_router, dependencies=_protected_dependencies)
 router.include_router(work_queue_router, dependencies=_protected_dependencies)

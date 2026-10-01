@@ -267,6 +267,80 @@ Keep raw inputs and shell history private, and review sanitized output before pu
 and sleep effects; no real database, network, FFmpeg or media is required. The separate
 owner-run synthetic-day replay supplies qualification evidence.
 
+### Opt-in live replay upgrades (ED-0121)
+
+With none of the new options, the existing behavior and JSON keys are unchanged.
+`--transcription`, `--arrival growing`, or `--profile-label LABEL` enables the additional
+measurements below. `--arrival atomic` is the default. Labels must match
+`^[a-z0-9][a-z0-9._-]{0,63}$`; the supplied label is the sole nonnumeric report value
+(other than null) and appears only as `profile_label`.
+
+`--transcription` requires `[local_transcription]` in the operator's config, the
+operator-installed `transcription` dependency group, provisioned model files, CUDA
+runtime libraries on `PATH`, and transcription configured for the disposable Event.
+ED-0075's distribution exclusion remains in force. Before arrival, the replay refuses
+an existing boundary-cue composition, reads the current catalog, and composes its
+Conference stage profile through the human-authority API with a fresh command ID.
+After each block's segmentation, it waits for the autonomous node's cumulative enqueue
+counter to reach its replay-start baseline plus the block ordinal. It polls the new
+asset transcription status endpoint and drives `app.demo.worker --once` while the
+operation is nonterminal, with a separate bounded timeout for enqueue and transcription.
+The worker's startup line is tolerated, captured stdout is capped at 16 KiB, and only
+its allowlisted outcome is parsed; child output is never echoed.
+
+Transcription degrades per ADR-0036: terminal failure, partial-only evidence, or phase
+timeout leaves transcript availability null and increments
+`transcription_unavailable_count`; partial-only results also increment
+`transcription_partial_count`. Replay and suggestion runs continue. Complete evidence
+availability is the first observation of `complete_evidence=true`, not merely a
+successful worker outcome. Other pipeline/protocol failures retain exit 3 and completed
+observations. The status counter baseline is process-local and reported as
+`transcription_enqueue_baseline`; a decreasing observed counter is a pipeline failure,
+not evidence of new enqueues.
+
+Growing arrival uses one background writer, exclusively creating each final filename
+and flushing visible chunks at intervals no longer than one second over duration/pace.
+The last chunk targets the original cumulative completion deadline, followed by flush,
+fsync, and close. Actual close times anchor stage timings. Disk/scheduler delays can
+make a deadline late; subsequent deadlines do not shift. The writer overlaps pipeline
+processing, surfaces failures to the main loop, and is stopped/joined on exit; any
+incomplete files remain. Discovery's existing stabilization is unchanged. If multiple
+assets register while a worker runs, their public timing intervals establish recording
+order after timing settles. This uses the existing continuous, chronologically ordered
+recording prerequisite and does not depend on the bounded recent-media projection.
+Missing timing, duplicate starts, reversed chronology, or registration before a file
+closes fails safely. Observed evidence and first subsequent runs are retained for all
+known registered blocks, including those that arrived during earlier worker calls.
+
+The additional allowlisted measurements are:
+
+- With truth, each talk adds absolute start/end errors in seconds at `first`,
+  `plus_300`, and `plus_900` (fields such as `first_start_error_seconds`). The latter
+  select the latest matching observation at or before truth end +300/+900 seconds
+  of replay media time, inclusive; no eligible match yields null. Existing matching,
+  recording origin, per-talk fields, and `final_accuracy` retain their meaning.
+- `stage_timings`: each block's `ordinal` and media seconds from actual close to
+  `registered`, `timing`, `segmentation`, `suggestion`, and (when enabled)
+  `transcription`. Unobserved stages are null. `stage_summary` contains `median` and
+  nearest-rank `p95` for each stage, excluding nulls; no samples yields nulls.
+- `evidence_timeline.blocks`: each `ordinal` and media seconds of observed
+  `segmentation` and optionally `transcription` availability.
+  `evidence_timeline.runs`: run `ordinal`, `media_seconds`, and highest settled block
+  ordinal for each evidence kind at that observation (zero if none). A highest ordinal
+  does not imply gap-free transcript coverage; consult the per-block nulls.
+
+These are observation times, including polling latency. Driving stages serially means
+these timings are a **lower bound on contention**; they do not qualify simultaneous
+rendering or appliance capacity.
+
+D4 owner-run protocol: use one day's morning from recording start through lunch, at 1x,
+with growing arrival, transcription, and a suggestion run after every block. Use a fresh
+Event/source and record the provisional appliance profile, for example append
+`--pace real --arrival growing --transcription --run-every 1 --profile-label dev.v1`
+to the invocation above. The live policy stays v3. The owner uses the availability
+timeline for D5's offline v5 evaluation; this directive performs no real-media run,
+policy switch, or held-out-seed evaluation.
+
 ## Existing validation controller
 
 `Invoke-StageFlowValidation.ps1` is a thin, non-production PowerShell controller for

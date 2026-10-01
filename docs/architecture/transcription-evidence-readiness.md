@@ -22,7 +22,7 @@ remains optional and operator-installed; ED-0075 excludes the `transcription` gr
 distributable artifacts without granting legal clearance (`backend/pyproject.toml:14`).
 
 `Transcript Evidence Revision` is the accepted internal asset/manifest-scoped evidence
-term. Session Transcript composition and any public API naming remain unresolved.
+term. Session Transcript composition and broader transcript APIs remain unresolved.
 
 ## Trigger scope and replay
 
@@ -56,6 +56,31 @@ Suggestion runs read the latest complete transcript reference per asset even bef
 association. Transcript arrival supplies evidence only; it grants no Session, association,
 Editorial, or package authority. Synthetic memory and rolled-back PostgreSQL coverage is
 in `backend/tests/test_event_asset_transcription.py`.
+
+## Read-only asset availability
+
+ED-0121's owner-approved deviation (2026-09-30) adds
+`GET /api/v1/transcription/assets/{asset_id}/status`, protected by the existing API
+shared-secret dependency. Its allowlisted response contains only `asset_id`,
+`operation` (null or `state`, `execution_profile_id`, `execution_profile_version`),
+`complete_evidence`, and `partial_evidence`. It exposes no transcript text, words,
+paths, connection details, worker output, or diagnostics.
+
+The operation read matches the current deployment, asset's Event, current manifest
+(version `1.0`), and currently configured transcription profile. It reuses the legacy
+operation-selection ordering from the Session trigger. Evidence availability is
+asset-wide: complete means a latest `evidence_status='complete'` revision exists,
+exactly as selected by suggestion snapshots. Later partial/failed revisions do not
+hide it; partial is true only when partial evidence exists and complete evidence does
+not. An operation's success alone does not imply complete evidence.
+
+Unknown assets return 404 `completed_media_asset_not_found`; missing Kernel composition
+returns 503 `kernel_not_configured`, absent transcription configuration returns 503
+`local_transcription_not_configured`, and unavailable Kernel/work storage returns 503
+`postgresql_unavailable`. This read does not enqueue work or change evidence, schema,
+Session authority, or transcription installation defaults. Broader transcript APIs
+remain deferred. Synthetic fake/memory and rolled-back PostgreSQL tests are in
+`backend/tests/test_transcription_status_api.py`.
 
 ## Evidence and authority boundary
 
@@ -294,6 +319,6 @@ No provider-specific storage or automatic downstream authority is implied.
 - human transcript correction/review ownership;
 - diarization-to-participant identity resolution;
 - first Editorial Candidate policy and any automatic AI authority; and
-- public APIs, UI pagination/search, and export/caption formats.
+- broader transcript APIs, UI pagination/search, and export/caption formats.
 
 None of these may be inferred from provider output or implemented through metadata.
