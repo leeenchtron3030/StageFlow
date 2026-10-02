@@ -4,8 +4,8 @@
 
 **Approved** (owner, 2026-09-30), with D1–D7 as recommended, including the D5 parity
 tolerances and the D6 profile-switch rule. **ED-0122** is allocated for the additive
-engine. **ED-0123** is reserved for the default switch, and its scope is confirmed when
-the owner parity run passes.
+engine. **ED-0123** (the default switch) is approved: the owner parity run passed
+([Run 001](../validation/results/transcription-engine-parity-001.md)), and the owner approved it on 2026-10-01.
 
 ## Execution authority
 

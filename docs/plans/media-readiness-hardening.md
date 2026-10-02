@@ -3,7 +3,7 @@
 ## Status
 
 - **Part 1 (ED-0124): Approved** by the owner on 2026-10-01. Raise the default stability interval.
-- **Part 2 (ED-0125): Proposed.** It needs owner approval of D2–D4 before it is implementation-ready.
+- **Part 2 (ED-0125): Approved** by the owner on 2026-10-01, with the recommended defaults (including network paths reporting `UNKNOWN`).
 
 ## Execution authority
 
@@ -17,7 +17,7 @@
   - the owner's 2026-10-01 approval of "raise the default now, active-writer detection as a
     follow-up plan";
   - the Live Replay Run 002 attempts recorded below.
-- **Implementation-ready:** Part 1 yes; Part 2 no.
+- **Implementation-ready:** yes, for both parts.
 - **Escalation:** stop if Part 2 needs a readiness-policy, contract or schema change, or a new
   dependency.
 
@@ -134,8 +134,8 @@ segmentation, transcription and suggestions would all use incomplete media.
 
 ## Acceptance criteria
 
-- [ ] ED-0124 merged: default 30 s; templates and docs updated.
-- [x] ED-0125 approved and merged: a Windows write-state adapter, and inactive write required when
+- [x] ED-0124 merged (PR #193; the validation controller template deliberately keeps its explicit 5 s for synthetic media): default 30 s; templates and docs updated.
+- [x] ED-0125 approved and merged (PR #196; D3 amended so an unknown write state falls back to stability): a Windows write-state adapter, with an observed active writer blocking readiness when
   supported.
 - [ ] Owner replay check: no mid-write registration under growing arrival.
 
