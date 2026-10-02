@@ -46,6 +46,17 @@ becomes ready only after snapshots this far apart show no change. Recorders that
 place can pause, so a short window can register a recording mid-write. Lower it only for
 sources that finalize atomically or for synthetic validation media.
 
+On Windows (ED-0125), each readiness check also probes the file for an active writer: a
+read-only share-deny-write open whose handle is closed immediately, with no data read or
+written. An observed active writer keeps the file unready despite stable snapshots, until
+a later cycle sees it inactive. The probe adds no waiting beyond the configured interval.
+UNC and extended UNC paths, mapped network drives, and other probe errors report
+`UNKNOWN`. Unknown does **not** block: such sources (for example a recorder writing to a
+network share) fall back to the stability interval, which remains the safeguard (owner
+decision, 2026-10-01). Other processes holding the file with incompatible sharing (some
+sync tools or editors) also read as active until they release it. Non-Windows behavior is
+unchanged: no probe is constructed, and the stability interval is the safeguard.
+
 Set `STAGEFLOW_KERNEL_CONFIG_PATH` to the TOML path and set the named secret environment
 variable (`STAGEFLOW_KERNEL_DSN` above) at the process/service boundary. Effective
 configuration summaries redact the resolved DSN. Loading the file validates only; it

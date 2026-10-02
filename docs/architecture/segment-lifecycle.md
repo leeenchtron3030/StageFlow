@@ -54,6 +54,27 @@ readiness policy outcomes remain:
 Discovery never chooses one of these outcomes. A visible, active, or zero-byte file may
 be a valid candidate while remaining not ready.
 
+On Windows, ED-0125 adds a live `WriteStateObservationCollectionPort` adapter using
+stdlib `ctypes`. After the snapshot basis, the cycle probes the resolved file with
+`CreateFileW`, `GENERIC_READ`, `FILE_SHARE_READ` only, and `OPEN_EXISTING`, then closes
+the handle immediately without reading or writing data. Success supplies `INACTIVE`;
+sharing violation 32 supplies `ACTIVE`; other errors supply `UNKNOWN` with a closed,
+privacy-safe limitation code. These observations persist in the existing Kernel
+observation store and are reconstructed into the readiness bundle.
+
+The Windows runtime declares write-state support. An `ACTIVE` observation at or after
+the stability basis blocks readiness (`active_write_observed`), so a stable file with an
+active writer remains unready until a later cycle observes inactivity. The policy
+parameter `require_inactive_write_when_available` stays off (owner decision, 2026-10-01),
+so `UNKNOWN` does not block. The probe adds no waiting interval and
+is point-in-time evidence, not a guarantee against a writer reopening the file later.
+Sharing violations can also conservatively reflect incompatible reader/delete handles.
+UNC paths (including extended UNC paths) and mapped drives reported as `DRIVE_REMOTE`
+produce `UNKNOWN`, since remote writers may be invisible. Such sources qualify through
+the stability route alone once `minimum_stable_seconds` elapses, as on other platforms.
+Non-Windows runtimes construct no probe, declare no write-state support, and retain the
+existing stability behavior and limitation that write state was not independently assessed.
+
 ### Completed asset
 
 `CompletedMediaAsset` is an immutable validation contract. The bounded Kernel cycle

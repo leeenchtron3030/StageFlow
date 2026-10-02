@@ -4,8 +4,8 @@
 
 **Approved** (owner, 2026-09-30), with D1–D7 as recommended, including the D5 parity
 tolerances and the D6 profile-switch rule. **ED-0122** is allocated for the additive
-engine. **ED-0123** is reserved for the default switch, and its scope is confirmed when
-the owner parity run passes.
+engine. **ED-0123** (the default switch) is approved: the owner parity run passed
+([Run 001](../validation/results/transcription-engine-parity-001.md)), and the owner approved it on 2026-10-01.
 
 ## Execution authority
 
@@ -332,7 +332,7 @@ None verified as needed:
   non-permissive component.
 - [x] The licensing guard test proves that no PyAV, faster-whisper, huggingface_hub,
   onnxruntime or tqdm is loaded.
-- [ ] Owner parity run recorded: D5 tolerances met on GPU (with and without render load),
+- [x] Owner parity run recorded ([Run 001](../validation/results/transcription-engine-parity-001.md), development machine): D5 tolerances met on GPU (with and without render load),
   and a CPU `int8` run completed.
 - [ ] ED-0123 proposed with the switch, guard replacement and SBOM regeneration.
 

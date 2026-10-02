@@ -2,7 +2,8 @@
 
 ## Status
 
-Proposed (2026-10-01). This is an owner decision. It extends
+**Accepted** (owner, 2026-10-01), with the recommended defaults, decisions 1–3. This is an
+owner decision. It extends
 [ADR-0034](ADR-0034-session-boundary-suggestions.md) and does not replace its authority model:
 suggestions stay advisory, and every Session is realized by a human.
 

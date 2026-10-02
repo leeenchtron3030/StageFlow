@@ -2,8 +2,10 @@
 
 ## Status
 
-**Proposed** (2026-10-01). This plan needs the owner's acceptance of ADR-0038 (decisions 1–3)
-and approval of D1–D6. The directive numbers below are **proposed**; the owner allocates them.
+**Approved** (owner, 2026-10-01): ADR-0038 accepted, D1–D6 approved, and **ED-0126 to ED-0130
+allocated** as listed in the phases below. The owner also approved, the same day:
+- adding a language-model edge referee to the Phase A lab;
+- the corpus additions under Phase A.
 
 ## Execution authority
 
@@ -21,7 +23,8 @@ and approval of D1–D6. The directive numbers below are **proposed**; the owner
     revision;
   - the owner's 2026-10-01 direction towards a probabilistic sequence model;
   - the [licence and risk review](../security/boundary-evidence-license-review-2026-10-01.md).
-- **Implementation-ready:** no, pending the owner's approval.
+- **Implementation-ready:** yes, phase by phase. Phase D still needs its own directive before
+  implementation.
 
 ## Problem statement
 
@@ -67,7 +70,7 @@ past policy step added hand-tuned rules for one failure mode. StageFlow needs:
 
 | Phase | Proposed ED | Deliverable | Kind | Exit criterion |
 | --- | --- | --- | --- | --- |
-| **A. Evidence lab** | ED-0126 | Automatic ground truth for the second event day (export-to-block cross-correlation, local only); `scripts/validation/boundary_evidence_lab.py`: offline extraction on archive blocks of FFmpeg `aspectralstats`, `ebur128`, `scdet` and `blackdetect` per second; Whisper no-speech probability, non-speech tokens and pooled encoder states per window; plus a separability report per family against the ground-truth edges (ROC AUC and detection lead/lag) | Validation tooling; no product change | A sanitized result ranks the families by how well they separate ends and starts |
+| **A. Evidence lab** | ED-0126 | Automatic ground truth from export-to-block audio cross-correlation (local only) for the 2024 edition (three days), the 2023 single-room summit and, if alignment is clean, a 2023 two-track event; families added to the lab: **known-graphics (title-card) matching**, **music-cue matching**, and a **language-model edge referee** (a local Apache-2.0 or MIT model, grammar-constrained, choosing sentence indices in targeted windows only); `scripts/validation/boundary_evidence_lab.py`: offline extraction on archive blocks of FFmpeg `aspectralstats`, `ebur128`, `scdet` and `blackdetect` per second; Whisper no-speech probability, non-speech tokens and pooled encoder states per window; plus a separability report per family against the ground-truth edges (ROC AUC and detection lead/lag) | Validation tooling; no product change | A sanitized result ranks the families by how well they separate ends and starts |
 | **B. End evidence and v5 end revision** | ED-0127 | Small applause, music and speech heads, plus a voice-continuity score (owner-archive trained, calibrated); a v5 end-edge revision (pure policy) using the evidence that passed A; an offline D5-style evaluation on 3 days and Run 002 | Pure policy plus harness | v5-revised meets D5 (no talk worse at +5 min) and improves end medians on all days; then **ED-0118 freezes it** (migration 0028) |
 | **C. v6 offline** | ED-0128 | A pure domain module: event grammar, explicit-duration priors with the lateness chain, LLR calibration, lattice semi-Markov decoding with marginals, settled flags, anchors; harness `--policy-version 6` | Pure policy plus harness | ADR-0038 gate met offline on all days and on Run 002's timeline, including calibration ≤ 0.10 |
 | **D. Recording-software signals** | ED-0129 | Read-only vMix TCP (TALLY, ACTS, XML) and OBS WebSocket v5 (scene, scene-item, mute, media-playback, record-file events) adapters; per-Event signal-meaning mapping; persistence as advisory evidence; a generic endpoint for manual marks | Adapters plus migration; needs ADR-0038 decision 3 | A rehearsal with vMix and with OBS: signals land as evidence with correct times, and v6 uses them offline |
@@ -79,6 +82,24 @@ past policy step added hand-tuned rules for one failure mode. StageFlow needs:
 - C can start once A's features exist.
 - D is independent and can run in parallel once ADR-0038 decision 3 is accepted.
 - E follows C, and D where available.
+
+## Language-model edge referee (Phase A test, approved 2026-10-01)
+
+- **Role: refinement, never the source of truth.** It runs only on edges v6 marks uncertain:
+  unsettled, low-confidence, or with two close candidates.
+- **Input:** about ±3 minutes of transcript, with word timings, plus the schedule entry and the
+  candidate edges. That is about 1,500–2,000 tokens.
+- **Output:** a grammar-constrained answer that picks sentence indices and labels sections
+  (intro, talk, Q&A, MC handoff, break). **It never writes times;** times come from word
+  timestamps.
+- **Use:** its answer becomes a calibrated evidence input to v6.
+- **Determinism and audit:** temperature 0, a pinned model checksum and runtime, and answers
+  stored as evidence keyed by input digest, so replays reuse them.
+- **Cost:** a 4-bit 7B model needs about 5 GB of GPU memory and takes about 1–2 s per edge, so
+  tens of GPU-seconds per day. There is no per-use cost.
+- **Licences:** Qwen2.5 7B or 14B (Apache-2.0), or Phi-3.5-mini (MIT), on llama.cpp (MIT).
+  **Not Qwen2.5-3B** (non-commercial).
+- **Ships only if** the Phase A lab shows it adds accuracy on ends beyond the cheaper families.
 
 ## Lean-first rationale
 

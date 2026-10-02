@@ -78,8 +78,14 @@ segmentation, transcription and suggestions would all use incomplete media.
     block the recorder.
   - **Recommended default:** Windows only. POSIX reports no write-state support (no portable
     equivalent), so readiness there stays on the stability route with the existing limitation.
-- **D3 (Part 2, proposed).** When the runtime capability reports `write_state_support`, set
-  `require_inactive_write_when_available=True`.
+- **D3 (Part 2, amended by the owner, 2026-10-01).** As first written, D3 set
+  `require_inactive_write_when_available=True` when the capability is supported. Review found
+  that this would stop Windows network-share sources (`UNKNOWN`) from ever registering,
+  contradicting the open question's rationale. **The parameter therefore stays False.**
+  - An observed `ACTIVE` writer still blocks readiness (`active_write_observed`).
+  - `UNKNOWN` falls back to the stability interval.
+  - The original text follows, superseded: "When the runtime capability reports
+    `write_state_support`, set `require_inactive_write_when_available=True`."
   - On Windows, the stability route then also needs an inactive-write observation after the
     stability basis.
   - Elsewhere, behavior is unchanged.
@@ -129,7 +135,7 @@ segmentation, transcription and suggestions would all use incomplete media.
 ## Acceptance criteria
 
 - [x] ED-0124 merged (PR #193; the validation controller template deliberately keeps its explicit 5 s for synthetic media): default 30 s; templates and docs updated.
-- [ ] ED-0125 approved and merged: a Windows write-state adapter, and inactive write required when
+- [x] ED-0125 approved and merged (PR #196; D3 amended so an unknown write state falls back to stability): a Windows write-state adapter, with an observed active writer blocking readiness when
   supported.
 - [ ] Owner replay check: no mid-write registration under growing arrival.
 
@@ -148,11 +154,30 @@ segmentation, transcription and suggestions would all use incomplete media.
 
 ## Completion record
 
-- Implemented revision:
-- Files and migrations actually changed:
-- Commands and tests actually run:
-- Results and warnings:
-- Execution authority used:
-- Approved deviations:
-- Rollback status:
-- Remaining work:
+- **Implemented revision:** ED-0124 in PR #193; ED-0125 in the PR that carries this record.
+- **Files changed (ED-0125):**
+  - `backend/app/infrastructure/windows_write_state.py` (new);
+  - `backend/app/bootstrap/media_cycle.py` and `runtime_factory.py`;
+  - `backend/tests/test_windows_write_state.py` (new);
+  - `docs/architecture/segment-lifecycle.md` and `durable-kernel-operations.md`.
+  - No migration: observations persist in the existing Kernel observation store.
+- **Commands and tests actually run:**
+  - **Host backend suite:** 3,587 passed, 0 failed, 5 skipped (before the D3 amendment).
+  - `test_windows_write_state.py`: 23 passed after the amendment, including the real Windows
+    child-writer test.
+  - The full suite was rerun after the amendment; see the PR.
+  - Ruff and Pyright were clean.
+- **Results and warnings:** other processes holding a file with incompatible sharing (some
+  sync tools or editors) read as `ACTIVE` until they release it. StageFlow's own readers close
+  their handles before the probe.
+- **Execution authority used:** Green under the approved plan. The reviewer escalated the D3
+  network-path conflict, and the owner chose "detect the writer, don't require the check"
+  (D3 amended).
+- **Approved deviations:**
+  - D3, as above;
+  - the validation controller template keeps its explicit 5 s (ED-0124).
+- **Rollback status:** additive. Reverting restores stability-only readiness.
+- **Remaining work:**
+  - the owner replay check (no registration mid-write under growing arrival);
+  - a later decision on recorder-reported closure (OBS and vMix) as a strong finalization
+    method.
