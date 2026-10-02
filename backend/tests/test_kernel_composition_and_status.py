@@ -94,6 +94,8 @@ name = "Main Stage"
 [[event.stages.sources]]
 key = "main-source"
 path = "{source_path.as_posix()}"
+[resources]
+minimum_stable_seconds = 5
 """.strip(),
         encoding="utf-8",
     )
