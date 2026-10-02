@@ -69,6 +69,8 @@ def test_ground_truth_offsets_skips_gap_and_names() -> None:
     assert row["start"] == common.iso(start + 187)
     assert row["end"] == common.iso(start + 227)
     assert row["consistent"] and row["status"] == "aligned"
+    assert row["span_start"] == row["start"] and row["span_end"] == row["end"]
+    assert row["coverage"] == 1.0 and row["span_ratio"] == 1.0
     assert math.isclose(row["min_score"], 1, abs_tol=2e-6)
     assert "path" not in json.dumps(row) and "name" not in json.dumps(row)
 
@@ -78,7 +80,8 @@ def test_ground_truth_internal_cut_two_segments() -> None:
     signal = np.random.default_rng(2).normal(size=20000)
     start = common.utc("2026-01-01T00:00:00Z")
     export = np.concatenate((signal[2000:5000], signal[9000:12000]))
-    row = truth.align_export(export, [truth.Run(start, signal)], ordinal=0, rate=100)
+    row = truth.align_export(export, [truth.Run(start, signal)], ordinal=0, rate=100,
+                             max_span_ratio=2.0)  # This search fixture removes 40 s of 100 s.
     assert row["status"] == "aligned" and not row["consistent"]
     assert row["segments"] == [{"start": common.iso(start + 20), "end": common.iso(start + 50),
                                 "accepted_fraction": 1.0},
@@ -90,7 +93,8 @@ def test_ground_truth_short_cut_cannot_hide_in_high_scoring_tile() -> None:
     np = pytest.importorskip("numpy")
     signal = np.random.default_rng(2).normal(size=20000)
     export = np.concatenate((signal[2000:5900], signal[9000:12100]))
-    row = truth.align_export(export, [truth.Run(1000, signal)], ordinal=0, rate=100)
+    row = truth.align_export(export, [truth.Run(1000, signal)], ordinal=0, rate=100,
+                             max_span_ratio=2.0)  # Preserve the 31 s cut search regression.
     assert row["status"] == "aligned"
     assert row["segments"] == [{"start": common.iso(1020), "end": common.iso(1059),
                                 "accepted_fraction": 1.0},
@@ -105,8 +109,154 @@ def test_ground_truth_low_score_unaligned_and_no_gap_bridge() -> None:
     row = truth.align_export(rng.normal(size=2000), [truth.Run(1000, signal)], ordinal=0, rate=100)
     assert row["status"] == "unaligned" and row["start"] is None and row["end"] is None
     assert not row["consistent"]
+    assert row["span_start"] is None and row["span_end"] is None
+    assert row["coverage"] == 0.0 and row["span_ratio"] is None
     with pytest.raises(common.Refusal):
         truth.recording_runs([(1000, 40, signal), (1020, 40, signal)], 100)
+
+
+def test_ground_truth_scattered_mislocations_merge_with_noise_unsupported() -> None:
+    np = pytest.importorskip("numpy")
+    signal = np.random.default_rng(101).normal(size=8000).astype(np.float32)
+    export = signal[1000:5000].copy()
+    for position in (500, 1500, 2500, 3500):
+        export[position:position + 25] = signal[6000:6025]
+    row = truth.align_export(export, [truth.Run(1000, signal)], ordinal=0, rate=100)
+    assert row["status"] == "aligned" and row["consistent"]
+    assert row["segments"] == [{"start": common.iso(1010), "end": common.iso(1050),
+                                "accepted_fraction": .975}]
+    assert row["coverage"] == .975 and row["accepted_fraction"] == .975
+    assert row["span_ratio"] == 1.0
+    # All intervening noise must lower merged acceptance, despite its perfect matches.
+    strict = truth.align_export(export, [truth.Run(1000, signal)], ordinal=0, rate=100,
+                                acceptance_fraction=.98)
+    assert strict["status"] == "unaligned" and strict["segments"] == []
+    assert strict["coverage"] == 0.0 and strict["accepted_fraction"] == .975
+
+
+def test_ground_truth_edge_noise_is_excluded_from_bounds_and_coverage() -> None:
+    np = pytest.importorskip("numpy")
+    signal = np.random.default_rng(102).normal(size=8000).astype(np.float32)
+    export = signal[1000:5000].copy()
+    export[:25] = signal[6000:6025]
+    export[-25:] = signal[6500:6525]
+    row = truth.align_export(export, [truth.Run(1000, signal)], ordinal=0, rate=100)
+    assert row["status"] == "aligned" and row["consistent"]
+    assert row["segments"] == [{"start": common.iso(1010.25), "end": common.iso(1049.75),
+                                "accepted_fraction": 1.0}]
+    assert row["coverage"] == .9875 and row["span_ratio"] == .9875
+
+
+@pytest.mark.parametrize("fragment_seconds,segment_count", [(1.75, 1), (2.0, 3)])
+def test_ground_truth_minimum_segment_duration_is_inclusive(
+    fragment_seconds: float, segment_count: int,
+) -> None:
+    np = pytest.importorskip("numpy")
+    signal = np.random.default_rng(103).normal(size=8000).astype(np.float32)
+    export = signal[1000:5000].copy()
+    size = round(fragment_seconds * 100)
+    export[1500:1500 + size] = signal[6000:6000 + size]
+    row = truth.align_export(export, [truth.Run(1000, signal)], ordinal=0, rate=100)
+    assert row["status"] == "aligned" and len(row["segments"]) == segment_count
+    assert row["consistent"] == (segment_count == 1)
+    assert row["coverage"] == (1 - fragment_seconds / 40 if segment_count == 1 else 1)
+
+
+def test_ground_truth_small_internal_cut_remains_aligned() -> None:
+    np = pytest.importorskip("numpy")
+    signal = np.random.default_rng(104).normal(size=8000).astype(np.float32)
+    export = np.concatenate((signal[1000:3000], signal[3200:5200]))
+    row = truth.align_export(export, [truth.Run(1000, signal)], ordinal=0, rate=100)
+    assert row["status"] == "aligned" and not row["consistent"]
+    assert row["segments"] == [{"start": common.iso(1010), "end": common.iso(1030),
+                                "accepted_fraction": 1.0},
+                               {"start": common.iso(1032), "end": common.iso(1052),
+                                "accepted_fraction": 1.0}]
+    assert row["coverage"] == 1.0 and row["span_ratio"] == 1.05
+
+
+def test_ground_truth_different_runs_never_merge_even_at_same_offset() -> None:
+    np = pytest.importorskip("numpy")
+    signal = np.random.default_rng(105).normal(size=4000).astype(np.float32)
+    runs = [truth.Run(1000, signal[:2000]), truth.Run(1020, signal[2000:])]
+    row = truth.align_export(signal, runs, ordinal=0, rate=100)
+    assert row["status"] == "aligned" and not row["consistent"]
+    assert len(row["segments"]) == 2
+    assert row["coverage"] == 1.0 and row["span_ratio"] == 1.0
+
+
+@pytest.mark.parametrize("middle_size,coverage,aligned", [(1000, .75, False), (250, 12 / 13, True)])
+def test_ground_truth_coverage_controls_acceptance_with_plausible_span(
+    middle_size: int, coverage: float, aligned: bool,
+) -> None:
+    np = pytest.importorskip("numpy")
+    signal = np.random.default_rng(106).normal(size=8000).astype(np.float32)
+    middle = signal[6000:6000 + middle_size].copy()
+    middle[200:] = 0  # Long enough to survive filtering, too weak to be supported.
+    export = np.concatenate((signal[1000:2500], middle,
+                             signal[2500 + middle_size:4000 + middle_size]))
+    row = truth.align_export(export, [truth.Run(1000, signal)], ordinal=0, rate=100)
+    assert row["status"] == ("aligned" if aligned else "unaligned")
+    assert not row["consistent"]
+    assert row["start"] == (row["span_start"] if aligned else None)
+    assert row["end"] == (row["span_end"] if aligned else None)
+    assert row["span_start"] == common.iso(1010)
+    assert row["span_end"] == common.iso(1040 + middle_size / 100)
+    assert len(row["segments"]) == 2
+    assert row["coverage"] == coverage and row["span_ratio"] == 1.0
+
+
+@pytest.mark.parametrize("second_start,span_ratio", [(2000, 2 / 3), (9000, 110 / 60)])
+def test_ground_truth_wrong_span_ratio_refused_despite_full_coverage(
+    second_start: int, span_ratio: float,
+) -> None:
+    np = pytest.importorskip("numpy")
+    signal = np.random.default_rng(107).normal(size=15000).astype(np.float32)
+    export = np.concatenate((signal[1000:4000], signal[second_start:second_start + 3000]))
+    row = truth.align_export(export, [truth.Run(1000, signal)], ordinal=0, rate=100)
+    assert row["status"] == "unaligned" and not row["consistent"]
+    assert row["start"] is None and row["end"] is None
+    assert row["span_start"] == common.iso(1010)
+    assert row["span_end"] == common.iso(1000 + second_start / 100 + 30)
+    assert len(row["segments"]) == 2
+    assert row["coverage"] == 1.0 and math.isclose(row["span_ratio"], span_ratio)
+
+
+@pytest.mark.parametrize("shift_samples,segment_count", [(4, 1), (6, 2)])
+def test_ground_truth_merge_preserves_offset_tolerance(
+    shift_samples: int, segment_count: int,
+) -> None:
+    np = pytest.importorskip("numpy")
+    signal = np.random.default_rng(108).normal(size=8000).astype(np.float32)
+    export = np.concatenate((signal[1000:3000], signal[6000:6025],
+                             signal[3025 + shift_samples:5000 + shift_samples]))
+    row = truth.align_export(export, [truth.Run(1000, signal)], ordinal=0, rate=100)
+    assert row["status"] == "aligned" and len(row["segments"]) == segment_count
+    assert row["consistent"] == (segment_count == 1)
+    assert row["coverage"] == 159 / 160
+
+
+def test_ground_truth_all_groups_filtered_report_empty_span() -> None:
+    np = pytest.importorskip("numpy")
+    signal = np.random.default_rng(109).normal(size=4000).astype(np.float32)
+    row = truth.align_export(signal, [truth.Run(1000, signal)], ordinal=0, rate=100,
+                             min_segment_seconds=41)
+    assert row["status"] == "unaligned" and not row["consistent"]
+    assert row["segments"] == [] and row["accepted_fraction"] == 0.0
+    assert row["start"] is None and row["end"] is None
+    assert row["span_start"] is None and row["span_end"] is None
+    assert row["coverage"] == 0.0 and row["span_ratio"] is None
+
+
+@pytest.mark.parametrize("options", [
+    {"min_segment_seconds": 0}, {"min_segment_seconds": -1},
+    {"min_segment_seconds": float("nan")}, {"min_segment_seconds": float("inf")},
+    {"min_span_ratio": 0}, {"min_span_ratio": float("nan")},
+    {"min_span_ratio": 2, "max_span_ratio": 1}, {"max_span_ratio": float("inf")},
+])
+def test_ground_truth_invalid_segmentation_options_refused(options: dict[str, float]) -> None:
+    with pytest.raises(common.Refusal):
+        truth.align_export([], [], ordinal=0, **options)
 
 
 def test_audio_metadata_parser_all_features() -> None:
@@ -606,6 +756,30 @@ def test_ground_truth_cli_writes_utc_only_to_external_artifact(
                       output=stdout) == 0
     assert json.loads(out.read_text())[0]["start"] == "2026-01-01T00:00:01Z"
     assert all(value not in stdout.getvalue() for value in ("private", "2026", str(tmp_path)))
+    row = json.loads(out.read_text())[0]
+    assert row["span_start"] == row["start"] and row["span_end"] == row["end"]
+    assert row["coverage"] == 1.0 and row["span_ratio"] == 1.0
+    for options, aligned, supported in [
+        (["--min-segment-seconds", "11"], False, False),
+        (["--min-span-ratio", "1.01"], False, True),
+        (["--max-span-ratio", "0.99"], False, True),
+        (["--min-span-ratio", "1", "--max-span-ratio", "1"], True, True),
+    ]:
+        stdout = io.StringIO()
+        assert truth.main(["--blocks", "blocks", "--exports", "exports", "--out", str(out),
+                           *options], output=stdout) == 0
+        row = json.loads(out.read_text())[0]
+        assert row["status"] == ("aligned" if aligned else "unaligned")
+        assert row["consistent"] == aligned
+        assert row["span_start"] == ("2026-01-01T00:00:01Z" if supported else None)
+        assert row["span_end"] == ("2026-01-01T00:00:11Z" if supported else None)
+        assert row["coverage"] == (1.0 if supported else 0.0)
+        assert row["span_ratio"] == (1.0 if supported else None)
+        assert json.loads(stdout.getvalue()) == [{
+            "ordinal": 0, "min_score": row["min_score"], "consistent": aligned,
+            "aligned": aligned, "snippet_scores": row["snippet_scores"],
+            "accepted_fraction": row["accepted_fraction"], "acceptance_fraction": .9}]
+        assert all(value not in stdout.getvalue() for value in ("private", "2026", str(tmp_path)))
 
 
 def test_ground_truth_cli_isolates_a_failing_export(
@@ -645,6 +819,8 @@ def test_ground_truth_cli_isolates_a_failing_export(
                       output=io.StringIO()) == 0
     rows = json.loads(out.read_text())
     assert [row["status"] for row in rows] == ["error", "aligned"]
+    assert rows[0]["span_start"] is None and rows[0]["span_end"] is None
+    assert rows[0]["coverage"] == 0.0 and rows[0]["span_ratio"] is None
     assert rows[1]["start"] == "2026-01-01T00:00:01Z"
 
 
@@ -822,7 +998,8 @@ def test_alignment_large_cut_falls_back_to_global(monkeypatch: pytest.MonkeyPatc
         return original(audio, runs, rate, **kwargs)
 
     monkeypatch.setattr(truth, "locate", search)
-    row = truth.align_export(export, [truth.Run(1000, signal)], ordinal=0, rate=100)
+    row = truth.align_export(export, [truth.Run(1000, signal)], ordinal=0, rate=100,
+                             max_span_ratio=8.0)  # This fixture tests a 270 s global jump.
     assert row["status"] == "aligned" and len(row["segments"]) == 2
     assert global_count == 6
 
@@ -885,7 +1062,8 @@ def test_internal_cut_uses_below_threshold_parent_match_locally(
         return result
 
     monkeypatch.setattr(truth, "locate", search)
-    row = truth.align_export(export, [truth.Run(1000, signal)], ordinal=0, rate=rate)
+    row = truth.align_export(export, [truth.Run(1000, signal)], ordinal=0, rate=rate,
+                             max_span_ratio=8.0)  # Preserve the distant-parent search fixture.
     assert row["status"] == "aligned" and not row["consistent"]
     assert [(s["start"], s["end"]) for s in row["segments"]] == [
         (common.iso(1010), common.iso(1032.5)), (common.iso(1300), common.iso(1317.5))]

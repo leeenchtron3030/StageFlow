@@ -684,6 +684,7 @@ uv run --no-sync python ../scripts/validation/derive_ground_truth.py `
   --blocks D:\BoundaryLab\blocks --exports D:\BoundaryLab\exports `
   --intro-skip 8 --outro-skip 5 --threshold 0.8 `
   --join-tolerance 2.0 --acceptance-fraction 0.9 `
+  --min-segment-seconds 2.0 --min-span-ratio 0.85 --max-span-ratio 1.10 `
   --out D:\BoundaryLab\truth.json
 ```
 
@@ -710,21 +711,41 @@ float32 audio and bounded FFT chunks with float64 cumulative energy sums confine
 each chunk.
 
 Tiles are checked in 0.25 s pieces and suspect tiles are rematched at that resolution,
-so short cuts still split source segments. Offsets must agree within 0.05 s to form one
-segment. A segment is accepted when at least `--acceptance-fraction` (default 0.9) of its
-quarter-second tiles meet `--threshold`. Unsupported quiet/processed tiles retain the
+so cuts still split source segments. Offsets must agree within 0.05 s within the same
+recording run to form one group. Groups shorter than `--min-segment-seconds` (default
+2.0 s, positive) are discarded as noise. Consecutive surviving groups merge when their
+run and offset agree within 0.05 s, bridging only the removed noise. A merged segment is
+supported when at least `--acceptance-fraction` (default 0.9) of **all** pieces between
+its first and last piece meet `--threshold`; removed noise counts as unsupported even
+if its misplaced match scored highly. Unsupported quiet/processed tiles retain the
 predicted placement but never update tracking or count as accepted evidence. This is
 waveform matching, not a semantic labeler; up to `1 - acceptance_fraction` (10% by default)
 may lack waveform support.
+An export is aligned when non-noise pieces belonging to supported merged segments cover
+at least `--acceptance-fraction` of all analysed pieces, and the first-to-last supported
+source span divided by analysed export duration falls within inclusive `--min-span-ratio`
+and `--max-span-ratio` (defaults 0.85 and 1.10). Analysed duration excludes intro/outro skips.
+Span limits must be finite, positive and ordered. A rejected group does not independently
+fail an export. Noise always reduces coverage, including noise inside a merged segment.
+Large real cuts can exceed the default span limit; widen it explicitly when appropriate
+and review the separate segments. `consistent` is true only for an aligned export with
+exactly one supported merged segment.
 Long corpora still require memory for decoded float32 recording runs, but subsequent
 successful tile searches and normalization no longer copy or transform whole runs.
 
 The external JSON array contains `ordinal`, `start`, `end`, `segments`, `min_score`,
 `consistent`, `status`, `snippet_scores`, `snippet_aligned`, `acceptance_fraction`
-(the configured minimum) and `accepted_fraction` (the measured tile fraction). Each
-segment also reports its measured `accepted_fraction`. Times are aware UTC
-strings. A failed export has null outer bounds, `status: "unaligned"` and
-`consistent: false`; any supported partial segments remain visible. For aligned
+(the configured minimum), `accepted_fraction` (the measured non-noise, above-threshold
+piece fraction), `span_start`, `span_end`, `coverage` and `span_ratio`. Each segment also
+reports its measured `accepted_fraction`, including intervening noise in its denominator.
+`coverage` is the fraction of all pieces belonging to supported segments, excluding noise;
+it can include tolerated quiet pieces within those segments. `span_start` and `span_end`
+are the first and last supported segment boundaries, even for an unaligned row, and
+`span_ratio` measures that source span against the analysed export duration. Times are
+aware UTC strings. An unaligned export has null `start`/`end`, `status: "unaligned"` and
+`consistent: false`; supported partial segments and their span remain visible for manual
+review. With no supported segments, span bounds and ratio are null and coverage is 0.
+Error rows use the same empty span and coverage fields. For aligned
 exports `min_score` is the minimum tile score, including tolerated unsupported tiles.
 Probe scores may be below the threshold when a probe crosses an internal cut; those probes are explicitly unaligned.
 For an internally cut export, the outer bounds enclose its first and last source

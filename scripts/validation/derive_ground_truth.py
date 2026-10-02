@@ -78,10 +78,14 @@ def locate(audio: Any, runs: list[Run], rate: int, *,
 
 def align_export(audio: Any, runs: list[Run], *, ordinal: int, rate: int = 8000,
                  intro_skip: float = 0, outro_skip: float = 0,
-                 threshold: float = .8, acceptance_fraction: float = .9) -> dict[str, Any]:
+                 threshold: float = .8, acceptance_fraction: float = .9,
+                 min_segment_seconds: float = 2.0, min_span_ratio: float = .85,
+                 max_span_ratio: float = 1.10) -> dict[str, Any]:
     """Five global anchors, then local tracking; quarter-second support per segment."""
     if (not 0 < threshold <= 1 or not 0 < acceptance_fraction <= 1
-            or min(intro_skip, outro_skip) < 0):
+            or min(intro_skip, outro_skip) < 0
+            or finite(min_segment_seconds) <= 0
+            or not 0 < finite(min_span_ratio) <= finite(max_span_ratio)):
         raise Refusal()
     start, end = round(intro_skip * rate), len(audio) - round(outro_skip * rate)
     if end - start < 10 * rate:
@@ -153,30 +157,63 @@ def align_export(audio: Any, runs: list[Run], *, ordinal: int, rate: int = 8000,
             groups[-1].append(piece)
         else:
             groups.append([piece])
-    fractions = [sum(p[3] >= threshold for p in g) / len(g) for g in groups]
-    supported = [g for g, fraction in zip(groups, fractions, strict=True)
+    merged: list[list[tuple[int, int, float, float, int]]] = []
+    noise: set[int] = set()
+    pending_noise: list[tuple[int, int, float, float, int]] = []
+    for group in groups:
+        if (group[-1][1] - group[0][0]) / rate < min_segment_seconds:
+            noise.update(p[0] for p in group)
+            pending_noise.extend(group)
+            continue
+        first = group[0]
+        prior = merged[-1][-1] if merged else None
+        if (prior is not None and first[4] == prior[4]
+                and abs(first[2] - prior[2] - (first[0] - prior[0]) / rate) <= .05):
+            merged[-1].extend(pending_noise)
+            merged[-1].extend(group)
+        else:
+            merged.append(group.copy())
+        pending_noise = []
+
+    def accepted_piece(piece: tuple[int, int, float, float, int]) -> bool:
+        # Even high-scoring mislocations are unsupported once filtered as noise.
+        return piece[0] not in noise and piece[3] >= threshold
+
+    # Include intervening noise in the denominator, never in the accepted evidence.
+    fractions = [sum(accepted_piece(p) for p in g) / len(g) for g in merged]
+    supported = [g for g, fraction in zip(merged, fractions, strict=True)
                  if fraction >= acceptance_fraction
                  and g[0][2] >= runs[g[0][4]].start
                  and g[-1][2] + (g[-1][1] - g[-1][0]) / rate
                  <= runs[g[-1][4]].start + len(runs[g[-1][4]].audio) / rate + 1 / rate]
     segments = [{"start": iso(g[0][2]),
                  "end": iso(g[-1][2] + (g[-1][1] - g[-1][0]) / rate),
-                 "accepted_fraction": sum(p[3] >= threshold for p in g) / len(g)}
+                 "accepted_fraction": sum(accepted_piece(p) for p in g) / len(g)}
                 for g in supported]
-    aligned = bool(segments) and len(supported) == len(groups)
+    coverage = (sum(p[0] not in noise for g in supported for p in g) / len(pieces)
+                if pieces else 0.0)
+    span_ratio = ((supported[-1][-1][2]
+                   + (supported[-1][-1][1] - supported[-1][-1][0]) / rate
+                   - supported[0][0][2]) / ((end - start) / rate) if supported else None)
+    aligned = (coverage >= acceptance_fraction and span_ratio is not None
+               and min_span_ratio <= span_ratio <= max_span_ratio)
     return {"ordinal": ordinal, "start": segments[0]["start"] if aligned else None,
             "end": segments[-1]["end"] if aligned else None, "segments": segments,
+            "span_start": segments[0]["start"] if segments else None,
+            "span_end": segments[-1]["end"] if segments else None,
+            "coverage": coverage, "span_ratio": span_ratio,
             "min_score": min(p[3] for p in pieces) if aligned else min(snippet_scores),
             "acceptance_fraction": acceptance_fraction,
-            "accepted_fraction": sum(p[3] >= threshold for p in pieces) / len(pieces)
+            "accepted_fraction": sum(accepted_piece(p) for p in pieces) / len(pieces)
             if pieces else 0.0,
-            "consistent": aligned and len(groups) == 1,
+            "consistent": aligned and len(supported) == 1,
             "status": "aligned" if aligned else "unaligned", "snippet_scores": snippet_scores,
             "snippet_aligned": [s >= threshold for s in snippet_scores]}
 
 
 def failed_row(ordinal: int, acceptance_fraction: float) -> dict[str, Any]:
     return {"ordinal": ordinal, "status": "error", "start": None, "end": None,
+            "span_start": None, "span_end": None, "coverage": 0.0, "span_ratio": None,
             "segments": [], "min_score": 0.0, "consistent": False, "snippet_scores": [],
             "accepted_fraction": 0.0, "acceptance_fraction": acceptance_fraction,
             "snippet_aligned": []}
@@ -204,6 +241,9 @@ def main(argv: list[str] | None = None, *, output: TextIO | None = None,
             parser.add_argument("--threshold", type=float, default=.8)
             parser.add_argument("--join-tolerance", type=float, default=2.0)
             parser.add_argument("--acceptance-fraction", type=float, default=.9)
+            parser.add_argument("--min-segment-seconds", type=float, default=2.0)
+            parser.add_argument("--min-span-ratio", type=float, default=.85)
+            parser.add_argument("--max-span-ratio", type=float, default=1.10)
             args = parser.parse_args(argv)
             target = external(args.out, output=True)
             settings = config(os.environ.get("STAGEFLOW_KERNEL_CONFIG_PATH", ""))
@@ -229,7 +269,10 @@ def main(argv: list[str] | None = None, *, output: TextIO | None = None,
                                              intro_skip=finite(args.intro_skip),
                                              outro_skip=finite(args.outro_skip),
                                              threshold=finite(args.threshold),
-                                             acceptance_fraction=finite(args.acceptance_fraction)))
+                                             acceptance_fraction=finite(args.acceptance_fraction),
+                                             min_segment_seconds=finite(args.min_segment_seconds),
+                                             min_span_ratio=finite(args.min_span_ratio),
+                                             max_span_ratio=finite(args.max_span_ratio)))
                 except Exception:
                     rows.append(failed_row(ordinal, finite(args.acceptance_fraction)))
             write_json(target, rows)
