@@ -2,29 +2,34 @@
 
 ## StageFlow adapter parity (ED-0122)
 
-`--candidate stageflow` compares `FasterWhisperExecutionAdapter` with
-`CTranslate2WhisperExecutionAdapter` end to end, including decode, word timing,
-normalization and partial/failure handling. Existing word/cue metrics, alternating
+`--candidate stageflow` compares an optional operator-installed faster-whisper baseline
+with the default `CTranslate2WhisperExecutionAdapter`, including its decode, word timing,
+normalization and partial/failure handling. Transcription is GPL-free and part of the
+default install under ED-0123; faster-whisper is never a project dependency. The comparison
+imports it only at runtime and refuses its absence with `faster_whisper_runtime_unavailable`.
+The historical qualification tools in `backend/tests/qualification/` likewise require
+an optional operator-installed baseline, local model/tokenizer files and no downloads.
+Existing word/cue metrics, alternating
 engine order, optional render load, bounded worker deadlines and sanitized reports
 are reused. The old option-A spike remains the default mode.
-The parity run forces `requested_language="en"` for both adapters, comparing the
-engines with English fixed on both sides under ADR-0036 decision 5.
+The parity run fixes English for both engines under ADR-0036 decision 5.
 
 ```text
 uv run --no-sync python ../scripts/validation/transcription_engine_spike.py --candidate stageflow --blocks <external-block-folder> --device cuda --max-blocks 6 --render-load --markdown
 uv run --no-sync python ../scripts/validation/transcription_engine_spike.py --candidate stageflow --blocks <external-block-folder> --device cpu --engine-timeout-seconds 3600
 ```
 
-Provision both optional dependency groups locally for comparison. No installation or
-download is performed by the script. In the operator TOML, set
-`[local_transcription].ffmpeg_path` to the LGPL FFmpeg executable, with LGPL ffprobe
+Provision the optional comparison package in a separate operator environment.
+No installation or download is performed by the script. In the operator TOML, set
+`[local_transcription].ffmpeg_path` (falling back to `[local_media_segmentation].ffmpeg_path`)
+to the LGPL FFmpeg executable, with LGPL ffprobe
 alongside it, and `[local_media_timing].ffprobe_path` for the measurement duration
 probe. Supply the same offline `model_path` (including `tokenizer.json`) for both.
-This mode selects float16 for CUDA and int8 for CPU. The CPU baseline uses an injected
-CPU model factory only in this private measurement harness; the production
-faster-whisper adapter remains CUDA-only. No live deployment configuration is changed.
+This mode selects float16 for CUDA and int8 for CPU. Both baseline pairs use the
+optional comparison package directly; no legacy production adapter remains.
+No live deployment configuration is changed.
 Whisper.cpp arguments cannot be combined with this mode. Warm-up consumes synthetic
-silence through each adapter; partial results are reported as failures, not parity data.
+silence through each engine; partial results are reported as failures, not parity data.
 
 D5 owner evaluation: matched words at least 95% and p95 word-start difference at most
 0.6 seconds on every block; over the set, candidate cue hits at least 90% of baseline
@@ -43,7 +48,7 @@ PyAV decoder and requires agreement within one signed-16-bit step.
 
 ## Transcription engine spike
 
-`transcription_engine_spike.py` measures the existing path-decoding baseline against
+`transcription_engine_spike.py` measures the optional legacy path-decoding baseline against
 external FFmpeg PCM decoding with the same faster-whisper model (option A), and optionally
 a local whisper.cpp CLI (option B). This is offline measurement tooling, authorized by
 [the approved plan](../../docs/plans/live-chain-validation.md#decisions-owner-approval-of-this-plan-approves-the-recommended-defaults).
@@ -87,9 +92,8 @@ start, end, and changeover phrases are included, deduplicated by normalized toke
 
 Engine and timing method:
 
-- **Baseline:** the adapter's lazy model factory is reused. The measurement script mirrors
-  `FasterWhisperExecutionAdapter.execute` at
-  `backend/app/infrastructure/transcription/faster_whisper.py:273-280`: `beam_size=5`,
+- **Baseline:** an operator-installed `faster_whisper.WhisperModel` is loaded lazily,
+  offline-only, with the frozen reference settings: `beam_size=5`,
   word timestamps enabled, `vad_filter=False`, `condition_on_previous_text=True`, English.
   It passes the media path. A temporary timer around faster-whisper's `decode_audio`
   measures PyAV decode and is restored even on failure. Inference is total minus decode,
@@ -317,9 +321,12 @@ measurements below. `--arrival atomic` is the default. Labels must match
 (other than null) and appears only as `profile_label`.
 
 `--transcription` requires `[local_transcription]` in the operator's config, the
-operator-installed `transcription` dependency group, provisioned model files, CUDA
+default GPL-free engine dependencies, provisioned model/tokenizer files, LGPL FFmpeg and CUDA
 runtime libraries on `PATH`, and transcription configured for the disposable Event.
-ED-0075's distribution exclusion remains in force. Before arrival, the replay refuses
+Use distinct profile identities (D6): changing an existing Event profile re-transcribes
+its assets; existing transcripts retain their provider identity and remain readable.
+Missing both transcription and segmentation FFmpeg paths fails configuration with
+`local_transcription_ffmpeg_path_required`. Before arrival, the replay refuses
 an existing boundary-cue composition, reads the current catalog, and composes its
 Conference stage profile through the human-authority API with a fresh command ID.
 After each block's segmentation, it waits for the autonomous node's cumulative enqueue
@@ -653,8 +660,8 @@ No result, readiness claim or completion record is created by installing these t
 
 Prerequisites:
 
-- Use the existing backend environment. NumPy and tokenizers are operator-installed
-  through `transcription-core`; no dependency is added. Whisper additionally needs the
+- Use the existing backend environment. NumPy and tokenizers are included in
+  the default install; no additional dependency is needed. Whisper additionally needs the
   ED-0122 CTranslate2 runtime and an offline-provisioned model with its tokenizer.
 - Set `STAGEFLOW_KERNEL_CONFIG_PATH` to the operator TOML. FFmpeg comes from
   `[local_transcription].ffmpeg_path`, falling back to

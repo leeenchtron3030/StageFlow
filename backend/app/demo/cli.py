@@ -23,8 +23,8 @@ from app.contexts.work_execution import TranscriptionOperationInput
 from app.core.config.deployment import LocalTranscriptionConfiguration, RuntimeProfile
 from app.infrastructure.transcription import (
     CTranslate2WhisperExecutionAdapter,
-    FasterWhisperExecutionAdapter,
 )
+from app.infrastructure.transcription.ctranslate2_whisper.runtime import inference_runtime
 from app.shared.ids import EntityId
 from app.shared.time import SystemClock
 
@@ -67,7 +67,7 @@ def write_silent_transcription_probe(path: Path) -> None:
 
 
 def verify_transcription_inference(
-    execution: FasterWhisperExecutionAdapter | CTranslate2WhisperExecutionAdapter,
+    execution: CTranslate2WhisperExecutionAdapter,
     transcription: LocalTranscriptionConfiguration,
     deployment_id: str,
 ) -> None:
@@ -94,6 +94,28 @@ def verify_transcription_inference(
             raise
 
 
+def verify_transcription_prerequisites(transcription: LocalTranscriptionConfiguration) -> None:
+    model = Path(transcription.model_path)
+    try:
+        model_available = model.is_dir() and (model / "tokenizer.json").is_file()
+    except OSError:
+        model_available = False
+    if not model_available:
+        raise RuntimeError("local_transcription_model_unavailable")
+    try:
+        ffmpeg_available = (transcription.ffmpeg_path is not None
+                            and Path(transcription.ffmpeg_path).is_file())
+    except OSError:
+        ffmpeg_available = False
+    if not ffmpeg_available:
+        raise RuntimeError("local_transcription_ffmpeg_unavailable")
+    try:
+        # The inference extension avoids CTranslate2's optional converter imports.
+        inference_runtime()
+    except (ImportError, OSError, RuntimeError):
+        raise RuntimeError("local_transcription_runtime_unavailable") from None
+
+
 def _preflight() -> int:
     components = _components()
     deployment = components.configuration.deployment
@@ -112,6 +134,7 @@ def _preflight() -> int:
     transcription = deployment.local_transcription
     if transcription is None:
         raise RuntimeError("local_transcription_not_configured")
+    verify_transcription_prerequisites(transcription)
     gpu = subprocess.run(
         [
             "nvidia-smi",
@@ -128,10 +151,7 @@ def _preflight() -> int:
     with tempfile.TemporaryDirectory(prefix="stageflow-demo-preflight-") as temporary:
         probe_path = Path(temporary) / "silent-probe.wav"
         write_silent_transcription_probe(probe_path)
-        adapter_type = (CTranslate2WhisperExecutionAdapter
-                        if transcription.provider == "stageflow-ctranslate2-whisper"
-                        else FasterWhisperExecutionAdapter)
-        execution = adapter_type(
+        execution = CTranslate2WhisperExecutionAdapter(
             transcription,
             resolver=_ProbeResolver(probe_path),
             clock=SystemClock(),

@@ -131,13 +131,10 @@ Every specification should reference the Product Constitution.
 Development Workflow
 
 For backend dependency installation, see [Local Setup](backend/README.md#local-setup)
-(`uv sync --dev` from `backend/`). Local transcription is an optional, operator-installed
-capability, explicitly installed locally with `uv sync --group transcription`. ED-0075
-excludes the `transcription` group and its runtime dependencies from every distributable
-StageFlow artifact because the confirmed PyAV wheel bundles a GPL-configured FFmpeg build.
-Do not promote them into the default installation or use `--all-groups` for distribution.
-This defers rather than resolves the licensing question and is not legal clearance. See
-the [SBOM decision record](docs/security/dependency-license-sbom-2026-08-21.md#decision-options-for-the-pyavffmpeg-exposure).
+(`uv sync --dev` from `backend/`). Under ADR-0036 / ED-0123, transcription is GPL-free
+and part of the default install, using `stageflow-ctranslate2-whisper`. The model,
+LGPL FFmpeg/ffprobe and CUDA runtime are provisioned offline by the operator. See the
+[configuration and profile migration guidance](backend/README.md#gpl-free-default-transcription-ed-0123).
 
 All new functionality follows the same lifecycle:
 

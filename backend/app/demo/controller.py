@@ -721,7 +721,7 @@ def worker_summary(dsn: str, event_id: object, deployment_id: object) -> dict[st
                              AND c.effective_from <= statement_timestamp()
                              AND (c.effective_until IS NULL
                                   OR c.effective_until > statement_timestamp())
-                             AND c.provider_id = 'faster-whisper'
+                             AND c.provider_id = 'stageflow-ctranslate2-whisper'
                        )
                 FROM stageflow.work_worker w
                 LEFT JOIN stageflow.work_worker_presence p ON p.worker_id = w.worker_id

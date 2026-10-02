@@ -42,7 +42,7 @@ def _version(distribution: str) -> str:
     try:
         return importlib.metadata.version(distribution)
     except importlib.metadata.PackageNotFoundError as exc:
-        raise EvaluationError(f"optional runtime {distribution} is unavailable") from exc
+        raise EvaluationError("optional_runtime_unavailable") from exc
 
 
 class FasterWhisperEngine:
@@ -59,8 +59,10 @@ class FasterWhisperEngine:
             runtime_module = importlib.import_module("faster_whisper")
             whisper_model: Any = runtime_module.WhisperModel
         except (ImportError, AttributeError, OSError) as exc:
-            raise EvaluationError("faster-whisper runtime could not be loaded") from exc
+            raise EvaluationError("faster_whisper_runtime_unavailable") from exc
 
+        if not Path(model).is_dir() or not (Path(model) / "tokenizer.json").is_file():
+            raise EvaluationError("faster_whisper_model_unavailable")
         runtime_version = _version("faster-whisper")
         ctranslate_version = _version("ctranslate2")
         model_path = Path(model).resolve(strict=False)
@@ -88,6 +90,7 @@ class FasterWhisperEngine:
                 model,
                 device=device,
                 compute_type=compute_type,
+                local_files_only=True,
             )
         except (RuntimeError, OSError, ValueError) as exc:
             raise EvaluationError("faster-whisper model could not be initialized") from exc

@@ -4,7 +4,11 @@ version = "0.1.0"
 description = "StageFlow backend foundation"
 readme = "README.md"
 requires-python = ">=3.13"
+# ADR-0036: GPL-free transcription is part of the default offline install.
 dependencies = [
+  "ctranslate2==4.8.1",
+  "tokenizers==0.23.1",
+  "numpy==2.5.2",
   "fastapi>=0.115.0,<1.0.0",
   "pydantic>=2.10.0,<3.0.0",
   "psycopg[binary]>=3.2.0,<4.0.0",
@@ -12,20 +16,6 @@ dependencies = [
 ]
 
 [dependency-groups]
-# ED-0075: licensing decision — exclude this optional operator-installed group from
-# every distributable StageFlow artifact due to the confirmed PyAV/FFmpeg GPL exposure.
-# See ../docs/security/dependency-license-sbom-2026-08-21.md (option 3).
-# This defers the licensing question; it is not legal clearance.
-transcription = [
-  "ctranslate2==4.8.1",
-  "faster-whisper==1.2.1",
-]
-# ED-0122: additive, offline-provisioned inference; not a default group.
-transcription-core = [
-  "ctranslate2==4.8.1",
-  "tokenizers==0.23.1",
-  "numpy==2.5.2",
-]
 dev = [
   "httpx>=0.28.0,<1.0.0",
   "pyright>=1.1.390,<2.0.0",

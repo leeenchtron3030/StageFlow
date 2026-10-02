@@ -232,12 +232,12 @@ correction itself remains Green.
   impact, ownership boundary, and lockfile update. Provider-specific dependencies must
   remain behind adapters and out of the core domain.
 - Never use real event recordings, transcripts, credentials, or customer data in tests.
-- ED-0075 keeps local transcription optional and operator-installed. Exclude the
-  `transcription` dependency group and its runtime dependencies from every distributable
-  StageFlow artifact because of the confirmed PyAV/FFmpeg GPL exposure; do not promote
-  them into default dependencies or use `--all-groups` for distribution. This defers
-  rather than resolves the licensing question and is not legal clearance. See the
-  [SBOM decision record](docs/security/dependency-license-sbom-2026-08-21.md#decision-options-for-the-pyavffmpeg-exposure).
+- Transcription is GPL-free and part of the default install (ADR-0036; ED-0122 and
+  ED-0123 superseded ED-0075's exclusion). Never add PyAV, faster-whisper, onnxruntime,
+  or any GPL/AGPL component to the dependency set. `huggingface-hub` and `tqdm` may appear
+  only as transitive dependencies of `tokenizers` and must never be imported.
+  `backend/tests/test_transcription_gpl_free_boundary.py` enforces this. See the
+  [SBOM record](docs/security/dependency-license-sbom-2026-08-21.md#ed-0123-refresh-2026-10-02).
 
 ## Tests and documentation
 

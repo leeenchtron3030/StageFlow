@@ -6,6 +6,7 @@ from collections.abc import Callable
 from pathlib import Path
 from types import SimpleNamespace
 from typing import cast
+from unittest.mock import Mock
 
 import pytest
 
@@ -17,7 +18,7 @@ from app.contexts.transcription_evidence import (
 from app.core.config.deployment import LocalTranscriptionConfiguration, RuntimeProfile
 from app.demo import cli
 from app.demo.cli import verify_transcription_inference, write_silent_transcription_probe
-from app.infrastructure.transcription import FasterWhisperExecutionAdapter
+from app.infrastructure.transcription import CTranslate2WhisperExecutionAdapter
 
 
 class FailingProbeExecution:
@@ -41,7 +42,50 @@ def _configuration(tmp_path: Path) -> LocalTranscriptionConfiguration:
     return LocalTranscriptionConfiguration(
         model_version="0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf",
         model_path=str(tmp_path / "model"),
+        ffmpeg_path=str(tmp_path / "ffmpeg"),
     )
+
+
+@pytest.mark.parametrize("missing,code", [
+    ("model", "local_transcription_model_unavailable"),
+    ("model_oserror", "local_transcription_model_unavailable"),
+    ("tokenizer.json", "local_transcription_model_unavailable"),
+    ("ffmpeg", "local_transcription_ffmpeg_unavailable"),
+    ("ffmpeg_oserror", "local_transcription_ffmpeg_unavailable"),
+    ("runtime", "local_transcription_runtime_unavailable"),
+    (None, None),
+])
+def test_preflight_prerequisites_use_closed_codes(
+    monkeypatch: pytest.MonkeyPatch, missing: str | None, code: str | None,
+) -> None:
+    config = _configuration(Path.cwd())
+
+    def is_directory(path: Path) -> bool:
+        if missing == "model_oserror":
+            raise PermissionError("private model path")
+        return missing != "model"
+
+    def is_file(path: Path) -> bool:
+        if missing == "ffmpeg_oserror" and path.name == "ffmpeg":
+            raise PermissionError("private executable path")
+        return path.name != missing
+
+    monkeypatch.setattr(Path, "is_dir", is_directory)
+    monkeypatch.setattr(Path, "is_file", is_file)
+    calls: list[bool] = []
+
+    def runtime() -> None:
+        calls.append(True)
+        if missing == "runtime":
+            raise ImportError("private runtime detail")
+
+    monkeypatch.setattr(cli, "inference_runtime", runtime)
+    if code is not None:
+        with pytest.raises(RuntimeError, match=f"^{code}$"):
+            cli.verify_transcription_prerequisites(config)
+    else:
+        cli.verify_transcription_prerequisites(config)
+    assert calls == ([True] if missing in {"runtime", None} else [])
 
 
 def test_silent_probe_is_valid_mono_pcm_audio(tmp_path: Path) -> None:
@@ -63,13 +107,13 @@ def test_preflight_accepts_no_speech_only_after_real_provider_execution(
         TranscriptionExecutionError(
             "provider_no_speech_segments",
             retryable=False,
-            diagnostic_summary="faster-whisper returned no speech segments",
+            diagnostic_summary="local transcription returned no speech segments",
         )
     )
     configuration = _configuration(tmp_path)
 
     verify_transcription_inference(
-        cast(FasterWhisperExecutionAdapter, execution),
+        cast(CTranslate2WhisperExecutionAdapter, execution),
         configuration,
         "demo-deployment",
     )
@@ -92,7 +136,7 @@ def test_preflight_rejects_cuda_runtime_failure(tmp_path: Path) -> None:
 
     with pytest.raises(TranscriptionExecutionError) as captured:
         verify_transcription_inference(
-            cast(FasterWhisperExecutionAdapter, execution),
+            cast(CTranslate2WhisperExecutionAdapter, execution),
             _configuration(tmp_path),
             "demo-deployment",
         )
@@ -142,8 +186,9 @@ def test_preflight_program_source_output_and_errors(
         return execution
 
     monkeypatch.setattr(cli, "_components", lambda: components)
+    monkeypatch.setattr(cli, "verify_transcription_prerequisites", Mock())
     monkeypatch.setattr(cli.subprocess, "run", gpu_probe)
-    monkeypatch.setattr(cli, "FasterWhisperExecutionAdapter", create_execution)
+    monkeypatch.setattr(cli, "CTranslate2WhisperExecutionAdapter", create_execution)
     monkeypatch.setattr(execution, "provider_id", "test-provider", raising=False)
     monkeypatch.setattr(execution, "provider_version", "test-version", raising=False)
 

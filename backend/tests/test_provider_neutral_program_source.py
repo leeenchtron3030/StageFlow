@@ -92,7 +92,8 @@ def _configuration(path: Path) -> EffectiveKernelConfiguration:
         "network_policy": "offline",
         "postgres_dsn_secret_ref": "EXAMPLE_DATABASE",
         "local_schedule": {"path": str(path)},
-        "local_transcription": {"model_version": "example", "model_path": "C:/models/example"},
+        "local_transcription": {"model_version": "example", "model_path": "C:/models/example",
+                                "ffmpeg_path": "C:/synthetic/ffmpeg.exe"},
         "event": {
             "key": "example-event", "name": "Example Event",
             "stages": [{"key": "main", "name": "Main", "sources": [

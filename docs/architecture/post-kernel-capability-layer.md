@@ -891,15 +891,17 @@ This architecture does not authorize production code, dependencies, schemas,
 migrations, frontend work, deployment, machine-setting changes, or event-readiness
 claims.
 
-[^local-transcription]: The 2026-08-18 acceptance selects faster-whisper 1.2.1,
-    CTranslate2 4.8.1, and the pinned large-v3-turbo model for the first local implementation;
-    broader production selection remains conditional
-    (`docs/validation/transcription-engine-evaluation.md:133`). The worker composes the
-    adapter (`backend/app/demo/worker.py:72`) behind the provider-neutral execution port
-    (`backend/app/contexts/transcription_evidence/application.py:40`,
-    `backend/app/contexts/work_execution/service.py:42`). The optional operator-installed
-    `transcription` group is excluded from distributable artifacts under ED-0075
-    (`backend/pyproject.toml:14`); this is not legal clearance.
+[^local-transcription]: Under ADR-0036 and ED-0123, transcription is GPL-free and part
+    of the default install: `stageflow-ctranslate2-whisper` over CTranslate2 4.8.1,
+    tokenizers 0.23.1 and NumPy 2.5.2, with the offline large-v3-turbo model and
+    explicit operator LGPL FFmpeg/ffprobe. CUDA/float16 defaults to profile
+    `ct2-whisper-large-v3-turbo-cuda-float16` version `1.0`. Absent transcription FFmpeg
+    configuration falls back to the segmentation FFmpeg path, otherwise validation
+    refuses. Legacy provider/profile configuration is refused, never remapped.
+    D6 requires distinct profiles: changing one on an existing Event re-transcribes
+    its assets while preserving readable old evidence. See
+    [transcription evidence readiness](transcription-evidence-readiness.md#default-local-engine-ed-0122--ed-0123)
+    for the unchanged execution contract, prerequisites, parity evidence and bounds.
 
 ## Session Suggestions core (ED-0104)
 

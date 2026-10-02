@@ -714,6 +714,7 @@ def test_worker_summary_scopes_current_available_gpu_worker_to_live_event(
             self, statement: str, parameters: object = None
         ) -> Result:
             if "FROM stageflow.work_worker" in statement:
+                assert "c.provider_id = 'stageflow-ctranslate2-whisper'" in statement
                 captured["parameters"] = parameters
             return Result()
 

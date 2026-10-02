@@ -13,10 +13,10 @@ from app.shared.ids import EntityId
 from tests.test_ctranslate2_whisper_adapter import configuration
 
 
-@pytest.mark.parametrize("provider", ["faster-whisper", "stageflow-ctranslate2-whisper"])
 def test_worker_selects_provider_and_registers_exact_profile(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], provider: str,
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
 ) -> None:
+    provider = "stageflow-ctranslate2-whisper"
     config = configuration(Path.cwd(), provider=provider, device="cuda", compute_type="float16",
                            execution_profile_id=f"synthetic-{provider}")
     deployment = SimpleNamespace(local_transcription=config, deployment_id="synthetic-deployment",
@@ -45,7 +45,6 @@ def test_worker_selects_provider_and_registers_exact_profile(
 
     monkeypatch.setattr(worker, "CTranslate2WhisperExecutionAdapter",
                         factory("stageflow-ctranslate2-whisper"))
-    monkeypatch.setattr(worker, "FasterWhisperExecutionAdapter", factory("faster-whisper"))
     service = Mock()
     service.run_once.return_value = SimpleNamespace(operation_id=None)
     monkeypatch.setattr(worker, "TranscriptionWorker", Mock(return_value=service))
@@ -59,15 +58,12 @@ def test_worker_selects_provider_and_registers_exact_profile(
     assert payload["execution_profile"] == config.execution_profile_id
     assert payload["device"] == config.device
     assert payload["compute_type"] == config.compute_type
-    if provider == "stageflow-ctranslate2-whisper":
-        assert payload["decode_tool"] == "ffmpeg"
-        assert payload["decode_tool_version"] == "8.1"
-        assert payload["decode_tool_sha256"] == "a" * 64
-        assert payload["probe_tool"] == "ffprobe"
-        assert payload["probe_tool_version"] == "8.1"
-        assert payload["probe_tool_sha256"] == "b" * 64
-    else:
-        assert not any(key.startswith(("decode_tool", "probe_tool")) for key in payload)
+    assert payload["decode_tool"] == "ffmpeg"
+    assert payload["decode_tool_version"] == "8.1"
+    assert payload["decode_tool_sha256"] == "a" * 64
+    assert payload["probe_tool"] == "ffprobe"
+    assert payload["probe_tool_version"] == "8.1"
+    assert payload["probe_tool_sha256"] == "b" * 64
 
 
 def test_preflight_selects_stageflow_adapter(monkeypatch: pytest.MonkeyPatch,
@@ -86,8 +82,7 @@ def test_preflight_selects_stageflow_adapter(monkeypatch: pytest.MonkeyPatch,
         "provider_no_speech_segments", retryable=False, diagnostic_summary="synthetic silence")
     factory = Mock(return_value=execution)
     monkeypatch.setattr(cli, "CTranslate2WhisperExecutionAdapter", factory)
-    legacy = Mock(side_effect=AssertionError("wrong provider"))
-    monkeypatch.setattr(cli, "FasterWhisperExecutionAdapter", legacy)
+    monkeypatch.setattr(cli, "verify_transcription_prerequisites", Mock())
 
     class Scratch:
         def __enter__(self) -> str:
@@ -100,7 +95,6 @@ def test_preflight_selects_stageflow_adapter(monkeypatch: pytest.MonkeyPatch,
     monkeypatch.setattr(cli, "write_silent_transcription_probe", Mock())
     assert cli.main(["preflight"]) == 0
     factory.assert_called_once()
-    legacy.assert_not_called()
     request = execution.execute.call_args.args[0]
     assert request.input.execution_profile_id == config.execution_profile_id
     assert json.loads(capsys.readouterr().out)["transcription_provider"] == config.provider

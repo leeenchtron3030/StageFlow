@@ -76,7 +76,7 @@ This directory is reserved for repository maintenance and developer utility scri
 
   ```powershell
   cd backend
-  uv sync --dev --group transcription --locked
+  uv sync --dev --locked
   cd ..\frontend
   npm ci
   cd ..

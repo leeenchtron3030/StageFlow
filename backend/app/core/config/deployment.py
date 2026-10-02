@@ -6,6 +6,7 @@ from collections.abc import Mapping
 from enum import StrEnum
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from types import MappingProxyType
+from typing import Any, cast
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -59,13 +60,13 @@ class LocalScheduleConfiguration(BaseModel):
 class LocalTranscriptionConfiguration(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    provider: str = "faster-whisper"
+    provider: str = "stageflow-ctranslate2-whisper"
     model_id: str = "large-v3-turbo"
     model_version: str
     model_path: str
     device: str = "cuda"
     compute_type: str = "float16"
-    execution_profile_id: str = "faster-whisper-large-v3-turbo-cuda-float16"
+    execution_profile_id: str = "ct2-whisper-large-v3-turbo-cuda-float16"
     execution_profile_version: str = "1.0"
     ffmpeg_path: str | None = Field(default=None, repr=False)
 
@@ -99,23 +100,28 @@ class LocalTranscriptionConfiguration(BaseModel):
 
     @model_validator(mode="after")
     def qualified_demo_baseline(self) -> LocalTranscriptionConfiguration:
-        if self.provider == "stageflow-ctranslate2-whisper":
-            if self.execution_profile_id.startswith("faster-whisper"):
-                raise ValueError("StageFlow transcription requires a distinct execution profile id")
-            if (self.model_id != "large-v3-turbo" or
-                    (self.device, self.compute_type) not in {("cuda", "float16"), ("cpu", "int8")}
-                    or self.ffmpeg_path is None):
-                raise ValueError("local transcription requires a qualified pair and ffmpeg_path")
-            return self
-        if (
-            self.provider != "faster-whisper"
-            or self.model_id != "large-v3-turbo"
-            or self.device != "cuda"
-            or self.compute_type != "float16"
-        ):
+        if self.provider == "faster-whisper":
             raise ValueError(
-                "Demo transcription must use faster-whisper large-v3-turbo CUDA float16"
+                "local_transcription_legacy_provider_refused: migrate to "
+                "stageflow-ctranslate2-whisper; execution profile ids must be distinct "
+                "(D6); changing an existing Event's profile re-transcribes its assets"
             )
+        if self.provider != "stageflow-ctranslate2-whisper":
+            raise ValueError("local_transcription_provider_unsupported")
+        if self.execution_profile_id.startswith("faster-whisper"):
+            raise ValueError(
+                "StageFlow transcription requires a distinct execution profile id (D6)")
+        if (self.device == "cpu"
+                and self.execution_profile_id == "ct2-whisper-large-v3-turbo-cuda-float16"):
+            raise ValueError(
+                "CPU transcription requires a distinct execution profile id (D6); "
+                "use ct2-whisper-large-v3-turbo-cpu-int8 or a distinct operator profile")
+        if (self.model_id != "large-v3-turbo" or
+                (self.device, self.compute_type) not in {("cuda", "float16"), ("cpu", "int8")}):
+            raise ValueError(
+                "local transcription requires a qualified model and device/compute pair")
+        if self.ffmpeg_path is None:
+            raise ValueError("local_transcription_ffmpeg_path_required")
         return self
 
     @field_validator("ffmpeg_path")
@@ -366,6 +372,21 @@ class KernelDeploymentConfiguration(BaseModel):
     autonomous_event_node: AutonomousEventNodeConfiguration = Field(
         default_factory=AutonomousEventNodeConfiguration
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def transcription_ffmpeg_fallback(cls, value: Any) -> Any:
+        if isinstance(value, Mapping):
+            raw = cast(Mapping[str, Any], value)
+            transcription: Any = raw.get("local_transcription")
+            segmentation: Any = raw.get("local_media_segmentation")
+            if (isinstance(transcription, Mapping) and "ffmpeg_path" not in transcription
+                    and isinstance(segmentation, Mapping) and "ffmpeg_path" in segmentation):
+                return {**raw, "local_transcription": {
+                    **cast(Mapping[str, Any], transcription),
+                    "ffmpeg_path": cast(Mapping[str, Any], segmentation)["ffmpeg_path"],
+                }}
+        return cast(Any, value)
 
     @field_validator(
         "schema_version",

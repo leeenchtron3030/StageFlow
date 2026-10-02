@@ -428,17 +428,15 @@ class LocalEffects:
         return self.whisper_measure(engine, block)
 
     def adapter_measure(self, engine: str, block: Path) -> Measurement:
-        """ED-0122 measures the complete adapter boundary, including normalization.
-
-        CPU comparison binds the reference factory to CPU int8 in this private
-        harness only; the production faster-whisper constructor stays CUDA-only.
-        """
+        """Measure the default adapter; baseline is an operator-installed comparison."""
+        if engine != "stageflow":
+            self.load_model()
+            return self.whisper_measure("baseline", block)
         from app.contexts.transcription_evidence import TranscriptionExecutionRequest
         from app.contexts.work_execution import TranscriptionOperationInput
         from app.core.config.deployment import LocalTranscriptionConfiguration
         from app.infrastructure.transcription import (
             CTranslate2WhisperExecutionAdapter,
-            FasterWhisperExecutionAdapter,
         )
         from app.shared.ids import EntityId
         from app.shared.time import SystemClock
@@ -448,41 +446,28 @@ class LocalEffects:
                 return self.current_block
 
         self.current_block = block
-        stageflow = engine == "stageflow"
         if engine not in self.adapters:
             configuration = LocalTranscriptionConfiguration(
-                provider="stageflow-ctranslate2-whisper" if stageflow else "faster-whisper",
+                provider="stageflow-ctranslate2-whisper",
                 model_version="offline-parity-model", model_path=str(self.settings.model),
-                device=self.settings.device if stageflow else "cuda",
-                compute_type=self.settings.compute_type if stageflow else "float16",
+                device=self.settings.device,
+                compute_type=self.settings.compute_type,
                 execution_profile_id=f"parity-{engine}-{self.settings.device}",
-                ffmpeg_path=str(self.settings.ffmpeg) if stageflow else None,
+                ffmpeg_path=str(self.settings.ffmpeg),
             )
-            if stageflow:
-                from app.infrastructure.transcription.ctranslate2_whisper.decode import (
-                    FFmpegDecoder,
-                )
-
-                class TimedDecoder(FFmpegDecoder):
-                    def decode(inner, path: Path, heartbeat: Callable[[], None]) -> Any:
-                        started = time.perf_counter()
-                        try:
-                            return super().decode(path, heartbeat)
-                        finally:
-                            self.decode_seconds += time.perf_counter() - started
-
-                self.adapters[engine] = CTranslate2WhisperExecutionAdapter(
-                    configuration, resolver=Resolver(), clock=SystemClock(),
-                    decoder_factory=TimedDecoder)
-            else:
-                def factory(path: str, **kwargs: Any) -> Any:
-                    module = importlib.import_module("faster_whisper")
-                    return module.WhisperModel(path, device=self.settings.device,
-                                               compute_type=self.settings.compute_type,
-                                               local_files_only=True)
-
-                self.adapters[engine] = FasterWhisperExecutionAdapter(
-                    configuration, resolver=Resolver(), clock=SystemClock(), model_factory=factory)
+            from app.infrastructure.transcription.ctranslate2_whisper.decode import (
+                FFmpegDecoder,
+            )
+            class TimedDecoder(FFmpegDecoder):
+                def decode(inner, path: Path, heartbeat: Callable[[], None]) -> Any:
+                    started = time.perf_counter()
+                    try:
+                        return super().decode(path, heartbeat)
+                    finally:
+                        self.decode_seconds += time.perf_counter() - started
+            self.adapters[engine] = CTranslate2WhisperExecutionAdapter(
+                configuration, resolver=Resolver(), clock=SystemClock(),
+                decoder_factory=TimedDecoder)
         identity = EntityId("42000000-0000-0000-0000-000000000001")
         request = TranscriptionExecutionRequest(
             operation_id=identity, attempt_id=identity, fence_generation=1, work_key="0" * 64,
@@ -491,48 +476,26 @@ class LocalEffects:
                 execution_profile_id=f"parity-{engine}-{self.settings.device}",
                 execution_profile_version="1.0", requested_language="en", request_word_timing=True))
         self.decode_seconds = 0.0
-        module: Any = None
-        original: Any = None
-        if not stageflow:
-            module = importlib.import_module("faster_whisper.transcribe")
-            original = module.decode_audio
-
-            def timed_decode(*args: Any, **kwargs: Any) -> Any:
-                started = time.perf_counter()
-                try:
-                    with decoding():
-                        return original(*args, **kwargs)
-                finally:
-                    self.decode_seconds += time.perf_counter() - started
-
-            module.decode_audio = timed_decode
         started = time.perf_counter()
-        try:
-            result = self.adapters[engine].execute(request, lambda: None)
-            if result.status.value != "complete":
-                raise WorkerFailure("engine_failed")
-            words = tuple(Word(w.text, w.asset_start_microseconds / 1e6,
-                               w.asset_end_microseconds / 1e6, segment.ordinal)
-                          for segment in result.segments for w in segment.words)
-            total = time.perf_counter() - started
-            return Measurement(words, self.decode_seconds,
-                               max(0, total - self.decode_seconds), total)
-        finally:
-            if module is not None:
-                module.decode_audio = original
+        result = self.adapters[engine].execute(request, lambda: None)
+        if result.status.value != "complete":
+            raise WorkerFailure("engine_failed")
+        words = tuple(Word(w.text, w.asset_start_microseconds / 1e6,
+                           w.asset_end_microseconds / 1e6, segment.ordinal)
+                      for segment in result.segments for w in segment.words)
+        total = time.perf_counter() - started
+        return Measurement(words, self.decode_seconds,
+                           max(0, total - self.decode_seconds), total)
 
     def load_model(self) -> None:
         if self.model is None:
-            # Adapter factory reused lazily. Its CUDA-only wrapper cannot measure CPU/arrays.
-            from app.infrastructure.transcription import faster_whisper as adapter
-
             local_path(str(self.settings.model / "tokenizer.json"))
-            factory: Any = cast(Any, adapter)._default_model_factory()
+            factory: Any = comparison_runtime("faster_whisper").WhisperModel
             self.model = factory(str(self.settings.model), device=self.settings.device,
                                  compute_type=self.settings.compute_type, local_files_only=True)
 
     def whisper_measure(self, engine: str, block: Path) -> Measurement:
-        module: Any = importlib.import_module("faster_whisper.transcribe")
+        module: Any = comparison_runtime("faster_whisper.transcribe")
         original = module.decode_audio
         decode_seconds = 0.0
 
@@ -554,7 +517,7 @@ class LocalEffects:
                 with decoding():
                     audio = pcm_array(self.command(decode_command(self.settings.ffmpeg, block)))
                 decode_seconds = time.perf_counter() - started
-            # Mirrors adapter execute(), faster_whisper.py:273-280. No exported settings object.
+            # Frozen reference settings retained for operator-installed comparisons.
             segments, _ = self.model.transcribe(
                 audio, language=self.settings.language, beam_size=5, word_timestamps=True,
                 vad_filter=False, condition_on_previous_text=True,
@@ -591,10 +554,18 @@ class WorkerConnection(Protocol):
 class WorkerFailure(RuntimeError):
     def __init__(self, code: Literal[
         "worker_start_failed", "cuda_runtime_unavailable", "warm_up_failed", "engine_failed",
-        "decode_failed", "engine_timeout",
+        "decode_failed", "engine_timeout", "faster_whisper_runtime_unavailable",
     ]) -> None:
         super().__init__(code)
         self.code = code
+
+
+def comparison_runtime(module: str) -> Any:
+    """Optional operator installation; never part of StageFlow's dependency set."""
+    try:
+        return importlib.import_module(module)
+    except (ImportError, OSError):
+        raise WorkerFailure("faster_whisper_runtime_unavailable") from None
 
 
 def warm_up_failure(exc: Exception, engine: str, device: str) -> str:
@@ -604,11 +575,12 @@ def warm_up_failure(exc: Exception, engine: str, device: str) -> str:
         return "warm_up_timeout"
     if isinstance(exc, WorkerFailure):
         return exc.code
-    from app.infrastructure.transcription import faster_whisper as adapter
+    from app.contexts.transcription_evidence import TranscriptionExecutionError
 
-    failure = (exc if isinstance(exc, adapter.TranscriptionExecutionError)
-               else cast(Any, adapter)._provider_failure(exc))
-    if device == "cuda" and failure.reason_code == "cuda_runtime_unavailable":
+    cuda = (exc.reason_code == "cuda_runtime_unavailable"
+            if isinstance(exc, TranscriptionExecutionError)
+            else any(name in str(exc).casefold() for name in ("cuda", "cublas", "cudnn")))
+    if device == "cuda" and cuda:
         return "cuda_runtime_unavailable"
     return "warm_up_failed"
 
@@ -633,6 +605,7 @@ def measurement_failure(exc: Exception, engine: str, device: str) -> str:
     if isinstance(exc, WorkerFailure):
         return (exc.code if exc.code in (
             "engine_failed", "decode_failed", "cuda_runtime_unavailable", "engine_timeout",
+            "faster_whisper_runtime_unavailable",
         ) else "engine_failed")
     if warm_up_failure(exc, engine, device) == "cuda_runtime_unavailable":
         return "cuda_runtime_unavailable"
@@ -705,6 +678,8 @@ class GuardedEffects(LocalEffects):
             succeeded, result = self.connection.recv()
             if not succeeded:
                 # Whitelist private IPC as well; never forward arbitrary worker strings.
+                if result == "faster_whisper_runtime_unavailable":
+                    raise WorkerFailure("faster_whisper_runtime_unavailable")
                 if action == "warm_up":
                     raise WorkerFailure("cuda_runtime_unavailable"
                                         if result == "cuda_runtime_unavailable"

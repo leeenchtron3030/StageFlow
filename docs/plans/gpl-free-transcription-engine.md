@@ -189,7 +189,12 @@ then retired, and the SBOM shows no GPL or AGPL component.
     - make `transcription-core` default dependencies;
     - remove the faster-whisper adapter and the `transcription` group;
     - replace the ED-0075 guard with a GPL-free guard (no `av`, `faster-whisper`,
-      `onnxruntime` or `huggingface-hub` in the default resolution);
+      `onnxruntime` or `huggingface-hub` in the default resolution). **Amended by the owner on
+      2026-10-01 (option "allow, never import"):** `tokenizers` hard-depends on
+      `huggingface-hub`, which pulls in `tqdm`. Both are permissive (Apache-2.0; MPL-2.0 AND
+      MIT) and may be installed, but only through that chain. The engine never imports them,
+      and a clean-process test enforces this. The guard forbids `av`, `faster-whisper` and
+      `onnxruntime` in the lock;
     - regenerate the SBOM;
     - update the ED-0075 and ADR-0036 status records.
 
@@ -334,7 +339,7 @@ None verified as needed:
   onnxruntime or tqdm is loaded.
 - [x] Owner parity run recorded ([Run 001](../validation/results/transcription-engine-parity-001.md), development machine): D5 tolerances met on GPU (with and without render load),
   and a CPU `int8` run completed.
-- [ ] ED-0123 proposed with the switch, guard replacement and SBOM regeneration.
+- [x] ED-0123 merged: default switch, faster-whisper and PyAV removed, GPL-free guard, SBOM regenerated.
 
 ## Rollback or reversal
 
@@ -398,3 +403,32 @@ ED-0122 is complete. The owner parity run (D5) and ED-0123 remain open.
     render load, plus CPU `int8`;
   - then ED-0123: the default switch, retiring faster-whisper, the GPL-free guard, the
     SBOM, and CI installing `transcription-core`.
+
+## Completion record (ED-0123)
+
+- **Implemented revision:** the ED-0123 PR, 2026-10-02.
+- **Delivered:**
+  - **Default engine:** `stageflow-ctranslate2-whisper`, profile `ct2-whisper-large-v3-turbo-cuda-float16`
+    version 1.0.
+  - **FFmpeg path:** `[local_transcription].ffmpeg_path` falls back to `[local_media_segmentation].ffmpeg_path`.
+  - **Refusals:** the legacy `faster-whisper` provider is refused with a migration message, as are
+    `faster-whisper*` profile ids.
+  - **Removals:** the faster-whisper adapter is removed, and the media path resolver moved unchanged to
+    `media_path.py`.
+  - **Callers:** the worker, CLI, preflight (closed codes), launchers and examples are updated.
+- **Dependencies:**
+  - `ctranslate2`, `tokenizers` and `numpy` are default dependencies, and the `transcription` and
+    `transcription-core` groups are removed.
+  - `uv.lock` was regenerated on the host: `av`, `faster-whisper`, `onnxruntime`, `flatbuffers` and
+    `protobuf` are gone.
+- **Guard:** `test_transcription_gpl_free_boundary.py`. Following the owner amendment (2026-10-01),
+  `huggingface-hub` and `tqdm` are allowed only through `tokenizers`, and are never imported.
+- **SBOM:** regenerated; see the
+  [ED-0123 refresh](../security/dependency-license-sbom-2026-08-21.md#ed-0123-refresh-2026-10-02).
+- **Validation:**
+  - Host backend suite: 3,678 passed, 0 failed, 5 skipped, with Ruff and Pyright clean.
+  - `directive-reviewer` returned FIX-FIRST on docs, the SBOM and one test; these are fixed in this PR.
+- **Open owner decision:** the CTranslate2 Linux wheel bundles `libgomp` (GPL-3.0 with the GCC Runtime
+  Library Exception). It must be decided before any Linux appliance build is distributed. Windows bundles
+  Intel OpenMP instead.
+- **Remaining work:** requalify the engine on appliance-class hardware when it exists.

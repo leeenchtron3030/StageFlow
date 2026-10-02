@@ -21,7 +21,7 @@ from app.contexts.transcription_evidence.application import (
 )
 from app.contexts.work_execution.repository import WorkExecutionLeaseLostError
 from app.core.config.deployment import LocalTranscriptionConfiguration
-from app.infrastructure.transcription.faster_whisper import (
+from app.infrastructure.transcription.media_path import (
     MediaPathResolver,
 )
 from app.shared.ids import EntityId

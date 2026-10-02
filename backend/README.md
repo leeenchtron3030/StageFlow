@@ -32,21 +32,14 @@ Worker retries stay on the same operation; terminal failures are not automatical
 re-enqueued. Suggestion runs can use an unassociated asset's latest complete transcript
 reference. See [trigger scope and replay](../docs/architecture/transcription-evidence-readiness.md#trigger-scope-and-replay).
 
-Local transcription is an optional, operator-installed capability: an operator can
-explicitly install it locally with `uv sync --group transcription`. Under ED-0075, the
-`transcription` group and its runtime dependencies must be excluded from every
-distributable StageFlow artifact because the confirmed PyAV wheel bundles a GPL-configured
-FFmpeg build. Do not promote these dependencies into the default installation or use
-`--all-groups` for distribution. This defers rather than resolves the licensing question
-and is not legal clearance. See the
-[SBOM decision record](../docs/security/dependency-license-sbom-2026-08-21.md#decision-options-for-the-pyavffmpeg-exposure).
+## GPL-free default transcription (ED-0123)
 
-## Additive CTranslate2 transcription provider (ED-0122)
-
-The optional `transcription-core` group contains CTranslate2 4.8.1, tokenizers 0.23.1,
-and NumPy 2.5.2. Provision these and the local large-v3-turbo model offline. The
-default remains faster-whisper; the existing `transcription` group and ED-0075
-distribution exclusion remain unchanged pending owner parity qualification and ED-0123.
+Transcription is GPL-free and part of the default install under ADR-0036. Default
+Python dependencies include CTranslate2 4.8.1, tokenizers 0.23.1, and NumPy 2.5.2.
+The default provider is `stageflow-ctranslate2-whisper`, with CUDA/float16 and profile
+`ct2-whisper-large-v3-turbo-cuda-float16` version `1.0`. Provision the large-v3-turbo
+model, LGPL FFmpeg/ffprobe binaries and CUDA runtime locally; there are no downloads
+at execution time. The legacy engine and both transcription dependency groups are removed.
 
 Example operator configuration (paths refer to locally provisioned resources):
 
@@ -63,8 +56,14 @@ execution_profile_id = "ct2-whisper-large-v3-turbo-cuda-float16"
 execution_profile_version = "1.0"
 ```
 
-`tokenizer.json` is required in the model directory. The explicit FFmpeg path is
-required for this provider; an LGPL `ffprobe` executable must be alongside it.
+`tokenizer.json` is required in the model directory. If `[local_transcription].ffmpeg_path`
+is absent, it inherits `[local_media_segmentation].ffmpeg_path`. Without either path,
+configuration fails with `local_transcription_ffmpeg_path_required`; an invalid explicit
+path is refused, never replaced. An LGPL `ffprobe` executable must be alongside FFmpeg.
+Demo preflight checks the model/tokenizer, FFmpeg file and CTranslate2 inference import
+with closed codes `local_transcription_model_unavailable`,
+`local_transcription_ffmpeg_unavailable`, and `local_transcription_runtime_unavailable`,
+then exercises synthetic inference. No media or model path is printed by those checks.
 Both binaries are versioned and hashed, and GPL/nonfree build flags are refused.
 Decode averages all 1–8 channels, produces 16 kHz s16 PCM, renews the lease, and has
 duration-based output and timeout bounds (maximum input duration four hours).
@@ -80,15 +79,17 @@ The other supported pair is `device = "cpu"`, `compute_type = "int8"`, with prof
 explicit profile, never an automatic fallback. Demo preflight retains its existing
 appliance GPU check; the standalone transcription worker can execute the CPU profile.
 
-**D6 switching rule:** switch profiles between Events. Keep profile identities
-distinct for each engine: the StageFlow provider refuses the default
-`faster-whisper-large-v3-turbo-cuda-float16` and every id starting with `faster-whisper`.
-Set an explicit, distinct `execution_profile_id`. Keep an existing Event's
-profile throughout its life. A deliberate mid-Event change causes ED-0120 to
-enqueue new transcription for every registered asset; previous transcript evidence
-remains immutable. Keep the current profile available when operating older Events.
-See the [parity procedure](../scripts/validation/README.md#stageflow-adapter-parity-ed-0122)
-before selecting the replacement as a production default.
+**D6 switching rule:** switch profiles between Events. Engine/device/compute choices
+must have distinct profile identities. `provider = "faster-whisper"` is refused with an
+actionable migration message naming the new provider; it is never silently remapped.
+Every profile id starting with `faster-whisper` is also refused. Keep an existing Event's
+profile throughout its life where possible. A deliberate profile change on an existing
+Event re-transcribes every registered asset under ED-0120; previous transcripts remain
+readable, immutable evidence carrying their own provider identity. This release cannot
+execute pending legacy-profile work; finish it with the prior installation before
+upgrading, or deliberately change the Event profile and accept re-transcription.
+The owner D5 parity gate passed in [Run 001](../docs/validation/results/transcription-engine-parity-001.md).
+This switch does not assert production-event readiness.
 
 ## Run the Backend
 

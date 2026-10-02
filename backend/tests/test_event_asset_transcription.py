@@ -95,6 +95,7 @@ class Harness:
                 "key": "main", "name": "Main", "sources": [{
                     "key": "main-recorder", "path": "C:/synthetic"}]}]},
             "local_transcription": {"model_version": "synthetic", "model_path": "C:/synthetic",
+                                    "ffmpeg_path": "C:/synthetic/ffmpeg.exe",
                                     "execution_profile_id": "test-profile",
                                     "execution_profile_version": "v1"},
         })

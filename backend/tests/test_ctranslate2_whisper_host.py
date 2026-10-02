@@ -16,8 +16,12 @@ from app.contexts.transcription_evidence import (  # noqa: E402
 from app.infrastructure.transcription import CTranslate2WhisperExecutionAdapter  # noqa: E402
 from app.infrastructure.transcription.ctranslate2_whisper.decode import FFmpegDecoder  # noqa: E402
 from app.shared.time import FixedClock  # noqa: E402
-from tests.test_ctranslate2_whisper_adapter import configuration, request  # noqa: E402
-from tests.test_faster_whisper_execution_adapter import NOW, StaticResolver  # noqa: E402
+from tests.test_ctranslate2_whisper_adapter import (  # noqa: E402
+    NOW,
+    StaticResolver,
+    configuration,
+    request,
+)
 
 pytestmark = pytest.mark.skipif(not os.environ.get("STAGEFLOW_TEST_FFMPEG_PATH"),
                                 reason="operator FFmpeg path not supplied")

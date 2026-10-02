@@ -35,13 +35,6 @@
     "Version": "4.14.1"
   },
   {
-    "Description": "Pythonic bindings for FFmpeg's libraries.",
-    "License": "BSD-3-Clause",
-    "Name": "av",
-    "URL": "https://pyav.basswood.io",
-    "Version": "18.1.0"
-  },
-  {
     "Description": "Python package for providing Mozilla's CA Bundle.",
     "License": "Mozilla Public License 2.0 (MPL 2.0)",
     "Name": "certifi",
@@ -84,25 +77,11 @@
     "Version": "0.139.0"
   },
   {
-    "Description": "Faster Whisper transcription with CTranslate2",
-    "License": "MIT License",
-    "Name": "faster-whisper",
-    "URL": "https://github.com/SYSTRAN/faster-whisper",
-    "Version": "1.2.1"
-  },
-  {
     "Description": "A platform independent file lock.",
     "License": "MIT",
     "Name": "filelock",
     "URL": "https://github.com/tox-dev/py-filelock",
     "Version": "3.32.3"
-  },
-  {
-    "Description": "The FlatBuffers serialization format for Python",
-    "License": "Apache Software License",
-    "Name": "flatbuffers",
-    "URL": "https://google.github.io/flatbuffers/",
-    "Version": "25.12.19"
   },
   {
     "Description": "File-system specification",
@@ -182,13 +161,6 @@
     "Version": "2.5.2"
   },
   {
-    "Description": "ONNX Runtime is a runtime accelerator for Machine Learning models",
-    "License": "MIT License",
-    "Name": "onnxruntime",
-    "URL": "https://onnxruntime.ai",
-    "Version": "1.29.0"
-  },
-  {
     "Description": "Core utilities for Python packages",
     "License": "Apache-2.0 OR BSD-2-Clause",
     "Name": "packaging",
@@ -201,13 +173,6 @@
     "Name": "pluggy",
     "URL": "UNKNOWN",
     "Version": "1.6.0"
-  },
-  {
-    "Description": "UNKNOWN",
-    "License": "3-Clause BSD License",
-    "Name": "protobuf",
-    "URL": "https://developers.google.com/protocol-buffers/",
-    "Version": "7.35.1"
   },
   {
     "Description": "PostgreSQL database adapter for Python",
