@@ -128,7 +128,7 @@ segmentation, transcription and suggestions would all use incomplete media.
 
 ## Acceptance criteria
 
-- [ ] ED-0124 merged: default 30 s; templates and docs updated.
+- [x] ED-0124 merged (PR #193; the validation controller template deliberately keeps its explicit 5 s for synthetic media): default 30 s; templates and docs updated.
 - [ ] ED-0125 approved and merged: a Windows write-state adapter, and inactive write required when
   supported.
 - [ ] Owner replay check: no mid-write registration under growing arrival.

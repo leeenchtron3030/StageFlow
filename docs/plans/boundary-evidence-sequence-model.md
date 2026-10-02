@@ -1,0 +1,143 @@
+# Boundary evidence and the probabilistic sequence model (ADR-0038)
+
+## Status
+
+**Proposed** (2026-10-01). This plan needs the owner's acceptance of ADR-0038 (decisions 1–3)
+and approval of D1–D6. The directive numbers below are **proposed**; the owner allocates them.
+
+## Execution authority
+
+- **Classification:**
+  - **Phase A** (offline evidence measurement) is Green once approved.
+  - **Phases B and C** are pure policy and harness work, Green after ADR-0038.
+  - **Phase D** (production-signal ingest) adds an external input type. It needs ADR-0038
+    decision 3 accepted.
+  - **Phase E** (v6 persistence and UI) involves a migration, under an approved plan.
+- **Authority evidence:**
+  - ADR-0034 (suggestions, advisory);
+  - ADR-0036 (transcription, degradable);
+  - ADR-0037 (appliance);
+  - the Live Replay Run 002 result and the owner decision to hold ED-0118 for a v5 end-edge
+    revision;
+  - the owner's 2026-10-01 direction towards a probabilistic sequence model;
+  - the [licence and risk review](../security/boundary-evidence-license-review-2026-10-01.md).
+- **Implementation-ready:** no, pending the owner's approval.
+
+## Problem statement
+
+v5 gets recall and starts right but misses ends by minutes on the real day (Run 002). Every
+past policy step added hand-tuned rules for one failure mode. StageFlow needs:
+- evidence that targets how talks *end*;
+- one model that combines all evidence with calibrated confidence;
+- a lean path that delivers value at each step.
+
+## Decisions (recommended defaults)
+
+- **D1. Measure before building.** Every new evidence family is first extracted offline on the
+  archive and scored for how far it separates true edges from non-edges. Only families that
+  measurably help are productized.
+- **D2. Reuse before adding.** Evidence comes first from instruments already in the chain:
+  - FFmpeg statistics on the existing decode pass;
+  - Whisper by-products from the ED-0122 engine.
+
+  Third-party audio and speaker models are comparisons only (the licence review).
+- **D3. Train on the owner's archive.** Small, calibrated heads are trained on the owner's
+  decoded productions, with labels derived from ground-truth edges. Cross-validate by day.
+  Training data stays off the repository. *Requires the owner to confirm contractual rights.*
+- **D4. No identity.** Voice evidence is same-session continuity only: no enrollment, no
+  stored embeddings, no named speakers.
+- **D5. v5 first, v6 next.**
+  - The owner-decided v5 end-edge revision uses Phase A and B evidence where it helps. Then
+    ED-0118 freezes v5.
+  - v6 is developed offline in parallel, and replaces v5 only through its own gate (ADR-0038
+    validation).
+- **D6. The control plane goes through one generic ingest,** fed by the operator's Companion.
+  No vendor SDKs.
+
+## Phases
+
+| Phase | Proposed ED | Deliverable | Kind | Exit criterion |
+| --- | --- | --- | --- | --- |
+| **A. Evidence lab** | ED-0126 | `scripts/validation/boundary_evidence_lab.py`: offline extraction on archive blocks of FFmpeg `aspectralstats`, `ebur128`, `scdet` and `blackdetect` per second; Whisper no-speech probability, non-speech tokens and pooled encoder states per window; plus a separability report per family against the ground-truth edges (ROC AUC and detection lead/lag) | Validation tooling; no product change | A sanitized result ranks the families by how well they separate ends and starts |
+| **B. End evidence and v5 end revision** | ED-0127 | Small applause, music and speech heads, plus a voice-continuity score (owner-archive trained, calibrated); a v5 end-edge revision (pure policy) using the evidence that passed A; an offline D5-style evaluation on 3 days and Run 002 | Pure policy plus harness | v5-revised meets D5 (no talk worse at +5 min) and improves end medians on all days; then **ED-0118 freezes it** (migration 0028) |
+| **C. v6 offline** | ED-0128 | A pure domain module: event grammar, explicit-duration priors with the lateness chain, LLR calibration, lattice semi-Markov decoding with marginals, settled flags, anchors; harness `--policy-version 6` | Pure policy plus harness | ADR-0038 gate met offline on all days and on Run 002's timeline, including calibration ≤ 0.10 |
+| **D. Production-signal ingest** | ED-0129 | An authenticated local endpoint for typed production signals, with per-Event meaning mapping, persistence as advisory evidence, and Companion recipe docs; optionally a direct vMix TCP adapter | API plus migration; needs ADR-0038 decision 3 | A rehearsal with Companion: signals land as evidence, and v6 uses them offline |
+| **E. v6 in product** | ED-0130 | Persist new evidence (from A and B) and v6 runs, with confidence and settled flags; producer UI shows exceptions only; Live Replay Run 003 | Migration, service, UI | Run 003 at 1× meets the ADR-0038 gate; owner UX checkpoint; default switch |
+| **F. Optional, measured** | later | OCR of title cards and lower thirds, matched to the schedule; picture embeddings; a local Apache-2.0 or MIT LLM labelling transcript windows | Each measured in the Phase A lab first | Only if the lab shows a gain |
+
+**Sequencing.**
+- A then B is the critical path to ED-0118.
+- C can start once A's features exist.
+- D is independent and can run in parallel once ADR-0038 decision 3 is accepted.
+- E follows C, and D where available.
+
+## Lean-first rationale
+
+- **A** costs one script and a few GPU hours on the archive. It tells us which families are
+  worth anything before any product change.
+- **B** directly attacks the measured failure (ends), and unblocks ED-0118 with evidence-backed
+  rules.
+- **C** reuses the existing harness, manifests, evaluator and D5 method. The model is pure
+  domain code with no new runtime dependency (numpy is already in `transcription-core`; the
+  domain itself should stay plain Python and fractions where determinism matters).
+- **D** gives near-exact edges when the gear is reachable, at the cost of one endpoint, because
+  Companion does the per-vendor work.
+
+## In scope (whole plan)
+
+- Offline lab, detectors, v5 revision, v6 module and harness, production-signal ingest,
+  persistence of evidence and v6, UI exceptions, and replay validation.
+- Directly affected docs: ADR-0034 and ADR-0038 records, architecture docs, glossary terms
+  (*production signal*, *edge confidence*, *settled edge*), and operator READMEs.
+
+## Out of scope
+
+- Automatic Session realization (ADR-0026 stays inactive).
+- Speaker identification, face recognition, or any biometric identity.
+- Cloud services; any network dependency during an Event.
+- Bundling vendor SDKs or Companion.
+- Third-party audio and speaker models as shipped defaults.
+
+## Constraints
+
+- Offline. No copyleft in what ships. Licences recorded per the review.
+- Deterministic, replayable policy with recorded lineage: model, calibration and prior digests.
+- Advisory evidence only. Missing families degrade gracefully.
+- No real media, transcripts, names or schedules in the repository. Sanitized results only.
+- The domain stays independent of FFmpeg, Whisper, Companion and the API.
+
+## Risks and catches
+
+| Risk | Mitigation |
+| --- | --- |
+| A small labelled corpus (29 main-stage talks plus the Day 2 legacy material) risks overfitting | Day-level cross-validation; few parameters (logistic heads, low-parameter priors); hold out Run 002's morning for v6 |
+| Applause-like noise (audience chatter, room tone) causes false ends | Calibrated LLRs combined with the grammar: an "end" also needs a changeover or voice change soon after |
+| Whisper non-speech tokens hallucinate | Weight them weakly through calibration; never used alone |
+| Unofficial console protocols change with firmware | Companion-first; each adapter optional and isolated |
+| Contractual rights to train on client footage | An owner confirmation before Phase B training |
+| LGPL-3.0 FFmpeg installation-information duty | Applies only to consumer "User Products"; recorded in the review; revisit if the appliance is sold or leased |
+| Confidence miscalibration erodes producer trust | Calibration is part of the gate; the UI shows confidence only after calibration passes |
+| Latency growth | Features computed in passes that already run; lattice decoding takes milliseconds; measured in Run 003 |
+
+## Acceptance criteria
+
+- [ ] ADR-0038 accepted (decisions 1–3) and this plan approved, with ED numbers allocated.
+- [ ] Phase A result recorded: families ranked by separability.
+- [ ] Phase B: v5-revised meets D5 offline; ED-0118 completed.
+- [ ] Phase C: the v6 offline gate is met.
+- [ ] Phase D: the production-signal ingest rehearsal is recorded (if pursued).
+- [ ] Phase E: Live Replay Run 003 meets the gate; owner UX checkpoint; default switch.
+
+## Rollback
+
+- Phases A to C are tooling and pure policy, reverted by reverting the code.
+- D and E are additive. v5 stays selectable, and the default switch is reversible by
+  configuration of the policy version.
+
+## Open questions for the owner
+
+1. Do production contracts allow training internal detectors on client event footage (D3)?
+2. Is the Companion-first control plane right for the rigs you typically run? Which switchers
+   and consoles are most common?
+3. Should the Day 2 legacy recordings get ground-truth labels (an hour or two of marking) to
+   enlarge the training set before Phase B?
