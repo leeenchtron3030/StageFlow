@@ -642,3 +642,223 @@ procedure remain authoritative in
   record remains the detailed evidence source.
 - Database provisioning, vMix recording configuration, media rights, machine power,
   source availability, and experiment timing remain operator responsibilities.
+
+## Boundary evidence lab (ED-0126, ADR-0038 Phase A)
+
+`derive_ground_truth.py` and `boundary_evidence_lab.py` are offline validation tools.
+They fit no model, tune no thresholds against a day, and write no production state.
+Their shared `boundary_evidence_*` modules contain only validation effects, numeric
+features and reporting. The approved Phase A plan supplies Green execution authority.
+No result, readiness claim or completion record is created by installing these tools.
+
+Prerequisites:
+
+- Use the existing backend environment. NumPy and tokenizers are operator-installed
+  through `transcription-core`; no dependency is added. Whisper additionally needs the
+  ED-0122 CTranslate2 runtime and an offline-provisioned model with its tokenizer.
+- Set `STAGEFLOW_KERNEL_CONFIG_PATH` to the operator TOML. FFmpeg comes from
+  `[local_transcription].ffmpeg_path`, falling back to
+  `[local_media_segmentation].ffmpeg_path`; ffprobe for ground truth comes from
+  `[local_media_timing].ffprobe_path`. Paths are explicit local executables, never PATH
+  searches. GPL/nonfree FFmpeg builds and shell wrappers are refused. Tools and model
+  weights are never downloaded or bundled. No PyAV or third-party audio/speaker model
+  is used.
+- Keep media, manifests, truth, graphic PNGs, cue audio, caches and report destinations
+  outside the repository. Create the external cache/output parent directories first.
+  Relative, UNC and repository paths are refused. Reports cannot alias input files.
+- Run with the optional environment installed, for example from `backend` with
+  `uv run --no-sync python ../scripts/validation/<tool>.py ...`. The examples below use
+  illustrative external paths; substitute private operator paths locally.
+
+### Automatic ground truth
+
+```powershell
+uv run --no-sync python ../scripts/validation/derive_ground_truth.py `
+  --blocks D:\BoundaryLab\blocks --exports D:\BoundaryLab\exports `
+  --intro-skip 8 --outro-skip 5 --threshold 0.8 `
+  --join-tolerance 2.0 --acceptance-fraction 0.9 `
+  --out D:\BoundaryLab\truth.json
+```
+
+Both folders are flat. Exports are sorted by case-insensitive filename (then exact
+filename), but names are never emitted. Recorder blocks are placed by timezone-aware
+container `creation_time` plus duration, and sorted by that advisory UTC placement.
+Consecutive blocks join when the absolute apparent gap or overlap is within
+`--join-tolerance` (default 2.0 s), accommodating whole-second recorder timestamps with
+fractional durations. Joined samples are anchored continuously to the first block start.
+Larger gaps form separate runs; larger overlaps and decoded/container duration
+discrepancies greater than 0.1 s are refused. Recorder clock timing remains unqualified,
+as in Media Timing Evidence.
+
+The tool decodes 8 kHz mono, subtracts the reference mean, and uses FFT correlation
+normalized by each candidate's local centered energy. Five 10 s probes cover start,
+early, middle, late and end after stripping the configured intro/outro. Additional
+10 s tiles establish source segments using a +/-60 s search around the offset predicted
+from the last accepted match. Only the five anchors search globally unconditionally;
+a failed local 10 s tile falls back to one global search. Quarter-second sub-tiles
+never search globally: they search +/-60 s around the current predicted offset and,
+when the parent failed locally, also around that parent's global best match (even
+below threshold), advanced by the sub-tile's offset within the parent. Correlation uses
+float32 audio and bounded FFT chunks with float64 cumulative energy sums confined to
+each chunk.
+
+Tiles are checked in 0.25 s pieces and suspect tiles are rematched at that resolution,
+so short cuts still split source segments. Offsets must agree within 0.05 s to form one
+segment. A segment is accepted when at least `--acceptance-fraction` (default 0.9) of its
+quarter-second tiles meet `--threshold`. Unsupported quiet/processed tiles retain the
+predicted placement but never update tracking or count as accepted evidence. This is
+waveform matching, not a semantic labeler; up to `1 - acceptance_fraction` (10% by default)
+may lack waveform support.
+Long corpora still require memory for decoded float32 recording runs, but subsequent
+successful tile searches and normalization no longer copy or transform whole runs.
+
+The external JSON array contains `ordinal`, `start`, `end`, `segments`, `min_score`,
+`consistent`, `status`, `snippet_scores`, `snippet_aligned`, `acceptance_fraction`
+(the configured minimum) and `accepted_fraction` (the measured tile fraction). Each
+segment also reports its measured `accepted_fraction`. Times are aware UTC
+strings. A failed export has null outer bounds, `status: "unaligned"` and
+`consistent: false`; any supported partial segments remain visible. For aligned
+exports `min_score` is the minimum tile score, including tolerated unsupported tiles.
+Probe scores may be below the threshold when a probe crosses an internal cut; those probes are explicitly unaligned.
+For an internally cut export, the outer bounds enclose its first and last source
+segments and must not be mistaken for an uninterrupted talk.
+
+Replay/harness truth consumers use only `start` and `end`: project those fields from
+aligned, consistent rows before passing them to a strict truth parser. Review cut or
+unaligned rows separately. Stdout includes only ordinal, scores and booleans; UTC
+timestamps are confined to the external truth artifact. Input errors emit only
+`{"error_count": 1}` and exit 1.
+
+### Evidence extraction and separability
+
+A manifest is an external JSON object with `stages`. Each stage contains `blocks`
+(`path`, aware UTC `start`) and `truth` (`start`, `end`). Optionally provide
+`known_graphics` as a flat PNG folder and `music_cues` as a list of reference audio paths.
+An external `--truth` can instead supply a span array for a single stage, or
+`{"stages":[{"truth":[...]}]}` matching manifest stage order. Display names are ignored.
+
+```powershell
+uv run --no-sync python ../scripts/validation/boundary_evidence_lab.py `
+  --manifest D:\BoundaryLab\corpus.json --cache D:\BoundaryLab\cache `
+  --audio-stats --picture --music-cue --whisper --voice-continuity `
+  --out D:\BoundaryLab\evidence.json --markdown-out D:\BoundaryLab\evidence.md
+```
+
+All six families are opt-in. Missing tools, filters, optional runtimes or reference
+audio produce a `skipped` family record; extraction/cache validation errors produce
+`failed`. Read the statuses even when a report was successfully written. Features:
+
+- `audio_stats`: one FFmpeg pass with aspectral flatness, centroid, flux, entropy and
+  rolloff, ebur128 momentary loudness and astats RMS. Metadata frames are averaged per
+  second. Digital-silence negative infinity is represented by the fixed -120 dB floor.
+- `picture`: per-second maximum scene score, black intervals, and maximum normalized
+  correlation against supplied 64x36 grayscale PNGs. Video graphics are sampled at
+  1 fps; uniform images have zero similarity. The winning graphic is an ordinal only.
+- `music_cue`: 8 kHz normalized correlation per second against each supplied reference,
+  taking the best valid reference-start score, a detection at the fixed 0.8 threshold,
+  and the winning reference ordinal. Decode and correlation use 60 s cores with overlap
+  equal to the longest reference length, including matches across chunk seams. Incomplete
+  reference placements are not scored.
+- `whisper`: segment spans, no-speech probability, average log probability, compression
+  ratio from the additive `WhisperEngine.inspect_window` accessor. It independently
+  inspects at most 10 s using ED-0122's existing inference and alignment. Decoder-level probabilities are shared by the split segments of that
+  window. The production adapter never calls this accessor and its outputs are unchanged.
+  Non-speech tokens are suppressed by the existing decoder and are not measured.
+- `voice_continuity`: adjacent pooled encoder cosine distances; only real audio frames
+  contribute to pooling. A zero-norm vector gives no observation. Block joins are compared
+  when the apparent gap or overlap is within `--join-tolerance` (default 2.0 s, also used
+  by ground truth). Larger gaps/overlaps and stage changes reset continuity.
+  Vectors are kept in memory and are never returned, cached, enrolled or clustered.
+
+Feature caches are keyed by block-content digest, extractor version, binary/model identity
+and relevant reference digests/settings. Cache reads are validated against closed numeric
+schemas. Only sanitized feature rows and constrained referee answers are cached. Whisper
+inference repeats when needed for private transcript/continuity; it never reloads an
+embedding or transcript from disk. `runtime_seconds` is incremental elapsed work per block
+and family, including cache lookup; `shared_extraction_seconds` discloses the Whisper work
+reused by Whisper/continuity. Do not sum the shared field across families. Cold model startup
+and provisioning are not an inference benchmark. Binary/model/reference digests are private
+cache inputs except the explicitly reported referee checksum.
+
+JSON and Markdown report each observed feature separately for starts and ends, per UTC
+calendar stage-day and pooled. AUC compares seconds within inclusive +/-15 s of the role's
+truth edges against seconds strictly more than 120 s from any truth edge. Ties get half
+credit; absent positive/negative evidence gives null AUC. Duplicate seconds from overlapping
+blocks are averaged before scoring. Each feature reports raw `auc`, `direction` (`higher`
+or `lower`, whichever is more separable), and `separability = max(auc, 1 - auc)`. Tied
+or absent AUC defaults to `higher`; absent AUC gives null separability. Peak search uses
++/-120 s, maxima for `higher` and troughs for `lower`, with earliest timestamp winning ties;
+it reports inclusive 10/30 s hit rates and signed median lag. Uncovered
+edges remain in hit-rate denominators. Sparse continuity is scored only at observed window
+boundaries. Direction is selected descriptively using these truth labels. Stage-day rows
+also report `held_out_direction`, chosen from pooled positive/negative observations of
+the other stage-days, and `held_out_separability`, this day's AUC read in that direction
+(AUC for `higher`, 1 - AUC for `lower`). It may be below 0.5. Tied training AUC chooses
+`higher`; absent training AUC gives null held-out fields, and absent test AUC gives null
+held-out separability. **Rank families by held-out separability**, not the descriptive
+per-day maximum. Pooled rows choose direction using all days and label it with
+`direction_scope: "all_stage_days"`; they are descriptive, not held-out estimates.
+Stage-day descriptive directions have `direction_scope: "stage_day"`. No detector is
+calibrated or trained, and these numbers do not qualify production accuracy.
+
+### Optional language-model referee
+
+Use an operator-provisioned **llama.cpp `llama-server` executable** at `--llm-binary`,
+an external GGUF at `--llm-model`, its required `--llm-sha256`, and a required
+`--llm-model-family` from the license-review allowlist: Qwen2.5 0.5B/1.5B/7B/14B/32B or
+Phi-3.5-mini. The family argument is the operator's declaration of the provisioned model;
+the actual bytes must match the checksum. Qwen2.5-3B, 72B, Llama and Gemma are not accepted
+choices. The lab does not discover, obtain or license weights.
+
+Add `--llm-referee` and those four options to the lab command. The lab starts a temporary
+server child bound only to `127.0.0.1` on a locally selected port and closes it on exit.
+There is no remote-server URL, proxy, Internet call or tool-enabled conversation. This
+server option avoids Windows command-line limits: transcript data crosses only the local
+in-memory HTTP request body, never argv or a prompt file. Runtime build/revision and model
+SHA-256 are reported. The context is 32768 tokens; token-count preflight refuses oversized
+windows and truncated responses are rejected. Pin and qualify the operator runtime before
+interpreting a real run; tests use fake effects, not a downloaded llama.cpp executable.
+
+Each truth edge and an equal number of negative slots is tested. Negative points come from
+the strongest within-feature ranked raw candidates more than 120 s from any edge, separated
+by more than 30 s. Insufficient candidates remain explicit skipped slots. Enable cheap
+families alongside the referee to supply negatives. For edges and negatives alike, the
+360 s window is centred on the evaluated point plus an offset drawn uniformly from
++/-120 s, deterministically seeded by point ordinal and fixed run seed 42. The edge's
+position therefore varies within the window. Word times are relative to window start;
+neither the evaluated point nor its offset is disclosed. The earlier truth-centred
+window and candidate-at-zero wording leaked the anchor despite omitting explicit labels.
+
+Sentences have numbered indices: gaps over 2 s split sentences; punctuation or 40 words
+ends a sentence. The prompt asks only whether and where a talk start or end occurs in
+the window. Transcript content is explicitly untrusted data. Truth still selects positive
+windows for this targeted evaluation; these metrics are not an unbiased full-day scan.
+
+Requests use GBNF-constrained JSON, temperature 0 and seed 42. Answers contain only bounded
+indices or null and section labels `intro`, `talk`, `qa`, `mc_handoff`, `break`, `other`.
+Strict validation rejects extra fields, duplicate keys, invalid indices and other labels.
+Chosen starts map only to the first word's start; chosen ends to the last word's end.
+Answers are cached by prompt/grammar/model/runtime/settings digest. Reports show median/p90
+absolute error, matched-edge counts, negative agreement and missing-answer counts separately
+for starts and ends, per stage-day and pooled. Referee runtime is attributed to the block
+containing the candidate start placement; prerequisite transcript extraction is also recorded.
+
+### Sanitization and synthetic validation
+
+Never commit real media, manifests, names, transcripts, prompts or operator configuration.
+Public reports contain ordinals, numeric measurements, booleans and closed labels only
+(plus the required model checksum/runtime revision). Raw provider diagnostics are captured
+and discarded; public errors never interpolate exception messages. Transcript words exist
+only in process memory and in the temporary local referee request. No embeddings persist.
+
+`backend/tests/test_boundary_evidence_lab.py` covers synthetic offsets, gaps, cuts including
+short cuts hidden by an otherwise high score, low-score refusal, parsers, graphics, music,
+continuity, day/overlap metrics, cache keys/poisoning, output collisions and sanitization,
+missing tools, checksums, grammar, fake referee transport and word-time mapping.
+`test_boundary_evidence_engine_accessor.py` verifies diagnostics, real-frame pooling,
+suppression preservation and unchanged normal transcription outputs. NumPy-dependent tests
+skip when the optional group is absent. Fixtures use pytest `tmp_path`, never a
+repository-relative scratch directory. Additional review regressions cover seeded referee
+windows, fractional recorder clocks, bounded local/global search counts, float32 FFT chunks,
+quiet-tile acceptance fractions, lower-direction troughs, and music chunk seams. No test
+needs media, models, a GPU or a network.
