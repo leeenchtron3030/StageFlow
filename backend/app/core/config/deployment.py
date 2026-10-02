@@ -330,7 +330,8 @@ class ResourceLimits(BaseModel):
     maximum_concurrent_assessments: int = Field(default=2, ge=1, le=64)
     maximum_cpu_percentage: int = Field(default=20, ge=1, le=100)
     maximum_memory_bytes: int = Field(default=536_870_912, ge=1)
-    minimum_stable_seconds: int = Field(default=5, ge=1, le=3600)
+    # Recorders that write in place can pause; a short window registers them mid-write.
+    minimum_stable_seconds: int = Field(default=30, ge=1, le=3600)
 
 
 class AutonomousEventNodeConfiguration(BaseModel):

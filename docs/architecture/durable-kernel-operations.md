@@ -38,8 +38,13 @@ allowed_extensions = [".mov", ".mp4", ".mxf"]
 maximum_concurrent_assessments = 2
 maximum_cpu_percentage = 20
 maximum_memory_bytes = 536870912
-minimum_stable_seconds = 5
+minimum_stable_seconds = 30
 ```
+
+`minimum_stable_seconds` defaults to 30 (ED-0124). A file that is not renamed into place
+becomes ready only after snapshots this far apart show no change. Recorders that write in
+place can pause, so a short window can register a recording mid-write. Lower it only for
+sources that finalize atomically or for synthetic validation media.
 
 Set `STAGEFLOW_KERNEL_CONFIG_PATH` to the TOML path and set the named secret environment
 variable (`STAGEFLOW_KERNEL_DSN` above) at the process/service boundary. Effective
