@@ -71,6 +71,7 @@ from app.core.config.deployment import (
     NetworkPolicy,
     NodeRole,
 )
+from app.infrastructure.windows_write_state import write_state_supported
 from app.shared.ids import EntityId
 from app.shared.time import Clock
 
@@ -188,6 +189,9 @@ def build_stageflow_runtime(
         RuntimeCapabilityKind.OPTIONAL_ACTIVITY_SUSPENSION,
         RuntimeCapabilityKind.HEALTH_REPORTING,
     )
+    supports_write_state = write_state_supported()
+    if supports_write_state:
+        capability_kinds += (RuntimeCapabilityKind.WRITE_STATE_OBSERVATION_COLLECTION,)
     capability_ids = {
         kind: _id(namespace, f"capability:{kind.value}") for kind in capability_kinds
     }
@@ -230,6 +234,10 @@ def build_stageflow_runtime(
             RuntimeCapabilityKind.RESOURCE_PRESENCE_OBSERVATION_COLLECTION
         ),
     }
+    if supports_write_state:
+        observation_kinds[RuntimeObservationType.WRITE_STATE] = (
+            RuntimeCapabilityKind.WRITE_STATE_OBSERVATION_COLLECTION
+        )
     observation_capabilities = tuple(
         RuntimeObservationCapability(
             id=_id(namespace, f"observation:{observation_type.value}"),
@@ -253,7 +261,7 @@ def build_stageflow_runtime(
         supporting_capability_ids=tuple(capability.id for capability in general),
         supported_finalization_methods=(),
         snapshot_support=True,
-        write_state_support=False,
+        write_state_support=supports_write_state,
         read_access_support=True,
         presence_support=True,
         stable_identity_support=True,
@@ -279,6 +287,8 @@ def build_stageflow_runtime(
         accepted_strong_finalization_methods=(
             CompletedMediaAssetCompletionMethod.ATOMIC_RENAME_OBSERVED,
         ),
+        # Owner decision 2026-10-01: an observed active writer blocks readiness, but an
+        # unknown write state (network paths, probe errors) falls back to stability.
         require_inactive_write_when_available=False,
         policy_version="1.0",
     )
@@ -288,6 +298,8 @@ def build_stageflow_runtime(
         RuntimeCapabilityKind.RESOURCE_PRESENCE_OBSERVATION_COLLECTION,
         RuntimeCapabilityKind.STABLE_RESOURCE_IDENTITY,
     )
+    if supports_write_state:
+        required_kinds += (RuntimeCapabilityKind.WRITE_STATE_OBSERVATION_COLLECTION,)
     selection = RuntimeReadinessPolicySelection(
         id=selection_id,
         runtime_id=runtime_id,

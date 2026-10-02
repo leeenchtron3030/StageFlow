@@ -5,6 +5,7 @@ import stat
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import cast
 from uuid import UUID, uuid5
 
 from app.contexts.production.asset_readiness import (
@@ -17,6 +18,8 @@ from app.contexts.production.asset_readiness import (
     AssetResourcePresenceObservation,
     AssetResourcePresenceStatus,
     AssetResourceSnapshot,
+    AssetWriteStateObservation,
+    AssetWriteStateStatus,
     ConservativeAssetReadinessPolicy,
     MediaAssetCandidate,
 )
@@ -50,14 +53,22 @@ from app.contexts.production.local_filesystem_discovery import (
 from app.contexts.production.media_collection import (
     MediaCandidateDiscoveryOutcome,
     MediaCandidateDiscoveryRequest,
+    MediaObservationCollectionRequest,
 )
 from app.contexts.production.runtime import (
     RuntimeCapabilityKind,
+    RuntimeCollectionMode,
+    RuntimeObservationType,
     RuntimeSourceLocationScheme,
     StageFlowRuntime,
 )
 from app.contexts.production.software_agent_runtime import AgentRuntimeExecutionPermission
 from app.core.config.deployment import EffectiveKernelConfiguration
+from app.infrastructure.windows_write_state import (
+    WindowsWriteStateObservationAdapter,
+    WindowsWriteStateProbe,
+    write_state_supported,
+)
 from app.shared.ids import EntityId
 
 
@@ -85,6 +96,7 @@ class MediaCycleResult:
 
 @dataclass(frozen=True, slots=True)
 class _FileFacts:
+    resolved_path: Path
     size_bytes: int
     modified_at: datetime
     created_at: datetime
@@ -109,11 +121,17 @@ class BoundedMediaCycle:
         runtime: StageFlowRuntime,
         kernel: DurableEventModeKernel,
         source_availability: dict[str, bool],
+        write_state_probe: WindowsWriteStateProbe | None = None,
     ) -> None:
         self.configuration = configuration
         self.runtime = runtime
         self.kernel = kernel
         self.source_availability = source_availability
+        self._write_state_probe = (
+            write_state_probe or WindowsWriteStateProbe()
+            if write_state_supported()
+            else None
+        )
         self._namespace = UUID(runtime.identity.runtime_id.value)
         self._plan = runtime.configuration.collection_plans[0]
         self._selection = runtime.configuration.readiness_policy_selections[0]
@@ -260,6 +278,7 @@ class BoundedMediaCycle:
                 try:
                     outcome = self._process_candidate(
                         discovered.candidate,
+                        cycle_id=cycle_id,
                         source_binding_key=key,
                         root=Path(source.path),
                     )
@@ -310,6 +329,7 @@ class BoundedMediaCycle:
         self,
         candidate: MediaAssetCandidate,
         *,
+        cycle_id: EntityId,
         source_binding_key: str,
         root: Path,
     ) -> MediaCycleCandidateResult:
@@ -331,15 +351,19 @@ class BoundedMediaCycle:
             Path(candidate.primary_resource.source_location.location_value), root=root
         )
         self._record_snapshot(candidate, observed_at, facts)
+        evaluated_at = observed_at
+        if self._write_state_probe is not None:
+            self._record_write_state(candidate, facts, source_binding_key, cycle_id)
+            evaluated_at = self.kernel.clock.now()
         observations = self.kernel.repository.list_observations(candidate.id)
-        bundle = self._bundle(candidate, observed_at, observations)
+        bundle = self._bundle(candidate, evaluated_at, observations)
         request = AssetReadinessEvaluationRequest(
             evaluation_id=EntityId.new(),
             policy_id=self._selection.policy_id,
             policy_version=self._selection.policy_version,
             candidate_id=candidate.id,
             resource_id=candidate.primary_resource.id,
-            evaluated_at=observed_at,
+            evaluated_at=evaluated_at,
             completion_declaration_id=EntityId.new(),
             readiness_declaration_id=EntityId.new(),
             request_id=EntityId.new(),
@@ -387,11 +411,66 @@ class BoundedMediaCycle:
         ) != _stat_identity(post):
             raise _CandidateInspectionError("candidate_replaced_during_observation")
         return _FileFacts(
+            resolved_path=resolved,
             size_bytes=opened.st_size,
             modified_at=datetime.fromtimestamp(opened.st_mtime_ns / 1_000_000_000, UTC),
             created_at=datetime.fromtimestamp(opened.st_ctime_ns / 1_000_000_000, UTC),
             identity_token=f"{opened.st_dev}:{opened.st_ino}",
         )
+
+    def _record_write_state(
+        self,
+        candidate: MediaAssetCandidate,
+        facts: _FileFacts,
+        source_binding_key: str,
+        cycle_id: EntityId,
+    ) -> None:
+        assert self._write_state_probe is not None
+        target = self._target_by_key[source_binding_key]
+        capability = next(
+            item for item in self.runtime.capability_set.observation_capabilities
+            if item.observation_type is RuntimeObservationType.WRITE_STATE
+        )
+        adapter = WindowsWriteStateObservationAdapter(
+            probe=self._write_state_probe,
+            resolve_path=lambda request: facts.resolved_path,
+            observer_id=self._adapter_id,
+            clock=self.kernel.clock,
+        )
+        result = adapter.collect_write_state_observation(
+            MediaObservationCollectionRequest(
+                collection_request_id=EntityId.new(),
+                collection_cycle_id=cycle_id,
+                runtime_id=self.runtime.identity.runtime_id,
+                configuration_id=self.runtime.configuration.id,
+                collection_plan_id=self._plan.id,
+                collection_target_id=target.id,
+                candidate_id=candidate.id,
+                resource_id=candidate.primary_resource.id,
+                observation_capability_id=capability.id,
+                observation_type=RuntimeObservationType.WRITE_STATE,
+                collection_mode=RuntimeCollectionMode.SCHEDULED_SAMPLING,
+                requested_at=self.kernel.clock.now(),
+                execution_permission=AgentRuntimeExecutionPermission.NORMAL,
+                required=True,
+                source_capability_ids=(target.source_capability_id,),
+            )
+        )
+        for observation in result.observations:
+            assert isinstance(observation, AssetWriteStateObservation)
+            self.kernel.record_resource_observation(
+                candidate_id=candidate.id,
+                observation_kind="asset_write_state",
+                observed_at=observation.observed_at,
+                facts={
+                    "resource_id": observation.resource_id.value,
+                    "observer_id": observation.observer_id.value,
+                    "source_runtime_id": self.runtime.identity.runtime_id.value,
+                    "status": observation.status.value,
+                    "assessment_mechanism_id": observation.assessment_mechanism_id,
+                    "limitations": tuple(observation.limitations),
+                },
+            )
 
     def _record_snapshot(
         self,
@@ -447,6 +526,7 @@ class BoundedMediaCycle:
         snapshots: list[AssetResourceSnapshot] = []
         access: list[AssetReadAccessObservation] = []
         presence: list[AssetResourcePresenceObservation] = []
+        write_state: list[AssetWriteStateObservation] = []
         for observation in observations:
             facts = observation.facts
             if facts.get("resource_id") != resource_id.value:
@@ -487,6 +567,24 @@ class BoundedMediaCycle:
                         source_runtime_id=runtime_id,
                     )
                 )
+            elif observation.observation_kind == "asset_write_state":
+                limitations = facts["limitations"]
+                assert isinstance(limitations, (tuple, list))
+                write_state.append(
+                    AssetWriteStateObservation(
+                        id=observation.id,
+                        candidate_id=candidate.id,
+                        resource_id=resource_id,
+                        observed_at=observation.observed_at,
+                        status=AssetWriteStateStatus(str(facts["status"])),
+                        assessment_mechanism_id=str(facts["assessment_mechanism_id"]),
+                        observer_id=observer_id,
+                        source_runtime_id=runtime_id,
+                        limitations=tuple(
+                            str(value) for value in cast(tuple[object, ...], limitations)
+                        ),
+                    )
+                )
             elif observation.observation_kind == "asset_resource_presence":
                 presence.append(
                     AssetResourcePresenceObservation(
@@ -518,6 +616,7 @@ class BoundedMediaCycle:
             created_at=created_at,
             resource_snapshots=current_run,
             read_access_observations=access,
+            write_state_observations=write_state,
             presence_observations=presence,
         )
 
