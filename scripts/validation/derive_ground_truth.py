@@ -175,6 +175,13 @@ def align_export(audio: Any, runs: list[Run], *, ordinal: int, rate: int = 8000,
             "snippet_aligned": [s >= threshold for s in snippet_scores]}
 
 
+def failed_row(ordinal: int, acceptance_fraction: float) -> dict[str, Any]:
+    return {"ordinal": ordinal, "status": "error", "start": None, "end": None,
+            "segments": [], "min_score": 0.0, "consistent": False, "snippet_scores": [],
+            "accepted_fraction": 0.0, "acceptance_fraction": acceptance_fraction,
+            "snippet_aligned": []}
+
+
 def media(folder: str) -> list[Path]:
     entries = sorted(external(folder, directory=True).iterdir(),
                      key=lambda p: (p.name.casefold(), p.name))
@@ -215,11 +222,16 @@ def main(argv: list[str] | None = None, *, output: TextIO | None = None,
                                finite(metadata["duration"]), decode(ffmpeg, path)))
             runs = recording_runs(blocks, 8000, finite(args.join_tolerance))
             for ordinal, path in enumerate(export_paths):
-                rows.append(align_export(decode(ffmpeg, path), runs, ordinal=ordinal,
-                                         intro_skip=finite(args.intro_skip),
-                                         outro_skip=finite(args.outro_skip),
-                                         threshold=finite(args.threshold),
-                                         acceptance_fraction=finite(args.acceptance_fraction)))
+                # One failing export (decode error, malformed media) must not discard the
+                # day's other alignments; it is recorded as a closed error status instead.
+                try:
+                    rows.append(align_export(decode(ffmpeg, path), runs, ordinal=ordinal,
+                                             intro_skip=finite(args.intro_skip),
+                                             outro_skip=finite(args.outro_skip),
+                                             threshold=finite(args.threshold),
+                                             acceptance_fraction=finite(args.acceptance_fraction)))
+                except Exception:
+                    rows.append(failed_row(ordinal, finite(args.acceptance_fraction)))
             write_json(target, rows)
         except Exception:
             rows = []

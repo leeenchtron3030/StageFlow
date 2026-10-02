@@ -29,6 +29,22 @@ def fake_external(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(ref, "external", path)
 
 
+def test_correlation_ignores_digital_silence_and_dither_level_windows() -> None:
+    # Real recordings contain zero runs and room tone far below speech level; those
+    # windows must never outscore the true match (the 2024 host-run failure).
+    np = pytest.importorskip("numpy")
+    rng = np.random.default_rng(7)
+    speech = (rng.normal(size=8000) * 0.1).astype(np.float32)
+    silence = np.zeros(4000, dtype=np.float32)
+    dither = (rng.normal(size=4000) * 1e-5).astype(np.float32)
+    signal = np.concatenate([silence, dither, speech, silence])
+    snippet = speech[3000:3800]
+    scores = common.correlate(signal, snippet)
+    assert scores.argmax() == 8000 + 3000
+    assert scores[:8000 - len(snippet) + 1].max() == 0  # windows wholly in silence/dither
+    assert scores[8000 + 3000] > 0.99
+
+
 def test_correlation_known_offset_and_local_energy() -> None:
     np = pytest.importorskip("numpy")
     rng = np.random.default_rng(42)
@@ -590,6 +606,38 @@ def test_ground_truth_cli_writes_utc_only_to_external_artifact(
                       output=stdout) == 0
     assert json.loads(out.read_text())[0]["start"] == "2026-01-01T00:00:01Z"
     assert all(value not in stdout.getvalue() for value in ("private", "2026", str(tmp_path)))
+
+
+def test_ground_truth_cli_isolates_a_failing_export(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # A single undecodable export must not discard the day's other alignments.
+    np = pytest.importorskip("numpy")
+    signal = np.random.default_rng(5).normal(size=20 * 8000)
+    block, bad, good, out = (tmp_path / "b", tmp_path / "x0", tmp_path / "x1",
+                             tmp_path / "out.json")
+    monkeypatch.setattr(truth, "external", lambda raw, **_k: Path(raw))
+    monkeypatch.setattr(truth, "config", lambda _r: {
+        "local_transcription": {"ffmpeg_path": "fake"},
+        "local_media_timing": {"ffprobe_path": "fake"}})
+    monkeypatch.setattr(truth, "ffmpeg_tool", lambda _r: tmp_path / "fake.exe")
+    monkeypatch.setattr(truth, "media",
+                        lambda folder: [block] if folder == "blocks" else [bad, good])
+    monkeypatch.setattr(truth, "probe", lambda *_a: {
+        "format": {"duration": 20, "tags": {"creation_time": "2026-01-01T00:00:00Z"}}})
+
+    def decode(_binary: Any, path: Path) -> Any:
+        if path == bad:
+            raise truth.Refusal()
+        return signal if path == block else signal[8000:11 * 8000]
+
+    monkeypatch.setattr(truth, "decode", decode)
+    monkeypatch.setenv("STAGEFLOW_KERNEL_CONFIG_PATH", str(tmp_path / "operator.toml"))
+    assert truth.main(["--blocks", "blocks", "--exports", "exports", "--out", str(out)],
+                      output=io.StringIO()) == 0
+    rows = json.loads(out.read_text())
+    assert [row["status"] for row in rows] == ["error", "aligned"]
+    assert rows[1]["start"] == "2026-01-01T00:00:01Z"
 
 
 def test_lab_cli_writes_sanitized_json_and_markdown(
