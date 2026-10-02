@@ -3,7 +3,7 @@
 ## Status
 
 - **Part 1 (ED-0124): Approved** by the owner on 2026-10-01. Raise the default stability interval.
-- **Part 2 (ED-0125): Proposed.** It needs owner approval of D2–D4 before it is implementation-ready.
+- **Part 2 (ED-0125): Approved** by the owner on 2026-10-01, with the recommended defaults (including network paths reporting `UNKNOWN`).
 
 ## Execution authority
 
@@ -17,7 +17,7 @@
   - the owner's 2026-10-01 approval of "raise the default now, active-writer detection as a
     follow-up plan";
   - the Live Replay Run 002 attempts recorded below.
-- **Implementation-ready:** Part 1 yes; Part 2 no.
+- **Implementation-ready:** yes, for both parts.
 - **Escalation:** stop if Part 2 needs a readiness-policy, contract or schema change, or a new
   dependency.
 

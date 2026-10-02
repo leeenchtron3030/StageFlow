@@ -42,9 +42,8 @@ suggestions stay advisory, and every Session is realized by a human.
 1. Whether boundary suggestion moves from rule-based edge selection to a **probabilistic
    segmental model** (policy v6), with calibrated per-edge confidence.
 2. Which **evidence families** feed it, and in what order.
-3. Whether StageFlow accepts a **generic production-signal ingest** for control-plane events.
-   This means external inputs from the event's own equipment, which is the first such input
-   type.
+3. Whether StageFlow reads **production signals from the recording software** (vMix and OBS)
+   as evidence. This is the first external, live input type.
 
 ## Options
 
@@ -90,7 +89,7 @@ labelled archive. The families, in order of cost:
 | Audio scene | FFmpeg `aspectralstats`, `ebur128` and `astats`, added to the existing decode pass, plus Whisper by-products (no-speech probability, non-speech tokens), scored by small StageFlow-trained heads for **applause, music and speech** | **Outro → Changeover (ends)** |
 | Voice continuity | Pooled Whisper encoder states per window, compared with adjacent windows only (no identity, nothing stored) | Talk → Q&A → Outro, the MC's return |
 | Picture | FFmpeg `scdet` and `blackdetect`, and similarity to the day's first holding frame | Holding and Changeover |
-| Control plane (optional) | Generic production-signal ingest: switcher tally or overlay, mic channel open and close, title-card triggers, one-tap stage-manager marks | Near-exact edges when present |
+| Production signals (optional) | vMix or OBS: program and scene changes, overlay or lower-third on/off, mic source mute, stinger playback, recording file events; optional one-tap marks | Near-exact edges when present |
 | Human anchors | Producer confirmations and corrections | Clamp the lattice (C5) |
 
 Missing families contribute nothing. The model degrades to the evidence present, so no
@@ -124,17 +123,38 @@ transcript or no control plane still works (ADR-0036 degradability).
   owner's rule that the UI is scannable under load.
 - Policy lineage: version `6`, model ID and version, calibration digest, prior digest.
 
-**C7. Control-plane ingest (decision 3).**
-- One read-only, authenticated local endpoint (HTTP, optionally OSC) accepts typed production
-  signals, such as:
-  - `program_input_changed`;
-  - `overlay_on` / `overlay_off` (title card, lower third);
-  - `mic_open` / `mic_closed`;
-  - `stage_mark`.
-- Each signal carries an operator-assigned meaning per Event.
-- The operator's Bitfocus Companion (MIT, separate) bridges vMix, ATEM and consoles to it. A
-  direct vMix TCP adapter is an optional later addition.
-- No vendor SDK is bundled. Signals are evidence, never commands.
+**C7. Recording-software signals (decision 3).**
+- **Source software.** In live event production, the files StageFlow ingests are almost always
+  written by **vMix or OBS Studio** (owner direction, 2026-10-01). Hardware switchers and
+  consoles vary too much from event to event to be a design target. StageFlow therefore reads
+  the **recording software itself**, read-only, over its documented local API:
+  - **vMix TCP API** (port 8099):
+    - `SUBSCRIBE TALLY` and `SUBSCRIBE ACTS` push program and preview input changes and
+      `Overlay1`–`8` activations. Title cards and lower thirds are usually overlays.
+    - XML state gives input titles and recording status.
+    - The API is available in every edition since vMix 22.
+  - **OBS WebSocket v5** (built into OBS 28 and later; password authentication):
+    - `CurrentProgramSceneChanged` and `SceneItemEnableStateChanged` (title-card and
+      lower-third sources);
+    - `InputMuteStateChanged` (mic sources);
+    - `MediaInputPlaybackStarted` / `MediaInputPlaybackEnded` (stinger or walk-in clips);
+    - `RecordStateChanged` and `RecordFileChanged`. The latter is emitted when a split file
+      begins, with the new path.
+- **Signal meaning.** Each signal maps to a typed production signal (`program_changed`,
+  `overlay_on` / `overlay_off`, `mic_open` / `mic_closed`, `media_started` / `media_ended`,
+  `record_file_started` / `record_file_closed`). Its meaning comes from a small per-Event
+  mapping that the operator chooses, for example: input 3 is the title card, the Podium mic
+  source is the speaker.
+- **Read-only.** Signals are advisory evidence, never commands. StageFlow never sends control
+  commands.
+- **A readiness bonus.** OBS's `RecordFileChanged` and `RecordStateChanged`, and vMix's recording
+  state, report exactly when a block file closes. That would be a stronger finalization fact
+  than file stability.
+
+  Accepting a "recorder-reported closure" as a strong completion method changes the ED-0049
+  readiness policy. It is therefore a **separate later decision**, out of scope here.
+- **Optional.** A generic signal endpoint (for example a stage-manager tap from a tablet, or
+  Bitfocus Companion) can feed the same ingest. It is not required.
 
 ## Why this is StageFlow-specific
 

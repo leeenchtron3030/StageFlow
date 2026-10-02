@@ -32,9 +32,9 @@ Sources were checked on 2026-10-01 and are listed under [Sources](#sources).
   under GDPR Article 9, and needs explicit consent. **Recommendation:** use only unsupervised,
   same-session *voice continuity* (is this the same voice as a moment ago?), never stored and
   never linked to a person.
-- **Production control-plane signals need no SDK.** Read vMix and the consoles through their
-  documented network protocols, or let the operator's Bitfocus Companion (MIT) relay them to
-  one generic StageFlow ingest.
+- **Production signals need no SDK.** Read the recording software (vMix TCP API, OBS
+  WebSocket v5) over its documented local protocol. Avoid the GPL-3.0 OBS Python client.
+  Hardware consoles and Companion are optional extras.
 - **Patents:** the closest prior art found is expired. This is not a freedom-to-operate
   opinion.
 
@@ -54,6 +54,7 @@ Sources were checked on 2026-10-01 and are listed under [Sources](#sources).
 | SigLIP image-text embeddings | Apache-2.0 weights | **OK** (Phase E) | Training data (WebLI) is web-scraped; same caveat class as Whisper. |
 | Local LLM: Qwen2.5 0.5B, 1.5B, 7B, 14B or 32B; Phi-3.5-mini | Apache-2.0; MIT | **OK** (Phase E) | **Qwen2.5-3B is non-commercial (the Qwen Research licence). Do not use it.** 72B has a usage cap. Avoid the custom Llama and Gemma licences. Runtime llama.cpp is MIT; ONNX Runtime is MIT. |
 | vMix TCP API (port 8099; `SUBSCRIBE TALLY` and `SUBSCRIBE ACTS`; XML state) | Documented protocol, available in all editions since v22 | **OK** | Read-only use. No vendor SDK to bundle. |
+| OBS WebSocket v5 (built into OBS 28 and later; password authentication; scene, scene-item, mute, media-playback and record-file events) | The server plugin is GPL-2.0, but StageFlow only speaks its protocol | **OK** | Talking to a GPL server over a network protocol does not make the client GPL. **Do not use `obsws-python` (GPL-3.0).** `simpleobsws` is MIT, or implement the small client over a permissive WebSocket library (for example `websockets`, BSD-3, which would be a new dependency). |
 | Blackmagic ATEM protocol | `atem-connection` is MIT (Node) | **OK through Companion** | Prefer Companion's relay to bundling a Node library. |
 | Audio consoles: Behringer/Midas X32 OSC (`/subscribe`, mute and fader), Allen & Heath dLive MIDI over TCP (51325/51327), Yamaha RCP over TCP (49280) | Public or unofficial protocols | **OK, read-only** | Unofficial protocols can change with firmware. Isolate each behind its own adapter, and treat it as optional evidence. |
 | Bitfocus Companion (an operator-run bridge with 700+ device modules) | MIT | **OK** | A separate operator tool, not bundled. StageFlow exposes one generic production-signal ingest (HTTP or OSC) that Companion buttons and feedbacks call. |
@@ -70,8 +71,8 @@ Sources were checked on 2026-10-01 and are listed under [Sources](#sources).
   categorisation. StageFlow performs neither under this design. Transcription itself is
   already part of ADR-0036.
 - **Event footage rights:** footage and transcripts belong to, or are licensed by, the event
-  client. Training on the archive needs a contractual basis. It is the owner's decision, and
-  is recorded as an open item.
+  client. The owner confirmed on 2026-10-01 that supplied archives may be used for this
+  internal purpose.
 
 ## Patents (prior art, not a freedom-to-operate opinion)
 
@@ -86,14 +87,13 @@ blocking patent was found in this pass.
 
 ## Open items for the owner
 
-1. Confirm that production contracts allow training internal detectors on client event
-   footage (Phase B).
+1. **Training rights:** confirmed by the owner on 2026-10-01 for internal use.
 2. Accept the "voice continuity, no identification" rule.
-3. Decide whether control-plane taps go through Companion only (recommended), or also through
-   direct vMix and console adapters.
+3. **Production signals:** focus on vMix and OBS (owner, 2026-10-01).
 
 ## Sources
 
+- [OBS WebSocket v5 protocol](https://github.com/obsproject/obs-websocket/blob/master/docs/generated/protocol.md); [simpleobsws (MIT)](https://pypi.org/project/simpleobsws/); [obsws-python (GPL-3.0)](https://libraries.io/pypi/obsws-python)
 - [vMix TCP API](https://www.vmix.com/help28/TCPAPI.html); vMix API in all editions since v22 ([Wikipedia: vMix](https://en.wikipedia.org/wiki/VMix))
 - [Bitfocus Companion licence (MIT)](https://github.com/bitfocus/companion/blob/main/LICENSE.md); [atem-connection (MIT)](https://www.npmjs.com/package/atem-connection)
 - [YAMNet (TF Models)](https://github.com/tensorflow/models/tree/master/research/audioset/yamnet); [TF Hub YAMNet tutorial](https://www.tensorflow.org/hub/tutorials/yamnet)

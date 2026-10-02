@@ -43,7 +43,13 @@ past policy step added hand-tuned rules for one failure mode. StageFlow needs:
   Third-party audio and speaker models are comparisons only (the licence review).
 - **D3. Train on the owner's archive.** Small, calibrated heads are trained on the owner's
   decoded productions, with labels derived from ground-truth edges. Cross-validate by day.
-  Training data stays off the repository. *Requires the owner to confirm contractual rights.*
+  Training data stays off the repository.
+  - **Rights:** the owner confirmed on 2026-10-01 that the archives and links they supply may
+    be used for this internal purpose.
+  - **Labels:** Phase A extends them automatically to a second event day. Its edited exports
+    exist (ordered talks with the standard opening graphic and music cue). Audio
+    cross-correlation locates each export in the raw blocks, as was done for the first
+    corpus. No manual labelling is needed.
 - **D4. No identity.** Voice evidence is same-session continuity only: no enrollment, no
   stored embeddings, no named speakers.
 - **D5. v5 first, v6 next.**
@@ -51,17 +57,20 @@ past policy step added hand-tuned rules for one failure mode. StageFlow needs:
     ED-0118 freezes v5.
   - v6 is developed offline in parallel, and replaces v5 only through its own gate (ADR-0038
     validation).
-- **D6. The control plane goes through one generic ingest,** fed by the operator's Companion.
-  No vendor SDKs.
+- **D6. Production signals come from the recording software.**
+  - Read-only adapters for the **vMix TCP API** and **OBS WebSocket v5**: the software that
+    writes the blocks in most live productions (owner, 2026-10-01).
+  - Hardware switchers and consoles are not a design target.
+  - No vendor SDKs. A generic endpoint for optional manual marks.
 
 ## Phases
 
 | Phase | Proposed ED | Deliverable | Kind | Exit criterion |
 | --- | --- | --- | --- | --- |
-| **A. Evidence lab** | ED-0126 | `scripts/validation/boundary_evidence_lab.py`: offline extraction on archive blocks of FFmpeg `aspectralstats`, `ebur128`, `scdet` and `blackdetect` per second; Whisper no-speech probability, non-speech tokens and pooled encoder states per window; plus a separability report per family against the ground-truth edges (ROC AUC and detection lead/lag) | Validation tooling; no product change | A sanitized result ranks the families by how well they separate ends and starts |
+| **A. Evidence lab** | ED-0126 | Automatic ground truth for the second event day (export-to-block cross-correlation, local only); `scripts/validation/boundary_evidence_lab.py`: offline extraction on archive blocks of FFmpeg `aspectralstats`, `ebur128`, `scdet` and `blackdetect` per second; Whisper no-speech probability, non-speech tokens and pooled encoder states per window; plus a separability report per family against the ground-truth edges (ROC AUC and detection lead/lag) | Validation tooling; no product change | A sanitized result ranks the families by how well they separate ends and starts |
 | **B. End evidence and v5 end revision** | ED-0127 | Small applause, music and speech heads, plus a voice-continuity score (owner-archive trained, calibrated); a v5 end-edge revision (pure policy) using the evidence that passed A; an offline D5-style evaluation on 3 days and Run 002 | Pure policy plus harness | v5-revised meets D5 (no talk worse at +5 min) and improves end medians on all days; then **ED-0118 freezes it** (migration 0028) |
 | **C. v6 offline** | ED-0128 | A pure domain module: event grammar, explicit-duration priors with the lateness chain, LLR calibration, lattice semi-Markov decoding with marginals, settled flags, anchors; harness `--policy-version 6` | Pure policy plus harness | ADR-0038 gate met offline on all days and on Run 002's timeline, including calibration ≤ 0.10 |
-| **D. Production-signal ingest** | ED-0129 | An authenticated local endpoint for typed production signals, with per-Event meaning mapping, persistence as advisory evidence, and Companion recipe docs; optionally a direct vMix TCP adapter | API plus migration; needs ADR-0038 decision 3 | A rehearsal with Companion: signals land as evidence, and v6 uses them offline |
+| **D. Recording-software signals** | ED-0129 | Read-only vMix TCP (TALLY, ACTS, XML) and OBS WebSocket v5 (scene, scene-item, mute, media-playback, record-file events) adapters; per-Event signal-meaning mapping; persistence as advisory evidence; a generic endpoint for manual marks | Adapters plus migration; needs ADR-0038 decision 3 | A rehearsal with vMix and with OBS: signals land as evidence with correct times, and v6 uses them offline |
 | **E. v6 in product** | ED-0130 | Persist new evidence (from A and B) and v6 runs, with confidence and settled flags; producer UI shows exceptions only; Live Replay Run 003 | Migration, service, UI | Run 003 at 1× meets the ADR-0038 gate; owner UX checkpoint; default switch |
 | **F. Optional, measured** | later | OCR of title cards and lower thirds, matched to the schedule; picture embeddings; a local Apache-2.0 or MIT LLM labelling transcript windows | Each measured in the Phase A lab first | Only if the lab shows a gain |
 
@@ -113,8 +122,8 @@ past policy step added hand-tuned rules for one failure mode. StageFlow needs:
 | A small labelled corpus (29 main-stage talks plus the Day 2 legacy material) risks overfitting | Day-level cross-validation; few parameters (logistic heads, low-parameter priors); hold out Run 002's morning for v6 |
 | Applause-like noise (audience chatter, room tone) causes false ends | Calibrated LLRs combined with the grammar: an "end" also needs a changeover or voice change soon after |
 | Whisper non-speech tokens hallucinate | Weight them weakly through calibration; never used alone |
-| Unofficial console protocols change with firmware | Companion-first; each adapter optional and isolated |
-| Contractual rights to train on client footage | An owner confirmation before Phase B training |
+| vMix or OBS API changes between versions | Pin the tested versions per appliance profile; adapters optional and isolated; signals are evidence only |
+| Contractual rights to train on client footage | Confirmed by the owner on 2026-10-01 for internal use |
 | LGPL-3.0 FFmpeg installation-information duty | Applies only to consumer "User Products"; recorded in the review; revisit if the appliance is sold or leased |
 | Confidence miscalibration erodes producer trust | Calibration is part of the gate; the UI shows confidence only after calibration passes |
 | Latency growth | Features computed in passes that already run; lattice decoding takes milliseconds; measured in Run 003 |
@@ -136,8 +145,9 @@ past policy step added hand-tuned rules for one failure mode. StageFlow needs:
 
 ## Open questions for the owner
 
-1. Do production contracts allow training internal detectors on client event footage (D3)?
-2. Is the Companion-first control plane right for the rigs you typically run? Which switchers
-   and consoles are most common?
-3. Should the Day 2 legacy recordings get ground-truth labels (an hour or two of marking) to
-   enlarge the training set before Phase B?
+- None blocking. Answered on 2026-10-01:
+  - training rights are confirmed for internal use;
+  - production signals focus on vMix and OBS;
+  - the second day is labelled automatically from its exports (Phase A).
+- **A later, separate decision:** whether a recorder-reported file closure (OBS or vMix) may
+  count as a strong readiness finalization method (ED-0049).
