@@ -50,6 +50,39 @@ class WhisperEngine:
         self.features, self.storage = features, storage
         self.alignment = Alignment(model)
 
+    def inspect_window(self, audio: FloatArray) -> dict[str, Any]:
+        """Read-only lab accessor for one <=10 s window; never called by the adapter.
+
+        Returns private word timings, per-segment diagnostics and a pooled encoder
+        vector. The caller must retain words/vectors in memory only. Inference uses
+        the existing suppression/fallback and alignment; production outputs are unchanged.
+        """
+        if not 0 < len(audio) <= 160000:
+            raise ValueError("invalid_window")
+        features = self.features(audio)
+        size = min(features.shape[-1] - 1, 1000)
+        window = pad_or_trim(features[:, :size])
+        encoded = self.model.encode(self.storage(np.ascontiguousarray(window[None])),
+                                    to_cpu=True)
+        # Only real audio frames contribute; exclude the 30 s padding.
+        pooled = np.asarray(encoded)[0, :max(1, (size + 1) // 2)].mean(axis=0).copy()
+        result, avg, _ = self.fallback(encoded, list(self.tokenizer.sot_sequence))
+        segments, _, _ = self.split(result.sequences_ids[0], 0, size, 0)
+        self.alignment.add_word_timestamps(
+            [segments], self.tokenizer, encoded, size,
+            "\"'“¿([{-", "\"'.。,，!！?？:：”)]}、", 0.0)
+        diagnostics: list[dict[str, Any]] = []
+        for segment in segments:
+            tokens = segment["tokens"]
+            diagnostics.append({
+                "start": segment["start"], "end": segment["end"],
+                "no_speech_probability": float(result.no_speech_prob),
+                "average_log_probability": avg,
+                "compression_ratio": compression_ratio(self.tokenizer.decode(tokens).strip()),
+                "words": [Word(**word) for word in segment.get("words", [])],
+            })
+        return {"segments": diagnostics, "embedding": pooled}
+
     def fallback(self, encoded: Any, prompt: list[int]) -> tuple[Any, float, float]:
         tokenizer = self.tokenizer
         suppressed = sorted(set((*tokenizer.non_speech_tokens, tokenizer.transcribe,
