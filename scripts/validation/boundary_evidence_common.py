@@ -129,6 +129,10 @@ def decode(binary: Path, path: Path, rate: int = 8000) -> Any:
     return array
 
 
+# Mean-square floor for correlation windows: -60 dBFS for float audio in [-1, 1].
+SILENCE_MEAN_SQUARE = 1e-6
+
+
 def correlate(signal: Any, reference: Any) -> Any:
     """Bounded FFTs; float32 audio/output with float64 local energy accumulation."""
     np = np_module()
@@ -155,8 +159,11 @@ def _correlate_chunk(x: Any, y: Any) -> Any:
     local = squares[len(y):] - squares[:-len(y)]
     local -= (sums[len(y):] - sums[:-len(y)]) ** 2 / len(y)
     denominator = np.sqrt(np.maximum(local, 0) * energy)
+    # Score only audible windows: digital silence and dither-level room tone make the
+    # normalized ratio numerically meaningless (cancellation yields spurious 1.0 peaks).
+    audible = local > SILENCE_MEAN_SQUARE * len(y)
     return np.clip(np.divide(numerator, denominator, out=np.zeros_like(numerator),
-                             where=denominator > 1e-12), -1, 1)
+                             where=audible & (denominator > 1e-12)), -1, 1)
 
 
 def decode_chunks(binary: Path, path: Path, overlap: int,
