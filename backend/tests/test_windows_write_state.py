@@ -223,8 +223,10 @@ def test_ctypes_open_uses_read_only_share_mode_and_pointer_sized_handle(
 
 @pytest.mark.parametrize("support", [True, False])
 def test_runtime_write_capability_matches_policy_and_collection_plan(
-    monkeypatch: pytest.MonkeyPatch, support: bool,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, support: bool,
 ) -> None:
+    # An absolute path on every platform; CI runs this test on Linux.
+    source_path = tmp_path.as_posix()
     monkeypatch.setattr(runtime_factory, "write_state_supported", lambda: support)
     monkeypatch.setattr(media_cycle, "write_state_supported", lambda: support)
     effective = EffectiveKernelConfiguration(
@@ -233,7 +235,7 @@ def test_runtime_write_capability_matches_policy_and_collection_plan(
             "node_role": "node", "postgres_dsn_secret_ref": "SYNTHETIC_DSN",
             "event": {"key": "event", "name": "Event", "stages": [
                 {"key": "main", "name": "Main", "sources": [
-                    {"key": "source", "path": "C:/synthetic"},
+                    {"key": "source", "path": source_path},
                 ]},
             ]},
         }),
@@ -241,7 +243,7 @@ def test_runtime_write_capability_matches_policy_and_collection_plan(
     )
     stage = Stage(
         id=EntityId.new(), event_id=EntityId.new(), key="main", name="Main",
-        source_bindings={"source": "C:/synthetic"}, external_references={}, revision=1,
+        source_bindings={"source": source_path}, external_references={}, revision=1,
         created_at=NOW, updated_at=NOW,
     )
     runtime = runtime_factory.build_stageflow_runtime(
