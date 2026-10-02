@@ -616,22 +616,30 @@ def test_ground_truth_cli_isolates_a_failing_export(
     signal = np.random.default_rng(5).normal(size=20 * 8000)
     block, bad, good, out = (tmp_path / "b", tmp_path / "x0", tmp_path / "x1",
                              tmp_path / "out.json")
-    monkeypatch.setattr(truth, "external", lambda raw, **_k: Path(raw))
-    monkeypatch.setattr(truth, "config", lambda _r: {
-        "local_transcription": {"ffmpeg_path": "fake"},
-        "local_media_timing": {"ffprobe_path": "fake"}})
-    monkeypatch.setattr(truth, "ffmpeg_tool", lambda _r: tmp_path / "fake.exe")
-    monkeypatch.setattr(truth, "media",
-                        lambda folder: [block] if folder == "blocks" else [bad, good])
-    monkeypatch.setattr(truth, "probe", lambda *_a: {
-        "format": {"duration": 20, "tags": {"creation_time": "2026-01-01T00:00:00Z"}}})
+    def external(raw: str, **_kwargs: Any) -> Path:
+        return Path(raw)
+
+    def config(_raw: Any) -> Any:
+        return {"local_transcription": {"ffmpeg_path": "fake"},
+                "local_media_timing": {"ffprobe_path": "fake"}}
+
+    def tool(_raw: Any) -> Any:
+        return tmp_path / "fake.exe"
+
+    def media(folder: str) -> Any:
+        return [block] if folder == "blocks" else [bad, good]
+
+    def probe(*_args: Any) -> Any:
+        return {"format": {"duration": 20, "tags": {"creation_time": "2026-01-01T00:00:00Z"}}}
 
     def decode(_binary: Any, path: Path) -> Any:
         if path == bad:
             raise truth.Refusal()
         return signal if path == block else signal[8000:11 * 8000]
 
-    monkeypatch.setattr(truth, "decode", decode)
+    for name, value in (("external", external), ("config", config), ("ffmpeg_tool", tool),
+                        ("media", media), ("probe", probe), ("decode", decode)):
+        monkeypatch.setattr(truth, name, value)
     monkeypatch.setenv("STAGEFLOW_KERNEL_CONFIG_PATH", str(tmp_path / "operator.toml"))
     assert truth.main(["--blocks", "blocks", "--exports", "exports", "--out", str(out)],
                       output=io.StringIO()) == 0
