@@ -5,7 +5,8 @@
 **Approved** (owner, 2026-09-30), with D1–D5 as recommended. ED-0119, ED-0120 and ED-0121 are allocated.
 
 ED-0119, ED-0120 and ED-0121 are completed (see the [completion record](#completion-record-ed-0119-and-ed-0120)
-and the [ED-0121 record](#completion-record-ed-0121)). Live Replay Run 002 and the D5 evaluation remain.
+and the [ED-0121 record](#completion-record-ed-0121)). Live Replay Run 002 and the D5 evaluation are recorded (see the
+[Run 002 and D5 record](#live-replay-run-002-and-d5-record)). ED-0118 is held for a v5 end-edge revision.
 
 It follows:
 - the owner's live-testing direction of 2026-09-30: simulate the live setting, where
@@ -202,7 +203,7 @@ The current tests leave four gaps against the live setting:
   behavior is unchanged.
 - [x] ED-0121 merged, with the growing-file mode, time-of-use accuracy, per-stage
   timings and the availability timeline.
-- [ ] Live Replay Run 002 recorded (D4), with the D5 evaluation and the ED-0118 go or
+- [x] Live Replay Run 002 recorded (D4), with the D5 evaluation and the ED-0118 go or
   no-go.
 
 ## Rollback
@@ -310,3 +311,21 @@ only the first two directives.
     sub-second read latency from Run 001's measurement point.
   - **Serial driving:** the replay drives the stages one after another, so the stage
     timings are a lower bound on contention, not a measure of it.
+
+## Live Replay Run 002 and D5 record
+
+- **Result:** [Live Replay Run 002](../validation/results/session-suggestions-replay-002.md),
+  completed on attempt c, 2026-10-01.
+  - The live chain worked at 1×.
+  - Transcripts were available about 123 s (p95 150 s) after each block closed, so transcription
+    is not the bottleneck.
+- **D5:** not met as written. Offline v5 (Option B) gets recall 1.00 against live v3's 0.40, and
+  much better starts at +5 min. But its end edges are worse on 3 of 5 talks, and one start
+  regressed between +5 and +15.
+- **Owner decision (2026-10-01):** hold ED-0118. A small pure-policy revision of v5's end-edge
+  selection comes first. It is evaluated offline on all three corpus days, and on this run's
+  evidence availability timeline. Then ED-0118 freezes the revised constants.
+- **Found along the way:** attempts a and b were stopped by host Modern Standby. They exposed
+  in-place mid-write registration, which the
+  [media readiness hardening plan](media-readiness-hardening.md) addresses (ED-0124 approved,
+  ED-0125 proposed).
