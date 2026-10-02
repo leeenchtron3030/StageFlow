@@ -641,6 +641,8 @@ def build_transcription_job(
     model_path = Path(model)
     if not model_path.is_absolute() or not model_path.is_dir():
         raise BenchmarkError("transcription_model_must_be_absolute_local_directory")
+    if not (model_path / "tokenizer.json").is_file():
+        raise BenchmarkError("faster_whisper_model_unavailable")
     if (
         not cuda_library_directory.is_absolute()
         or not cuda_library_directory.is_dir()
@@ -661,6 +663,7 @@ def build_transcription_job(
             str(model_path.resolve(strict=True)),
             device=device,
             compute_type=compute_type,
+            local_files_only=True,
         )
     except (RuntimeError, OSError, ValueError) as exc:
         raise BenchmarkError("faster_whisper_model_initialization_failed") from exc

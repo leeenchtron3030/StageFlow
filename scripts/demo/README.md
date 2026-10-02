@@ -1,28 +1,30 @@
 # Guarded Demo rehearsal controller
 
-## Optional StageFlow transcription engine (ED-0122)
+## GPL-free default transcription (ED-0123)
 
-The worker and CLI select the adapter using `[local_transcription].provider`.
-The default remains `faster-whisper`. To exercise the additive engine, provision
-`transcription-core` offline and set `provider = "stageflow-ctranslate2-whisper"`,
-an absolute `ffmpeg_path`, and a model directory containing `tokenizer.json`.
-Provision an LGPL `ffprobe` alongside FFmpeg; neither executable is searched on PATH.
-See the [complete configuration example](../../backend/README.md#additive-ctranslate2-transcription-provider-ed-0122).
+Transcription is GPL-free and part of the default install. The worker and CLI use
+`stageflow-ctranslate2-whisper`, CUDA/float16, and profile
+`ct2-whisper-large-v3-turbo-cuda-float16` version `1.0` by default. Provision the model
+with `tokenizer.json`, CUDA runtime, and LGPL FFmpeg with a sibling LGPL ffprobe offline.
+If `[local_transcription].ffmpeg_path` is absent, it falls back to
+`[local_media_segmentation].ffmpeg_path`; without either path, configuration refuses
+with `local_transcription_ffmpeg_path_required`. Neither binary is searched on PATH.
+See the [complete configuration and preflight codes](../../backend/README.md#gpl-free-default-transcription-ed-0123).
 
-Use CUDA/float16 with profile `ct2-whisper-large-v3-turbo-cuda-float16`, or explicitly
-select CPU/int8 with `ct2-whisper-large-v3-turbo-cpu-int8`. Keep a distinct profile id
-for each engine/device/compute choice. Other pairs are refused; there is no automatic
-CPU fallback. Demo preflight still checks the appliance GPU requirement. The standalone
-transcription worker supports the explicit CPU profile.
-The StageFlow provider requires an explicit, distinct `execution_profile_id`: it
-refuses the default `faster-whisper-large-v3-turbo-cuda-float16` and every id starting
-with `faster-whisper`.
+CPU/int8 remains an explicit choice with a distinct profile such as
+`ct2-whisper-large-v3-turbo-cpu-int8`; other pairs are refused and there is no automatic
+CPU fallback. Demo preflight retains the appliance GPU check. The standalone worker
+supports the CPU profile. Preflight checks the model/tokenizer, FFmpeg and CTranslate2
+inference import before synthetic inference.
 
-**D6:** change profiles between Events. An existing Event keeps its profile for life.
-A deliberate mid-Event change re-transcribes all registered Event assets under ED-0120;
-earlier transcript evidence remains immutable. Keep the old profile available for older
-Events. The owner must complete the D5 parity run before the ED-0123 default switch.
-The old dependency group and ED-0075 distribution exclusion are unchanged.
+**D6:** change profiles between Events and keep each existing Event's profile for life.
+A deliberate profile change on an existing Event re-transcribes all registered assets;
+earlier transcripts stay readable and immutable with their own provider identity.
+Legacy `provider = "faster-whisper"` is refused with migration guidance, never remapped;
+`faster-whisper*` profile ids are refused too. Finish pending legacy work before upgrading
+with the previous installation, or deliberately switch profiles and re-transcribe.
+The owner D5 parity run passed before this default switch. Both old dependency groups
+are removed; launchers now use the default install.
 
 ## Rehearsal controller
 
@@ -148,8 +150,8 @@ associated assets. Association and re-association do not duplicate transcription
 Old Session-keyed operations are reused by their asset, manifest and execution profile
 inputs. Retryable failures stay on the existing operation (three attempts, 30-second
 delay); terminal failures are not automatically replaced. Enqueue failures that stored
-no operation are retried by later cycles. Configuration defaults and the optional,
-operator-installed transcription dependency boundary are unchanged.
+no operation are retried by later cycles. Transcription uses the GPL-free default
+install described above.
 
 Media registered before a safely eligible Session remains unresolved until the material
 Session input set changes. Demo 2 then reevaluates only the existing deterministic

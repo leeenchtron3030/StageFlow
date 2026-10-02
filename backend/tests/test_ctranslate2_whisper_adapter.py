@@ -2,6 +2,7 @@ import os
 import subprocess
 import sys
 from collections.abc import Callable, Iterable
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -19,7 +20,16 @@ from app.infrastructure.transcription.ctranslate2_whisper.adapter import Engine
 from app.infrastructure.transcription.ctranslate2_whisper.types import Segment, Word
 from app.shared.ids import EntityId
 from app.shared.time import FixedClock
-from tests.test_faster_whisper_execution_adapter import NOW, StaticResolver
+
+NOW = datetime(2026, 8, 18, 12, 0, tzinfo=UTC)
+
+
+class StaticResolver:
+    def __init__(self, path: Path) -> None:
+        self.path = path
+
+    def resolve(self, input: TranscriptionOperationInput) -> Path:
+        return self.path
 
 
 def request() -> TranscriptionExecutionRequest:
@@ -175,25 +185,46 @@ def test_explicit_ffmpeg_configuration_required(tmp_path: Path, path: str | None
         configuration(tmp_path, ffmpeg_path=path)
 
 
-def test_defaults_unchanged_and_both_new_profiles_validate(tmp_path: Path) -> None:
-    old = LocalTranscriptionConfiguration(model_path=str(tmp_path), model_version="synthetic")
-    assert (old.provider, old.device, old.compute_type, old.ffmpeg_path) == (
-        "faster-whisper", "cuda", "float16", None)
-    assert old.execution_profile_id == "faster-whisper-large-v3-turbo-cuda-float16"
+def test_default_profile_and_both_qualified_pairs_validate() -> None:
+    default = LocalTranscriptionConfiguration(model_path=str(Path.cwd()), model_version="synthetic",
+                                             ffmpeg_path=str(Path.cwd() / "ffmpeg"))
+    assert (default.provider, default.device, default.compute_type) == (
+        "stageflow-ctranslate2-whisper", "cuda", "float16")
+    assert default.execution_profile_id == "ct2-whisper-large-v3-turbo-cuda-float16"
+    assert default.execution_profile_version == "1.0"
     for device, compute in (("cpu", "int8"), ("cuda", "float16")):
-        assert configuration(tmp_path, device=device, compute_type=compute).device == device
+        assert configuration(Path.cwd(), device=device, compute_type=compute).device == device
 
 
-@pytest.mark.parametrize("profile", [None, "faster-whisper-large-v3-turbo-cuda-float16",
+@pytest.mark.parametrize("profile", ["faster-whisper-large-v3-turbo-cuda-float16",
                                     "faster-whisper", "faster-whisper-custom"])
-def test_stageflow_refuses_legacy_profile_identity(profile: str | None) -> None:
-    values = configuration(Path.cwd()).model_dump()
-    if profile is None:
-        values.pop("execution_profile_id")
-    else:
-        values["execution_profile_id"] = profile
+def test_stageflow_refuses_legacy_profile_identity(profile: str) -> None:
     with pytest.raises(ValueError, match="distinct execution profile id"):
-        LocalTranscriptionConfiguration.model_validate(values)
+        configuration(Path.cwd(), execution_profile_id=profile)
+
+
+def test_unknown_provider_is_refused() -> None:
+    with pytest.raises(ValueError, match="local_transcription_provider_unsupported"):
+        configuration(Path.cwd(), provider="some-other-engine")
+
+
+def test_legacy_provider_is_refused_with_actionable_migration_message() -> None:
+    with pytest.raises(ValueError) as caught:
+        configuration(Path.cwd(), provider="faster-whisper")
+    message = str(caught.value)
+    assert "local_transcription_legacy_provider_refused" in message
+    assert "stageflow-ctranslate2-whisper" in message
+    assert "profile ids must be distinct" in message and "D6" in message
+    assert "re-transcribes" in message
+
+
+def test_cpu_must_not_inherit_cuda_default_profile_identity() -> None:
+    with pytest.raises(
+        ValueError, match="CPU transcription requires a distinct execution profile id",
+    ):
+        LocalTranscriptionConfiguration(
+            model_path=str(Path.cwd()), model_version="synthetic",
+            ffmpeg_path=str(Path.cwd() / "ffmpeg"), device="cpu", compute_type="int8")
 
 
 @pytest.mark.parametrize("device,compute", [("cuda", "float16"), ("cpu", "int8")])
@@ -206,7 +237,7 @@ def test_stageflow_accepts_distinct_operator_profile(device: str, compute: str) 
 def test_clean_process_exercises_adapter_and_native_loader_without_forbidden_imports(
     tmp_path: Path,
 ) -> None:
-    # The real engine modules need the optional transcription-core runtime.
+    # Exercise the default inference runtime in a clean interpreter.
     pytest.importorskip("numpy")
     pytest.importorskip("tokenizers")
     script = '''

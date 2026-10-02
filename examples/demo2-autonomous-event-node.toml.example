@@ -15,13 +15,15 @@ schedule_source_reference = "C:/StageFlowDemo/local-schedule.json"
 path = "C:/StageFlowDemo/local-schedule.json"
 
 [local_transcription]
-provider = "faster-whisper"
+# Explicit LGPL binary; otherwise falls back to local_media_segmentation.ffmpeg_path.
+ffmpeg_path = "C:/StageFlowDemo/runtime/ffmpeg/bin/ffmpeg.exe"
+provider = "stageflow-ctranslate2-whisper"
 model_id = "large-v3-turbo"
 model_version = "0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf"
 model_path = "C:/StageFlowDemo/models/faster-whisper-large-v3-turbo"
 device = "cuda"
 compute_type = "float16"
-execution_profile_id = "faster-whisper-large-v3-turbo-cuda-float16"
+execution_profile_id = "ct2-whisper-large-v3-turbo-cuda-float16"
 execution_profile_version = "1.0"
 
 [autonomous_event_node]

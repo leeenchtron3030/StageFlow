@@ -404,7 +404,7 @@ try {
                 Push-Location $script:BackendRoot
                 try {
                     $uv = Resolve-UvCommand
-                    & $uv run --group transcription python -m app.demo.cli preflight
+                    & $uv run python -m app.demo.cli preflight
                     if ($LASTEXITCODE -ne 0) { throw "demo_diagnose_preflight_failed" }
                 }
                 finally { Pop-Location }

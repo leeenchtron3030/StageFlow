@@ -24,7 +24,7 @@ That foundation is not an event-readiness claim.
 | AI/media Event Worker | A separate transcription worker process claims PostgreSQL-backed work and commits transcript evidence.[^work] | Additional analysis, vision, proxy, or rendering consumers |
 | Recording/shared-storage system | Bounded media inspection runs on startup, explicit request, or the enabled coordinator's cadence.[^coordinator] | Remains source of media; StageFlow registers completed assets by reference |
 | Schedule/conference system | Provider-neutral program source reconciles a complete Stage snapshot from an offline local schedule file or optional Devcon public-program read into External Program Expectations | Remains source of planned conference data and external identifiers |
-| Transcript/vision providers | First local transcription adapter composed by the worker; transcription remains optional and operator-installed.[^work] | Additional providers behind adapters |
+| Transcript/vision providers | The StageFlow-owned CTranslate2 transcription engine is composed by the worker and is part of the default, GPL-free install (ADR-0036, ED-0122/ED-0123).[^work] | Additional providers behind adapters |
 | Publishing/delivery destinations | External publication frozen under ADR-0031; no operator action | Future provider-neutral durable operations with idempotency and reconciliation |
 
 An application caller can create a durable human-authorized Session, register media
@@ -188,8 +188,8 @@ bounded cycles under a PostgreSQL advisory lock.[^work][^coordinator]
   `backend/pyproject.toml:10`); Redis, a broker, containers, and cloud/provider services
   remain absent from the local event-critical runtime. The optional program-read adapter
   remains outside that path. A separate durable transcription worker and local model
-  execution now exist; transcription dependencies are optional, operator-installed, and
-  excluded from distributable artifacts under ED-0075.[^work] Shared-secret API
+  execution now exist. The transcription engine is GPL-free and its dependencies are default
+  dependencies (ADR-0036, ED-0123), superseding ED-0075's exclusion.[^work] Shared-secret API
   authentication is implemented (`backend/app/api/authentication.py:16`,
   `backend/app/api/v1/router.py:14`).
 
@@ -227,7 +227,8 @@ automatic machine editorial publication.
     `backend/app/contexts/work_execution/service.py:42` and
     `backend/app/contexts/work_execution/service.py:101`; durable worker/Operation/Attempt
     schema: `backend/app/infrastructure/postgres/sql/0007_transcription_worker_forward.sql:1`.
-    Optional operator-installed distribution boundary: `backend/pyproject.toml:14`.
+    GPL-free default dependencies: `backend/pyproject.toml:7`; guard:
+    `backend/tests/test_transcription_gpl_free_boundary.py`.
 
 [^editorial]: Review application boundary: `backend/app/contexts/editorial/service.py:69`;
     review/Clip schema:

@@ -176,6 +176,7 @@ schedule_source_reference = "{(tmp_path / "schedule.json").as_posix()}"
 path = "{(tmp_path / "schedule.json").as_posix()}"
 
 [local_transcription]
+ffmpeg_path = "C:/StageFlowDemo/runtime/ffmpeg/bin/ffmpeg.exe"
 model_version = "0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf"
 model_path = "C:/StageFlowDemo/models/faster-whisper-large-v3-turbo"
 

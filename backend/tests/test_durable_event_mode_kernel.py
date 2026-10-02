@@ -224,6 +224,7 @@ schedule_source_reference = "C:/StageFlowDemo/local-schedule.json"
 [local_schedule]
 path = "C:/StageFlowDemo/local-schedule.json"
 [local_transcription]
+ffmpeg_path = "C:/StageFlowDemo/runtime/ffmpeg/bin/ffmpeg.exe"
 model_version = "0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf"
 model_path = "C:/StageFlowDemo/models/faster-whisper-large-v3-turbo"
 [event]
@@ -251,7 +252,7 @@ path = "C:/StageFlowDemo/recordings"
     assert effective.deployment.local_schedule.path == "C:/StageFlowDemo/local-schedule.json"
     assert effective.deployment.devcon_read is None
     assert effective.deployment.local_transcription is not None
-    assert effective.deployment.local_transcription.provider == "faster-whisper"
+    assert effective.deployment.local_transcription.provider == "stageflow-ctranslate2-whisper"
     assert effective.deployment.local_transcription.device == "cuda"
     assert effective.deployment.local_transcription.compute_type == "float16"
     assert effective.redacted_summary()["runtime_profile"] == "demo-single-stage"

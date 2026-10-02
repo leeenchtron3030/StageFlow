@@ -170,11 +170,11 @@ $env:PATH = $resolvedCudaRuntimePath + [System.IO.Path]::PathSeparator + $origin
 try {
     Push-Location $backendRoot
     try {
-        & $uv run --group transcription python -m app.demo.cli preflight
+        & $uv run python -m app.demo.cli preflight
         if ($LASTEXITCODE -ne 0) { throw "Demo preflight failed." }
-        & $uv run --group transcription python -m app.demo.cli bootstrap
+        & $uv run python -m app.demo.cli bootstrap
         if ($LASTEXITCODE -ne 0) { throw "Demo bootstrap failed." }
-        & $uv run --group transcription python -m app.demo.cli sync-program
+        & $uv run python -m app.demo.cli sync-program
         if ($LASTEXITCODE -ne 0) { throw "Program synchronization failed." }
     }
     finally {

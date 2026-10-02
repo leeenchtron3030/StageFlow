@@ -11,20 +11,17 @@ contracts/repository implement the provider-neutral evidence and operation subst
 When local transcription is configured, Demo media reconciliation enqueues transcription
 for registered Completed Media Assets across the Event, including unassociated assets.
 The bounded, default-off Demo 2 coordinator invokes this reconciliation automatically
-(`backend/app/demo/autonomous.py`); configuration defaults are unchanged.
-The first local provider was subsequently accepted on 2026-08-18: faster-whisper 1.2.1,
-CTranslate2 4.8.1, and the pinned large-v3-turbo model; broader production selection
-remains conditional (`docs/validation/transcription-engine-evaluation.md:133`). The worker
-composes that adapter behind the provider-neutral Work Execution port
-(`backend/app/demo/worker.py:72`, `backend/app/contexts/work_execution/service.py:42`,
-`backend/app/contexts/transcription_evidence/application.py:40`). Local transcription
-remains optional and operator-installed; ED-0075 excludes the `transcription` group from
-distributable artifacts without granting legal clearance (`backend/pyproject.toml:14`).
+(`backend/app/demo/autonomous.py`); coordinator activation defaults are unchanged.
+ED-0123, following the owner-approved D5 parity result, makes transcription GPL-free
+and part of the default install under ADR-0036. The worker composes
+`CTranslate2WhisperExecutionAdapter` behind the unchanged provider-neutral Work Execution
+port. Existing transcripts remain readable with their recorded provider identity;
+removing the legacy engine changes no transcript contract, schema or migration.
 
 `Transcript Evidence Revision` is the accepted internal asset/manifest-scoped evidence
 term. Session Transcript composition and broader transcript APIs remain unresolved.
 
-## Additive local engine (ED-0122)
+## Default local engine (ED-0122 / ED-0123)
 
 `CTranslate2WhisperExecutionAdapter`, in
 `backend/app/infrastructure/transcription/ctranslate2_whisper/`, provides the
@@ -38,11 +35,20 @@ automatic language detection, and explicit non-English requests are refused.
 VAD, batching, translation and model downloads are absent. Infrastructure owns all
 NumPy and CTranslate2 use; domain contracts and persistence are unchanged.
 
-The optional `transcription-core` group does not change installation defaults or
-ED-0075. CTranslate2's version-pinned native extension is loaded directly because
+CTranslate2 4.8.1, tokenizers 0.23.1 and NumPy 2.5.2 are default dependencies;
+the `transcription` and `transcription-core` groups and legacy adapter are removed.
+CTranslate2's version-pinned native extension is loaded directly because
 its public package initializer imports conversion helpers that attempt to import
 `huggingface_hub`. The new inference path loads none of PyAV, faster-whisper,
 huggingface_hub, onnxruntime or tqdm. Synthetic tests exercise this in a clean process.
+
+Absent `[local_transcription].ffmpeg_path` inherits
+`[local_media_segmentation].ffmpeg_path`; without either path configuration refuses with
+`local_transcription_ffmpeg_path_required`. Invalid explicit paths are never replaced.
+Preflight checks the model directory and `tokenizer.json`, FFmpeg file and CTranslate2
+inference import with closed `local_transcription_model_unavailable`,
+`local_transcription_ffmpeg_unavailable`, and `local_transcription_runtime_unavailable`
+codes, then exercises synthetic inference.
 
 The decoder uses explicit-path operator LGPL FFmpeg and sibling ffprobe, checks
 their versions/build flags and hashes, probes the first audio stream, and averages
@@ -60,19 +66,20 @@ These disclosures do not enter persisted transcript evidence or its `limitations
 A first-class decode provenance field in transcript evidence is deferred to a later
 contract plan; ED-0122 does not change that contract.
 
-Supported execution pairs are CUDA/float16 and CPU/int8, selected explicitly and
-validated at configuration and adapter construction. Suggested distinct profiles are
-`ct2-whisper-large-v3-turbo-cuda-float16` and `ct2-whisper-large-v3-turbo-cpu-int8`.
-The StageFlow provider refuses every profile id starting with `faster-whisper`,
-including the configuration default; operators must name a distinct profile.
-Worker capabilities report the configured profile and provider. The default provider
-and existing configuration defaults remain faster-whisper CUDA/float16.
+Supported execution pairs are CUDA/float16 (default) and CPU/int8 (explicit).
+The default provider is `stageflow-ctranslate2-whisper` and the default profile is
+`ct2-whisper-large-v3-turbo-cuda-float16` version `1.0`. CPU uses a distinct profile
+such as `ct2-whisper-large-v3-turbo-cpu-int8`. Worker capabilities report the configured
+profile and provider. Legacy `provider = "faster-whisper"` is refused with actionable
+migration guidance, never silently remapped. Every `faster-whisper*` profile id is refused.
 
-Under D6, switch profiles between Events and keep each existing Event's profile for
-its lifetime. A deliberate mid-Event switch creates new ED-0120 work for every
-registered asset; earlier evidence stays immutable. The owner-run D5 parity gate and
-ED-0123 default switch remain separate from this additive implementation. The
-synthetic tests establish implementation behavior, not event readiness.
+Under D6, use distinct profile identities for different engines/devices/compute types,
+switch between Events and keep each existing Event's profile for its lifetime.
+A deliberate profile change on an existing Event re-transcribes every registered asset
+through ED-0120; earlier evidence remains readable and immutable with its own provider
+identity. Pending legacy-profile work requires the prior installation or a deliberate
+profile switch. The [owner D5 parity gate passed](../validation/results/transcription-engine-parity-001.md)
+before ED-0123. Synthetic tests establish implementation behavior, not event readiness.
 
 ## Trigger scope and replay
 

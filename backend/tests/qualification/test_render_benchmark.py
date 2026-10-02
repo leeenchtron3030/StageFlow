@@ -358,6 +358,7 @@ def test_transcription_requires_explicit_local_model_and_cuda_directories(
 def test_transcription_requires_available_cuda_directory(tmp_path: Path) -> None:
     model = tmp_path / "model"
     model.mkdir()
+    (model / "tokenizer.json").write_text("{}", encoding="utf-8")
     with pytest.raises(BenchmarkError, match="cuda_library_directory_unavailable"):
         benchmark.build_transcription_job(
             (), model=str(model.resolve()), cuda_library_directory=tmp_path / "missing-cuda",

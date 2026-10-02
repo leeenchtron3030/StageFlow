@@ -61,7 +61,17 @@ def test_demo_example_keeps_accepted_profile_and_cuda_contract() -> None:
     example = EXAMPLE.read_text(encoding="utf-8")
 
     assert 'runtime_profile = "demo-single-stage"' in example
-    assert 'provider = "faster-whisper"' in example
+    assert 'provider = "stageflow-ctranslate2-whisper"' in example
     assert 'model_id = "large-v3-turbo"' in example
     assert 'device = "cuda"' in example
     assert 'compute_type = "float16"' in example
+
+    assert 'execution_profile_id = "ct2-whisper-large-v3-turbo-cuda-float16"' in example
+    assert 'ffmpeg_path = ' in example
+
+
+def test_demo_launchers_use_default_dependencies() -> None:
+    for name in ("Start-StageFlowDemo.ps1", "StageFlow-Demo.ps1"):
+        source = (ROOT / "scripts" / "demo" / name).read_text(encoding="utf-8")
+        assert "--group transcription" not in source
+        assert "run python -m app.demo.cli preflight" in source

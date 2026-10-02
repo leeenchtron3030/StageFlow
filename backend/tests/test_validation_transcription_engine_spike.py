@@ -453,8 +453,6 @@ def test_faster_whisper_settings_lazy_iteration_and_separate_decode_timing(
 def test_local_model_factory_reused_offline_and_loading_excluded(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from app.infrastructure.transcription import faster_whisper
-
     clock = [0.0]
     factory_calls: list[Any] = []
 
@@ -467,10 +465,10 @@ def test_local_model_factory_reused_offline_and_loading_excluded(
         clock[0] += 100
         return SimpleNamespace(transcribe=transcribe)
 
-    monkeypatch.setattr(faster_whisper, "_default_model_factory", constant(factory))
     monkeypatch.setattr(spike, "local_path", constant(Path("tokenizer.json")))
     monkeypatch.setattr(spike.importlib, "import_module",
-                        constant(SimpleNamespace(decode_audio=constant(None))))
+                        constant(SimpleNamespace(WhisperModel=factory,
+                                                 decode_audio=constant(None))))
     monkeypatch.setattr(spike.time, "perf_counter", lambda: clock[0])
     effect = spike.LocalEffects(settings())
     for _ in range(2):
@@ -478,6 +476,22 @@ def test_local_model_factory_reused_offline_and_loading_excluded(
     assert factory_calls == [("private-model", {
         "device": "cuda", "compute_type": "float16", "local_files_only": True,
     })]
+
+
+@pytest.mark.parametrize("candidate", ["option_a", "stageflow"])
+def test_optional_baseline_absence_is_a_closed_code(
+    monkeypatch: pytest.MonkeyPatch, candidate: str,
+) -> None:
+    def unavailable(name: str) -> Any:
+        raise ImportError("private operator installation detail")
+
+    monkeypatch.setattr(spike.importlib, "import_module", unavailable)
+    monkeypatch.setattr(spike, "local_path", constant(Path("tokenizer.json")))
+    effect = spike.LocalEffects(replace(settings(), candidate=candidate))
+    with pytest.raises(spike.WorkerFailure) as caught:
+        effect.measure("baseline", Path("synthetic.wav"))
+    assert caught.value.code == "faster_whisper_runtime_unavailable"
+    assert spike.warm_up_failure(caught.value, "baseline", "cuda") == caught.value.code
 
 
 def test_subprocess_commands_capture_diagnostics_and_probe_duration(
@@ -910,6 +924,7 @@ def test_typed_provider_warmup_failure_respects_reason_code(reason: str, expecte
 
 
 @pytest.mark.parametrize("response,expected", [
+    ("faster_whisper_runtime_unavailable", "faster_whisper_runtime_unavailable"),
     ("cuda_runtime_unavailable", "cuda_runtime_unavailable"),
     ("warm_up_failed", "warm_up_failed"),
     ("private unexpected IPC", "warm_up_failed"),
@@ -1177,14 +1192,13 @@ def test_stageflow_measure_calls_adapter_end_to_end_and_normalizes_words(
                     asset_end_microseconds=900000)])])
 
     monkeypatch.setattr(adapters, "CTranslate2WhisperExecutionAdapter", Adapter)
-    monkeypatch.setattr(adapters, "FasterWhisperExecutionAdapter", Adapter)
     config = settings(candidate="stageflow", model=Path.cwd() / "synthetic-model",
                       ffmpeg=Path.cwd() / "ffmpeg.exe", device="cpu", compute_type="int8")
     effects = spike.LocalEffects(config)
-    for name in ("stageflow", "baseline", "stageflow"):
+    for name in ("stageflow", "stageflow"):
         result = effects.measure(name, Path("synthetic.wav"))
         assert result.words == (spike.Word("synthetic", .5, .9, 2),)
-    assert len(calls) == 5  # two constructions; three executions
+    assert len(calls) == 3  # one construction; two executions; baseline tested separately
     assert calls[0][0].provider == "stageflow-ctranslate2-whisper"
     assert calls[0][0].compute_type == "int8"
     assert calls[1].input.execution_profile_id == "parity-stageflow-cpu"

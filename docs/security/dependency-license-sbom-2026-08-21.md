@@ -209,3 +209,38 @@ npx.cmd --yes @cyclonedx/cyclonedx-npm --package-lock-only --ignore-npm-errors -
 
 The npm command failed with the two recorded invalid-version findings. The independent
 CycloneDX command completed with those warnings. No package manifest or lockfile changed.
+
+## ED-0123 refresh (2026-10-02)
+
+The backend artifacts were regenerated after ED-0123 made the GPL-free transcription engine a default
+dependency and removed faster-whisper:
+- `sbom/backend.cdx.json` comes from `uv export --format cyclonedx1.5 --all-groups --no-hashes`, using
+  `uv 0.12.3`; it has 45 components.
+- `sbom/backend-licenses.json` comes from `pip-licenses --format=json --with-urls --with-description
+  --with-system`, run against the synchronized environment. It has 44 installed distributions, after
+  excluding pip-licenses and its own helpers. The CycloneDX file also lists `uvloop`, which is locked but
+  installed only on non-Windows platforms.
+
+Results:
+- **Removed:** `av` (PyAV, with its bundled GPL FFmpeg), `faster-whisper`, `onnxruntime`, `flatbuffers`
+  and `protobuf`. **No GPL or AGPL distribution remains.**
+- **Engine dependencies, now default:** `ctranslate2` (MIT), `tokenizers` (Apache-2.0) and `numpy`
+  (BSD-3-Clause).
+- **New transitive dependencies, all permissive:**
+  - through `tokenizers`, installed but never imported (owner amendment, 2026-10-01): `huggingface-hub`
+    (Apache-2.0) and `tqdm` (MPL-2.0 AND MIT), which in turn bring `hf-xet`, `fsspec`, `filelock` and
+    `httpx`;
+  - through `ctranslate2`: `pyyaml` and `setuptools`.
+- **Pre-existing, unchanged:** `psycopg` and `psycopg-binary` (LGPL-3.0-only, imported dynamically) and
+  `certifi` (MPL-2.0).
+- **Native libraries** (not covered by distribution metadata):
+  - Windows CTranslate2 wheel: MIT libraries, NVIDIA cuDNN 9.10.2.21 (allowed by the D2 amendment) and
+    Intel OpenMP.
+  - Linux wheel: `libctranslate2` (MIT) and `libgomp` (GPL-3.0 with the GCC Runtime Library Exception).
+    That is an **open owner decision** before any Linux appliance build is distributed; see the
+    [boundary evidence licence review](boundary-evidence-license-review-2026-10-01.md).
+- The operator FFmpeg is an LGPL-3.0 build (`--enable-version3`) run as a separate process. It is not
+  part of the Python dependency set.
+
+ED-0075's exclusion of the `transcription` group is **superseded** by ADR-0036, as implemented by ED-0122
+and ED-0123. The guard is now `backend/tests/test_transcription_gpl_free_boundary.py`.
