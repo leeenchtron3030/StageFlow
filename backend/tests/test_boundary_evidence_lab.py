@@ -29,6 +29,15 @@ def fake_external(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(ref, "external", path)
 
 
+@pytest.fixture
+def window_alignment_only(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Preserve window-support regressions independently of the endpoint fallback."""
+    def no_anchor(*_args: Any, **_kwargs: Any) -> None:
+        return None
+
+    monkeypatch.setattr(truth, "endpoint_anchor", no_anchor)
+
+
 def test_correlation_ignores_digital_silence_and_dither_level_windows() -> None:
     # Real recordings contain zero runs and room tone far below speech level; those
     # windows must never outscore the true match (the 2024 host-run failure).
@@ -64,7 +73,8 @@ def test_ground_truth_offsets_skips_gap_and_names() -> None:
     runs = truth.recording_runs([(start, 40, a[:4000]), (start + 40, 40, a[4000:]),
                                 (start + 180, 80, b)], 100)
     assert len(runs) == 2
-    export = np.concatenate((np.zeros(200), b[700:4700], np.zeros(300)))
+    # An audible outro is skipped; digital silence would now be trimmed first.
+    export = np.concatenate((np.zeros(200), b[700:4700], np.full(300, .01)))
     row = truth.align_export(export, runs, ordinal=3, rate=100, intro_skip=2, outro_skip=3)
     assert row["start"] == common.iso(start + 187)
     assert row["end"] == common.iso(start + 227)
@@ -115,7 +125,9 @@ def test_ground_truth_low_score_unaligned_and_no_gap_bridge() -> None:
         truth.recording_runs([(1000, 40, signal), (1020, 40, signal)], 100)
 
 
-def test_ground_truth_scattered_mislocations_merge_with_noise_unsupported() -> None:
+def test_ground_truth_scattered_mislocations_merge_with_noise_unsupported(
+    window_alignment_only: None,
+) -> None:
     np = pytest.importorskip("numpy")
     signal = np.random.default_rng(101).normal(size=8000).astype(np.float32)
     export = signal[1000:5000].copy()
@@ -187,7 +199,7 @@ def test_ground_truth_different_runs_never_merge_even_at_same_offset() -> None:
 
 @pytest.mark.parametrize("middle_size,coverage,aligned", [(1000, .75, False), (250, 12 / 13, True)])
 def test_ground_truth_coverage_controls_acceptance_with_plausible_span(
-    middle_size: int, coverage: float, aligned: bool,
+    middle_size: int, coverage: float, aligned: bool, window_alignment_only: None,
 ) -> None:
     np = pytest.importorskip("numpy")
     signal = np.random.default_rng(106).normal(size=8000).astype(np.float32)
@@ -236,7 +248,7 @@ def test_ground_truth_merge_preserves_offset_tolerance(
     assert row["coverage"] == 159 / 160
 
 
-def test_ground_truth_all_groups_filtered_report_empty_span() -> None:
+def test_ground_truth_all_groups_filtered_report_empty_span(window_alignment_only: None) -> None:
     np = pytest.importorskip("numpy")
     signal = np.random.default_rng(109).normal(size=4000).astype(np.float32)
     row = truth.align_export(signal, [truth.Run(1000, signal)], ordinal=0, rate=100,
@@ -257,6 +269,224 @@ def test_ground_truth_all_groups_filtered_report_empty_span() -> None:
 def test_ground_truth_invalid_segmentation_options_refused(options: dict[str, float]) -> None:
     with pytest.raises(common.Refusal):
         truth.align_export([], [], ordinal=0, **options)
+
+
+def test_ground_truth_padding_trim_precedes_outro_skip_and_preserves_leading() -> None:
+    np = pytest.importorskip("numpy")
+    signal = np.random.default_rng(126).normal(size=8000)
+    signal[1000:1200] = 0  # Leading silence is part of the analysed span.
+    export = np.concatenate((signal[1000:5000], np.zeros(137000)))
+    row = truth.align_export(export, [truth.Run(1000, signal)], ordinal=0, rate=100,
+                             outro_skip=3)
+    assert row["status"] == "aligned" and row["padding_seconds"] == 1370.0
+    assert row["start"] == common.iso(1010) and row["end"] == common.iso(1047)
+    assert row["anchor_start"] == row["start"] and row["anchor_end"] == row["end"]
+    assert row["span_ratio"] == row["anchor_span_ratio"] == 1.0
+    assert row["anchor_rule"] is None
+    trimmed, padding = truth.trim_padding(np.array([0., .1, -.001, .001, 0.]), 100)
+    np.testing.assert_array_equal(trimmed, [0., .1])
+    assert padding == .03
+
+
+@pytest.mark.parametrize("cut_samples,processed,status,rule,ratio", [
+    (0, True, "anchored", "length", 1.0),
+    (1200, False, "anchored", "cut", 1.2),
+    (1200, True, "unaligned", None, 1.2),
+])
+def test_ground_truth_endpoint_rules_with_synthetic_audio(
+    cut_samples: int, processed: bool, status: str, rule: str | None, ratio: float,
+) -> None:
+    np = pytest.importorskip("numpy")
+    rng = np.random.default_rng(127)
+    signal = rng.normal(size=12000)
+    export = np.concatenate((signal[1000:4000],
+                             signal[4000 + cut_samples:7000 + cut_samples]))
+    if processed:
+        export = export + 1.5 * rng.normal(size=len(export))
+    row = truth.align_export(export, [truth.Run(1000, signal)], ordinal=0, rate=100)
+    assert row["status"] == status and row["anchor_rule"] == rule
+    assert row["anchor_start"] == common.iso(1010)
+    assert row["anchor_end"] == common.iso(1070 + cut_samples / 100)
+    assert row["anchor_span_ratio"] == ratio and not row["consistent"]
+    assert row["padding_seconds"] == 0.0 and row["duplicate_of"] is None
+    if processed:
+        assert .4 < min(row["anchor_start_score"], row["anchor_end_score"]) < .8
+        assert row["coverage"] == 0.0
+    else:
+        assert min(row["anchor_start_score"], row["anchor_end_score"]) > .99
+    assert row["start"] == (row["anchor_start"] if rule else None)
+    assert row["end"] == (row["anchor_end"] if rule else None)
+
+
+def test_ground_truth_endpoint_fit_and_run_boundaries() -> None:
+    np = pytest.importorskip("numpy")
+    signal = np.random.default_rng(128).normal(size=4000)
+    row = truth.align_export(signal, [truth.Run(1000, signal)], ordinal=0, rate=100,
+                             min_segment_seconds=41)
+    assert row["status"] == "anchored" and row["anchor_rule"] == "fit"
+    assert row["coverage"] == 0.0 and not row["consistent"]
+    runs = [truth.Run(1000, signal[:2000]), truth.Run(1020, signal[2000:])]
+    row = truth.align_export(signal, runs, ordinal=0, rate=100, min_segment_seconds=41)
+    assert row["anchor_start"] == common.iso(1000)
+    assert row["anchor_end"] == common.iso(1040)
+    assert row["anchor_span_ratio"] is None and row["anchor_rule"] is None
+    assert row["status"] == "unaligned" and row["start"] is None and row["end"] is None
+    # Pre-roll absent from the recording: the mapped start falls before the run starts.
+    other = np.random.default_rng(129).normal(size=500)
+    export = np.concatenate((other, signal[:3500]))
+    row = truth.align_export(export, [truth.Run(1000, signal)], ordinal=0, rate=100,
+                             min_segment_seconds=41)
+    assert row["anchor_start"] is not None and common.utc(row["anchor_start"]) < 1000
+    assert row["anchor_end"] == common.iso(1035)
+    assert row["anchor_span_ratio"] is None and row["anchor_rule"] is None
+    assert row["status"] == "unaligned" and row["start"] is None and row["end"] is None
+    row = truth.align_export(signal, [], ordinal=0, rate=100)
+    assert all(row[key] is None for key in (
+        "anchor_start", "anchor_end", "anchor_start_score", "anchor_end_score",
+        "anchor_span_ratio", "anchor_rule"))
+
+
+@pytest.mark.parametrize("from_end", [False, True])
+@pytest.mark.parametrize("passing", [False, True])
+def test_ground_truth_endpoint_steps_first_passing_or_best(
+    monkeypatch: pytest.MonkeyPatch, from_end: bool, passing: bool,
+) -> None:
+    np = pytest.importorskip("numpy")
+    audio = np.arange(14000)
+    positions: list[int] = []
+
+    def locate(snippet: Any, _runs: Any, rate: int) -> tuple[float, float, int]:
+        position = int(snippet[0])
+        positions.append(position)
+        step = (13000 - position if from_end else position) // 1500
+        score = (.85 if passing else .65) if step == 3 else .5
+        return 1000 + position / rate, score, 0
+
+    monkeypatch.setattr(truth, "locate", locate)
+    anchor = truth.endpoint_anchor(audio, [], 100, 0, len(audio), .8, from_end=from_end)
+    assert anchor == (1140 if from_end else 1000, .85 if passing else .65, 0)
+    assert positions == [13000 - k * 1500 if from_end else k * 1500
+                         for k in range(4 if passing else 9)]
+
+
+def test_ground_truth_collapse_first_start_and_ordinal_tie() -> None:
+    def row(ordinal: int, start: float, ratio: float, status: str) -> dict[str, Any]:
+        return {"ordinal": ordinal, "start": common.iso(start), "end": common.iso(start + 40),
+                "status": status, "span_ratio": ratio if status == "aligned" else None,
+                "anchor_span_ratio": ratio if status == "anchored" else None}
+
+    rows = [row(4, 1010, 1, "aligned"), row(3, 1005, 1, "anchored"),
+            row(1, 1000, 1.1, "aligned"), row(2, 1002, 1, "aligned"),
+            truth.failed_row(5, .9)]
+    truth.collapse_sessions(rows)
+    assert [r["duplicate_of"] for r in rows] == [None, 2, 2, None, None]
+    assert [r["status"] for r in rows] == ["aligned", "anchored", "aligned", "aligned", "error"]
+    truth.collapse_sessions(rows, 0)
+    assert all(r["duplicate_of"] is None for r in rows)
+
+
+def test_ground_truth_spans_cli_collapse_order_errors_and_collisions(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    np = pytest.importorskip("numpy")
+    signal = np.random.default_rng(129).normal(size=130 * 8000)
+    block, out, spans = (tmp_path / "block", tmp_path / "rows.json", tmp_path / "spans.json")
+    exports = [tmp_path / f"export-{i}" for i in range(5)]
+    # Filename order differs from time order; the cut edit loses to the complete export.
+    audio = [signal[90 * 8000:120 * 8000],
+             np.concatenate((signal[10 * 8000:25 * 8000], signal[31 * 8000:46 * 8000])),
+             signal[10 * 8000:46 * 8000], np.zeros(20 * 8000)]
+    outputs: list[Path] = []
+
+    def external(raw: str, *, output: bool = False, **_kwargs: Any) -> Path:
+        path = Path(raw)
+        if output:
+            outputs.append(path)
+        return path
+
+    def config(_raw: str) -> dict[str, Any]:
+        return {"local_transcription": {"ffmpeg_path": "fake"},
+                "local_media_timing": {"ffprobe_path": "fake"}}
+
+    def tool(_raw: str) -> Path:
+        return tmp_path / "fake.exe"
+
+    def media(folder: str) -> list[Path]:
+        return [block] if folder == "blocks" else exports
+
+    def probe(_binary: Path, _path: Path) -> dict[str, Any]:
+        return {"format": {"duration": 130, "tags": {"creation_time": common.iso(1000)}}}
+
+    def decode(_binary: Path, path: Path) -> Any:
+        if path == block:
+            return signal
+        if path == exports[-1]:
+            raise common.Refusal()
+        return audio[exports.index(path)]
+
+    for name, value in (("external", external), ("config", config), ("ffmpeg_tool", tool),
+                        ("media", media), ("probe", probe), ("decode", decode)):
+        monkeypatch.setattr(truth, name, value)
+    monkeypatch.setenv("STAGEFLOW_KERNEL_CONFIG_PATH", str(tmp_path / "operator.toml"))
+    args = ["--blocks", "blocks", "--exports", "exports", "--out", str(out), "--spans-out"]
+    stdout = io.StringIO()
+    assert truth.main([*args, str(spans)], output=stdout) == 0
+    rows = json.loads(out.read_text())
+    assert [r["status"] for r in rows] == ["aligned", "anchored", "aligned", "error", "error"]
+    assert [r["duplicate_of"] for r in rows] == [None, 2, None, None, None]
+    assert rows[1]["anchor_rule"] == "cut" and rows[1]["anchor_span_ratio"] == 1.2
+    assert [r["padding_seconds"] for r in rows] == [0., 0., 0., 20., 0.]
+    assert rows[3]["anchor_start"] is None and rows[4]["anchor_end_score"] is None
+    assert json.loads(spans.read_text()) == [
+        {"start": common.iso(1010), "end": common.iso(1046)},
+        {"start": common.iso(1090), "end": common.iso(1120)}]
+    assert outputs == [out, spans]
+    public = json.loads(stdout.getvalue())
+    assert [r["duplicate"] for r in public] == [False, True, False, False, False]
+    assert public[1]["anchored"] and public[1]["anchor_span_ratio"] == 1.2
+    assert public[3]["padding_seconds"] == 20.0
+    assert all(isinstance(value, (int, float, bool))
+               for r in public for key, value in r.items() if key != "snippet_scores")
+    assert all(r["start"] is None or r["start"] not in stdout.getvalue() for r in rows)
+    assert "T00:" not in stdout.getvalue() and str(tmp_path) not in stdout.getvalue()
+    previous = out.read_bytes()
+    for collision in (out, block, exports[0], tmp_path / "fake.exe",
+                      tmp_path / "operator.toml"):
+        stdout = io.StringIO()
+        assert truth.main([*args, str(collision)], output=stdout) == 1
+        assert json.loads(stdout.getvalue()) == {"error_count": 1}
+        assert out.read_bytes() == previous
+
+
+@pytest.mark.parametrize("option,value", [
+    ("anchor_cut_score", 0), ("anchor_cut_score", 1.1),
+    ("anchor_length_score", float("nan")), ("anchor_length_score", 1.1),
+    ("anchor_max_cut_ratio", 0), ("anchor_max_cut_ratio", float("inf")),
+    ("anchor_length_tolerance", -1), ("anchor_length_tolerance", float("inf")),
+])
+def test_ground_truth_invalid_anchor_options_refused(option: str, value: float) -> None:
+    with pytest.raises(common.Refusal):
+        truth.align_export([], [], ordinal=0, **{option: value})
+
+
+@pytest.mark.parametrize("spans", ["", "relative.json", str(ROOT / "spans.json")])
+def test_ground_truth_spans_path_uses_external_output_validation(
+    monkeypatch: pytest.MonkeyPatch, spans: str,
+) -> None:
+    calls: list[tuple[str, bool]] = []
+
+    def external(raw: str, *, output: bool = False) -> Path:
+        calls.append((raw, output))
+        if raw == "report":
+            return ROOT / "unused-report.json"
+        return common.external(raw, output=output)
+
+    monkeypatch.setattr(truth, "external", external)
+    stdout = io.StringIO()
+    assert truth.main(["--blocks", "blocks", "--exports", "exports", "--out", "report",
+                       "--spans-out", spans], output=stdout) == 1
+    assert calls == [("report", True), (spans, True)]
+    assert json.loads(stdout.getvalue()) == {"error_count": 1}
 
 
 def test_audio_metadata_parser_all_features() -> None:
@@ -734,7 +964,7 @@ def test_server_child_is_loopback_hidden_and_closed(monkeypatch: pytest.MonkeyPa
 
 
 def test_ground_truth_cli_writes_utc_only_to_external_artifact(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, window_alignment_only: None,
 ) -> None:
     np = pytest.importorskip("numpy")
     signal = np.random.default_rng(4).normal(size=20 * 8000)
@@ -791,6 +1021,8 @@ def test_ground_truth_cli_writes_utc_only_to_external_artifact(
         assert json.loads(stdout.getvalue()) == [{
             "ordinal": 0, "min_score": row["min_score"], "consistent": aligned,
             "aligned": aligned, "snippet_scores": row["snippet_scores"],
+            "anchored": False, "padding_seconds": 0.0, "anchor_start_score": 0.0,
+            "anchor_end_score": 0.0, "anchor_span_ratio": 0.0, "duplicate": False,
             "accepted_fraction": row["accepted_fraction"], "acceptance_fraction": .9}]
         assert all(value not in stdout.getvalue() for value in ("private", "2026", str(tmp_path)))
 
@@ -984,7 +1216,7 @@ def test_correlation_float32_chunk_bound_and_cross_chunk_match(
     assert len(sizes) == 4 and max(sizes) <= 262144 + 99
 
 
-def test_alignment_fraction_allows_processed_quiet_tiles() -> None:
+def test_alignment_fraction_allows_processed_quiet_tiles(window_alignment_only: None) -> None:
     np = pytest.importorskip("numpy")
     signal = np.random.default_rng(84).normal(size=8000).astype(np.float32)
     export = signal[1000:5000].copy()
