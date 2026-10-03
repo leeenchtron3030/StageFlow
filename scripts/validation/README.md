@@ -685,7 +685,7 @@ uv run --no-sync python ../scripts/validation/derive_ground_truth.py `
   --intro-skip 8 --outro-skip 5 --threshold 0.8 `
   --join-tolerance 2.0 --acceptance-fraction 0.9 `
   --min-segment-seconds 2.0 --min-span-ratio 0.85 --max-span-ratio 1.10 `
-  --out D:\BoundaryLab\truth.json
+  --out D:\BoundaryLab\truth.json --spans-out D:\BoundaryLab\spans.json
 ```
 
 Both folders are flat. Exports are sorted by case-insensitive filename (then exact
@@ -698,11 +698,17 @@ Larger gaps form separate runs; larger overlaps and decoded/container duration
 discrepancies greater than 0.1 s are refused. Recorder clock timing remains unqualified,
 as in Media Timing Evidence.
 
-The tool decodes 8 kHz mono, subtracts the reference mean, and uses FFT correlation
+The tool decodes 8 kHz mono and trims trailing samples with absolute amplitude at or
+below `SILENCE_LEVEL = 1e-3` (-60 dBFS). It never trims leading samples. `--outro-skip`
+is applied from the trimmed end; `--intro-skip` remains relative to the original start.
+Every artifact row reports `padding_seconds` (0.0 when none, or decode failed; errors
+after trimming retain the measured padding). The analysed length excludes padding and skips.
+
+The tool subtracts the reference mean and uses FFT correlation
 normalized by each candidate's local centered energy. Five 10 s probes cover start,
 early, middle, late and end after stripping the configured intro/outro. Additional
 10 s tiles establish source segments using a +/-60 s search around the offset predicted
-from the last accepted match. Only the five anchors search globally unconditionally;
+from the last accepted match. The five probes and endpoint snippets search globally;
 a failed local 10 s tile falls back to one global search. Quarter-second sub-tiles
 never search globally: they search +/-60 s around the current predicted offset and,
 when the parent failed locally, also around that parent's global best match (even
@@ -724,7 +730,7 @@ may lack waveform support.
 An export is aligned when non-noise pieces belonging to supported merged segments cover
 at least `--acceptance-fraction` of all analysed pieces, and the first-to-last supported
 source span divided by analysed export duration falls within inclusive `--min-span-ratio`
-and `--max-span-ratio` (defaults 0.85 and 1.10). Analysed duration excludes intro/outro skips.
+and `--max-span-ratio` (defaults 0.85 and 1.10). Analysed duration excludes padding and skips.
 Span limits must be finite, positive and ordered. A rejected group does not independently
 fail an export. Noise always reduces coverage, including noise inside a merged segment.
 Large real cuts can exceed the default span limit; widen it explicitly when appropriate
@@ -733,10 +739,43 @@ exactly one supported merged segment.
 Long corpora still require memory for decoded float32 recording runs, but subsequent
 successful tile searches and normalization no longer copy or transform whole runs.
 
+Every export also gets endpoint anchors. Starting at each analysed end, the tool tries
+10 s snippets stepped inward by 15 s, for steps 0 through 8 (stopping if the snippet
+would leave the analysed audio). Each end stops at the first score at least `--threshold`;
+otherwise it keeps its best location, even below threshold. Step-zero locations reuse
+the existing first/last probes. The inward offset is subtracted for the start and added
+for the end to recover the analysed bounds. `anchor_start` and `anchor_end` are artifact-only
+UTC strings; `anchor_start_score` and `anchor_end_score` report their scores. Missing
+locations are null. `anchor_span_ratio` is the mapped span divided by analysed length;
+it is null unless the mapped bounds form a positive span within the same recording run.
+
+An export that is not `aligned` becomes `anchored` under the first matching rule below,
+with `start`/`end` set to the anchor bounds and `consistent` remaining false. Let `low`
+be the lower endpoint score and `r` the anchor span ratio:
+
+- `fit`: `low >= threshold` and `min_span_ratio <= r <= max_span_ratio`.
+- `cut`: `low >= --anchor-cut-score` (default 0.9) and
+  `max_span_ratio < r <= --anchor-max-cut-ratio` (default 1.5).
+- `length`: `low >= --anchor-length-score` (default 0.4) and
+  `abs(r - 1) <= --anchor-length-tolerance` (default 0.01).
+
+`anchor_rule` records `fit`, `cut`, `length`, or null. Aligned rows keep their existing
+window-alignment fields and have null `anchor_rule`; the endpoint fields are additional
+evidence. Anchor score options must be finite in (0, 1], the maximum cut ratio finite and
+positive, and length tolerance finite and nonnegative.
+
+After alignment, accepted (`aligned` or `anchored`) rows are sorted by start and grouped
+within `--collapse-seconds` (default 5.0, finite and nonnegative) of each group's **first**
+start. The row whose applicable ratio is closest to 1 wins: `span_ratio` for aligned,
+`anchor_span_ratio` for anchored, with lower ordinal breaking ties. Other group members
+get `duplicate_of: <kept ordinal>`; every other row gets null. Statuses are unchanged.
+This collapses alternative edits of one session for the truth artifact only.
+
 The external JSON array contains `ordinal`, `start`, `end`, `segments`, `min_score`,
 `consistent`, `status`, `snippet_scores`, `snippet_aligned`, `acceptance_fraction`
 (the configured minimum), `accepted_fraction` (the measured non-noise, above-threshold
-piece fraction), `span_start`, `span_end`, `coverage` and `span_ratio`. Each segment also
+piece fraction), `span_start`, `span_end`, `coverage`, `span_ratio`, and the padding,
+anchor and duplicate fields described above. Each segment also
 reports its measured `accepted_fraction`, including intervening noise in its denominator.
 `coverage` is the fraction of all pieces belonging to supported segments, excluding noise;
 it can include tolerated quiet pieces within those segments. `span_start` and `span_end`
@@ -751,10 +790,15 @@ Probe scores may be below the threshold when a probe crosses an internal cut; th
 For an internally cut export, the outer bounds enclose its first and last source
 segments and must not be mistaken for an uninterrupted talk.
 
-Replay/harness truth consumers use only `start` and `end`: project those fields from
-aligned, consistent rows before passing them to a strict truth parser. Review cut or
-unaligned rows separately. Stdout includes only ordinal, scores and booleans; UTC
-timestamps are confined to the external truth artifact. Input errors emit only
+Optional `--spans-out` writes only `{"start", "end"}` objects for aligned or anchored
+rows with null `duplicate_of`, sorted by start. This JSON array is the single-stage
+form accepted by `boundary_evidence_lab.py --truth`. Its path must pass the same external
+output validation as `--out`, differ from `--out`, and cannot alias any input or output.
+Review internal cuts: an accepted outer span may include material removed from the export.
+Stdout retains its existing numeric fields and adds `anchored`, `padding_seconds`,
+`anchor_start_score`, `anchor_end_score`, `anchor_span_ratio`, and `duplicate`, using only
+numbers and booleans (missing anchor numbers become 0.0 on stdout, null in the artifact).
+UTC timestamps and rule labels are confined to external artifacts. Input errors emit only
 `{"error_count": 1}` and exit 1.
 
 ### Evidence extraction and separability
