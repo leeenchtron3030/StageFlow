@@ -152,7 +152,8 @@ past policy step added hand-tuned rules for one failure mode. StageFlow needs:
 ## Acceptance criteria
 
 - [ ] ADR-0038 accepted (decisions 1–3) and this plan approved, with ED numbers allocated.
-- [ ] Phase A result recorded: families ranked by separability.
+- [x] Phase A result recorded: families ranked by separability
+  ([boundary-evidence-lab-001](../validation/results/boundary-evidence-lab-001.md)).
 - [ ] Phase B: v5-revised meets D5 offline; ED-0118 completed.
 - [ ] Phase C: the v6 offline gate is met.
 - [ ] Phase D: the production-signal ingest rehearsal is recorded (if pursued).
