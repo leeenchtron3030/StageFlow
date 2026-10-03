@@ -191,7 +191,10 @@ class Referee:
             raise Refusal()
         version = runner([str(binary), "--version"]).decode("utf-8", "replace")
         # Never retain a raw version line (it may contain local build paths).
-        parsed = re.search(r"(?:version:|build:)\s*(\d+)\s*\(([0-9a-f]{7,40})\)", version)
+        # Older builds print "version: 1234 (abcdef1)"; current builds print
+        # "version: 0.5.0-dev (build 1234, commit abcdef1)".
+        parsed = (re.search(r"(?:version:|build:)\s*(\d+)\s*\(([0-9a-f]{7,40})\)", version)
+                  or re.search(r"\(build\s+(\d+),\s*commit\s+([0-9a-f]{7,40})\)", version))
         if parsed is None:
             raise Refusal()
         self.version = {"build": int(parsed[1]), "revision": parsed[2]}

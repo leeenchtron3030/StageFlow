@@ -400,6 +400,19 @@ def test_referee_fake_runner_checksum_cache_and_flags(tmp_path: Path, fake_exter
     assert payloads[0]["temperature"] == 0 and payloads[0]["seed"] == 42
     assert "grammar" in payloads[0] and "private" not in " ".join(calls[1])
     assert referee.version == {"build": 1234, "revision": "abcdef123"}
+
+    def current_runner(args: list[str], *, data: bytes | None = None) -> bytes:
+        return b"version: 0.5.0-dev (build 11342, commit f1cee9941)\nbuilt with private/path"
+
+    current = ref.Referee(binary, model, common.digest(model), "qwen2.5-7b", tmp_path,
+                          current_runner)
+    assert current.version == {"build": 11342, "revision": "f1cee9941"}
+
+    def unknown_runner(args: list[str], *, data: bytes | None = None) -> bytes:
+        return b"version: 0.5.0-dev"
+
+    with pytest.raises(common.Refusal):
+        ref.Referee(binary, model, common.digest(model), "qwen2.5-7b", tmp_path, unknown_runner)
     for path in tmp_path.glob("*.json"):
         assert "private" not in path.read_text() and "text" not in path.read_text()
     referee.evaluate(words(), 103, "end", 0)
